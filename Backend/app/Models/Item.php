@@ -13,6 +13,7 @@ class Item extends Model
     protected $fillable = [
         'sku',
         'barcode',
+        'internal_barcode',
         'name',
         'category_id',
         'sub_category_id',

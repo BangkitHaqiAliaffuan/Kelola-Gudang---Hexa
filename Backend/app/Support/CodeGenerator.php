@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class CodeGenerator
 {
-    public static function next(string $model, string $prefix): string
+    public static function next(string $model, string $prefix, string $column = 'code'): string
     {
         $instance = new $model;
 
@@ -16,12 +16,12 @@ class CodeGenerator
             throw new \InvalidArgumentException("{$model} must be an Eloquent model.");
         }
 
-        return DB::transaction(function () use ($instance, $prefix) {
-            DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ["code:{$instance->getTable()}:{$prefix}"]);
+        return DB::transaction(function () use ($instance, $prefix, $column) {
+            DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ["code:{$instance->getTable()}:{$column}:{$prefix}"]);
 
             $codes = $instance->query()
-                ->where('code', 'like', $prefix.'-%')
-                ->pluck('code');
+                ->where($column, 'like', $prefix.'-%')
+                ->pluck($column);
 
             $next = $codes->reduce(function (?int $carry, string $code) use ($prefix) {
                 $number = (int) Str::after($code, $prefix.'-');

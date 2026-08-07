@@ -13,6 +13,7 @@ class ItemResource extends JsonResource
             'id' => $this->id,
             'sku' => $this->sku,
             'barcode' => $this->barcode,
+            'internal_barcode' => $this->internal_barcode,
             'name' => $this->name,
             'category_id' => $this->category_id,
             'sub_category_id' => $this->sub_category_id,

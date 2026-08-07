@@ -8,8 +8,10 @@ use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Http\Resources\ItemResource;
 use App\Models\Item;
+use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ItemController extends Controller
 {
@@ -22,7 +24,8 @@ class ItemController extends Controller
             $query->where(function ($q) use ($needle) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"])
                     ->orWhereRaw('LOWER(sku) LIKE ?', ["%{$needle}%"])
-                    ->orWhereRaw('LOWER(barcode) LIKE ?', ["%{$needle}%"]);
+                    ->orWhereRaw('LOWER(barcode) LIKE ?', ["%{$needle}%"])
+                    ->orWhereRaw('LOWER(internal_barcode) LIKE ?', ["%{$needle}%"]);
             });
         }
 
@@ -46,7 +49,13 @@ class ItemController extends Controller
         $data = $request->validated();
         $data['stock'] = $data['stock'] ?? 0;
         $data['reserved'] = $data['reserved'] ?? 0;
-        $item = Item::create($data);
+
+        $item = DB::transaction(function () use ($data) {
+            $data['internal_barcode'] = $data['internal_barcode']
+                ?? CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
+
+            return Item::create($data);
+        });
 
         return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse']));
     }

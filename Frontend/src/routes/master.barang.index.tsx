@@ -103,7 +103,9 @@ function MasterBarang() {
         const s = stockStatus(it).label;
         return (
           (!q ||
-            `${it.name} ${it.sku} ${it.barcode ?? ""}`.toLowerCase().includes(q.toLowerCase())) &&
+            `${it.name} ${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`
+              .toLowerCase()
+              .includes(q.toLowerCase())) &&
           (cat === ALL || it.category === cat) &&
           (subCat === ALL || it.subCategory === subCat) &&
           (brand === ALL || it.brand === brand) &&

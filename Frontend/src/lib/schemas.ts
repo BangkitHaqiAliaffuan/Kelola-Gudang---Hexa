@@ -49,6 +49,7 @@ export const itemSchema = z
   .object({
     sku: z.string().trim().min(1, "SKU wajib diisi").max(30, "Maksimal 30 karakter"),
     barcode: z.string().trim().max(30, "Maksimal 30 karakter").default(""),
+    internal_barcode: z.string().trim().max(30, "Maksimal 30 karakter").optional(),
     name: z.string().trim().min(1, "Nama barang wajib diisi").max(200, "Maksimal 200 karakter"),
     category_id: z.coerce.number().int().positive("Kategori wajib dipilih"),
     sub_category_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),

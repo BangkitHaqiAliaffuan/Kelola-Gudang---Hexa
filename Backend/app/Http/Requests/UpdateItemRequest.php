@@ -19,6 +19,7 @@ class UpdateItemRequest extends FormRequest
         return [
             'sku' => ['required', 'string', 'max:30', Rule::unique('items', 'sku')->ignore($item)],
             'barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'barcode')->ignore($item)],
+            'internal_barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'internal_barcode')->ignore($item)],
             'name' => ['required', 'string', 'max:200'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'sub_category_id' => ['nullable', 'integer', Rule::exists('sub_categories', 'id')->where(

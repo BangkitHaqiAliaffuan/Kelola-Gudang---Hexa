@@ -31,9 +31,10 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BarcodeBars({ code }: { code: string }) {
+function BarcodeBars({ code, label }: { code: string; label?: string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4 text-center">
+      {label && <p className="mb-2 text-xs text-muted-foreground">{label}</p>}
       <div className="flex h-20 items-end justify-center gap-[2px]">
         {code.split("").flatMap((ch, i) =>
           Array.from({ length: 3 }, (_, j) => (
@@ -53,10 +54,11 @@ function BarcodeBars({ code }: { code: string }) {
   );
 }
 
-function QrPreview({ code }: { code: string }) {
+function QrPreview({ code, label }: { code: string; label?: string }) {
   const cells = Array.from({ length: 144 }, (_, i) => (i * 37 + code.length * 13) % 5 !== 0);
   return (
     <div className="rounded-xl border border-border bg-card p-4">
+      {label && <p className="mb-2 text-center text-xs text-muted-foreground">{label}</p>}
       <div className="mx-auto grid w-40 grid-cols-12 gap-[2px]">
         {cells.map((on, i) => (
           <span
@@ -189,6 +191,7 @@ function DetailBarang() {
             <TabsContent value="info" className="m-0 grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
               <Field label="SKU" value={item.sku} />
               <Field label="Barcode" value={item.barcode ?? "—"} />
+              <Field label="Barcode Internal" value={item.internal_barcode ?? "—"} />
               <Field label="Nama Barang" value={item.name} />
               <Field label="Merk" value={item.brand ?? "—"} />
               <Field label="Kategori" value={categoryLabel} />
@@ -254,8 +257,12 @@ function DetailBarang() {
             </TabsContent>
 
             <TabsContent value="barcode" className="m-0 grid gap-4 p-5 sm:grid-cols-2">
-              <BarcodeBars code={item.barcode ?? item.sku} />
-              <QrPreview code={item.sku} />
+              <BarcodeBars
+                code={item.internal_barcode ?? item.sku}
+                label="Barcode Internal"
+              />
+              {item.barcode && <BarcodeBars code={item.barcode} label="Barcode Produk" />}
+              <QrPreview code={item.sku} label="QR Code SKU" />
             </TabsContent>
 
             <TabsContent value="riwayat" className="m-0 p-5">

@@ -112,6 +112,73 @@ class ItemApiTest extends TestCase
             ->assertJsonValidationErrors(['sku']);
     }
 
+    public function test_store_auto_generates_internal_barcode(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-91001-001',
+            'name' => 'Auto Barcode',
+            'category_id' => $category->id,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertCreated()
+            ->assertJsonPath('data.internal_barcode', 'IB-001');
+
+        $this->assertDatabaseHas('items', ['sku' => 'SKU-91001-001', 'internal_barcode' => 'IB-001']);
+    }
+
+    public function test_store_auto_generates_incremental_internal_barcode(): void
+    {
+        $category = Category::factory()->create();
+        Item::factory()->create(['internal_barcode' => 'IB-007', 'category_id' => $category->id]);
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-91002-001',
+            'name' => 'Auto Barcode Lanjutan',
+            'category_id' => $category->id,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertCreated()
+            ->assertJsonPath('data.internal_barcode', 'IB-008');
+    }
+
+    public function test_store_respects_explicit_internal_barcode(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-91003-001',
+            'name' => 'Barcode Manual',
+            'category_id' => $category->id,
+            'internal_barcode' => 'IB-999',
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertCreated()
+            ->assertJsonPath('data.internal_barcode', 'IB-999');
+    }
+
+    public function test_index_search_matches_internal_barcode(): void
+    {
+        $category = Category::factory()->create();
+        Item::factory()->create([
+            'category_id' => $category->id,
+            'name' => 'Kabel Khusus',
+            'internal_barcode' => 'IB-123',
+        ]);
+
+        $this->getJson('/api/master/items?search=IB-123')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.internal_barcode', 'IB-123');
+    }
+
     public function test_store_requires_category_and_status(): void
     {
         $this->postJson('/api/master/items', [

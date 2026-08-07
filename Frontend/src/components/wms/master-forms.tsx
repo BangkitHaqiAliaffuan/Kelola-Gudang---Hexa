@@ -43,6 +43,7 @@ import {
   useCreateSubCategory,
   useCreateUnit,
   useCreateWarehouse,
+  useItems,
   useMerks,
   useSubCategories,
   useUnits,
@@ -179,9 +180,16 @@ export function CategoryFormDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Deskripsi</FormLabel>
+                  <FormLabel>
+                    Deskripsi <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Opsional" className="rounded-xl" rows={3} {...field} />
+                    <Textarea
+                      placeholder="Kategori untuk alat kesehatan"
+                      className="rounded-xl"
+                      rows={3}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -458,9 +466,11 @@ export function MerkFormDialog({
               name="country"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Negara</FormLabel>
+                  <FormLabel>
+                    Negara <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="Opsional" className="rounded-xl" {...field} />
+                    <Input placeholder="Indonesia" className="rounded-xl" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -705,9 +715,11 @@ export function WarehouseFormDialog({
               name="city"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Kota</FormLabel>
+                  <FormLabel>
+                    Kota <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="Opsional" className="rounded-xl" {...field} />
+                    <Input placeholder="Jakarta" className="rounded-xl" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -718,9 +730,16 @@ export function WarehouseFormDialog({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Alamat</FormLabel>
+                  <FormLabel>
+                    Alamat <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Opsional" className="rounded-xl" rows={2} {...field} />
+                    <Textarea
+                      placeholder="Jl. Merdeka No. 1"
+                      className="rounded-xl"
+                      rows={2}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -765,6 +784,11 @@ export function ItemFormDialog({
   const { data: merks } = useMerks();
   const { data: units } = useUnits();
   const { data: warehouses } = useWarehouses();
+  const { data: items } = useItems();
+  const previewInternal = nextCode(
+    (items?.data ?? []).map((i) => i.internal_barcode).filter((c): c is string => c != null),
+    "IB",
+  );
 
   const defaultValues = useMemo<ItemInput>(
     () =>
@@ -772,6 +796,7 @@ export function ItemFormDialog({
         ? {
             sku: initial.sku,
             barcode: initial.barcode ?? "",
+            internal_barcode: initial.internal_barcode ?? "",
             name: initial.name,
             category_id: initial.category_id,
             sub_category_id: initial.sub_category_id ?? "",
@@ -790,6 +815,7 @@ export function ItemFormDialog({
         : {
             sku: "",
             barcode: "",
+            internal_barcode: "",
             name: "",
             category_id: 0,
             sub_category_id: "",
@@ -894,9 +920,31 @@ export function ItemFormDialog({
                   name="barcode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Barcode</FormLabel>
+                      <FormLabel>
+                        Barcode{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="8991..." className="rounded-xl" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="internal_barcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Barcode Internal</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          disabled
+                          placeholder="Otomatis dibuat sistem"
+                          value={initial ? field.value : previewInternal}
+                          className="rounded-xl font-mono"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -953,7 +1001,10 @@ export function ItemFormDialog({
                   name="sub_category_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Sub Kategori</FormLabel>
+                      <FormLabel>
+                        Sub Kategori{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <Select
                         value={field.value ? String(field.value) : ""}
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
@@ -981,7 +1032,9 @@ export function ItemFormDialog({
                   name="brand_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Merk</FormLabel>
+                      <FormLabel>
+                        Merk <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <Select
                         value={field.value ? String(field.value) : ""}
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
@@ -1011,7 +1064,9 @@ export function ItemFormDialog({
                   name="unit_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Satuan</FormLabel>
+                      <FormLabel>
+                        Satuan <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <Select
                         value={field.value ? String(field.value) : ""}
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
@@ -1039,7 +1094,10 @@ export function ItemFormDialog({
                   name="default_warehouse_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gudang Default</FormLabel>
+                      <FormLabel>
+                        Gudang Default{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <Select
                         value={field.value ? String(field.value) : ""}
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
@@ -1110,7 +1168,10 @@ export function ItemFormDialog({
                   name="max_stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Stok Maksimum</FormLabel>
+                      <FormLabel>
+                        Stok Maksimum{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -1151,7 +1212,10 @@ export function ItemFormDialog({
                   name="weight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Berat (kg)</FormLabel>
+                      <FormLabel>
+                        Berat (kg){" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -1178,7 +1242,10 @@ export function ItemFormDialog({
                   name="dimension"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Dimensi</FormLabel>
+                      <FormLabel>
+                        Dimensi{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="10 x 5 x 3 cm" className="rounded-xl" {...field} />
                       </FormControl>

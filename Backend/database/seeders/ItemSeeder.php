@@ -67,6 +67,7 @@ class ItemSeeder extends Seeder
             Item::create([
                 'sku' => 'SKU-'.(10001 + $i).'-'.str_pad((string) (1 + ($i % 9)), 3, '0', STR_PAD_LEFT),
                 'barcode' => '899'.str_pad((string) (10000000000 + $i * 7919), 10, '0', STR_PAD_LEFT),
+                'internal_barcode' => 'IB-'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
                 'name' => $pick($prefixes).' '.$pick($suffixes),
                 'category_id' => $category->id,
                 'sub_category_id' => $sub?->id,

@@ -61,6 +61,7 @@ export type ItemApi = {
   id: number;
   sku: string;
   barcode: string | null;
+  internal_barcode: string | null;
   name: string;
   category: string | null;
   category_id: number;
