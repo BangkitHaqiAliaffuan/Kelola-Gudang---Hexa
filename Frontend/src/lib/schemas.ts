@@ -45,6 +45,22 @@ export const warehouseSchema = z.object({
 });
 export type WarehouseInput = z.infer<typeof warehouseSchema>;
 
+export const rackSchema = z.object({
+  warehouse_id: z.coerce.number().int().positive("Gudang wajib dipilih"),
+  code,
+  name,
+  is_active: z.boolean().default(true),
+});
+export type RackInput = z.infer<typeof rackSchema>;
+
+export const binSchema = z.object({
+  rack_id: z.coerce.number().int().positive("Rak wajib dipilih"),
+  code,
+  name,
+  is_active: z.boolean().default(true),
+});
+export type BinInput = z.infer<typeof binSchema>;
+
 export const itemSchema = z
   .object({
     sku: z.string().trim().min(1, "SKU wajib diisi").max(30, "Maksimal 30 karakter"),
@@ -56,6 +72,8 @@ export const itemSchema = z
     brand_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     unit_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     default_warehouse_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
+    default_rack_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
+    default_bin_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     cost: z.coerce
       .number({ invalid_type_error: "Harga pokok wajib diisi" })
       .min(0, "Tidak boleh negatif"),

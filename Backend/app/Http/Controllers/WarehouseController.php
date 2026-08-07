@@ -62,9 +62,9 @@ class WarehouseController extends Controller
 
     public function destroy(Warehouse $warehouse): JsonResponse
     {
-        if ($warehouse->items()->exists()) {
+        if ($warehouse->items()->exists() || $warehouse->racks()->exists()) {
             return response()->json([
-                'message' => 'Gudang tidak dapat dihapus karena masih digunakan oleh barang.',
+                'message' => 'Gudang tidak dapat dihapus karena masih digunakan oleh barang atau rak.',
             ], 422);
         }
 

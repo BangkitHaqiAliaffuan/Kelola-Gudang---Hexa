@@ -57,6 +57,31 @@ export type Warehouse = {
   updated_at: string;
 };
 
+export type Rack = {
+  id: number;
+  warehouse_id: number;
+  warehouse_name?: string | null;
+  code: string;
+  name: string;
+  is_active: boolean;
+  bin_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Bin = {
+  id: number;
+  rack_id: number;
+  rack_name?: string | null;
+  warehouse_name?: string | null;
+  code: string;
+  name: string;
+  is_active: boolean;
+  item_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ItemApi = {
   id: number;
   sku: string;
@@ -70,6 +95,8 @@ export type ItemApi = {
   brand_id: number | null;
   unit_id: number | null;
   default_warehouse_id: number | null;
+  default_rack_id: number | null;
+  default_bin_id: number | null;
   // Reference tables ship with later master-data phases — null until then.
   brand: string | null;
   supplier: string | null;

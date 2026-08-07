@@ -1,6 +1,6 @@
 # Backend — Kelola Gudang Pro
 
-Laravel 13 API (`/api`) powering the master data module (Kategori, Sub Kategori, Merk, Barang). The frontend (`Frontend/`) calls this API for those pages; the rest of the app is still UI-only dummy data.
+Laravel 13 API (`/api`) powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Barang). The frontend (`Frontend/`) calls this API for those pages; the rest of the app is still UI-only dummy data.
 
 ## Stack & environment
 
@@ -34,10 +34,11 @@ php artisan migrate --seed
 - The frontend proxies `/api` → `http://127.0.0.1:8000` in dev (see `Frontend/vite.config.ts`), so both servers must run: `composer dev` (this dir) + `npm run dev` (in `Frontend/`).
 - Validation in `app/Http/Requests` (FormRequests); `code`/`sku`/`barcode` are unique with `Rule::unique(...)->ignore()` on update.
 - CORS is enabled via `config/cors.php` (`allowed_origins: *`, `supports_credentials: false`) so the Vercel-deployed frontend can call the ngrok tunnel (`dev.sh`) cross-origin. Tighten origins once auth ships.
-- Deleting a category that still has sub-categories/items is blocked (FK restrict → 422).
+- Deleting a category that still has sub-categories/items, a rack with bins/items, a bin with items, or a warehouse with racks/items is blocked (422).
 
 ## Schema notes
 
 - `items.stock`/`items.reserved` are denormalized for now; they will normalize to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) when the Persediaan module is built.
-- `items.brand_id` has an FK to `merks` (nullable, `nullOnDelete`). `unit_id`, `preferred_supplier_id`, `default_warehouse_id`, `default_rack_id`, `default_bin_id` exist but have **no FK constraints yet** — those master tables ship in later phases. Adding those phases: create the tables, add the FK constraints, backfill items.
+- `items.brand_id` has an FK to `merks` (nullable, `nullOnDelete`). `default_rack_id`/`default_bin_id` are FKs to `racks`/`bins` (nullable, `nullOnDelete`). `unit_id`, `preferred_supplier_id`, `default_warehouse_id` exist but have **no FK constraints yet** — those master tables ship in later phases. Adding those phases: create the tables, add the FK constraints, backfill items.
+- `racks` belongsTo `warehouses` (`cascadeOnDelete`) and hasMany `bins` (`cascadeOnDelete`) / `items` via `default_rack_id`. `bins` hasMany `items` via `default_bin_id`. Codes auto-generate via `CodeGenerator` (`RAK-###`, `BIN-###`) when omitted.
 - Item belongsTo Category (required) and SubCategory (nullable). SubCategory belongsTo Category (cascade delete).

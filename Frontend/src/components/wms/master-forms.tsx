@@ -21,47 +21,68 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
+  binSchema,
   categorySchema,
   itemSchema,
   merkSchema,
+  rackSchema,
   subCategorySchema,
   unitSchema,
   warehouseSchema,
+  type BinInput,
   type CategoryInput,
   type ItemInput,
   type MerkInput,
+  type RackInput,
   type SubCategoryInput,
   type UnitInput,
   type WarehouseInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
 import {
+  useBins,
   useCategories,
+  useCreateBin,
   useCreateCategory,
   useCreateItem,
   useCreateMerk,
+  useCreateRack,
   useCreateSubCategory,
   useCreateUnit,
   useCreateWarehouse,
   useItems,
   useMerks,
+  useRacks,
   useSubCategories,
   useUnits,
+  useUpdateBin,
   useUpdateCategory,
   useUpdateItem,
   useUpdateMerk,
+  useUpdateRack,
   useUpdateSubCategory,
   useUpdateUnit,
   useUpdateWarehouse,
   useWarehouses,
+  type BinPayload,
   type CategoryPayload,
   type ItemPayload,
   type MerkPayload,
+  type RackPayload,
   type SubCategoryPayload,
   type UnitPayload,
   type WarehousePayload,
 } from "@/hooks/use-master";
-import type { Category, ItemApi, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
+import type {
+  Bin,
+  Category,
+  ItemApi,
+  Merk,
+  Rack,
+  SubCategory,
+  Unit,
+  Warehouse,
+} from "@/lib/master-types";
 
 function rowField(
   form: { setError: (n: string, o: { message: string }) => void },
@@ -768,6 +789,300 @@ export function WarehouseFormDialog({
   );
 }
 
+export function RackFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Rack | null;
+}) {
+  const create = useCreateRack();
+  const update = useUpdateRack();
+  const { data: racks } = useRacks();
+  const { data: warehouses } = useWarehouses();
+  const previewCode = nextCode(
+    (racks?.data ?? []).map((r) => r.code),
+    "RAK",
+  );
+
+  return (
+    <CrudFormDialog<RackInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Rak" : "Tambah Rak"}
+      description="Rak penyimpanan barang di dalam gudang."
+      schema={rackSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              warehouse_id: initial.warehouse_id,
+              code: initial.code,
+              name: initial.name,
+              is_active: initial.is_active,
+            }
+          : { warehouse_id: 0, code: "", name: "", is_active: true }
+      }
+      onSubmit={async (values, form) => {
+        const payload: RackPayload = {
+          warehouse_id: values.warehouse_id,
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Rak diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Rak ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "warehouse_id");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "warehouse_id")
+          )
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="warehouse_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Gudang</FormLabel>
+                  <Select
+                    value={String(field.value)}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih gudang" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {warehouses?.data.map((w) => (
+                        <SelectItem key={w.id} value={String(w.id)}>
+                          {w.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Rak</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Rak</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Rak A" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="rack-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="rack-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function BinFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Bin | null;
+}) {
+  const create = useCreateBin();
+  const update = useUpdateBin();
+  const { data: bins } = useBins();
+  const { data: racks } = useRacks();
+  const previewCode = nextCode(
+    (bins?.data ?? []).map((b) => b.code),
+    "BIN",
+  );
+
+  return (
+    <CrudFormDialog<BinInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Bin" : "Tambah Bin"}
+      description="Titik penyimpanan terkecil di dalam rak."
+      schema={binSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              rack_id: initial.rack_id,
+              code: initial.code,
+              name: initial.name,
+              is_active: initial.is_active,
+            }
+          : { rack_id: 0, code: "", name: "", is_active: true }
+      }
+      onSubmit={async (values, form) => {
+        const payload: BinPayload = {
+          rack_id: values.rack_id,
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Bin diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Bin ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "rack_id");
+          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "rack_id"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="rack_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rak</FormLabel>
+                  <Select
+                    value={String(field.value)}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih rak" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {racks?.data.map((r) => (
+                        <SelectItem key={r.id} value={String(r.id)}>
+                          {r.code} — {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Bin</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Bin</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Bin 1" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="bin-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="bin-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -784,6 +1099,8 @@ export function ItemFormDialog({
   const { data: merks } = useMerks();
   const { data: units } = useUnits();
   const { data: warehouses } = useWarehouses();
+  const { data: rackRows } = useRacks();
+  const { data: binRows } = useBins();
   const { data: items } = useItems();
   const previewInternal = nextCode(
     (items?.data ?? []).map((i) => i.internal_barcode).filter((c): c is string => c != null),
@@ -803,6 +1120,8 @@ export function ItemFormDialog({
             brand_id: initial.brand_id ?? "",
             unit_id: initial.unit_id ?? "",
             default_warehouse_id: initial.default_warehouse_id ?? "",
+            default_rack_id: initial.default_rack_id ?? "",
+            default_bin_id: initial.default_bin_id ?? "",
             cost: initial.cost,
             price: initial.price,
             min_stock: initial.min,
@@ -822,6 +1141,8 @@ export function ItemFormDialog({
             brand_id: "",
             unit_id: "",
             default_warehouse_id: "",
+            default_rack_id: "",
+            default_bin_id: "",
             cost: 0,
             price: 0,
             min_stock: 0,
@@ -851,6 +1172,8 @@ export function ItemFormDialog({
     if (v.brand_id) payload.brand_id = v.brand_id;
     if (v.unit_id) payload.unit_id = v.unit_id;
     if (v.default_warehouse_id) payload.default_warehouse_id = v.default_warehouse_id;
+    if (v.default_rack_id) payload.default_rack_id = v.default_rack_id;
+    if (v.default_bin_id) payload.default_bin_id = v.default_bin_id;
     if (v.max_stock != null) payload.max_stock = v.max_stock;
     if (v.weight != null) payload.weight = v.weight;
     return payload;
@@ -1100,7 +1423,11 @@ export function ItemFormDialog({
                       </FormLabel>
                       <Select
                         value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        onValueChange={(v) => {
+                          field.onChange(v === "" ? "" : Number(v));
+                          form.setValue("default_rack_id", "");
+                          form.setValue("default_bin_id", "");
+                        }}
                       >
                         <FormControl>
                           <SelectTrigger className="rounded-xl">
@@ -1119,6 +1446,77 @@ export function ItemFormDialog({
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="default_rack_id"
+                  render={({ field }) => {
+                    const selectedWh = form.watch("default_warehouse_id");
+                    return (
+                      <FormItem>
+                        <FormLabel>Rak Default</FormLabel>
+                        <Select
+                          value={field.value ? String(field.value) : ""}
+                          onValueChange={(v) => {
+                            field.onChange(v === "" ? "" : Number(v));
+                            form.setValue("default_bin_id", "");
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="rounded-xl">
+                              <SelectValue placeholder="Pilih rak" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-72 rounded-xl">
+                            <SelectItem value="">Tidak ada</SelectItem>
+                            {rackRows?.data
+                              .filter((r) => r.warehouse_id === selectedWh)
+                              .map((r) => (
+                                <SelectItem key={r.id} value={String(r.id)}>
+                                  {r.code} — {r.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+                <FormField
+                  control={form.control}
+                  name="default_bin_id"
+                  render={({ field }) => {
+                    const selectedRack = form.watch("default_rack_id");
+                    return (
+                      <FormItem>
+                        <FormLabel>Bin Default</FormLabel>
+                        <Select
+                          value={field.value ? String(field.value) : ""}
+                          onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="rounded-xl">
+                              <SelectValue placeholder="Pilih bin" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-72 rounded-xl">
+                            <SelectItem value="">Tidak ada</SelectItem>
+                            {binRows?.data
+                              .filter((b) => b.rack_id === selectedRack)
+                              .map((b) => (
+                                <SelectItem key={b.id} value={String(b.id)}>
+                                  {b.code} — {b.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">

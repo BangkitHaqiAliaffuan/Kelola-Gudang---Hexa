@@ -2,8 +2,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MasterCrudPage } from "./master-crud";
 import {
+  BinFormDialog,
   CategoryFormDialog,
   MerkFormDialog,
+  RackFormDialog,
   SubCategoryFormDialog,
   UnitFormDialog,
   WarehouseFormDialog,
@@ -18,18 +20,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  useBins,
   useCategories,
+  useDeleteBin,
   useDeleteCategory,
   useDeleteMerk,
+  useDeleteRack,
   useDeleteSubCategory,
   useDeleteUnit,
   useDeleteWarehouse,
   useMerks,
+  useRacks,
   useSubCategories,
   useUnits,
   useWarehouses,
 } from "@/hooks/use-master";
-import type { Category, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
+import type { Bin, Category, Merk, Rack, SubCategory, Unit, Warehouse } from "@/lib/master-types";
 
 function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
@@ -379,6 +385,147 @@ export function GudangPage() {
         )}
       />
       <WarehouseFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function RakPage() {
+  const { data, isLoading } = useRacks();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Rack | null>(null);
+  const del = useDeleteRack();
+
+  const columns: Column<Rack>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Rak",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "warehouse", label: "Gudang", render: (r) => r.warehouse_name ?? "—" },
+    {
+      key: "bin_count",
+      label: "Jumlah Bin",
+      render: (r) => (r.bin_count ?? 0).toLocaleString("id-ID"),
+    },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  return (
+    <>
+      <MasterCrudPage<Rack>
+        title="Rak"
+        description="Rak penyimpanan per gudang"
+        searchPlaceholder="Cari rak..."
+        searchText={(r) => `${r.code} ${r.name} ${r.warehouse_name ?? ""}`}
+        columns={columns}
+        rows={data?.data}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Rak dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.warehouse_name ?? "—"} • {r.bin_count ?? 0} bin
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <RackFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function BinPage() {
+  const { data, isLoading } = useBins();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Bin | null>(null);
+  const del = useDeleteBin();
+
+  const columns: Column<Bin>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Bin",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "rack", label: "Rak", render: (r) => r.rack_name ?? "—" },
+    { key: "warehouse", label: "Gudang", render: (r) => r.warehouse_name ?? "—" },
+    {
+      key: "item_count",
+      label: "Jumlah SKU",
+      render: (r) => (r.item_count ?? 0).toLocaleString("id-ID"),
+    },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  return (
+    <>
+      <MasterCrudPage<Bin>
+        title="Bin Location"
+        description="Titik penyimpanan terkecil di dalam rak"
+        searchPlaceholder="Cari bin..."
+        searchText={(r) => `${r.code} ${r.name} ${r.rack_name ?? ""} ${r.warehouse_name ?? ""}`}
+        columns={columns}
+        rows={data?.data}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Bin dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.warehouse_name ?? "—"} • {r.rack_name ?? "—"} • {r.item_count ?? 0} SKU
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <BinFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
 }

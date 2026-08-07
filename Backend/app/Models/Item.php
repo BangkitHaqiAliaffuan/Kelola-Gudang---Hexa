@@ -71,4 +71,14 @@ class Item extends Model
     {
         return $this->belongsTo(Warehouse::class, 'default_warehouse_id');
     }
+
+    public function rack(): BelongsTo
+    {
+        return $this->belongsTo(Rack::class, 'default_rack_id');
+    }
+
+    public function bin(): BelongsTo
+    {
+        return $this->belongsTo(Bin::class, 'default_bin_id');
+    }
 }

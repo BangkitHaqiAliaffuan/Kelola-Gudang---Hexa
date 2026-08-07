@@ -5,14 +5,7 @@ import { PageHeader, Panel, Pill } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  customers,
-  departments,
-  projects,
-  suppliers,
-  warehouses,
-  workOrders,
-} from "@/lib/wms-data";
+import { customers, departments, projects, suppliers, workOrders } from "@/lib/wms-data";
 
 type Row = { id: string; kode: string; nama: string; info: string; extra: string; status: string };
 
@@ -31,32 +24,6 @@ export const masterDatasets: Record<
   string,
   { title: string; description: string; headers: [string, string, string]; rows: Row[] }
 > = {
-  rak: {
-    title: "Rak",
-    description: "Rak penyimpanan per gudang",
-    headers: ["Kode Rak", "Gudang", "Jumlah Bin"],
-    rows: make(
-      "RAK",
-      Array.from({ length: 24 }, (_, i) => ({
-        nama: `RAK-${String.fromCharCode(65 + (i % 6))}${(i % 8) + 1}`,
-        info: warehouses[i % warehouses.length]!.name,
-        extra: `${6 + (i % 6)} bin`,
-      })),
-    ),
-  },
-  "bin-location": {
-    title: "Bin Location",
-    description: "Titik penyimpanan terkecil",
-    headers: ["Kode Bin", "Rak", "Okupansi"],
-    rows: make(
-      "BIN",
-      Array.from({ length: 30 }, (_, i) => ({
-        nama: `BIN-${(i % 9) + 1}${["A", "B", "C"][i % 3]}`,
-        info: `RAK-${String.fromCharCode(65 + (i % 5))}${(i % 9) + 1}`,
-        extra: `${40 + ((i * 7) % 60)}%`,
-      })),
-    ),
-  },
   supplier: {
     title: "Supplier",
     description: "Mitra pemasok barang",

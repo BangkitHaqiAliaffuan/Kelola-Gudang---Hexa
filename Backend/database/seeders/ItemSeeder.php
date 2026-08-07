@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Bin;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\Merk;
+use App\Models\Rack;
 use App\Models\SubCategory;
 use App\Models\Unit;
 use App\Models\Warehouse;
@@ -51,6 +53,8 @@ class ItemSeeder extends Seeder
         $merks = Merk::orderBy('id')->get();
         $units = Unit::orderBy('id')->get();
         $warehouses = Warehouse::orderBy('id')->get();
+        $racks = Rack::orderBy('id')->get();
+        $bins = Bin::orderBy('id')->get();
         $statuses = ['Aktif', 'Aktif', 'Aktif', 'Nonaktif'];
 
         for ($i = 0; $i < 300; $i++) {
@@ -64,6 +68,12 @@ class ItemSeeder extends Seeder
             $status = $pick($statuses);
             $reserved = $status === 'Nonaktif' ? 0 : $reserved;
 
+            $warehouse = $warehouses[$i % $warehouses->count()];
+            $racksOfWarehouse = $racks->where('warehouse_id', $warehouse->id)->values();
+            $rack = $racksOfWarehouse[$i % $racksOfWarehouse->count()];
+            $binsOfRack = $bins->where('rack_id', $rack->id)->values();
+            $bin = $binsOfRack[$i % $binsOfRack->count()];
+
             Item::create([
                 'sku' => 'SKU-'.(10001 + $i).'-'.str_pad((string) (1 + ($i % 9)), 3, '0', STR_PAD_LEFT),
                 'barcode' => '899'.str_pad((string) (10000000000 + $i * 7919), 10, '0', STR_PAD_LEFT),
@@ -73,7 +83,9 @@ class ItemSeeder extends Seeder
                 'sub_category_id' => $sub?->id,
                 'brand_id' => $merks[$i % $merks->count()]->id,
                 'unit_id' => $units[$i % $units->count()]->id,
-                'default_warehouse_id' => $warehouses[$i % $warehouses->count()]->id,
+                'default_warehouse_id' => $warehouse->id,
+                'default_rack_id' => $rack->id,
+                'default_bin_id' => $bin->id,
                 'weight' => round(($rnd() * 48) + 0.05, 2),
                 'dimension' => $int(5, 120).'x'.$int(5, 120).'x'.$int(1, 60).' cm',
                 'cost' => $cost,

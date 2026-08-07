@@ -4,17 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Warehouse extends Model
+class Bin extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'rack_id',
         'code',
         'name',
-        'city',
-        'address',
         'is_active',
     ];
 
@@ -22,13 +22,13 @@ class Warehouse extends Model
         'is_active' => 'boolean',
     ];
 
-    public function items(): HasMany
+    public function rack(): BelongsTo
     {
-        return $this->hasMany(Item::class, 'default_warehouse_id');
+        return $this->belongsTo(Rack::class);
     }
 
-    public function racks(): HasMany
+    public function items(): HasMany
     {
-        return $this->hasMany(Rack::class);
+        return $this->hasMany(Item::class, 'default_bin_id');
     }
 }

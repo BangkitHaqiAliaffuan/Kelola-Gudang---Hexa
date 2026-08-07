@@ -11,7 +11,7 @@
 
 # KelolaGudang Pro
 
-Warehouse Management System front-end demo (**KelolaGudang**, Indonesian UI). Most data is deterministic dummy data generated in `src/lib/wms-data.ts` (seeded PRNG). **Exception: the master-data pages (Kategori, Sub Kategori, Merk, Barang) are backed by the Laravel API** (`Backend/`) — no dummy fallback. The remaining modules (transaksi, persediaan, opname, pengadaan, laporan, system) are still UI-only dummy. Do not add server/business logic unless asked; the "API reference" pages under `/system/developer` are UI placeholders.
+Warehouse Management System front-end demo (**KelolaGudang**, Indonesian UI). Most data is deterministic dummy data generated in `src/lib/wms-data.ts` (seeded PRNG). **Exception: the master-data pages (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin Location, Barang) are backed by the Laravel API** (`Backend/`) — no dummy fallback. The remaining modules (transaksi, persediaan, opname, pengadaan, laporan, system) are still UI-only dummy. Do not add server/business logic unless asked; the "API reference" pages under `/system/developer` are UI placeholders.
 
 ## Stack
 
@@ -19,12 +19,12 @@ TanStack Start (SSR) + React 19 + TanStack Router file-based routing + Vite + Ta
 
 ## Backend API integration (master data)
 
-- Master data (Kategori, Sub Kategori, Merk, Barang) comes from the Laravel API. Types mirror the API resources in `src/lib/master-types.ts`; API client in `src/lib/api.ts` (`api.get/post/put/delete`, `Paginated<T>`, `ApiError`, `fieldError`). `API_BASE` is `VITE_API_URL` (build-time env) falling back to `/api` — the deployed Vercel build needs `VITE_API_URL` set to `<backend>/api` (e.g. the ngrok URL printed by `dev.sh`) or it calls the Vercel origin's `/api` and fails.
+- Master data (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin Location, Barang) comes from the Laravel API. Types mirror the API resources in `src/lib/master-types.ts`; API client in `src/lib/api.ts` (`api.get/post/put/delete`, `Paginated<T>`, `ApiError`, `fieldError`). `API_BASE` is `VITE_API_URL` (build-time env) falling back to `/api` — the deployed Vercel build needs `VITE_API_URL` set to `<backend>/api` (e.g. the ngrok URL printed by `dev.sh`) or it calls the Vercel origin's `/api` and fails.
 - Hooks in `src/hooks/use-master.ts` (TanStack Query). They fetch everything (`per_page=500`) and let the UI paginate/filter client-side. **Queries are `enabled`-gated on `typeof window !== "undefined"`** so SSR doesn't fetch a relative `/api` URL — pages render the shell server-side and data hydrates client-side.
 - `PER_PAGE=500` is a hardcoded scale assumption (≤300 items today). Revisit when item count can exceed the page size — the UI has no server pagination yet.
 - `master.barang.$id.tsx` sets a **static SSR `<head>` title** — the item name comes from a client-side query and can't be known during server render. Accepted tradeoff for API-backed detail pages.
 - Zod validation in `src/lib/schemas.ts` mirrors backend FormRequests; field errors map back onto the form via `form.setError(fieldError(...))`.
-- Shared CRUD scaffolding: `src/components/wms/master-crud.tsx` (`MasterCrudPage` table + `CrudFormDialog`) and `src/components/wms/master-forms.tsx` (per-entity dialogs). `src/components/wms/master-crud-pages.tsx` has the Kategori/Sub Kategori/Merk pages.
+- Shared CRUD scaffolding: `src/components/wms/master-crud.tsx` (`MasterCrudPage` table + `CrudFormDialog`) and `src/components/wms/master-forms.tsx` (per-entity dialogs, incl. `RackFormDialog`/`BinFormDialog` and the rak/bin cascade on the Item form). `src/components/wms/master-crud-pages.tsx` has the Kategori/Sub Kategori/Merk/Satuan/Gudang/Rak/Bin pages.
 - `master.barang.$id.tsx` shows real API data, but its **Kartu Stock / Riwayat tabs are placeholders** fed by dummy `stockCard()` until the Persediaan module ships ITEM_STOCK.
 
 ## Commands
@@ -49,7 +49,7 @@ npm run format     # prettier --write .
 - File-based routing in `src/routes/`. Only root layout is `src/routes/__root.tsx` (renders `<Outlet />` — removing it breaks all children). Never create `src/pages/` or `app/layout.tsx` (Next.js/Remix conventions).
 - `src/routes/routeTree.gen.ts` is **auto-generated** — never edit by hand.
 - Most modules use one generic route with a `$section` param instead of a file per page:
-  - `/master/$section` → `GenericMasterPage`, data in `masterDatasets` (`src/components/wms/generic-master.tsx`) — **except `kategori`/`sub-kategori`/`merk`, which dispatch to the API-driven `KategoriPage`/`SubKategoriPage`/`MerkPage`** in `src/components/wms/master-crud-pages.tsx`
+  - `/master/$section` → `GenericMasterPage`, data in `masterDatasets` (`src/components/wms/generic-master.tsx`) — **except `kategori`/`sub-kategori`/`merk`/`satuan`/`gudang`/`rak`/`bin-location`, which dispatch to the API-driven pages** (`KategoriPage`/`SubKategoriPage`/`MerkPage`/`SatuanPage`/`GudangPage`/`RakPage`/`BinPage`) in `src/components/wms/master-crud-pages.tsx`
   - `/transaksi/$section` → `TransactionPage`, config in `trxSections` (`src/lib/trx-sections.ts`)
   - `/transaksi/entri/$section` → `TransactionFormPage` (same `trxSections` registry)
   - `/persediaan/$section`, `/opname/$section`, `/pengadaan/$section`, `/system/$section`, `/laporan/$report` → inline slug→config maps in each route file

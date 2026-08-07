@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bin;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\Merk;
+use App\Models\Rack;
 use App\Models\SubCategory;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -306,5 +309,74 @@ class ItemApiTest extends TestCase
 
         $this->postJson('/api/master/items/bulk-status', ['ids' => [], 'status' => 'Aktif'])
             ->assertStatus(422);
+    }
+
+    public function test_can_store_item_with_default_rack_and_bin(): void
+    {
+        $category = Category::factory()->create();
+        $warehouse = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $warehouse->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-92001-001',
+            'name' => 'Barang Berlokasi',
+            'category_id' => $category->id,
+            'default_warehouse_id' => $warehouse->id,
+            'default_rack_id' => $rack->id,
+            'default_bin_id' => $bin->id,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertCreated()
+            ->assertJsonPath('data.default_rack_id', $rack->id)
+            ->assertJsonPath('data.default_bin_id', $bin->id)
+            ->assertJsonPath('data.rack', $rack->code)
+            ->assertJsonPath('data.bin', $bin->code);
+    }
+
+    public function test_store_rejects_invalid_rack_and_bin(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-92002-001',
+            'name' => 'Rak Salah',
+            'category_id' => $category->id,
+            'default_rack_id' => 9999,
+            'default_bin_id' => 9999,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['default_rack_id', 'default_bin_id']);
+    }
+
+    public function test_can_update_item_rack_and_bin(): void
+    {
+        $category = Category::factory()->create();
+        $item = Item::factory()->create(['category_id' => $category->id]);
+        $warehouse = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $warehouse->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $this->putJson("/api/master/items/{$item->id}", [
+            'sku' => $item->sku,
+            'name' => $item->name,
+            'category_id' => $category->id,
+            'default_warehouse_id' => $warehouse->id,
+            'default_rack_id' => $rack->id,
+            'default_bin_id' => $bin->id,
+            'cost' => $item->cost,
+            'price' => $item->price,
+            'min_stock' => $item->min_stock,
+            'status' => $item->status,
+        ])->assertOk()
+            ->assertJsonPath('data.default_rack_id', $rack->id)
+            ->assertJsonPath('data.default_bin_id', $bin->id)
+            ->assertJsonPath('data.rack', $rack->code)
+            ->assertJsonPath('data.bin', $bin->code);
     }
 }

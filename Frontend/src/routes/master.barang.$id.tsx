@@ -195,6 +195,9 @@ function DetailBarang() {
               <Field label="Nama Barang" value={item.name} />
               <Field label="Merk" value={item.brand ?? "—"} />
               <Field label="Kategori" value={categoryLabel} />
+              <Field label="Gudang" value={item.warehouse ?? "—"} />
+              <Field label="Rak" value={item.rack ?? "—"} />
+              <Field label="Bin" value={item.bin ?? "—"} />
               <Field label="Supplier" value={item.supplier ?? "—"} />
               <Field label="Satuan" value={item.unit ?? "—"} />
               <Field label="Berat" value={item.weight != null ? `${item.weight} kg` : "—"} />

@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
-import type { Category, ItemApi, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
+import type {
+  Bin,
+  Category,
+  ItemApi,
+  Merk,
+  Rack,
+  SubCategory,
+  Unit,
+  Warehouse,
+} from "@/lib/master-types";
 
 // Data volume is small (~300 items), so fetch everything and let the UI
 // (DataTable) paginate + filter client-side, matching the existing UX.
@@ -12,6 +21,8 @@ const keys = {
   merks: ["master", "merks"] as const,
   units: ["master", "units"] as const,
   warehouses: ["master", "warehouses"] as const,
+  racks: ["master", "racks"] as const,
+  bins: ["master", "bins"] as const,
   items: ["master", "items"] as const,
   item: (id: number) => ["master", "items", id] as const,
 };
@@ -52,6 +63,22 @@ export function useWarehouses() {
   return useQuery({
     queryKey: keys.warehouses,
     queryFn: () => api.get<Paginated<Warehouse>>(`/master/warehouses?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useRacks() {
+  return useQuery({
+    queryKey: keys.racks,
+    queryFn: () => api.get<Paginated<Rack>>(`/master/racks?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useBins() {
+  return useQuery({
+    queryKey: keys.bins,
+    queryFn: () => api.get<Paginated<Bin>>(`/master/bins?per_page=${PER_PAGE}`),
     enabled: typeof window !== "undefined",
   });
 }
@@ -107,6 +134,20 @@ export type WarehousePayload = {
   is_active: boolean;
 };
 
+export type RackPayload = {
+  warehouse_id: number;
+  code?: string;
+  name: string;
+  is_active: boolean;
+};
+
+export type BinPayload = {
+  rack_id: number;
+  code?: string;
+  name: string;
+  is_active: boolean;
+};
+
 export type ItemPayload = {
   sku: string;
   barcode: string | null;
@@ -116,6 +157,8 @@ export type ItemPayload = {
   brand_id?: number;
   unit_id?: number;
   default_warehouse_id?: number;
+  default_rack_id?: number;
+  default_bin_id?: number;
   cost: number;
   price: number;
   min_stock: number;
@@ -251,6 +294,56 @@ export function useDeleteWarehouse() {
   return useMutation({
     mutationFn: (id: number) => api.delete<{ message: string }>(`/master/warehouses/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.warehouses }),
+  });
+}
+
+export function useCreateRack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: RackPayload) => api.post<{ data: Rack }>("/master/racks", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.racks }),
+  });
+}
+
+export function useUpdateRack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: RackPayload & { id: number }) =>
+      api.put<{ data: Rack }>(`/master/racks/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.racks }),
+  });
+}
+
+export function useDeleteRack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/racks/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.racks }),
+  });
+}
+
+export function useCreateBin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BinPayload) => api.post<{ data: Bin }>("/master/bins", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bins }),
+  });
+}
+
+export function useUpdateBin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: BinPayload & { id: number }) =>
+      api.put<{ data: Bin }>(`/master/bins/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bins }),
+  });
+}
+
+export function useDeleteBin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/bins/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.bins }),
   });
 }
 
