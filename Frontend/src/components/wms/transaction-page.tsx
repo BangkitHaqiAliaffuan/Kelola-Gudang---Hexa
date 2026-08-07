@@ -152,14 +152,22 @@ export function TransactionPage({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nomor transaksi..." className="rounded-xl pl-9" />
           </div>
-          <FilterSelect value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouses.map((w) => w.name)} />
           <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses.map((w) => w.name)}
+          />
+          <FilterSelect
+            className="w-full"
             value={partner}
             onChange={setPartner}
             placeholder={variant === "masuk" ? "Semua Supplier" : "Semua Tujuan"}
             options={(variant === "masuk" ? suppliers.slice(0, 25).map((s) => s.name) : customers.map((c) => c.name))}
           />
           <FilterSelect
+            className="w-full"
             value={status}
             onChange={setStatus}
             placeholder="Semua Status"

@@ -17,15 +17,17 @@ export function FilterSelect({
   onChange,
   placeholder,
   options,
+  className,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   options: string[];
+  className?: string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="rounded-xl">
+      <SelectTrigger className={cn("w-48 shrink-0 rounded-xl", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="max-h-72 rounded-xl">

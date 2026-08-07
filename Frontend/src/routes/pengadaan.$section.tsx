@@ -305,7 +305,13 @@ function PengadaanPage() {
               className="rounded-xl pl-9"
             />
           </div>
-          <FilterSelect value={status} onChange={setStatus} placeholder="Semua Status" options={statuses} />
+          <FilterSelect
+            className="w-full"
+            value={status}
+            onChange={setStatus}
+            placeholder="Semua Status"
+            options={statuses}
+          />
         </div>
 
         <DataTable

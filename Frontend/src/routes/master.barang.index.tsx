@@ -316,6 +316,7 @@ function MasterBarang() {
             />
           </div>
           <FilterSelect
+            className="w-full"
             value={cat}
             onChange={(v) => {
               setCat(v);
@@ -325,24 +326,28 @@ function MasterBarang() {
             options={categoryNames}
           />
           <FilterSelect
+            className="w-full"
             value={subCat}
             onChange={setSubCat}
             placeholder="Semua Sub Kategori"
             options={subCategoryNames}
           />
           <FilterSelect
+            className="w-full"
             value={brand}
             onChange={setBrand}
             placeholder="Semua Merk"
             options={merkNames}
           />
           <FilterSelect
+            className="w-full"
             value={stockF}
             onChange={setStockF}
             placeholder="Semua Stock"
             options={["Normal", "Menipis", "Habis", "Overstock"]}
           />
           <FilterSelect
+            className="w-full"
             value={status}
             onChange={setStatus}
             placeholder="Semua Status"

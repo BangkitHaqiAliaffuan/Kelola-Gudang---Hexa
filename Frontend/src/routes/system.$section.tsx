@@ -108,8 +108,20 @@ function AuditTrails() {
             className="rounded-xl pl-9"
           />
         </div>
-        <FilterSelect value={action} onChange={setAction} placeholder="Semua Aksi" options={actions} />
-        <FilterSelect value={module} onChange={setModule} placeholder="Semua Modul" options={modules} />
+        <FilterSelect
+          className="w-full"
+          value={action}
+          onChange={setAction}
+          placeholder="Semua Aksi"
+          options={actions}
+        />
+        <FilterSelect
+          className="w-full"
+          value={module}
+          onChange={setModule}
+          placeholder="Semua Modul"
+          options={modules}
+        />
       </div>
       <DataTable
         columns={columns}

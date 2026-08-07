@@ -92,6 +92,7 @@ export function TransactionFormPage({
           <div className="space-y-1.5">
             <Label>{variant === "transfer" ? "Gudang Asal" : "Gudang"}</Label>
             <FilterSelect
+              className="w-full"
               value={trx?.warehouse ?? ALL}
               onChange={() => {}}
               placeholder="Pilih Gudang"
@@ -103,6 +104,7 @@ export function TransactionFormPage({
             <div className="space-y-1.5">
               <Label>Gudang Tujuan</Label>
               <FilterSelect
+                className="w-full"
                 value={trx?.destination ?? ALL}
                 onChange={() => {}}
                 placeholder="Pilih Gudang Tujuan"
@@ -113,6 +115,7 @@ export function TransactionFormPage({
             <div className="space-y-1.5">
               <Label>Supplier</Label>
               <FilterSelect
+                className="w-full"
                 value={ALL}
                 onChange={() => {}}
                 placeholder="Pilih Supplier"
@@ -124,6 +127,7 @@ export function TransactionFormPage({
               <div className="space-y-1.5">
                 <Label>Tujuan Pengeluaran</Label>
                 <FilterSelect
+                  className="w-full"
                   value={tujuan}
                   onChange={setTujuan}
                   placeholder="Pilih Tujuan"
@@ -134,11 +138,18 @@ export function TransactionFormPage({
                 <>
                   <div className="space-y-1.5">
                     <Label>Proyek</Label>
-                    <FilterSelect value={ALL} onChange={() => {}} placeholder="Pilih Proyek" options={projects} />
+                    <FilterSelect
+                      className="w-full"
+                      value={ALL}
+                      onChange={() => {}}
+                      placeholder="Pilih Proyek"
+                      options={projects}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Work Order</Label>
                     <FilterSelect
+                      className="w-full"
                       value={ALL}
                       onChange={() => {}}
                       placeholder="Pilih Work Order"
@@ -159,6 +170,7 @@ export function TransactionFormPage({
                   <div className="space-y-1.5">
                     <Label>Customer</Label>
                     <FilterSelect
+                      className="w-full"
                       value={ALL}
                       onChange={() => {}}
                       placeholder="Pilih Customer"
@@ -167,7 +179,13 @@ export function TransactionFormPage({
                   </div>
                   <div className="space-y-1.5">
                     <Label>Departemen</Label>
-                    <FilterSelect value={ALL} onChange={() => {}} placeholder="Pilih Departemen" options={departments} />
+                    <FilterSelect
+                      className="w-full"
+                      value={ALL}
+                      onChange={() => {}}
+                      placeholder="Pilih Departemen"
+                      options={departments}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Keperluan</Label>

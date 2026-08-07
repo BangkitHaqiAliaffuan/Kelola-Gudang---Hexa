@@ -123,8 +123,20 @@ function StockSaatIni() {
               className="rounded-xl pl-9"
             />
           </div>
-          <FilterSelect value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouses.map((w) => w.name)} />
-          <FilterSelect value={cat} onChange={setCat} placeholder="Semua Kategori" options={categories} />
+          <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses.map((w) => w.name)}
+          />
+          <FilterSelect
+            className="w-full"
+            value={cat}
+            onChange={setCat}
+            placeholder="Semua Kategori"
+            options={categories}
+          />
         </div>
       </Panel>
       <Panel title="Posisi Stock" description={`${formatNumber(rows.length)} baris`}>

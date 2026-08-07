@@ -70,6 +70,7 @@ function BarcodePage() {
             <div className="space-y-1.5">
               <Label>Barang</Label>
               <FilterSelect
+                className="w-full"
                 value={sku}
                 onChange={setSku}
                 placeholder="Pilih Barang"

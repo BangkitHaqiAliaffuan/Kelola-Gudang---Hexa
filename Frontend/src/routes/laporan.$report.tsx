@@ -132,7 +132,13 @@ function Laporan() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari..." className="rounded-xl pl-9" />
           </div>
-          <FilterSelect value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouses.map((w) => w.name)} />
+          <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses.map((w) => w.name)}
+          />
           <Input type="date" defaultValue="2026-07-01" className="rounded-xl" />
         </div>
       </Panel>
