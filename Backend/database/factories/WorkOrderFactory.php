@@ -19,7 +19,7 @@ class WorkOrderFactory extends Factory
     public function definition(): array
     {
         return [
-            'no' => 'WO-'.$this->faker->unique()->numberBetween(1000, 9999),
+            'no' => 'WO/'.date('Y').'/'.$this->faker->unique()->numberBetween(1000, 9999),
             'project_id' => Project::factory(),
             'item_id' => Item::factory(),
             'unit_id' => Unit::factory(),

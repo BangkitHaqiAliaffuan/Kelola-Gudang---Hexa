@@ -47,7 +47,7 @@ class WorkOrderController extends Controller
         $data['status'] = $data['status'] ?? 'Perencanaan';
 
         $workOrder = DB::transaction(function () use ($data) {
-            $data['no'] = $data['no'] ?? CodeGenerator::next(WorkOrder::class, 'WO', 'no');
+            $data['no'] = $data['no'] ?? CodeGenerator::nextYearly(WorkOrder::class, 'WO', 'no');
 
             return WorkOrder::create($data);
         });

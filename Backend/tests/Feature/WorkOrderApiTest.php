@@ -98,9 +98,9 @@ class WorkOrderApiTest extends TestCase
             'item_id' => $item->id,
             'target_qty' => 25,
         ])->assertCreated()
-            ->assertJsonPath('data.no', 'WO-001');
+            ->assertJsonPath('data.no', 'WO/'.date('Y').'/0001');
 
-        $this->assertDatabaseHas('work_orders', ['no' => 'WO-001']);
+        $this->assertDatabaseHas('work_orders', ['no' => 'WO/'.date('Y').'/0001']);
     }
 
     public function test_store_validates_required_fields(): void
