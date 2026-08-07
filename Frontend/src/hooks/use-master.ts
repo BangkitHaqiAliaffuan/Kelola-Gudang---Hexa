@@ -3,11 +3,14 @@ import { api, type Paginated } from "@/lib/api";
 import type {
   Bin,
   Category,
+  Customer,
   ItemApi,
   Merk,
   Rack,
   SubCategory,
+  Supplier,
   Unit,
+  Vendor,
   Warehouse,
 } from "@/lib/master-types";
 
@@ -23,6 +26,9 @@ const keys = {
   warehouses: ["master", "warehouses"] as const,
   racks: ["master", "racks"] as const,
   bins: ["master", "bins"] as const,
+  suppliers: ["master", "suppliers"] as const,
+  customers: ["master", "customers"] as const,
+  vendors: ["master", "vendors"] as const,
   items: ["master", "items"] as const,
   item: (id: number) => ["master", "items", id] as const,
 };
@@ -91,6 +97,30 @@ export function useItems() {
   });
 }
 
+export function useSuppliers() {
+  return useQuery({
+    queryKey: keys.suppliers,
+    queryFn: () => api.get<Paginated<Supplier>>(`/master/suppliers?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useCustomers() {
+  return useQuery({
+    queryKey: keys.customers,
+    queryFn: () => api.get<Paginated<Customer>>(`/master/customers?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useVendors() {
+  return useQuery({
+    queryKey: keys.vendors,
+    queryFn: () => api.get<Paginated<Vendor>>(`/master/vendors?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
 export function useItem(id: number | undefined) {
   return useQuery({
     queryKey: keys.item(id ?? 0),
@@ -148,6 +178,38 @@ export type BinPayload = {
   is_active: boolean;
 };
 
+export type SupplierPayload = {
+  code?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  tax_id?: string;
+  payment_terms?: string;
+  is_active: boolean;
+};
+
+export type CustomerPayload = {
+  code?: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  segment?: string;
+  is_active: boolean;
+};
+
+export type VendorPayload = {
+  code?: string;
+  name: string;
+  service_type?: string;
+  contact_phone?: string;
+  email?: string;
+  is_active: boolean;
+};
+
 export type ItemPayload = {
   sku: string;
   barcode: string | null;
@@ -159,6 +221,7 @@ export type ItemPayload = {
   default_warehouse_id?: number;
   default_rack_id?: number;
   default_bin_id?: number;
+  preferred_supplier_id?: number;
   cost: number;
   price: number;
   min_stock: number;
@@ -344,6 +407,83 @@ export function useDeleteBin() {
   return useMutation({
     mutationFn: (id: number) => api.delete<{ message: string }>(`/master/bins/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.bins }),
+  });
+}
+
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SupplierPayload) =>
+      api.post<{ data: Supplier }>("/master/suppliers", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.suppliers }),
+  });
+}
+
+export function useUpdateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: SupplierPayload & { id: number }) =>
+      api.put<{ data: Supplier }>(`/master/suppliers/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.suppliers }),
+  });
+}
+
+export function useDeleteSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/suppliers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.suppliers }),
+  });
+}
+
+export function useCreateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CustomerPayload) =>
+      api.post<{ data: Customer }>("/master/customers", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.customers }),
+  });
+}
+
+export function useUpdateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: CustomerPayload & { id: number }) =>
+      api.put<{ data: Customer }>(`/master/customers/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.customers }),
+  });
+}
+
+export function useDeleteCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/customers/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.customers }),
+  });
+}
+
+export function useCreateVendor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: VendorPayload) => api.post<{ data: Vendor }>("/master/vendors", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vendors }),
+  });
+}
+
+export function useUpdateVendor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: VendorPayload & { id: number }) =>
+      api.put<{ data: Vendor }>(`/master/vendors/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vendors }),
+  });
+}
+
+export function useDeleteVendor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/vendors/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.vendors }),
   });
 }
 

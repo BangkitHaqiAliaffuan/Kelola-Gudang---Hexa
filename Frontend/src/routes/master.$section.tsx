@@ -2,12 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { GenericMasterPage, masterDatasets } from "@/components/wms/generic-master";
 import {
   BinPage,
+  CustomerPage,
   GudangPage,
   KategoriPage,
   MerkPage,
   RakPage,
   SatuanPage,
   SubKategoriPage,
+  SupplierPage,
+  VendorPage,
 } from "@/components/wms/master-crud-pages";
 
 const apiTitles: Record<string, { title: string; description: string }> = {
@@ -18,6 +21,9 @@ const apiTitles: Record<string, { title: string; description: string }> = {
   gudang: { title: "Gudang", description: "Daftar lokasi penyimpanan barang" },
   rak: { title: "Rak", description: "Rak penyimpanan per gudang" },
   "bin-location": { title: "Bin Location", description: "Titik penyimpanan terkecil" },
+  supplier: { title: "Supplier", description: "Daftar pemasok barang" },
+  customer: { title: "Customer", description: "Daftar pembeli / pelanggan" },
+  vendor: { title: "Vendor", description: "Daftar penyedia jasa pendukung" },
 };
 
 export const Route = createFileRoute("/master/$section")({
@@ -47,5 +53,8 @@ function MasterSection() {
   if (section === "gudang") return <GudangPage />;
   if (section === "rak") return <RakPage />;
   if (section === "bin-location") return <BinPage />;
+  if (section === "supplier") return <SupplierPage />;
+  if (section === "customer") return <CustomerPage />;
+  if (section === "vendor") return <VendorPage />;
   return <GenericMasterPage slug={section} />;
 }

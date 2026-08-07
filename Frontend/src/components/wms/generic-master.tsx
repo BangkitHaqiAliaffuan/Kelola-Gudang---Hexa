@@ -5,7 +5,7 @@ import { PageHeader, Panel, Pill } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { customers, departments, projects, suppliers, workOrders } from "@/lib/wms-data";
+import { departments, projects, workOrders } from "@/lib/wms-data";
 
 type Row = { id: string; kode: string; nama: string; info: string; extra: string; status: string };
 
@@ -24,37 +24,6 @@ export const masterDatasets: Record<
   string,
   { title: string; description: string; headers: [string, string, string]; rows: Row[] }
 > = {
-  supplier: {
-    title: "Supplier",
-    description: "Mitra pemasok barang",
-    headers: ["Nama Supplier", "Kota", "Termin"],
-    rows: make(
-      "SUP",
-      suppliers.map((s) => ({ nama: s.name, info: s.city, extra: s.terms })),
-    ),
-  },
-  customer: {
-    title: "Customer",
-    description: "Pelanggan penerima barang",
-    headers: ["Nama Customer", "Kota", "Segmen"],
-    rows: make(
-      "CUS",
-      customers.map((c) => ({ nama: c.name, info: c.city, extra: c.segment })),
-    ),
-  },
-  vendor: {
-    title: "Vendor",
-    description: "Vendor jasa dan ekspedisi",
-    headers: ["Nama Vendor", "Layanan", "Kontak"],
-    rows: make(
-      "VDR",
-      Array.from({ length: 18 }, (_, i) => ({
-        nama: `PT Vendor Logistik ${i + 1}`,
-        info: ["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"][i % 4]!,
-        extra: `0812-${1000 + i}-${2000 + i}`,
-      })),
-    ),
-  },
   departemen: {
     title: "Departemen",
     description: "Unit kerja peminta barang",

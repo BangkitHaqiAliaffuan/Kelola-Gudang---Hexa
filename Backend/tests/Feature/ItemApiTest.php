@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\Merk;
 use App\Models\Rack;
 use App\Models\SubCategory;
+use App\Models\Supplier;
 use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -378,5 +379,58 @@ class ItemApiTest extends TestCase
             ->assertJsonPath('data.default_bin_id', $bin->id)
             ->assertJsonPath('data.rack', $rack->code)
             ->assertJsonPath('data.bin', $bin->code);
+    }
+
+    public function test_index_resolves_supplier_name(): void
+    {
+        $category = Category::factory()->create();
+        $supplier = Supplier::factory()->create(['name' => 'PT Sumber Barang']);
+        Item::factory()->create([
+            'category_id' => $category->id,
+            'preferred_supplier_id' => $supplier->id,
+        ]);
+
+        $this->getJson('/api/master/items')
+            ->assertOk()
+            ->assertJsonPath('data.0.supplier', 'PT Sumber Barang')
+            ->assertJsonPath('data.0.preferred_supplier_id', $supplier->id);
+    }
+
+    public function test_can_store_item_with_preferred_supplier(): void
+    {
+        $category = Category::factory()->create();
+        $supplier = Supplier::factory()->create();
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-93001-001',
+            'name' => 'Barang Bersupplier',
+            'category_id' => $category->id,
+            'preferred_supplier_id' => $supplier->id,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertCreated()
+            ->assertJsonPath('data.preferred_supplier_id', $supplier->id)
+            ->assertJsonPath('data.supplier', $supplier->name);
+
+        $this->assertDatabaseHas('items', ['sku' => 'SKU-93001-001', 'preferred_supplier_id' => $supplier->id]);
+    }
+
+    public function test_store_rejects_invalid_supplier(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/master/items', [
+            'sku' => 'SKU-93002-001',
+            'name' => 'Supplier Salah',
+            'category_id' => $category->id,
+            'preferred_supplier_id' => 9999,
+            'cost' => 1,
+            'price' => 2,
+            'min_stock' => 0,
+            'status' => 'Aktif',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['preferred_supplier_id']);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Item;
 use App\Models\Merk;
 use App\Models\Rack;
 use App\Models\SubCategory;
+use App\Models\Supplier;
 use App\Models\Unit;
 use App\Models\Warehouse;
 use Illuminate\Database\Seeder;
@@ -55,6 +56,7 @@ class ItemSeeder extends Seeder
         $warehouses = Warehouse::orderBy('id')->get();
         $racks = Rack::orderBy('id')->get();
         $bins = Bin::orderBy('id')->get();
+        $suppliers = Supplier::orderBy('id')->get();
         $statuses = ['Aktif', 'Aktif', 'Aktif', 'Nonaktif'];
 
         for ($i = 0; $i < 300; $i++) {
@@ -86,6 +88,7 @@ class ItemSeeder extends Seeder
                 'default_warehouse_id' => $warehouse->id,
                 'default_rack_id' => $rack->id,
                 'default_bin_id' => $bin->id,
+                'preferred_supplier_id' => $suppliers[$i % $suppliers->count()]->id,
                 'weight' => round(($rnd() * 48) + 0.05, 2),
                 'dimension' => $int(5, 120).'x'.$int(5, 120).'x'.$int(1, 60).' cm',
                 'cost' => $cost,

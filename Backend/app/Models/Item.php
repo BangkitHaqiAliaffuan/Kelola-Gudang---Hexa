@@ -67,6 +67,11 @@ class Item extends Model
         return $this->belongsTo(Unit::class, 'unit_id');
     }
 
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class, 'preferred_supplier_id');
+    }
+
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'default_warehouse_id');

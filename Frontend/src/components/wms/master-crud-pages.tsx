@@ -4,14 +4,18 @@ import { MasterCrudPage } from "./master-crud";
 import {
   BinFormDialog,
   CategoryFormDialog,
+  CustomerFormDialog,
   MerkFormDialog,
   RackFormDialog,
   SubCategoryFormDialog,
+  SupplierFormDialog,
   UnitFormDialog,
+  VendorFormDialog,
   WarehouseFormDialog,
 } from "./master-forms";
-import { EmptyState, Pill, TableSkeleton } from "./kit";
+import { ALL, EmptyState, FilterSelect, Pill, TableSkeleton } from "./kit";
 import { type Column } from "./data-table";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import {
   Dialog,
   DialogContent,
@@ -22,23 +26,53 @@ import {
 import {
   useBins,
   useCategories,
+  useCustomers,
   useDeleteBin,
   useDeleteCategory,
+  useDeleteCustomer,
   useDeleteMerk,
   useDeleteRack,
   useDeleteSubCategory,
+  useDeleteSupplier,
   useDeleteUnit,
+  useDeleteVendor,
   useDeleteWarehouse,
   useMerks,
   useRacks,
   useSubCategories,
+  useSuppliers,
   useUnits,
+  useVendors,
   useWarehouses,
 } from "@/hooks/use-master";
-import type { Bin, Category, Merk, Rack, SubCategory, Unit, Warehouse } from "@/lib/master-types";
+import type {
+  Bin,
+  Category,
+  Customer,
+  Merk,
+  Rack,
+  SubCategory,
+  Supplier,
+  Unit,
+  Vendor,
+  Warehouse,
+} from "@/lib/master-types";
 
 function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
+}
+
+function uniqueOptions<T>(rows: T[], pick: (r: T) => string | null | undefined): string[] {
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const v = pick(r);
+    if (v) seen.add(v);
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b));
+}
+
+function dateStamp(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function KategoriPage() {
@@ -526,6 +560,321 @@ export function BinPage() {
         )}
       />
       <BinFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function SupplierPage() {
+  const { data, isLoading } = useSuppliers();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Supplier | null>(null);
+  const [cityFilter, setCityFilter] = useState(ALL);
+  const [termsFilter, setTermsFilter] = useState(ALL);
+  const del = useDeleteSupplier();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) =>
+      (cityFilter === ALL || r.city === cityFilter) &&
+      (termsFilter === ALL || r.payment_terms === termsFilter),
+  );
+
+  const columns: Column<Supplier>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Supplier",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "city", label: "Kota", render: (r) => r.city ?? "—" },
+    { key: "payment_terms", label: "Termin", render: (r) => r.payment_terms ?? "—" },
+    {
+      key: "items_count",
+      label: "Jumlah Barang",
+      render: (r) => (r.items_count ?? 0).toLocaleString("id-ID"),
+    },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `suppliers-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama Supplier" },
+        { key: "phone", label: "Telepon" },
+        { key: "email", label: "Email" },
+        { key: "address", label: "Alamat" },
+        { key: "city", label: "Kota" },
+        { key: "tax_id", label: "NPWP" },
+        { key: "payment_terms", label: "Termin Pembayaran" },
+        { key: "is_active", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<Supplier>
+        title="Supplier"
+        description="Daftar pemasok barang"
+        searchPlaceholder="Cari supplier..."
+        searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""} ${r.payment_terms ?? ""}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Supplier dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <>
+            <FilterSelect
+              value={cityFilter}
+              onChange={setCityFilter}
+              placeholder="Semua Kota"
+              options={uniqueOptions(rows, (r) => r.city)}
+            />
+            <FilterSelect
+              value={termsFilter}
+              onChange={setTermsFilter}
+              placeholder="Semua Termin"
+              options={["NET 30", "NET 14", "COD", "NET 45"]}
+            />
+          </>
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.city ?? "—"} • {r.payment_terms ?? "—"} • {r.items_count ?? 0} barang
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <SupplierFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function CustomerPage() {
+  const { data, isLoading } = useCustomers();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
+  const [cityFilter, setCityFilter] = useState(ALL);
+  const [segmentFilter, setSegmentFilter] = useState(ALL);
+  const del = useDeleteCustomer();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) =>
+      (cityFilter === ALL || r.city === cityFilter) &&
+      (segmentFilter === ALL || r.segment === segmentFilter),
+  );
+
+  const columns: Column<Customer>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Customer",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "city", label: "Kota", render: (r) => r.city ?? "—" },
+    { key: "segment", label: "Segmen", render: (r) => r.segment ?? "—" },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `customers-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama Customer" },
+        { key: "phone", label: "Telepon" },
+        { key: "email", label: "Email" },
+        { key: "address", label: "Alamat" },
+        { key: "city", label: "Kota" },
+        { key: "segment", label: "Segmen" },
+        { key: "is_active", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<Customer>
+        title="Customer"
+        description="Daftar pembeli / pelanggan"
+        searchPlaceholder="Cari customer..."
+        searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""} ${r.segment ?? ""}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Customer dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <>
+            <FilterSelect
+              value={cityFilter}
+              onChange={setCityFilter}
+              placeholder="Semua Kota"
+              options={uniqueOptions(rows, (r) => r.city)}
+            />
+            <FilterSelect
+              value={segmentFilter}
+              onChange={setSegmentFilter}
+              placeholder="Semua Segmen"
+              options={["Retail", "Distributor", "Proyek", "Korporat"]}
+            />
+          </>
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.city ?? "—"} • {r.segment ?? "—"}
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <CustomerFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function VendorPage() {
+  const { data, isLoading } = useVendors();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Vendor | null>(null);
+  const [serviceFilter, setServiceFilter] = useState(ALL);
+  const del = useDeleteVendor();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter((r) => serviceFilter === ALL || r.service_type === serviceFilter);
+
+  const columns: Column<Vendor>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Vendor",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "service_type", label: "Jenis Layanan", render: (r) => r.service_type ?? "—" },
+    { key: "contact_phone", label: "Kontak", render: (r) => r.contact_phone ?? "—" },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `vendors-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama Vendor" },
+        { key: "service_type", label: "Jenis Layanan" },
+        { key: "contact_phone", label: "Kontak" },
+        { key: "email", label: "Email" },
+        { key: "is_active", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<Vendor>
+        title="Vendor"
+        description="Daftar penyedia jasa pendukung"
+        searchPlaceholder="Cari vendor..."
+        searchText={(r) => `${r.code} ${r.name} ${r.service_type ?? ""}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Vendor dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <FilterSelect
+            value={serviceFilter}
+            onChange={setServiceFilter}
+            placeholder="Semua Layanan"
+            options={["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"]}
+          />
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.service_type ?? "—"} • {r.contact_phone ?? "—"}
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <VendorFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
 }

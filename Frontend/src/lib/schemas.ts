@@ -61,6 +61,54 @@ export const binSchema = z.object({
 });
 export type BinInput = z.infer<typeof binSchema>;
 
+const phone = z.string().trim().max(20, "Maksimal 20 karakter").optional().or(z.literal(""));
+const email = z
+  .string()
+  .trim()
+  .email("Format email tidak valid")
+  .max(150, "Maksimal 150 karakter")
+  .optional()
+  .or(z.literal(""));
+
+export const supplierSchema = z.object({
+  code,
+  name,
+  phone,
+  email,
+  address: z.string().trim().max(255, "Maksimal 255 karakter").optional().or(z.literal("")),
+  city: z.string().trim().max(100, "Maksimal 100 karakter").optional().or(z.literal("")),
+  tax_id: z.string().trim().max(50, "Maksimal 50 karakter").optional().or(z.literal("")),
+  payment_terms: z.union([z.enum(["NET 30", "NET 14", "COD", "NET 45"]), z.literal("")]).optional(),
+  is_active: z.boolean().default(true),
+});
+export type SupplierInput = z.infer<typeof supplierSchema>;
+
+export const customerSchema = z.object({
+  code,
+  name,
+  phone,
+  email,
+  address: z.string().trim().max(255, "Maksimal 255 karakter").optional().or(z.literal("")),
+  city: z.string().trim().max(100, "Maksimal 100 karakter").optional().or(z.literal("")),
+  segment: z
+    .union([z.enum(["Retail", "Distributor", "Proyek", "Korporat"]), z.literal("")])
+    .optional(),
+  is_active: z.boolean().default(true),
+});
+export type CustomerInput = z.infer<typeof customerSchema>;
+
+export const vendorSchema = z.object({
+  code,
+  name,
+  service_type: z
+    .union([z.enum(["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"]), z.literal("")])
+    .optional(),
+  contact_phone: phone,
+  email,
+  is_active: z.boolean().default(true),
+});
+export type VendorInput = z.infer<typeof vendorSchema>;
+
 export const itemSchema = z
   .object({
     sku: z.string().trim().min(1, "SKU wajib diisi").max(30, "Maksimal 30 karakter"),
@@ -74,6 +122,7 @@ export const itemSchema = z
     default_warehouse_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     default_rack_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     default_bin_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
+    preferred_supplier_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     cost: z.coerce
       .number({ invalid_type_error: "Harga pokok wajib diisi" })
       .min(0, "Tidak boleh negatif"),

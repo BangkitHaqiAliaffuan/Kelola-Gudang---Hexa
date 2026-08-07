@@ -19,6 +19,9 @@ class DatabaseSeeder extends Seeder
             WarehouseSeeder::class,
             RackSeeder::class,
             BinSeeder::class,
+            SupplierSeeder::class,
+            CustomerSeeder::class,
+            VendorSeeder::class,
             ItemSeeder::class,
         ]);
     }

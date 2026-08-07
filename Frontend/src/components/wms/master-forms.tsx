@@ -23,19 +23,25 @@ import {
 import {
   binSchema,
   categorySchema,
+  customerSchema,
   itemSchema,
   merkSchema,
   rackSchema,
   subCategorySchema,
+  supplierSchema,
   unitSchema,
+  vendorSchema,
   warehouseSchema,
   type BinInput,
   type CategoryInput,
+  type CustomerInput,
   type ItemInput,
   type MerkInput,
   type RackInput,
   type SubCategoryInput,
+  type SupplierInput,
   type UnitInput,
+  type VendorInput,
   type WarehouseInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
@@ -44,43 +50,58 @@ import {
   useCategories,
   useCreateBin,
   useCreateCategory,
+  useCreateCustomer,
   useCreateItem,
   useCreateMerk,
   useCreateRack,
   useCreateSubCategory,
+  useCreateSupplier,
   useCreateUnit,
+  useCreateVendor,
   useCreateWarehouse,
+  useCustomers,
   useItems,
   useMerks,
   useRacks,
   useSubCategories,
+  useSuppliers,
   useUnits,
   useUpdateBin,
   useUpdateCategory,
+  useUpdateCustomer,
   useUpdateItem,
   useUpdateMerk,
   useUpdateRack,
   useUpdateSubCategory,
+  useUpdateSupplier,
   useUpdateUnit,
+  useUpdateVendor,
   useUpdateWarehouse,
+  useVendors,
   useWarehouses,
   type BinPayload,
   type CategoryPayload,
+  type CustomerPayload,
   type ItemPayload,
   type MerkPayload,
   type RackPayload,
   type SubCategoryPayload,
+  type SupplierPayload,
   type UnitPayload,
+  type VendorPayload,
   type WarehousePayload,
 } from "@/hooks/use-master";
 import type {
   Bin,
   Category,
+  Customer,
   ItemApi,
   Merk,
   Rack,
   SubCategory,
+  Supplier,
   Unit,
+  Vendor,
   Warehouse,
 } from "@/lib/master-types";
 
@@ -1083,6 +1104,700 @@ export function BinFormDialog({
   );
 }
 
+export function SupplierFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Supplier | null;
+}) {
+  const create = useCreateSupplier();
+  const update = useUpdateSupplier();
+  const { data: suppliers } = useSuppliers();
+  const previewCode = nextCode(
+    (suppliers?.data ?? []).map((s) => s.code),
+    "SUP",
+  );
+
+  return (
+    <CrudFormDialog<SupplierInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Supplier" : "Tambah Supplier"}
+      description="Pemasok barang yang dijadikan referensi di master Barang."
+      schema={supplierSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              phone: initial.phone ?? "",
+              email: initial.email ?? "",
+              address: initial.address ?? "",
+              city: initial.city ?? "",
+              tax_id: initial.tax_id ?? "",
+              payment_terms: (initial.payment_terms ?? "") as SupplierInput["payment_terms"],
+              is_active: initial.is_active,
+            }
+          : {
+              code: "",
+              name: "",
+              phone: "",
+              email: "",
+              address: "",
+              city: "",
+              tax_id: "",
+              payment_terms: "",
+              is_active: true,
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: SupplierPayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        const phone = values.phone?.trim();
+        if (phone) payload.phone = phone;
+        const email = values.email?.trim();
+        if (email) payload.email = email;
+        const address = values.address?.trim();
+        if (address) payload.address = address;
+        const city = values.city?.trim();
+        if (city) payload.city = city;
+        const taxId = values.tax_id?.trim();
+        if (taxId) payload.tax_id = taxId;
+        if (values.payment_terms) payload.payment_terms = values.payment_terms;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Supplier diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Supplier ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "email");
+          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Supplier</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Supplier</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="PT Sumber Makmur Sentosa"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Telepon <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="021-555..." className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Email <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="kontak@supplier.co.id"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Alamat <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Jl. Raya Industri No. 1"
+                      className="rounded-xl"
+                      rows={2}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Kota <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Jakarta" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NPWP <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="NPWP perusahaan" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="payment_terms"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Termin Pembayaran{" "}
+                    <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih termin" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="">Tidak ada</SelectItem>
+                      <SelectItem value="NET 30">NET 30</SelectItem>
+                      <SelectItem value="NET 14">NET 14</SelectItem>
+                      <SelectItem value="COD">COD</SelectItem>
+                      <SelectItem value="NET 45">NET 45</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="supplier-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="supplier-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function CustomerFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Customer | null;
+}) {
+  const create = useCreateCustomer();
+  const update = useUpdateCustomer();
+  const { data: customers } = useCustomers();
+  const previewCode = nextCode(
+    (customers?.data ?? []).map((c) => c.code),
+    "CUS",
+  );
+
+  return (
+    <CrudFormDialog<CustomerInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Customer" : "Tambah Customer"}
+      description="Pembeli / pelanggan yang terdaftar di master data."
+      schema={customerSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              phone: initial.phone ?? "",
+              email: initial.email ?? "",
+              address: initial.address ?? "",
+              city: initial.city ?? "",
+              segment: (initial.segment ?? "") as CustomerInput["segment"],
+              is_active: initial.is_active,
+            }
+          : {
+              code: "",
+              name: "",
+              phone: "",
+              email: "",
+              address: "",
+              city: "",
+              segment: "",
+              is_active: true,
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: CustomerPayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        const phone = values.phone?.trim();
+        if (phone) payload.phone = phone;
+        const email = values.email?.trim();
+        if (email) payload.email = email;
+        const address = values.address?.trim();
+        if (address) payload.address = address;
+        const city = values.city?.trim();
+        if (city) payload.city = city;
+        if (values.segment) payload.segment = values.segment;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Customer diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Customer ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "email");
+          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Customer</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Customer</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Toko Sinar Terang" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Telepon <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="021-777..." className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Email <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="sales@customer.co.id"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Alamat <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Jl. Pasar Raya No. 1"
+                      className="rounded-xl"
+                      rows={2}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Kota <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Jakarta" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="segment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Segmen <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih segmen" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="">Tidak ada</SelectItem>
+                        <SelectItem value="Retail">Retail</SelectItem>
+                        <SelectItem value="Distributor">Distributor</SelectItem>
+                        <SelectItem value="Proyek">Proyek</SelectItem>
+                        <SelectItem value="Korporat">Korporat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="customer-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="customer-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function VendorFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Vendor | null;
+}) {
+  const create = useCreateVendor();
+  const update = useUpdateVendor();
+  const { data: vendors } = useVendors();
+  const previewCode = nextCode(
+    (vendors?.data ?? []).map((v) => v.code),
+    "VDR",
+  );
+
+  return (
+    <CrudFormDialog<VendorInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Vendor" : "Tambah Vendor"}
+      description="Penyedia jasa pendukung (ekspedisi, maintenance, kalibrasi, dll)."
+      schema={vendorSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              service_type: (initial.service_type ?? "") as VendorInput["service_type"],
+              contact_phone: initial.contact_phone ?? "",
+              email: initial.email ?? "",
+              is_active: initial.is_active,
+            }
+          : {
+              code: "",
+              name: "",
+              service_type: "",
+              contact_phone: "",
+              email: "",
+              is_active: true,
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: VendorPayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        if (values.service_type) payload.service_type = values.service_type;
+        const contact = values.contact_phone?.trim();
+        if (contact) payload.contact_phone = contact;
+        const email = values.email?.trim();
+        if (email) payload.email = email;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Vendor diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Vendor ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "email");
+          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Vendor</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Vendor</FormLabel>
+                  <FormControl>
+                    <Input placeholder="JNE Cabang Pusat" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="service_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Jenis Layanan{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih layanan" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="">Tidak ada</SelectItem>
+                        <SelectItem value="Ekspedisi">Ekspedisi</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <SelectItem value="Kalibrasi">Kalibrasi</SelectItem>
+                        <SelectItem value="Cleaning">Cleaning</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="contact_phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Kontak <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="021-888..." className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Email <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="cs@vendor.co.id"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="vendor-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="vendor-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -1101,6 +1816,7 @@ export function ItemFormDialog({
   const { data: warehouses } = useWarehouses();
   const { data: rackRows } = useRacks();
   const { data: binRows } = useBins();
+  const { data: suppliers } = useSuppliers();
   const { data: items } = useItems();
   const previewInternal = nextCode(
     (items?.data ?? []).map((i) => i.internal_barcode).filter((c): c is string => c != null),
@@ -1122,6 +1838,7 @@ export function ItemFormDialog({
             default_warehouse_id: initial.default_warehouse_id ?? "",
             default_rack_id: initial.default_rack_id ?? "",
             default_bin_id: initial.default_bin_id ?? "",
+            preferred_supplier_id: initial.preferred_supplier_id ?? "",
             cost: initial.cost,
             price: initial.price,
             min_stock: initial.min,
@@ -1143,6 +1860,7 @@ export function ItemFormDialog({
             default_warehouse_id: "",
             default_rack_id: "",
             default_bin_id: "",
+            preferred_supplier_id: "",
             cost: 0,
             price: 0,
             min_stock: 0,
@@ -1174,6 +1892,7 @@ export function ItemFormDialog({
     if (v.default_warehouse_id) payload.default_warehouse_id = v.default_warehouse_id;
     if (v.default_rack_id) payload.default_rack_id = v.default_rack_id;
     if (v.default_bin_id) payload.default_bin_id = v.default_bin_id;
+    if (v.preferred_supplier_id) payload.preferred_supplier_id = v.preferred_supplier_id;
     if (v.max_stock != null) payload.max_stock = v.max_stock;
     if (v.weight != null) payload.weight = v.weight;
     return payload;
@@ -1372,6 +2091,37 @@ export function ItemFormDialog({
                           {merks?.data.map((m) => (
                             <SelectItem key={m.id} value={String(m.id)}>
                               {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="preferred_supplier_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Supplier{" "}
+                        <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : ""}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Pilih supplier" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-72 rounded-xl">
+                          <SelectItem value="">Tidak ada</SelectItem>
+                          {suppliers?.data.map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

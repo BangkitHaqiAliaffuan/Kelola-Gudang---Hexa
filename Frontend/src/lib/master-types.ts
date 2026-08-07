@@ -82,6 +82,48 @@ export type Bin = {
   updated_at: string;
 };
 
+export type Supplier = {
+  id: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  tax_id: string | null;
+  payment_terms: string | null;
+  is_active: boolean;
+  items_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Customer = {
+  id: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  segment: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Vendor = {
+  id: number;
+  code: string;
+  name: string;
+  service_type: string | null;
+  contact_phone: string | null;
+  email: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ItemApi = {
   id: number;
   sku: string;
@@ -97,6 +139,7 @@ export type ItemApi = {
   default_warehouse_id: number | null;
   default_rack_id: number | null;
   default_bin_id: number | null;
+  preferred_supplier_id: number | null;
   // Reference tables ship with later master-data phases — null until then.
   brand: string | null;
   supplier: string | null;

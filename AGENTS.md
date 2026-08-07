@@ -3,7 +3,7 @@
 Warehouse Management System (WMS) monorepo. Two sibling sub-projects with **no root manifest**. Git repo lives at the root (branch `main`, remote `origin` → `https://github.com/BangkitHaqiAliaffuan/Kelola-Gudang---Hexa.git`) — commit from the root, not inside a sub-project. The Frontend is Lovable-connected, so never force-push or rewrite published history. Each sub-project has its own detailed AGENTS.md — read the relevant one before touching its code.
 
 - `Frontend/` — the active product: TanStack Start + React 19 UI demo (Indonesian UI). `Frontend/AGENTS.md` is authoritative and detailed — commands, routing, tooling gotchas, and data conventions live there.
-- `Backend/` — Laravel 13 API powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Barang — API-backed since 2026). `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
+- `Backend/` — Laravel 13 API powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang — API-backed since 2026). `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
 
 ## Git rules
 
@@ -33,7 +33,7 @@ UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded
 
 ## Backend (Laravel 13)
 
-PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). `items.stock`/`reserved` are denormalized today and will move to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) with the Persediaan module. Master data includes `racks`/`bins` (Rak / Bin Location); `items.default_rack_id`/`default_bin_id` are FKs (`nullOnDelete`). Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
+PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). `items.stock`/`reserved` are denormalized today and will move to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) with the Persediaan module. Master data includes `racks`/`bins` (Rak / Bin Location) and `suppliers`/`customers`/`vendors` (Supplier / Customer / Vendor); `items.default_rack_id`/`default_bin_id`/`preferred_supplier_id` are FKs (`nullOnDelete`). Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
 
 ## Multi-session protocol
 

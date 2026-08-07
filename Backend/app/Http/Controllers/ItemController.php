@@ -17,7 +17,7 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::query()->with(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin']);
+        $query = Item::query()->with(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin', 'supplier']);
 
         if ($search = $request->query('search')) {
             $needle = strtolower($search);
@@ -57,12 +57,12 @@ class ItemController extends Controller
             return Item::create($data);
         });
 
-        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin']));
+        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin', 'supplier']));
     }
 
     public function show(Item $item): ItemResource
     {
-        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin']));
+        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin', 'supplier']));
     }
 
     public function update(UpdateItemRequest $request, Item $item): ItemResource

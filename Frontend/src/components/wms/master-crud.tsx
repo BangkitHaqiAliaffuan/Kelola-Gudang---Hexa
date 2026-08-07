@@ -8,7 +8,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
-import { Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "./data-table";
 import { PageHeader, Panel } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,8 @@ export function MasterCrudPage<T extends { id: number }>({
   onRowClick,
   onEdit,
   onDelete,
+  filters,
+  onExport,
 }: {
   title: string;
   description: string;
@@ -67,6 +69,8 @@ export function MasterCrudPage<T extends { id: number }>({
   onRowClick?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void | Promise<void>;
+  filters?: ReactNode;
+  onExport?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
@@ -186,20 +190,30 @@ export function MasterCrudPage<T extends { id: number }>({
         title={title}
         description={description}
         actions={
-          <Button className="rounded-xl" onClick={onAdd}>
-            <Plus className="h-4 w-4" /> {addLabel}
-          </Button>
+          <div className="flex items-center gap-2">
+            {onExport && (
+              <Button variant="outline" className="rounded-xl" onClick={onExport}>
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+            )}
+            <Button className="rounded-xl" onClick={onAdd}>
+              <Plus className="h-4 w-4" /> {addLabel}
+            </Button>
+          </div>
         }
       />
       <Panel title={title} {...(filtered ? { description: `${filtered.length} data` } : {})}>
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="rounded-xl pl-9"
-          />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="rounded-xl pl-9"
+            />
+          </div>
+          {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
         </div>
         <DataTable
           columns={allColumns}

@@ -27,7 +27,7 @@ class UpdateItemRequest extends FormRequest
             )],
             'brand_id' => ['nullable', 'integer', 'exists:merks,id'],
             'unit_id' => ['nullable', 'integer', 'exists:units,id'],
-            'preferred_supplier_id' => ['nullable', 'string', 'max:20'],
+            'preferred_supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'default_rack_id' => ['nullable', 'integer', Rule::exists('racks', 'id')],
             'default_bin_id' => ['nullable', 'integer', Rule::exists('bins', 'id')],
