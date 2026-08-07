@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useForm,
   type DefaultValues,
@@ -270,10 +270,13 @@ export function CrudFormDialog<TValues extends FieldValues>({
   });
   const { isSubmitting } = form.formState;
 
+  const defaultValuesRef = useRef(defaultValues);
+  defaultValuesRef.current = defaultValues;
+
   useEffect(() => {
-    if (open) form.reset(defaultValues);
+    if (open) form.reset(defaultValuesRef.current);
     // resetKey forces a reset when switching between create/edit targets.
-  }, [open, resetKey, defaultValues, form]);
+  }, [open, resetKey, defaultValuesRef, form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
