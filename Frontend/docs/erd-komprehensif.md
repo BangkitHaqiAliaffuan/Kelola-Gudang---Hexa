@@ -161,9 +161,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     string payment_terms
     boolean is_active
   }
@@ -184,9 +181,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     boolean is_active
   }
   DEPARTMENT {
@@ -250,9 +244,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     boolean is_active
   }
   %% PK komposit (item_id, warehouse_id, bin_id); bin_id opsional bila tanpa bin
@@ -831,9 +822,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     string payment_terms
     boolean is_active
   }
@@ -854,9 +842,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     boolean is_active
   }
   DEPARTMENT {
@@ -920,9 +905,6 @@ erDiagram
     string bank_name
     string bank_account_no
     string bank_account_name
-    string verification_status
-    string verification_note
-    datetime verified_at
     boolean is_active
   }
 

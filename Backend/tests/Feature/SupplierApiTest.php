@@ -119,23 +119,6 @@ class SupplierApiTest extends TestCase
             ->assertJsonValidationErrors(['nib']);
     }
 
-    public function test_store_rejects_invalid_verification_status(): void
-    {
-        $this->postJson('/api/master/suppliers', [
-            'name' => 'PT Status Salah',
-            'verification_status' => 'approved',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['verification_status']);
-    }
-
-    public function test_store_defaults_verification_status_to_unverified(): void
-    {
-        $this->postJson('/api/master/suppliers', [
-            'name' => 'PT Status Default',
-        ])->assertCreated()
-            ->assertJsonPath('data.verification_status', 'unverified');
-    }
-
     public function test_store_persists_detail_pt_fields(): void
     {
         $this->postJson('/api/master/suppliers', [
@@ -148,8 +131,6 @@ class SupplierApiTest extends TestCase
             'bank_name' => 'BCA',
             'bank_account_no' => '1234567890',
             'bank_account_name' => 'PT Detail Sempurna Legal',
-            'verification_status' => 'verified',
-            'verification_note' => 'Dokumen lengkap',
         ])->assertCreated()
             ->assertJsonPath('data.legal_name', 'PT Detail Sempurna Legal')
             ->assertJsonPath('data.nib', '9120000000001')
@@ -158,10 +139,7 @@ class SupplierApiTest extends TestCase
             ->assertJsonPath('data.website', 'https://sempurna.co.id')
             ->assertJsonPath('data.bank_name', 'BCA')
             ->assertJsonPath('data.bank_account_no', '1234567890')
-            ->assertJsonPath('data.bank_account_name', 'PT Detail Sempurna Legal')
-            ->assertJsonPath('data.verification_status', 'verified')
-            ->assertJsonPath('data.verification_note', 'Dokumen lengkap')
-            ->assertJsonStructure(['data' => ['verified_at']]);
+            ->assertJsonPath('data.bank_account_name', 'PT Detail Sempurna Legal');
     }
 
     public function test_can_show_supplier(): void
@@ -184,33 +162,6 @@ class SupplierApiTest extends TestCase
             ->assertJsonPath('data.name', 'PT Baru');
 
         $this->assertDatabaseHas('suppliers', ['id' => $supplier->id, 'name' => 'PT Baru']);
-    }
-
-    public function test_update_sets_verified_at_when_verified(): void
-    {
-        $supplier = Supplier::factory()->create();
-
-        $this->putJson("/api/master/suppliers/{$supplier->id}", [
-            'name' => $supplier->name,
-            'verification_status' => 'verified',
-        ])->assertOk()
-            ->assertJsonPath('data.verification_status', 'verified')
-            ->assertJsonStructure(['data' => ['verified_at']]);
-    }
-
-    public function test_update_clears_verified_at_when_unverified(): void
-    {
-        $supplier = Supplier::factory()->create([
-            'verification_status' => 'verified',
-            'verified_at' => now(),
-        ]);
-
-        $this->putJson("/api/master/suppliers/{$supplier->id}", [
-            'name' => $supplier->name,
-            'verification_status' => 'unverified',
-        ])->assertOk()
-            ->assertJsonPath('data.verification_status', 'unverified')
-            ->assertJsonPath('data.verified_at', null);
     }
 
     public function test_cannot_delete_supplier_that_has_items(): void

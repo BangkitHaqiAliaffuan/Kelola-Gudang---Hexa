@@ -13,14 +13,14 @@ class CustomerSeeder extends Seeder
         $customers = [
             ['name' => 'Toko Sinar Terang', 'city' => 'Jakarta Barat', 'segment' => 'Retail'],
             ['name' => 'CV Maju Bersama', 'city' => 'Surabaya', 'segment' => 'Distributor'],
-            ['name' => 'PT Bangun Karya Utama', 'city' => 'Bandung', 'segment' => 'Proyek', 'verified' => true],
-            ['name' => 'PT Indogrosir Sentosa', 'city' => 'Bekasi', 'segment' => 'Korporat', 'verified' => true],
+            ['name' => 'PT Bangun Karya Utama', 'city' => 'Bandung', 'segment' => 'Proyek'],
+            ['name' => 'PT Indogrosir Sentosa', 'city' => 'Bekasi', 'segment' => 'Korporat'],
             ['name' => 'Toko Kembar Jaya', 'city' => 'Semarang', 'segment' => 'Retail'],
             ['name' => 'PT Sinar Perkasa Group', 'city' => 'Jakarta Timur', 'segment' => 'Korporat'],
             ['name' => 'CV Niaga Berkah', 'city' => 'Medan', 'segment' => 'Distributor'],
             ['name' => 'Toko Baru Elektronik', 'city' => 'Makassar', 'segment' => 'Retail'],
             ['name' => 'PT Multi Konstruksi', 'city' => 'Jakarta Selatan', 'segment' => 'Proyek'],
-            ['name' => 'CV Andalan Jaya', 'city' => 'Tangerang', 'segment' => 'Distributor', 'verified' => true],
+            ['name' => 'CV Andalan Jaya', 'city' => 'Tangerang', 'segment' => 'Distributor'],
             ['name' => 'Toko Murni Sejahtera', 'city' => 'Yogyakarta', 'segment' => 'Retail'],
             ['name' => 'PT Cipta Sarana Bangun', 'city' => 'Bogor', 'segment' => 'Proyek'],
             ['name' => 'CV Trans Retail Abadi', 'city' => 'Depok', 'segment' => 'Distributor'],
@@ -47,9 +47,6 @@ class CustomerSeeder extends Seeder
                 'bank_name' => ['BCA', 'Mandiri', 'BNI', 'BRI'][($i - 1) % 4],
                 'bank_account_no' => (string) (2000000000 + $i * 17231),
                 'bank_account_name' => $customer['name'],
-                'verification_status' => ($customer['verified'] ?? false) ? 'verified' : 'unverified',
-                'verification_note' => ($customer['verified'] ?? false) ? 'Dokumen lengkap sesuai hasil cek' : null,
-                'verified_at' => ($customer['verified'] ?? false) ? now() : null,
                 'is_active' => true,
             ]);
             $i++;

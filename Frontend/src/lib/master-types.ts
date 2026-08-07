@@ -104,9 +104,6 @@ export type Supplier = {
   bank_name: string | null;
   bank_account_no: string | null;
   bank_account_name: string | null;
-  verification_status: string;
-  verification_note: string | null;
-  verified_at: string | null;
   is_active: boolean;
   items_count?: number;
   created_at: string;
@@ -130,9 +127,6 @@ export type Customer = {
   bank_name: string | null;
   bank_account_no: string | null;
   bank_account_name: string | null;
-  verification_status: string;
-  verification_note: string | null;
-  verified_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -153,9 +147,6 @@ export type Vendor = {
   bank_name: string | null;
   bank_account_no: string | null;
   bank_account_name: string | null;
-  verification_status: string;
-  verification_note: string | null;
-  verified_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

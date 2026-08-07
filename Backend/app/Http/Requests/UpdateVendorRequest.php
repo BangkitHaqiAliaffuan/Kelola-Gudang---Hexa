@@ -31,8 +31,6 @@ class UpdateVendorRequest extends FormRequest
             'bank_name' => ['nullable', 'string', 'max:100'],
             'bank_account_no' => ['nullable', 'string', 'max:50'],
             'bank_account_name' => ['nullable', 'string', 'max:150'],
-            'verification_status' => ['nullable', Rule::in(['unverified', 'verified', 'rejected'])],
-            'verification_note' => ['nullable', 'string', 'max:500'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

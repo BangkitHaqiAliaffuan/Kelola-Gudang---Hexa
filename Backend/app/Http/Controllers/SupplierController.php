@@ -58,12 +58,6 @@ class SupplierController extends Controller
     {
         $data = $request->validated();
 
-        if (($data['verification_status'] ?? null) === 'verified' && $supplier->verification_status !== 'verified') {
-            $data['verified_at'] = now();
-        } elseif (($data['verification_status'] ?? null) !== 'verified') {
-            $data['verified_at'] = null;
-        }
-
         $supplier->update($data);
 
         return new SupplierResource($supplier->fresh()->loadCount('items'));

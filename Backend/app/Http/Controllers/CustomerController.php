@@ -56,12 +56,6 @@ class CustomerController extends Controller
     {
         $data = $request->validated();
 
-        if (($data['verification_status'] ?? null) === 'verified' && $customer->verification_status !== 'verified') {
-            $data['verified_at'] = now();
-        } elseif (($data['verification_status'] ?? null) !== 'verified') {
-            $data['verified_at'] = null;
-        }
-
         $customer->update($data);
 
         return new CustomerResource($customer->fresh());

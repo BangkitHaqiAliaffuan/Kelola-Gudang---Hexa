@@ -11,13 +11,13 @@ class VendorSeeder extends Seeder
     public function run(): void
     {
         $vendors = [
-            ['name' => 'JNE Cabang Pusat', 'service_type' => 'Ekspedisi', 'verified' => true],
+            ['name' => 'JNE Cabang Pusat', 'service_type' => 'Ekspedisi'],
             ['name' => 'PT SiCepat Express', 'service_type' => 'Ekspedisi'],
-            ['name' => 'PT Anugrah Servis Teknik', 'service_type' => 'Maintenance', 'verified' => true],
+            ['name' => 'PT Anugrah Servis Teknik', 'service_type' => 'Maintenance'],
             ['name' => 'CV Presisi Kalibrasi', 'service_type' => 'Kalibrasi'],
             ['name' => 'PT Nusantara Cleaning Service', 'service_type' => 'Cleaning'],
             ['name' => 'TIKI Kargo Indonesia', 'service_type' => 'Ekspedisi'],
-            ['name' => 'CV Sumber Teknik Maintenance', 'service_type' => 'Maintenance', 'verified' => true],
+            ['name' => 'CV Sumber Teknik Maintenance', 'service_type' => 'Maintenance'],
             ['name' => 'PT Verifikasi Alat Ukur', 'service_type' => 'Kalibrasi'],
         ];
 
@@ -37,9 +37,6 @@ class VendorSeeder extends Seeder
                 'bank_name' => ['BCA', 'Mandiri', 'BNI', 'BRI'][($i - 1) % 4],
                 'bank_account_no' => (string) (3000000000 + $i * 19141),
                 'bank_account_name' => $vendor['name'],
-                'verification_status' => ($vendor['verified'] ?? false) ? 'verified' : 'unverified',
-                'verification_note' => ($vendor['verified'] ?? false) ? 'Dokumen lengkap sesuai hasil cek' : null,
-                'verified_at' => ($vendor['verified'] ?? false) ? now() : null,
                 'is_active' => true,
             ]);
             $i++;

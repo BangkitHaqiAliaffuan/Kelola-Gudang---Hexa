@@ -98,35 +98,6 @@ class VendorApiTest extends TestCase
             ->assertJsonValidationErrors(['nib']);
     }
 
-    public function test_store_rejects_invalid_verification_status(): void
-    {
-        $this->postJson('/api/master/vendors', [
-            'name' => 'Vendor Status Salah',
-            'verification_status' => 'approved',
-        ])->assertUnprocessable()
-            ->assertJsonValidationErrors(['verification_status']);
-    }
-
-    public function test_store_defaults_verification_status_to_unverified(): void
-    {
-        $this->postJson('/api/master/vendors', [
-            'name' => 'Vendor Status Default',
-        ])->assertCreated()
-            ->assertJsonPath('data.verification_status', 'unverified');
-    }
-
-    public function test_update_sets_verified_at_when_verified(): void
-    {
-        $vendor = Vendor::factory()->create();
-
-        $this->putJson("/api/master/vendors/{$vendor->id}", [
-            'name' => $vendor->name,
-            'verification_status' => 'verified',
-        ])->assertOk()
-            ->assertJsonPath('data.verification_status', 'verified')
-            ->assertJsonStructure(['data' => ['verified_at']]);
-    }
-
     public function test_can_show_vendor(): void
     {
         $vendor = Vendor::factory()->create(['name' => 'Vendor Tampil']);

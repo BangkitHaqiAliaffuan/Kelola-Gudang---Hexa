@@ -236,8 +236,6 @@ export type SupplierPayload = {
   bank_name?: string;
   bank_account_no?: string;
   bank_account_name?: string;
-  verification_status?: string;
-  verification_note?: string;
   is_active: boolean;
 };
 
@@ -257,8 +255,6 @@ export type CustomerPayload = {
   bank_name?: string;
   bank_account_no?: string;
   bank_account_name?: string;
-  verification_status?: string;
-  verification_note?: string;
   is_active: boolean;
 };
 
@@ -276,8 +272,6 @@ export type VendorPayload = {
   bank_name?: string;
   bank_account_no?: string;
   bank_account_name?: string;
-  verification_status?: string;
-  verification_note?: string;
   is_active: boolean;
 };
 

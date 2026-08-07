@@ -29,8 +29,6 @@ class VendorFactory extends Factory
             'bank_name' => $this->faker->randomElement(['BCA', 'Mandiri', 'BNI', 'BRI']),
             'bank_account_no' => (string) $this->faker->unique()->numberBetween(1000000000, 9999999999),
             'bank_account_name' => $this->faker->company(),
-            'verification_status' => 'unverified',
-            'verification_note' => null,
             'is_active' => true,
         ];
     }

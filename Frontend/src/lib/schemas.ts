@@ -144,8 +144,6 @@ export const supplierSchema = z.object({
   bank_name: optionalText(100),
   bank_account_no: optionalText(50),
   bank_account_name: optionalText(150),
-  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
-  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type SupplierInput = z.infer<typeof supplierSchema>;
@@ -168,8 +166,6 @@ export const customerSchema = z.object({
   bank_name: optionalText(100),
   bank_account_no: optionalText(50),
   bank_account_name: optionalText(150),
-  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
-  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type CustomerInput = z.infer<typeof customerSchema>;
@@ -190,8 +186,6 @@ export const vendorSchema = z.object({
   bank_name: optionalText(100),
   bank_account_no: optionalText(50),
   bank_account_name: optionalText(150),
-  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
-  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type VendorInput = z.infer<typeof vendorSchema>;

@@ -11,17 +11,17 @@ class SupplierSeeder extends Seeder
     public function run(): void
     {
         $suppliers = [
-            ['name' => 'PT Sumber Makmur Sentosa', 'city' => 'Jakarta Timur', 'payment_terms' => 'NET 30', 'verified' => true],
+            ['name' => 'PT Sumber Makmur Sentosa', 'city' => 'Jakarta Timur', 'payment_terms' => 'NET 30'],
             ['name' => 'CV Elektronik Nusantara', 'city' => 'Surabaya', 'payment_terms' => 'NET 14'],
             ['name' => 'PT Indochem Distributor', 'city' => 'Bekasi', 'payment_terms' => 'NET 30'],
-            ['name' => 'PT Teknik Prima Perkasa', 'city' => 'Bandung', 'payment_terms' => 'NET 45', 'verified' => true],
+            ['name' => 'PT Teknik Prima Perkasa', 'city' => 'Bandung', 'payment_terms' => 'NET 45'],
             ['name' => 'CV Sinar Logistik', 'city' => 'Semarang', 'payment_terms' => 'COD'],
             ['name' => 'PT Anugerah Karya Abadi', 'city' => 'Medan', 'payment_terms' => 'NET 30'],
-            ['name' => 'PT Citra Bangun Mandiri', 'city' => 'Makassar', 'payment_terms' => 'NET 14', 'verified' => true],
+            ['name' => 'PT Citra Bangun Mandiri', 'city' => 'Makassar', 'payment_terms' => 'NET 14'],
             ['name' => 'CV Alat Ukur Jaya', 'city' => 'Jakarta Pusat', 'payment_terms' => 'COD'],
             ['name' => 'PT Fajar Sentosa Jaya', 'city' => 'Jakarta Barat', 'payment_terms' => 'NET 30'],
             ['name' => 'CV Mitra Bahari', 'city' => 'Tangerang', 'payment_terms' => 'NET 45'],
-            ['name' => 'PT Raja Material Indonesia', 'city' => 'Jakarta Selatan', 'payment_terms' => 'NET 30', 'verified' => true],
+            ['name' => 'PT Raja Material Indonesia', 'city' => 'Jakarta Selatan', 'payment_terms' => 'NET 30'],
             ['name' => 'CV Putra Mandiri Sejahtera', 'city' => 'Bogor', 'payment_terms' => 'NET 14'],
             ['name' => 'PT Graha Suplai Nusantara', 'city' => 'Yogyakarta', 'payment_terms' => 'NET 30'],
             ['name' => 'CV Karya Logam Utama', 'city' => 'Surakarta', 'payment_terms' => 'COD'],
@@ -51,9 +51,6 @@ class SupplierSeeder extends Seeder
                 'bank_name' => ['BCA', 'Mandiri', 'BNI', 'BRI'][($i - 1) % 4],
                 'bank_account_no' => (string) (1000000000 + $i * 13717),
                 'bank_account_name' => $supplier['name'],
-                'verification_status' => ($supplier['verified'] ?? false) ? 'verified' : 'unverified',
-                'verification_note' => ($supplier['verified'] ?? false) ? 'Dokumen lengkap sesuai hasil cek' : null,
-                'verified_at' => ($supplier['verified'] ?? false) ? now() : null,
                 'is_active' => true,
             ]);
             $i++;

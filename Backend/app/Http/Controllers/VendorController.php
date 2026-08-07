@@ -56,12 +56,6 @@ class VendorController extends Controller
     {
         $data = $request->validated();
 
-        if (($data['verification_status'] ?? null) === 'verified' && $vendor->verification_status !== 'verified') {
-            $data['verified_at'] = now();
-        } elseif (($data['verification_status'] ?? null) !== 'verified') {
-            $data['verified_at'] = null;
-        }
-
         $vendor->update($data);
 
         return new VendorResource($vendor->fresh());

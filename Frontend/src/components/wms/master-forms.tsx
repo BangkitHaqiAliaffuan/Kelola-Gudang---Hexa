@@ -1231,10 +1231,6 @@ export function SupplierFormDialog({
               bank_name: initial.bank_name ?? "",
               bank_account_no: initial.bank_account_no ?? "",
               bank_account_name: initial.bank_account_name ?? "",
-              verification_status:
-                (initial.verification_status as SupplierInput["verification_status"]) ??
-                "unverified",
-              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
@@ -1253,8 +1249,6 @@ export function SupplierFormDialog({
               bank_name: "",
               bank_account_no: "",
               bank_account_name: "",
-              verification_status: "unverified",
-              verification_note: "",
               is_active: true,
             }
       }
@@ -1290,9 +1284,6 @@ export function SupplierFormDialog({
         if (bankAccountNo) payload.bank_account_no = bankAccountNo;
         const bankAccountName = values.bank_account_name?.trim();
         if (bankAccountName) payload.bank_account_name = bankAccountName;
-        if (values.verification_status) payload.verification_status = values.verification_status;
-        const verificationNote = values.verification_note?.trim();
-        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -1602,54 +1593,6 @@ export function SupplierFormDialog({
                 )}
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="verification_status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status Verifikasi</FormLabel>
-                    <Select
-                      value={field.value ?? "unverified"}
-                      onValueChange={(v) => field.onChange(v as typeof field.value)}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Pilih status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
-                        <SelectItem value="verified">Diverifikasi</SelectItem>
-                        <SelectItem value="rejected">Ditolak</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="verification_note"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Catatan Verifikasi{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Alasan / catatan verifikasi"
-                        className="rounded-xl"
-                        rows={1}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
               name="is_active"
@@ -1716,10 +1659,6 @@ export function CustomerFormDialog({
               bank_name: initial.bank_name ?? "",
               bank_account_no: initial.bank_account_no ?? "",
               bank_account_name: initial.bank_account_name ?? "",
-              verification_status:
-                (initial.verification_status as CustomerInput["verification_status"]) ??
-                "unverified",
-              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
@@ -1738,8 +1677,6 @@ export function CustomerFormDialog({
               bank_name: "",
               bank_account_no: "",
               bank_account_name: "",
-              verification_status: "unverified",
-              verification_note: "",
               is_active: true,
             }
       }
@@ -1775,9 +1712,6 @@ export function CustomerFormDialog({
         if (bankAccountNo) payload.bank_account_no = bankAccountNo;
         const bankAccountName = values.bank_account_name?.trim();
         if (bankAccountName) payload.bank_account_name = bankAccountName;
-        if (values.verification_status) payload.verification_status = values.verification_status;
-        const verificationNote = values.verification_note?.trim();
-        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -1794,15 +1728,13 @@ export function CustomerFormDialog({
           rowField(form as never, err, "nib");
           rowField(form as never, err, "npwp");
           rowField(form as never, err, "website");
-          rowField(form as never, err, "verification_status");
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
             !fieldError(err, "nib") &&
             !fieldError(err, "npwp") &&
-            !fieldError(err, "website") &&
-            !fieldError(err, "verification_status")
+            !fieldError(err, "website")
           )
             toast.error((err as Error).message);
         }
@@ -2079,54 +2011,6 @@ export function CustomerFormDialog({
                 )}
               />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="verification_status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status Verifikasi</FormLabel>
-                    <Select
-                      value={field.value ?? "unverified"}
-                      onValueChange={(v) => field.onChange(v as typeof field.value)}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Pilih status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
-                        <SelectItem value="verified">Diverifikasi</SelectItem>
-                        <SelectItem value="rejected">Ditolak</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="verification_note"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Catatan Verifikasi{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Alasan / catatan verifikasi"
-                        className="rounded-xl"
-                        rows={1}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
               name="is_active"
@@ -2191,9 +2075,6 @@ export function VendorFormDialog({
               bank_name: initial.bank_name ?? "",
               bank_account_no: initial.bank_account_no ?? "",
               bank_account_name: initial.bank_account_name ?? "",
-              verification_status:
-                (initial.verification_status as VendorInput["verification_status"]) ?? "unverified",
-              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
@@ -2210,8 +2091,6 @@ export function VendorFormDialog({
               bank_name: "",
               bank_account_no: "",
               bank_account_name: "",
-              verification_status: "unverified",
-              verification_note: "",
               is_active: true,
             }
       }
@@ -2243,9 +2122,6 @@ export function VendorFormDialog({
         if (bankAccountNo) payload.bank_account_no = bankAccountNo;
         const bankAccountName = values.bank_account_name?.trim();
         if (bankAccountName) payload.bank_account_name = bankAccountName;
-        if (values.verification_status) payload.verification_status = values.verification_status;
-        const verificationNote = values.verification_note?.trim();
-        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -2262,15 +2138,13 @@ export function VendorFormDialog({
           rowField(form as never, err, "nib");
           rowField(form as never, err, "npwp");
           rowField(form as never, err, "website");
-          rowField(form as never, err, "verification_status");
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
             !fieldError(err, "nib") &&
             !fieldError(err, "npwp") &&
-            !fieldError(err, "website") &&
-            !fieldError(err, "verification_status")
+            !fieldError(err, "website")
           )
             toast.error((err as Error).message);
         }
@@ -2499,54 +2373,6 @@ export function VendorFormDialog({
                       <Input
                         placeholder="Nama pemilik rekening"
                         className="rounded-xl"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="verification_status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status Verifikasi</FormLabel>
-                    <Select
-                      value={field.value ?? "unverified"}
-                      onValueChange={(v) => field.onChange(v as typeof field.value)}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Pilih status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
-                        <SelectItem value="verified">Diverifikasi</SelectItem>
-                        <SelectItem value="rejected">Ditolak</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="verification_note"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Catatan Verifikasi{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Alasan / catatan verifikasi"
-                        className="rounded-xl"
-                        rows={1}
                         {...field}
                       />
                     </FormControl>
