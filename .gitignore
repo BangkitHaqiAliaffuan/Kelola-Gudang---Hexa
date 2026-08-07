@@ -1,0 +1,25 @@
+# Runtime/tunnel artifacts created by dev.sh
+.dev/
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Loose secrets safety net (sub-project gitignores already cover their dirs)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+ngrok.yml
+
+# Build output / deps (sub-projects cover these too)
+node_modules/
+dist/
+.output/
+.nitro/
+public/build/
+vendor/

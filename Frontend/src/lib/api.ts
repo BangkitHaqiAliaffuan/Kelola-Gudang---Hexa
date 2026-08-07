@@ -33,6 +33,8 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {};
   if (init?.body) headers["Content-Type"] = "application/json";
+  // ngrok free-tier intercepts browser requests with an HTML interstitial unless this header is set (see dev.sh).
+  if (API_BASE !== "/api") headers["ngrok-skip-browser-warning"] = "true";
 
   let res: Response;
   try {

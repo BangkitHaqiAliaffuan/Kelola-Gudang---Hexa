@@ -1,18 +1,31 @@
 # Kelola Gudang Pro
 
-Warehouse Management System (WMS) monorepo. Two sibling sub-projects with **no root manifest** and **no git repo** at any level. Each sub-project has its own detailed AGENTS.md — read the relevant one before touching its code.
+Warehouse Management System (WMS) monorepo. Two sibling sub-projects with **no root manifest**. Git repo lives at the root (branch `main`, remote `origin` → `https://github.com/BangkitHaqiAliaffuan/Kelola-Gudang---Hexa.git`) — commit from the root, not inside a sub-project. The Frontend is Lovable-connected, so never force-push or rewrite published history. Each sub-project has its own detailed AGENTS.md — read the relevant one before touching its code.
 
 - `Frontend/` — the active product: TanStack Start + React 19 UI demo (Indonesian UI). `Frontend/AGENTS.md` is authoritative and detailed — commands, routing, tooling gotchas, and data conventions live there.
-- `Backend/` — Laravel 13 API powering the master data module (Kategori, Sub Kategori, Barang — API-backed since 2026). `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
+- `Backend/` — Laravel 13 API powering the master data module (Kategori, Sub Kategori, Merk, Barang — API-backed since 2026). `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
+
+## Git rules
+
+- **Never run `git add`, `git commit`, `git push`, or rewrite history (rebase/merge/amend/force-push) without an explicit user instruction.** When asked to commit, stage only the files relevant to the task — never `git add .` / `git add -A`.
+- **Before any commit/push, do a deep pre-commit check** and show the user what would be committed:
+  - Review `git status`, `git diff`, and `git diff --cached` line by line.
+  - Scan staged and new files for secrets: `authtoken`, `api[_-]?key`, `secret`, `password`, `token`, `APP_KEY`, AWS/cloud credentials, `BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY`, URLs with embedded credentials. Never commit `.env`, `.env.local`, `*.key`, `*.pem`, `*.p12`, or `ngrok.yml`.
+  - Reject unnecessary/volatile files: logs, `.dev/` artifacts, build output (`dist`, `.output`, `.nitro`, `public/build`), `node_modules`, IDE/OS files.
+  - Verify `.gitignore` covers everything above; add rules first if not.
+  - Keep `bun.lock` and `package-lock.json` in sync — they change together.
+- If anything suspicious is found, **stop and report to the user** — do not commit/push until resolved.
 
 ## Running the app
 
 Dev loop needs **TWO servers**:
 
 - Laravel API: `composer dev` in `Backend/` → `http://127.0.0.1:8000` (also runs queue:listen + pail + npm run dev).
-- Frontend: `npm run dev` in `Frontend/` → `http://localhost:8081`. Vite proxies `/api` → `http://127.0.0.1:8000` (`vite.config.ts`). If master pages show "Tidak dapat terhubung ke server backend", the Laravel server isn't running.
+- Frontend: `npm run dev` in `Frontend/` → `http://localhost:8080` (default injected by `@lovable.dev/vite-tanstack-config` — not 8081). Vite proxies `/api` → `http://127.0.0.1:8000` (`vite.config.ts`). If master pages show "Tidak dapat terhubung ke server backend", the Laravel server isn't running.
 
-Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/logs/`), verifies ports 8000/8081 are free first, and kills both on Ctrl+C. Prefer this over running the two loops separately.
+Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/logs/`), verifies ports 8000/8080 are free first, and kills both on Ctrl+C. Prefer this over running the two loops separately.
+
+`dev.sh` also starts an **ngrok tunnel** to the backend (skip with `SKIP_TUNNEL=1`) so the Vercel-deployed frontend can reach the local API from production. It prints `VITE_API_URL=<ngrok-url>/api` (also saved to `.dev/logs/ngrok-url.txt` and copied to clipboard). To use it: set that value in the Vercel project's Environment Variables and redeploy — the URL changes each ngrok restart. Backend CORS for this is enabled via `Backend/config/cors.php`.
 
 ## Frontend
 
