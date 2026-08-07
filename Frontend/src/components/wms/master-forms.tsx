@@ -146,6 +146,17 @@ function nextCode(codes: string[], prefix: string): string {
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
+function nextYearlyCode(codes: string[], prefix: string, year = new Date().getFullYear()): string {
+  const head = `${prefix}/${year}/`;
+  let max = 0;
+  for (const c of codes) {
+    if (!c.startsWith(head)) continue;
+    const suffix = c.slice(head.length);
+    if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
+  }
+  return `${head}${String(max + 1).padStart(4, "0")}`;
+}
+
 export function CategoryFormDialog({
   open,
   onOpenChange,
@@ -3598,7 +3609,7 @@ export function WorkOrderFormDialog({
   const { data: items } = useItems();
   const { data: units } = useUnits();
   const { data: users } = useUsers();
-  const previewNo = nextCode(
+  const previewNo = nextYearlyCode(
     (workOrders?.data ?? []).map((w) => w.no),
     "WO",
   );
