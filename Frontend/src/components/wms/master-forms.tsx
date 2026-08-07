@@ -1198,23 +1198,43 @@ export function SupplierFormDialog({
           ? {
               code: initial.code,
               name: initial.name,
+              legal_name: initial.legal_name ?? "",
+              nib: initial.nib ?? "",
               phone: initial.phone ?? "",
               email: initial.email ?? "",
+              pic_name: initial.pic_name ?? "",
+              website: initial.website ?? "",
               address: initial.address ?? "",
               city: initial.city ?? "",
-              tax_id: initial.tax_id ?? "",
+              npwp: initial.npwp ?? "",
               payment_terms: (initial.payment_terms ?? "") as SupplierInput["payment_terms"],
+              bank_name: initial.bank_name ?? "",
+              bank_account_no: initial.bank_account_no ?? "",
+              bank_account_name: initial.bank_account_name ?? "",
+              verification_status:
+                (initial.verification_status as SupplierInput["verification_status"]) ??
+                "unverified",
+              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
               code: "",
               name: "",
+              legal_name: "",
+              nib: "",
               phone: "",
               email: "",
+              pic_name: "",
+              website: "",
               address: "",
               city: "",
-              tax_id: "",
+              npwp: "",
               payment_terms: "",
+              bank_name: "",
+              bank_account_no: "",
+              bank_account_name: "",
+              verification_status: "unverified",
+              verification_note: "",
               is_active: true,
             }
       }
@@ -1225,17 +1245,34 @@ export function SupplierFormDialog({
         };
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
+        const legalName = values.legal_name?.trim();
+        if (legalName) payload.legal_name = legalName;
+        const nib = values.nib?.trim();
+        if (nib) payload.nib = nib;
         const phone = values.phone?.trim();
         if (phone) payload.phone = phone;
         const email = values.email?.trim();
         if (email) payload.email = email;
+        const picName = values.pic_name?.trim();
+        if (picName) payload.pic_name = picName;
+        const website = values.website?.trim();
+        if (website) payload.website = website;
         const address = values.address?.trim();
         if (address) payload.address = address;
         const city = values.city?.trim();
         if (city) payload.city = city;
-        const taxId = values.tax_id?.trim();
-        if (taxId) payload.tax_id = taxId;
+        const npwp = values.npwp?.trim();
+        if (npwp) payload.npwp = npwp;
         if (values.payment_terms) payload.payment_terms = values.payment_terms;
+        const bankName = values.bank_name?.trim();
+        if (bankName) payload.bank_name = bankName;
+        const bankAccountNo = values.bank_account_no?.trim();
+        if (bankAccountNo) payload.bank_account_no = bankAccountNo;
+        const bankAccountName = values.bank_account_name?.trim();
+        if (bankAccountName) payload.bank_account_name = bankAccountName;
+        if (values.verification_status) payload.verification_status = values.verification_status;
+        const verificationNote = values.verification_note?.trim();
+        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -1249,7 +1286,17 @@ export function SupplierFormDialog({
           rowField(form as never, err, "code");
           rowField(form as never, err, "name");
           rowField(form as never, err, "email");
-          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+          rowField(form as never, err, "npwp");
+          rowField(form as never, err, "nib");
+          rowField(form as never, err, "website");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "email") &&
+            !fieldError(err, "npwp") &&
+            !fieldError(err, "nib") &&
+            !fieldError(err, "website")
+          )
             toast.error((err as Error).message);
         }
       }}
@@ -1291,6 +1338,57 @@ export function SupplierFormDialog({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="legal_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Nama Legal <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Nama sesuai akta / dokumen resmi"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="nib"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NIB <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="13 digit NIB" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="npwp"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NPWP <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="NPWP perusahaan" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -1366,20 +1464,44 @@ export function SupplierFormDialog({
               />
               <FormField
                 control={form.control}
-                name="tax_id"
+                name="pic_name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      NPWP <span className="font-normal text-muted-foreground">(opsional)</span>
+                      PIC <span className="font-normal text-muted-foreground">(opsional)</span>
                     </FormLabel>
                     <FormControl>
-                      <Input placeholder="NPWP perusahaan" className="rounded-xl" {...field} />
+                      <Input
+                        placeholder="Nama penanggung jawab"
+                        className="rounded-xl"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="website"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Website <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="url"
+                      placeholder="https://www.supplier.co.id"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="payment_terms"
@@ -1407,6 +1529,107 @@ export function SupplierFormDialog({
                 </FormItem>
               )}
             />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="bank_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="BCA" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_no"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      No. Rekening{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Atas Nama{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nama pemilik rekening"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="verification_status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status Verifikasi</FormLabel>
+                    <Select
+                      value={field.value ?? "unverified"}
+                      onValueChange={(v) => field.onChange(v as typeof field.value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
+                        <SelectItem value="verified">Diverifikasi</SelectItem>
+                        <SelectItem value="rejected">Ditolak</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="verification_note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Catatan Verifikasi{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Alasan / catatan verifikasi"
+                        className="rounded-xl"
+                        rows={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="is_active"
@@ -1460,21 +1683,43 @@ export function CustomerFormDialog({
           ? {
               code: initial.code,
               name: initial.name,
+              legal_name: initial.legal_name ?? "",
+              nib: initial.nib ?? "",
+              npwp: initial.npwp ?? "",
               phone: initial.phone ?? "",
               email: initial.email ?? "",
+              pic_name: initial.pic_name ?? "",
+              website: initial.website ?? "",
               address: initial.address ?? "",
               city: initial.city ?? "",
               segment: (initial.segment ?? "") as CustomerInput["segment"],
+              bank_name: initial.bank_name ?? "",
+              bank_account_no: initial.bank_account_no ?? "",
+              bank_account_name: initial.bank_account_name ?? "",
+              verification_status:
+                (initial.verification_status as CustomerInput["verification_status"]) ??
+                "unverified",
+              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
               code: "",
               name: "",
+              legal_name: "",
+              nib: "",
+              npwp: "",
               phone: "",
               email: "",
+              pic_name: "",
+              website: "",
               address: "",
               city: "",
               segment: "",
+              bank_name: "",
+              bank_account_no: "",
+              bank_account_name: "",
+              verification_status: "unverified",
+              verification_note: "",
               is_active: true,
             }
       }
@@ -1485,15 +1730,34 @@ export function CustomerFormDialog({
         };
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
+        const legalName = values.legal_name?.trim();
+        if (legalName) payload.legal_name = legalName;
+        const nib = values.nib?.trim();
+        if (nib) payload.nib = nib;
+        const npwp = values.npwp?.trim();
+        if (npwp) payload.npwp = npwp;
         const phone = values.phone?.trim();
         if (phone) payload.phone = phone;
         const email = values.email?.trim();
         if (email) payload.email = email;
+        const picName = values.pic_name?.trim();
+        if (picName) payload.pic_name = picName;
+        const website = values.website?.trim();
+        if (website) payload.website = website;
         const address = values.address?.trim();
         if (address) payload.address = address;
         const city = values.city?.trim();
         if (city) payload.city = city;
         if (values.segment) payload.segment = values.segment;
+        const bankName = values.bank_name?.trim();
+        if (bankName) payload.bank_name = bankName;
+        const bankAccountNo = values.bank_account_no?.trim();
+        if (bankAccountNo) payload.bank_account_no = bankAccountNo;
+        const bankAccountName = values.bank_account_name?.trim();
+        if (bankAccountName) payload.bank_account_name = bankAccountName;
+        if (values.verification_status) payload.verification_status = values.verification_status;
+        const verificationNote = values.verification_note?.trim();
+        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -1507,7 +1771,19 @@ export function CustomerFormDialog({
           rowField(form as never, err, "code");
           rowField(form as never, err, "name");
           rowField(form as never, err, "email");
-          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+          rowField(form as never, err, "nib");
+          rowField(form as never, err, "npwp");
+          rowField(form as never, err, "website");
+          rowField(form as never, err, "verification_status");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "email") &&
+            !fieldError(err, "nib") &&
+            !fieldError(err, "npwp") &&
+            !fieldError(err, "website") &&
+            !fieldError(err, "verification_status")
+          )
             toast.error((err as Error).message);
         }
       }}
@@ -1545,6 +1821,57 @@ export function CustomerFormDialog({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="legal_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Nama Legal <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="PT Sinar Terang Perkasa"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="nib"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NIB <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="13 digit" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="npwp"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NPWP <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="15 atau 16 digit" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -1573,6 +1900,40 @@ export function CustomerFormDialog({
                       <Input
                         type="email"
                         placeholder="sales@customer.co.id"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pic_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nama kontak person" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Website <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://customer.co.id"
                         className="rounded-xl"
                         {...field}
                       />
@@ -1645,6 +2006,107 @@ export function CustomerFormDialog({
                 )}
               />
             </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="bank_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="BCA" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_no"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      No. Rekening{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Atas Nama{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nama pemilik rekening"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="verification_status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status Verifikasi</FormLabel>
+                    <Select
+                      value={field.value ?? "unverified"}
+                      onValueChange={(v) => field.onChange(v as typeof field.value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
+                        <SelectItem value="verified">Diverifikasi</SelectItem>
+                        <SelectItem value="rejected">Ditolak</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="verification_note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Catatan Verifikasi{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Alasan / catatan verifikasi"
+                        className="rounded-xl"
+                        rows={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="is_active"
@@ -1698,17 +2160,38 @@ export function VendorFormDialog({
           ? {
               code: initial.code,
               name: initial.name,
+              legal_name: initial.legal_name ?? "",
+              nib: initial.nib ?? "",
+              npwp: initial.npwp ?? "",
               service_type: (initial.service_type ?? "") as VendorInput["service_type"],
               contact_phone: initial.contact_phone ?? "",
               email: initial.email ?? "",
+              pic_name: initial.pic_name ?? "",
+              website: initial.website ?? "",
+              bank_name: initial.bank_name ?? "",
+              bank_account_no: initial.bank_account_no ?? "",
+              bank_account_name: initial.bank_account_name ?? "",
+              verification_status:
+                (initial.verification_status as VendorInput["verification_status"]) ?? "unverified",
+              verification_note: initial.verification_note ?? "",
               is_active: initial.is_active,
             }
           : {
               code: "",
               name: "",
+              legal_name: "",
+              nib: "",
+              npwp: "",
               service_type: "",
               contact_phone: "",
               email: "",
+              pic_name: "",
+              website: "",
+              bank_name: "",
+              bank_account_no: "",
+              bank_account_name: "",
+              verification_status: "unverified",
+              verification_note: "",
               is_active: true,
             }
       }
@@ -1719,11 +2202,30 @@ export function VendorFormDialog({
         };
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
+        const legalName = values.legal_name?.trim();
+        if (legalName) payload.legal_name = legalName;
+        const nib = values.nib?.trim();
+        if (nib) payload.nib = nib;
+        const npwp = values.npwp?.trim();
+        if (npwp) payload.npwp = npwp;
         if (values.service_type) payload.service_type = values.service_type;
         const contact = values.contact_phone?.trim();
         if (contact) payload.contact_phone = contact;
         const email = values.email?.trim();
         if (email) payload.email = email;
+        const picName = values.pic_name?.trim();
+        if (picName) payload.pic_name = picName;
+        const website = values.website?.trim();
+        if (website) payload.website = website;
+        const bankName = values.bank_name?.trim();
+        if (bankName) payload.bank_name = bankName;
+        const bankAccountNo = values.bank_account_no?.trim();
+        if (bankAccountNo) payload.bank_account_no = bankAccountNo;
+        const bankAccountName = values.bank_account_name?.trim();
+        if (bankAccountName) payload.bank_account_name = bankAccountName;
+        if (values.verification_status) payload.verification_status = values.verification_status;
+        const verificationNote = values.verification_note?.trim();
+        if (verificationNote) payload.verification_note = verificationNote;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -1737,7 +2239,19 @@ export function VendorFormDialog({
           rowField(form as never, err, "code");
           rowField(form as never, err, "name");
           rowField(form as never, err, "email");
-          if (!fieldError(err, "code") && !fieldError(err, "name") && !fieldError(err, "email"))
+          rowField(form as never, err, "nib");
+          rowField(form as never, err, "npwp");
+          rowField(form as never, err, "website");
+          rowField(form as never, err, "verification_status");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "email") &&
+            !fieldError(err, "nib") &&
+            !fieldError(err, "npwp") &&
+            !fieldError(err, "website") &&
+            !fieldError(err, "verification_status")
+          )
             toast.error((err as Error).message);
         }
       }}
@@ -1775,6 +2289,57 @@ export function VendorFormDialog({
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="legal_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Nama Legal <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="PT Jalur Nugraha Ekakurir"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="nib"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NIB <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="13 digit" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="npwp"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      NPWP <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="15 atau 16 digit" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
@@ -1818,27 +2383,158 @@ export function VendorFormDialog({
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Email <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="cs@vendor.co.id"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pic_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nama kontak person" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
             <FormField
               control={form.control}
-              name="email"
+              name="website"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Email <span className="font-normal text-muted-foreground">(opsional)</span>
+                    Website <span className="font-normal text-muted-foreground">(opsional)</span>
                   </FormLabel>
                   <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="cs@vendor.co.id"
-                      className="rounded-xl"
-                      {...field}
-                    />
+                    <Input placeholder="https://vendor.co.id" className="rounded-xl" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="bank_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="BCA" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_no"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      No. Rekening{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bank_account_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Atas Nama{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nama pemilik rekening"
+                        className="rounded-xl"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="verification_status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status Verifikasi</FormLabel>
+                    <Select
+                      value={field.value ?? "unverified"}
+                      onValueChange={(v) => field.onChange(v as typeof field.value)}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="unverified">Belum Diverifikasi</SelectItem>
+                        <SelectItem value="verified">Diverifikasi</SelectItem>
+                        <SelectItem value="rejected">Ditolak</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="verification_note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Catatan Verifikasi{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Alasan / catatan verifikasi"
+                        className="rounded-xl"
+                        rows={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="is_active"
@@ -2797,7 +3493,8 @@ export function ProjectFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Tanggal Mulai <span className="font-normal text-muted-foreground">(opsional)</span>
+                      Tanggal Mulai{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -2817,7 +3514,8 @@ export function ProjectFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Tanggal Selesai <span className="font-normal text-muted-foreground">(opsional)</span>
+                      Tanggal Selesai{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -3106,7 +3804,8 @@ export function WorkOrderFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Tanggal Mulai <span className="font-normal text-muted-foreground">(opsional)</span>
+                      Tanggal Mulai{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
                     </FormLabel>
                     <FormControl>
                       <Input
@@ -3126,7 +3825,8 @@ export function WorkOrderFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Tanggal Selesai <span className="font-normal text-muted-foreground">(opsional)</span>
+                      Tanggal Selesai{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
                     </FormLabel>
                     <FormControl>
                       <Input

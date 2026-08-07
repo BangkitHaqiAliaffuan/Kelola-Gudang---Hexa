@@ -72,6 +72,62 @@ class CustomerApiTest extends TestCase
             ->assertJsonValidationErrors(['segment']);
     }
 
+    public function test_store_accepts_valid_npwp(): void
+    {
+        $this->postJson('/api/master/customers', [
+            'name' => 'Toko NPWP Valid',
+            'npwp' => '016090524017000',
+        ])->assertCreated()
+            ->assertJsonPath('data.npwp', '016090524017000');
+    }
+
+    public function test_store_rejects_invalid_npwp(): void
+    {
+        $this->postJson('/api/master/customers', [
+            'name' => 'Toko NPWP Invalid',
+            'npwp' => '999999999999999',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['npwp']);
+    }
+
+    public function test_store_rejects_invalid_nib(): void
+    {
+        $this->postJson('/api/master/customers', [
+            'name' => 'Toko NIB Invalid',
+            'nib' => 'abc',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['nib']);
+    }
+
+    public function test_store_rejects_invalid_verification_status(): void
+    {
+        $this->postJson('/api/master/customers', [
+            'name' => 'Toko Status Salah',
+            'verification_status' => 'approved',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['verification_status']);
+    }
+
+    public function test_store_defaults_verification_status_to_unverified(): void
+    {
+        $this->postJson('/api/master/customers', [
+            'name' => 'Toko Status Default',
+        ])->assertCreated()
+            ->assertJsonPath('data.verification_status', 'unverified');
+    }
+
+    public function test_update_sets_verified_at_when_verified(): void
+    {
+        $customer = Customer::factory()->create();
+
+        $this->putJson("/api/master/customers/{$customer->id}", [
+            'name' => $customer->name,
+            'verification_status' => 'verified',
+        ])->assertOk()
+            ->assertJsonPath('data.verification_status', 'verified')
+            ->assertJsonStructure(['data' => ['verified_at']]);
+    }
+
     public function test_can_show_customer(): void
     {
         $customer = Customer::factory()->create(['name' => 'Toko Tampil']);

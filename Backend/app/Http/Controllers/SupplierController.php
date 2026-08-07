@@ -44,7 +44,7 @@ class SupplierController extends Controller
             return Supplier::create($data);
         });
 
-        return new SupplierResource($supplier);
+        return new SupplierResource($supplier->refresh());
     }
 
     public function show(Supplier $supplier): SupplierResource
@@ -56,7 +56,15 @@ class SupplierController extends Controller
 
     public function update(UpdateSupplierRequest $request, Supplier $supplier): SupplierResource
     {
-        $supplier->update($request->validated());
+        $data = $request->validated();
+
+        if (($data['verification_status'] ?? null) === 'verified' && $supplier->verification_status !== 'verified') {
+            $data['verified_at'] = now();
+        } elseif (($data['verification_status'] ?? null) !== 'verified') {
+            $data['verified_at'] = null;
+        }
+
+        $supplier->update($data);
 
         return new SupplierResource($supplier->fresh()->loadCount('items'));
     }

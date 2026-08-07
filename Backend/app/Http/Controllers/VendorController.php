@@ -44,7 +44,7 @@ class VendorController extends Controller
             return Vendor::create($data);
         });
 
-        return new VendorResource($vendor);
+        return new VendorResource($vendor->refresh());
     }
 
     public function show(Vendor $vendor): VendorResource
@@ -54,7 +54,15 @@ class VendorController extends Controller
 
     public function update(UpdateVendorRequest $request, Vendor $vendor): VendorResource
     {
-        $vendor->update($request->validated());
+        $data = $request->validated();
+
+        if (($data['verification_status'] ?? null) === 'verified' && $vendor->verification_status !== 'verified') {
+            $data['verified_at'] = now();
+        } elseif (($data['verification_status'] ?? null) !== 'verified') {
+            $data['verified_at'] = null;
+        }
+
+        $vendor->update($data);
 
         return new VendorResource($vendor->fresh());
     }

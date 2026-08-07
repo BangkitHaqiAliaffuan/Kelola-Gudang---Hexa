@@ -5,6 +5,50 @@ import { z } from "zod";
 const code = z.string().trim().max(20, "Maksimal 20 karakter").optional();
 const name = z.string().trim().min(1, "Nama wajib diisi").max(150, "Maksimal 150 karakter");
 
+function luhn(number: string): boolean {
+  let sum = 0;
+  const parity = number.length % 2;
+  for (let i = 0; i < number.length; i++) {
+    let digit = Number(number[i]);
+    if (i % 2 === parity) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+  return sum % 10 === 0;
+}
+
+// Mirrors App\Support\Npwp::isValid in the backend.
+function isValidNpwp(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 15) return luhn(digits.slice(0, 9));
+  if (digits.length === 16) return digits[0] === "0" ? luhn(digits.slice(0, 10)) : true;
+  return false;
+}
+
+const optionalText = (max: number) =>
+  z.string().trim().max(max, `Maksimal ${max} karakter`).optional().or(z.literal(""));
+const optionalRegex = (pattern: RegExp, message: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `Maksimal ${max} karakter`)
+    .regex(pattern, message)
+    .optional()
+    .or(z.literal(""));
+
+const npwp = optionalText(20).refine(
+  (v) => !v || isValidNpwp(v),
+  "Format NPWP tidak valid (15/16 digit dengan checksum yang benar)",
+);
+const nib = optionalRegex(/^\d{13}$/, "NIB harus 13 digit angka", 13);
+const website = optionalRegex(
+  /^https?:\/\/.+\..+/,
+  "Format URL tidak valid (mis. https://...)",
+  255,
+);
+
 export const categorySchema = z.object({
   code,
   name,
@@ -87,12 +131,21 @@ const email = z
 export const supplierSchema = z.object({
   code,
   name,
+  legal_name: optionalText(200),
+  nib,
   phone,
   email,
-  address: z.string().trim().max(255, "Maksimal 255 karakter").optional().or(z.literal("")),
-  city: z.string().trim().max(100, "Maksimal 100 karakter").optional().or(z.literal("")),
-  tax_id: z.string().trim().max(50, "Maksimal 50 karakter").optional().or(z.literal("")),
+  pic_name: optionalText(150),
+  website,
+  address: optionalText(255),
+  city: optionalText(100),
+  npwp,
   payment_terms: z.union([z.enum(["NET 30", "NET 14", "COD", "NET 45"]), z.literal("")]).optional(),
+  bank_name: optionalText(100),
+  bank_account_no: optionalText(50),
+  bank_account_name: optionalText(150),
+  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
+  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type SupplierInput = z.infer<typeof supplierSchema>;
@@ -100,13 +153,23 @@ export type SupplierInput = z.infer<typeof supplierSchema>;
 export const customerSchema = z.object({
   code,
   name,
+  legal_name: optionalText(200),
+  nib,
+  npwp,
   phone,
   email,
-  address: z.string().trim().max(255, "Maksimal 255 karakter").optional().or(z.literal("")),
-  city: z.string().trim().max(100, "Maksimal 100 karakter").optional().or(z.literal("")),
+  pic_name: optionalText(150),
+  website,
+  address: optionalText(255),
+  city: optionalText(100),
   segment: z
     .union([z.enum(["Retail", "Distributor", "Proyek", "Korporat"]), z.literal("")])
     .optional(),
+  bank_name: optionalText(100),
+  bank_account_no: optionalText(50),
+  bank_account_name: optionalText(150),
+  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
+  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type CustomerInput = z.infer<typeof customerSchema>;
@@ -114,11 +177,21 @@ export type CustomerInput = z.infer<typeof customerSchema>;
 export const vendorSchema = z.object({
   code,
   name,
+  legal_name: optionalText(200),
+  nib,
+  npwp,
   service_type: z
     .union([z.enum(["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"]), z.literal("")])
     .optional(),
   contact_phone: phone,
   email,
+  pic_name: optionalText(150),
+  website,
+  bank_name: optionalText(100),
+  bank_account_no: optionalText(50),
+  bank_account_name: optionalText(150),
+  verification_status: z.enum(["unverified", "verified", "rejected"]).default("unverified"),
+  verification_note: optionalText(500),
   is_active: z.boolean().default(true),
 });
 export type VendorInput = z.infer<typeof vendorSchema>;

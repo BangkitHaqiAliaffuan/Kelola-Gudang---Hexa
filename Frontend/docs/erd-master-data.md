@@ -123,11 +123,21 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
-    string tax_id
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     string payment_terms
     boolean is_active
   }
@@ -135,11 +145,22 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
     string segment
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
   DEPARTMENT {
@@ -219,9 +240,20 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string service_type
     string contact_phone
     string email
+    string pic_name
+    string website
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
 ```
@@ -295,14 +327,14 @@ Detail tipe & contoh nilai dummy untuk entitas core:
 | **RACK**        | `id` PK, `warehouse_id` FK→WAREHOUSE, `code`, `zone`, `is_active`                                                                                                                                                                                                                                                    | RAK-A1 / zona A                                              |
 | **BIN**         | `id` PK, `rack_id` FK→RACK, `code`, `capacity`, `is_active`                                                                                                                                                                                                                                                          | BIN-1A / okupansi 40%                                        |
 | **ITEM**        | `id` PK, `sku` UK, `barcode` UK, `name`, `category_id` FK, `sub_category_id` FK, `brand_id` FK, `unit_id` FK, `preferred_supplier_id` FK, `default_warehouse_id` FK, `default_rack_id` FK, `default_bin_id` FK, `weight`, `dimension`, `cost`, `price`, `min_stock`, `max_stock`, `lead_time`, `status`, `image_url` | SKU-10001-001 / "Bearing 6205" / Rp 125.000                  |
-| **SUPPLIER**    | `id` PK, `code`, `name`, `phone`, `email`, `address`, `city`, `tax_id`, `payment_terms`, `is_active`                                                                                                                                                                                                                 | SUP-001 / "PT Sinar Jaya Abadi" / NET 30                     |
-| **CUSTOMER**    | `id` PK, `code`, `name`, `phone`, `email`, `address`, `city`, `segment`, `is_active`                                                                                                                                                                                                                                 | CUS-001 / "PT Maju 1" / Distributor                          |
+| **SUPPLIER**    | `id` PK, `code`, `name`, `legal_name`, `nib`, `npwp`, `phone`, `email`, `pic_name`, `website`, `address`, `city`, `bank_name`, `bank_account_no`, `bank_account_name`, `verification_status`, `verification_note`, `verified_at`, `payment_terms`, `is_active`                                                                                                                                                                                                                 | SUP-001 / "PT Sinar Jaya Abadi" / NET 30                     |
+| **CUSTOMER**    | `id` PK, `code`, `name`, `legal_name`, `nib`, `npwp`, `phone`, `email`, `pic_name`, `website`, `address`, `city`, `segment`, `bank_name`, `bank_account_no`, `bank_account_name`, `verification_status`, `verification_note`, `verified_at`, `is_active`                                                                                                                                                                                                                                 | CUS-001 / "PT Maju 1" / Distributor                          |
 | **DEPARTMENT**  | `id` PK, `code`, `name`, `head_user_id` FK→USER, `is_active`                                                                                                                                                                                                                                                         | DEP-001 / "Produksi" / "Bayu Pratama"                        |
 | **PROJECT**     | `id` PK, `code`, `name`, `pic_user_id` FK→USER, `start_date`, `end_date`, `status`, `budget`                                                                                                                                                                                                                         | PRJ-001 / "Proyek Tol Cisumdawu" / "Rudi Hartono" / Berjalan |
 | **WORK_ORDER**  | `id` PK, `no`, `project_id` FK, `item_id` FK→ITEM, `unit_id` FK→UNIT, `target_qty`, `start_date`, `finish_date`, `pic_user_id` FK→USER, `status`                                                                                                                                                                     | WO/2026/0001 / target 25 / "Selesai"                         |
 | **USER**        | `id` PK, `name`, `username` UK, `email` UK, `password_hash`, `phone`, `role_id` FK→ROLE, `is_active`                                                                                                                                                                                                                 | "Rudi Hartono" / Operator Gudang                             |
 | **ROLE**        | `id` PK, `code`, `name`, `description`, `is_active`                                                                                                                                                                                                                                                                  | ROL-001 / "Administrator" / 24 modul                         |
-| **VENDOR**      | `id` PK, `code`, `name`, `service_type`, `contact_phone`, `email`, `is_active`                                                                                                                                                                                                                                       | VDR-001 / "PT Vendor Logistik 1" / Ekspedisi                 |
+| **VENDOR**      | `id` PK, `code`, `name`, `legal_name`, `nib`, `npwp`, `service_type`, `contact_phone`, `email`, `pic_name`, `website`, `bank_name`, `bank_account_no`, `bank_account_name`, `verification_status`, `verification_note`, `verified_at`, `is_active`                                                                                                                                                                                                                                       | VDR-001 / "PT Vendor Logistik 1" / Ekspedisi                 |
 
 ## 6. Tabel jembatan
 

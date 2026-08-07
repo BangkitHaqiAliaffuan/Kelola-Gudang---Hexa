@@ -223,32 +223,61 @@ export type BinPayload = {
 export type SupplierPayload = {
   code?: string;
   name: string;
+  legal_name?: string;
+  nib?: string;
   phone?: string;
   email?: string;
+  pic_name?: string;
+  website?: string;
   address?: string;
   city?: string;
-  tax_id?: string;
+  npwp?: string;
   payment_terms?: string;
+  bank_name?: string;
+  bank_account_no?: string;
+  bank_account_name?: string;
+  verification_status?: string;
+  verification_note?: string;
   is_active: boolean;
 };
 
 export type CustomerPayload = {
   code?: string;
   name: string;
+  legal_name?: string;
+  nib?: string;
+  npwp?: string;
   phone?: string;
   email?: string;
+  pic_name?: string;
+  website?: string;
   address?: string;
   city?: string;
   segment?: string;
+  bank_name?: string;
+  bank_account_no?: string;
+  bank_account_name?: string;
+  verification_status?: string;
+  verification_note?: string;
   is_active: boolean;
 };
 
 export type VendorPayload = {
   code?: string;
   name: string;
+  legal_name?: string;
+  nib?: string;
+  npwp?: string;
   service_type?: string;
   contact_phone?: string;
   email?: string;
+  pic_name?: string;
+  website?: string;
+  bank_name?: string;
+  bank_account_no?: string;
+  bank_account_name?: string;
+  verification_status?: string;
+  verification_note?: string;
   is_active: boolean;
 };
 

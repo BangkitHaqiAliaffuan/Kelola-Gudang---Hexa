@@ -82,6 +82,12 @@ function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
 }
 
+function VerificationPill({ status }: { status: string }) {
+  if (status === "verified") return <Pill tone="success">Diverifikasi</Pill>;
+  if (status === "rejected") return <Pill tone="danger">Ditolak</Pill>;
+  return <Pill tone="warning">Belum Diverifikasi</Pill>;
+}
+
 function uniqueOptions<T>(rows: T[], pick: (r: T) => string | null | undefined): string[] {
   const seen = new Set<string>();
   for (const r of rows) {
@@ -594,13 +600,15 @@ export function SupplierPage() {
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [cityFilter, setCityFilter] = useState(ALL);
   const [termsFilter, setTermsFilter] = useState(ALL);
+  const [verificationFilter, setVerificationFilter] = useState(ALL);
   const del = useDeleteSupplier();
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
     (r) =>
       (cityFilter === ALL || r.city === cityFilter) &&
-      (termsFilter === ALL || r.payment_terms === termsFilter),
+      (termsFilter === ALL || r.payment_terms === termsFilter) &&
+      (verificationFilter === ALL || r.verification_status === verificationFilter),
   );
 
   const columns: Column<Supplier>[] = [
@@ -621,6 +629,11 @@ export function SupplierPage() {
       label: "Jumlah Barang",
       render: (r) => (r.items_count ?? 0).toLocaleString("id-ID"),
     },
+    {
+      key: "verification_status",
+      label: "Verifikasi",
+      render: (r) => <VerificationPill status={r.verification_status} />,
+    },
     { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
   ];
 
@@ -630,11 +643,19 @@ export function SupplierPage() {
       toCsv(filtered, [
         { key: "code", label: "Kode" },
         { key: "name", label: "Nama Supplier" },
+        { key: "legal_name", label: "Nama Legal" },
+        { key: "nib", label: "NIB" },
+        { key: "npwp", label: "NPWP" },
         { key: "phone", label: "Telepon" },
         { key: "email", label: "Email" },
+        { key: "pic_name", label: "PIC" },
+        { key: "website", label: "Website" },
         { key: "address", label: "Alamat" },
         { key: "city", label: "Kota" },
-        { key: "tax_id", label: "NPWP" },
+        { key: "bank_name", label: "Bank" },
+        { key: "bank_account_no", label: "No. Rekening" },
+        { key: "bank_account_name", label: "Atas Nama" },
+        { key: "verification_status", label: "Verifikasi" },
         { key: "payment_terms", label: "Termin Pembayaran" },
         { key: "is_active", label: "Status" },
       ]),
@@ -647,7 +668,9 @@ export function SupplierPage() {
         title="Supplier"
         description="Daftar pemasok barang"
         searchPlaceholder="Cari supplier..."
-        searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""} ${r.payment_terms ?? ""}`}
+        searchText={(r) =>
+          `${r.code} ${r.name} ${r.city ?? ""} ${r.payment_terms ?? ""} ${r.verification_status ?? ""}`
+        }
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
@@ -681,6 +704,12 @@ export function SupplierPage() {
               placeholder="Semua Termin"
               options={["NET 30", "NET 14", "COD", "NET 45"]}
             />
+            <FilterSelect
+              value={verificationFilter}
+              onChange={setVerificationFilter}
+              placeholder="Semua Verifikasi"
+              options={["unverified", "verified", "rejected"]}
+            />
           </>
         }
         onExport={exportCsv}
@@ -693,7 +722,10 @@ export function SupplierPage() {
                 {r.city ?? "—"} • {r.payment_terms ?? "—"} • {r.items_count ?? 0} barang
               </p>
             </div>
-            <ActivePill active={r.is_active} />
+            <div className="flex flex-col items-end gap-1">
+              <VerificationPill status={r.verification_status} />
+              <ActivePill active={r.is_active} />
+            </div>
           </div>
         )}
       />
@@ -708,13 +740,15 @@ export function CustomerPage() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [cityFilter, setCityFilter] = useState(ALL);
   const [segmentFilter, setSegmentFilter] = useState(ALL);
+  const [verificationFilter, setVerificationFilter] = useState(ALL);
   const del = useDeleteCustomer();
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
     (r) =>
       (cityFilter === ALL || r.city === cityFilter) &&
-      (segmentFilter === ALL || r.segment === segmentFilter),
+      (segmentFilter === ALL || r.segment === segmentFilter) &&
+      (verificationFilter === ALL || r.verification_status === verificationFilter),
   );
 
   const columns: Column<Customer>[] = [
@@ -730,6 +764,11 @@ export function CustomerPage() {
     },
     { key: "city", label: "Kota", render: (r) => r.city ?? "—" },
     { key: "segment", label: "Segmen", render: (r) => r.segment ?? "—" },
+    {
+      key: "verification_status",
+      label: "Verifikasi",
+      render: (r) => <VerificationPill status={r.verification_status} />,
+    },
     { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
   ];
 
@@ -739,11 +778,20 @@ export function CustomerPage() {
       toCsv(filtered, [
         { key: "code", label: "Kode" },
         { key: "name", label: "Nama Customer" },
+        { key: "legal_name", label: "Nama Legal" },
+        { key: "nib", label: "NIB" },
+        { key: "npwp", label: "NPWP" },
         { key: "phone", label: "Telepon" },
         { key: "email", label: "Email" },
+        { key: "pic_name", label: "PIC" },
+        { key: "website", label: "Website" },
         { key: "address", label: "Alamat" },
         { key: "city", label: "Kota" },
         { key: "segment", label: "Segmen" },
+        { key: "bank_name", label: "Bank" },
+        { key: "bank_account_no", label: "No. Rekening" },
+        { key: "bank_account_name", label: "Atas Nama" },
+        { key: "verification_status", label: "Verifikasi" },
         { key: "is_active", label: "Status" },
       ]),
     );
@@ -755,7 +803,9 @@ export function CustomerPage() {
         title="Customer"
         description="Daftar pembeli / pelanggan"
         searchPlaceholder="Cari customer..."
-        searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""} ${r.segment ?? ""}`}
+        searchText={(r) =>
+          `${r.code} ${r.name} ${r.city ?? ""} ${r.segment ?? ""} ${r.verification_status ?? ""}`
+        }
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
@@ -789,6 +839,12 @@ export function CustomerPage() {
               placeholder="Semua Segmen"
               options={["Retail", "Distributor", "Proyek", "Korporat"]}
             />
+            <FilterSelect
+              value={verificationFilter}
+              onChange={setVerificationFilter}
+              placeholder="Semua Verifikasi"
+              options={["unverified", "verified", "rejected"]}
+            />
           </>
         }
         onExport={exportCsv}
@@ -801,7 +857,10 @@ export function CustomerPage() {
                 {r.city ?? "—"} • {r.segment ?? "—"}
               </p>
             </div>
-            <ActivePill active={r.is_active} />
+            <div className="flex flex-col items-end gap-1">
+              <VerificationPill status={r.verification_status} />
+              <ActivePill active={r.is_active} />
+            </div>
           </div>
         )}
       />
@@ -815,10 +874,15 @@ export function VendorPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
   const [serviceFilter, setServiceFilter] = useState(ALL);
+  const [verificationFilter, setVerificationFilter] = useState(ALL);
   const del = useDeleteVendor();
 
   const rows = data?.data ?? [];
-  const filtered = rows.filter((r) => serviceFilter === ALL || r.service_type === serviceFilter);
+  const filtered = rows.filter(
+    (r) =>
+      (serviceFilter === ALL || r.service_type === serviceFilter) &&
+      (verificationFilter === ALL || r.verification_status === verificationFilter),
+  );
 
   const columns: Column<Vendor>[] = [
     {
@@ -833,6 +897,11 @@ export function VendorPage() {
     },
     { key: "service_type", label: "Jenis Layanan", render: (r) => r.service_type ?? "—" },
     { key: "contact_phone", label: "Kontak", render: (r) => r.contact_phone ?? "—" },
+    {
+      key: "verification_status",
+      label: "Verifikasi",
+      render: (r) => <VerificationPill status={r.verification_status} />,
+    },
     { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
   ];
 
@@ -842,9 +911,18 @@ export function VendorPage() {
       toCsv(filtered, [
         { key: "code", label: "Kode" },
         { key: "name", label: "Nama Vendor" },
+        { key: "legal_name", label: "Nama Legal" },
+        { key: "nib", label: "NIB" },
+        { key: "npwp", label: "NPWP" },
         { key: "service_type", label: "Jenis Layanan" },
         { key: "contact_phone", label: "Kontak" },
         { key: "email", label: "Email" },
+        { key: "pic_name", label: "PIC" },
+        { key: "website", label: "Website" },
+        { key: "bank_name", label: "Bank" },
+        { key: "bank_account_no", label: "No. Rekening" },
+        { key: "bank_account_name", label: "Atas Nama" },
+        { key: "verification_status", label: "Verifikasi" },
         { key: "is_active", label: "Status" },
       ]),
     );
@@ -856,7 +934,9 @@ export function VendorPage() {
         title="Vendor"
         description="Daftar penyedia jasa pendukung"
         searchPlaceholder="Cari vendor..."
-        searchText={(r) => `${r.code} ${r.name} ${r.service_type ?? ""}`}
+        searchText={(r) =>
+          `${r.code} ${r.name} ${r.service_type ?? ""} ${r.verification_status ?? ""}`
+        }
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
@@ -877,12 +957,20 @@ export function VendorPage() {
           }
         }}
         filters={
-          <FilterSelect
-            value={serviceFilter}
-            onChange={setServiceFilter}
-            placeholder="Semua Layanan"
-            options={["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"]}
-          />
+          <>
+            <FilterSelect
+              value={serviceFilter}
+              onChange={setServiceFilter}
+              placeholder="Semua Layanan"
+              options={["Ekspedisi", "Maintenance", "Kalibrasi", "Cleaning"]}
+            />
+            <FilterSelect
+              value={verificationFilter}
+              onChange={setVerificationFilter}
+              placeholder="Semua Verifikasi"
+              options={["unverified", "verified", "rejected"]}
+            />
+          </>
         }
         onExport={exportCsv}
         mobileCard={(r) => (
@@ -894,7 +982,10 @@ export function VendorPage() {
                 {r.service_type ?? "—"} • {r.contact_phone ?? "—"}
               </p>
             </div>
-            <ActivePill active={r.is_active} />
+            <div className="flex flex-col items-end gap-1">
+              <VerificationPill status={r.verification_status} />
+              <ActivePill active={r.is_active} />
+            </div>
           </div>
         )}
       />
@@ -1031,9 +1122,7 @@ export function DepartemenPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{r.name}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">
-                Kepala: {r.head ?? "—"}
-              </p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">Kepala: {r.head ?? "—"}</p>
             </div>
             <ActivePill active={r.is_active} />
           </div>
@@ -1219,9 +1308,7 @@ export function WorkOrderPage() {
         title="Work Order"
         description="Daftar instruksi kerja produksi"
         searchPlaceholder="Cari work order..."
-        searchText={(r) =>
-          `${r.no} ${r.project ?? ""} ${r.item ?? ""} ${r.pic ?? ""} ${r.status}`
-        }
+        searchText={(r) => `${r.no} ${r.project ?? ""} ${r.item ?? ""} ${r.pic ?? ""} ${r.status}`}
         columns={columns}
         rows={filtered}
         isLoading={isLoading}

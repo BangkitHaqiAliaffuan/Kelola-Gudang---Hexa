@@ -149,11 +149,21 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
-    string tax_id
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     string payment_terms
     boolean is_active
   }
@@ -161,11 +171,22 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
     string segment
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
   DEPARTMENT {
@@ -218,9 +239,20 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string service_type
     string contact_phone
     string email
+    string pic_name
+    string website
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
   %% PK komposit (item_id, warehouse_id, bin_id); bin_id opsional bila tanpa bin
@@ -787,11 +819,21 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
-    string tax_id
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     string payment_terms
     boolean is_active
   }
@@ -799,11 +841,22 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string phone
     string email
+    string pic_name
+    string website
     string address
     string city
     string segment
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
   DEPARTMENT {
@@ -856,9 +909,20 @@ erDiagram
     string id PK
     string code
     string name
+    string legal_name
+    string nib
+    string npwp
     string service_type
     string contact_phone
     string email
+    string pic_name
+    string website
+    string bank_name
+    string bank_account_no
+    string bank_account_name
+    string verification_status
+    string verification_note
+    datetime verified_at
     boolean is_active
   }
 

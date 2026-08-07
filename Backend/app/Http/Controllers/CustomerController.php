@@ -44,7 +44,7 @@ class CustomerController extends Controller
             return Customer::create($data);
         });
 
-        return new CustomerResource($customer);
+        return new CustomerResource($customer->refresh());
     }
 
     public function show(Customer $customer): CustomerResource
@@ -54,7 +54,15 @@ class CustomerController extends Controller
 
     public function update(UpdateCustomerRequest $request, Customer $customer): CustomerResource
     {
-        $customer->update($request->validated());
+        $data = $request->validated();
+
+        if (($data['verification_status'] ?? null) === 'verified' && $customer->verification_status !== 'verified') {
+            $data['verified_at'] = now();
+        } elseif (($data['verification_status'] ?? null) !== 'verified') {
+            $data['verified_at'] = null;
+        }
+
+        $customer->update($data);
 
         return new CustomerResource($customer->fresh());
     }

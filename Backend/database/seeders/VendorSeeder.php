@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Vendor;
+use App\Support\Npwp;
 use Illuminate\Database\Seeder;
 
 class VendorSeeder extends Seeder
@@ -10,13 +11,13 @@ class VendorSeeder extends Seeder
     public function run(): void
     {
         $vendors = [
-            ['name' => 'JNE Cabang Pusat', 'service_type' => 'Ekspedisi'],
+            ['name' => 'JNE Cabang Pusat', 'service_type' => 'Ekspedisi', 'verified' => true],
             ['name' => 'PT SiCepat Express', 'service_type' => 'Ekspedisi'],
-            ['name' => 'PT Anugrah Servis Teknik', 'service_type' => 'Maintenance'],
+            ['name' => 'PT Anugrah Servis Teknik', 'service_type' => 'Maintenance', 'verified' => true],
             ['name' => 'CV Presisi Kalibrasi', 'service_type' => 'Kalibrasi'],
             ['name' => 'PT Nusantara Cleaning Service', 'service_type' => 'Cleaning'],
             ['name' => 'TIKI Kargo Indonesia', 'service_type' => 'Ekspedisi'],
-            ['name' => 'CV Sumber Teknik Maintenance', 'service_type' => 'Maintenance'],
+            ['name' => 'CV Sumber Teknik Maintenance', 'service_type' => 'Maintenance', 'verified' => true],
             ['name' => 'PT Verifikasi Alat Ukur', 'service_type' => 'Kalibrasi'],
         ];
 
@@ -25,9 +26,20 @@ class VendorSeeder extends Seeder
             Vendor::create([
                 'code' => 'VDR-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                 'name' => $vendor['name'],
+                'legal_name' => $vendor['name'],
+                'nib' => '9120'.str_pad((string) $i, 9, '0', STR_PAD_LEFT),
+                'npwp' => Npwp::generate(),
                 'service_type' => $vendor['service_type'],
                 'contact_phone' => '021-'.(string) (8800000 + $i * 211),
                 'email' => 'cs@vendor'.$i.'.co.id',
+                'pic_name' => ['Agus Salim', 'Bayu Pratama', 'Dewi Lestari'][($i - 1) % 3],
+                'website' => 'https://vendor'.$i.'.co.id',
+                'bank_name' => ['BCA', 'Mandiri', 'BNI', 'BRI'][($i - 1) % 4],
+                'bank_account_no' => (string) (3000000000 + $i * 19141),
+                'bank_account_name' => $vendor['name'],
+                'verification_status' => ($vendor['verified'] ?? false) ? 'verified' : 'unverified',
+                'verification_note' => ($vendor['verified'] ?? false) ? 'Dokumen lengkap sesuai hasil cek' : null,
+                'verified_at' => ($vendor['verified'] ?? false) ? now() : null,
                 'is_active' => true,
             ]);
             $i++;
