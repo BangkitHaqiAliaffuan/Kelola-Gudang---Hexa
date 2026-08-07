@@ -8,7 +8,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
-import { Download, Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Eye, Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "./data-table";
 import { PageHeader, Panel } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export function MasterCrudPage<T extends { id: number }>({
   onAdd,
   addLabel = "Tambah",
   onRowClick,
+  onView,
   onEdit,
   onDelete,
   filters,
@@ -67,6 +68,7 @@ export function MasterCrudPage<T extends { id: number }>({
   onAdd: () => void;
   addLabel?: string;
   onRowClick?: (row: T) => void;
+  onView?: (row: T) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void | Promise<void>;
   filters?: ReactNode;
@@ -84,7 +86,7 @@ export function MasterCrudPage<T extends { id: number }>({
   }, [rows, q, searchText]);
 
   const actionColumn: Column<T> | undefined =
-    onEdit || onDelete
+    onView || onEdit || onDelete
       ? {
           key: "actions",
           label: "",
@@ -104,6 +106,16 @@ export function MasterCrudPage<T extends { id: number }>({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-36">
+                  {onView && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onView(r);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" /> Detail
+                    </DropdownMenuItem>
+                  )}
                   {onEdit && (
                     <DropdownMenuItem
                       onClick={(e) => {
@@ -114,19 +126,17 @@ export function MasterCrudPage<T extends { id: number }>({
                       <Pencil className="h-4 w-4" /> Edit
                     </DropdownMenuItem>
                   )}
+                  {(onView || onEdit) && onDelete && <DropdownMenuSeparator />}
                   {onDelete && (
-                    <>
-                      {onEdit && <DropdownMenuSeparator />}
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(r);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" /> Hapus
-                      </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(r);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" /> Hapus
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -140,8 +150,21 @@ export function MasterCrudPage<T extends { id: number }>({
   const mobileCardWithActions = (row: T): ReactNode => (
     <>
       {mobileCard(row)}
-      {(onEdit || onDelete) && (
+      {(onView || onEdit || onDelete) && (
         <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+          {onView && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(row);
+              }}
+            >
+              <Eye className="h-3.5 w-3.5" /> Detail
+            </Button>
+          )}
           {onEdit && (
             <Button
               size="sm"

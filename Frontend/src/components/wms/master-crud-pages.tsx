@@ -17,6 +17,7 @@ import {
   WorkOrderFormDialog,
 } from "./master-forms";
 import { ALL, EmptyState, FilterSelect, Pill, TableSkeleton, type Tone } from "./kit";
+import { CustomerDetailSheet, SupplierDetailSheet, VendorDetailSheet } from "./party-detail";
 import { type Column } from "./data-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
@@ -592,6 +593,7 @@ export function SupplierPage() {
   const { data, isLoading } = useSuppliers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
+  const [viewing, setViewing] = useState<Supplier | null>(null);
   const [cityFilter, setCityFilter] = useState(ALL);
   const [termsFilter, setTermsFilter] = useState(ALL);
   const del = useDeleteSupplier();
@@ -658,6 +660,8 @@ export function SupplierPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        onView={setViewing}
+        onRowClick={setViewing}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -704,6 +708,15 @@ export function SupplierPage() {
           </div>
         )}
       />
+      <SupplierDetailSheet
+        entity={viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        onEdit={() => {
+          setViewing(null);
+          setEditing(viewing);
+          setDialogOpen(true);
+        }}
+      />
       <SupplierFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
@@ -713,6 +726,7 @@ export function CustomerPage() {
   const { data, isLoading } = useCustomers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [viewing, setViewing] = useState<Customer | null>(null);
   const [cityFilter, setCityFilter] = useState(ALL);
   const [segmentFilter, setSegmentFilter] = useState(ALL);
   const del = useDeleteCustomer();
@@ -774,6 +788,8 @@ export function CustomerPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        onView={setViewing}
+        onRowClick={setViewing}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -820,6 +836,15 @@ export function CustomerPage() {
           </div>
         )}
       />
+      <CustomerDetailSheet
+        entity={viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        onEdit={() => {
+          setViewing(null);
+          setEditing(viewing);
+          setDialogOpen(true);
+        }}
+      />
       <CustomerFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
@@ -829,6 +854,7 @@ export function VendorPage() {
   const { data, isLoading } = useVendors();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
+  const [viewing, setViewing] = useState<Vendor | null>(null);
   const [serviceFilter, setServiceFilter] = useState(ALL);
   const del = useDeleteVendor();
 
@@ -883,6 +909,8 @@ export function VendorPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        onView={setViewing}
+        onRowClick={setViewing}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -922,6 +950,15 @@ export function VendorPage() {
             <ActivePill active={r.is_active} />
           </div>
         )}
+      />
+      <VendorDetailSheet
+        entity={viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        onEdit={() => {
+          setViewing(null);
+          setEditing(viewing);
+          setDialogOpen(true);
+        }}
       />
       <VendorFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
