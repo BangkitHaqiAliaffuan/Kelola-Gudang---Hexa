@@ -13,6 +13,8 @@ class Bin extends Model
 
     protected $fillable = [
         'rack_id',
+        'level',
+        'position',
         'code',
         'name',
         'is_active',

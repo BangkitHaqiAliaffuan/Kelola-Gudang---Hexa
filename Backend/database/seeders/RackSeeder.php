@@ -12,15 +12,14 @@ class RackSeeder extends Seeder
     {
         $warehouses = Warehouse::orderBy('id')->get();
 
-        $n = 0;
         foreach ($warehouses as $warehouse) {
-            foreach (['A', 'B', 'C', 'D'] as $letter) {
-                $n++;
-
+            foreach (['A', 'B', 'C', 'D'] as $aisle) {
                 Rack::create([
                     'warehouse_id' => $warehouse->id,
-                    'code' => 'RAK-'.str_pad((string) $n, 3, '0', STR_PAD_LEFT),
-                    'name' => "Rak {$letter} — {$warehouse->name}",
+                    'aisle' => $aisle,
+                    'bay' => '01',
+                    'code' => "{$aisle}-01",
+                    'name' => "Rak {$aisle} — {$warehouse->name}",
                     'is_active' => true,
                 ]);
             }

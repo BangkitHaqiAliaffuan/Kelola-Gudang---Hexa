@@ -12,11 +12,25 @@ class StoreBinRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'code' => $this->input('level').'-'.$this->input('position'),
+        ]);
+    }
+
     public function rules(): array
     {
         return [
             'rack_id' => ['required', 'integer', 'exists:racks,id'],
-            'code' => ['nullable', 'string', 'max:20', Rule::unique('bins', 'code')],
+            'level' => ['required', 'string', 'regex:/^\d{2}$/'],
+            'position' => ['required', 'string', 'regex:/^\d{2}$/'],
+            'code' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('bins', 'code')->where(fn ($q) => $q->where('rack_id', $this->input('rack_id'))),
+            ],
             'name' => ['required', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
         ];

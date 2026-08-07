@@ -12,17 +12,18 @@ class BinSeeder extends Seeder
     {
         $racks = Rack::orderBy('id')->get();
 
-        $n = 0;
         foreach ($racks as $rack) {
-            foreach (range(1, 6) as $i) {
-                $n++;
-
-                Bin::create([
-                    'rack_id' => $rack->id,
-                    'code' => 'BIN-'.str_pad((string) $n, 3, '0', STR_PAD_LEFT),
-                    'name' => "Bin {$i}",
-                    'is_active' => true,
-                ]);
+            foreach (range(1, 3) as $level) {
+                foreach (range(1, 2) as $position) {
+                    Bin::create([
+                        'rack_id' => $rack->id,
+                        'level' => str_pad((string) $level, 2, '0', STR_PAD_LEFT),
+                        'position' => str_pad((string) $position, 2, '0', STR_PAD_LEFT),
+                        'code' => str_pad((string) $level, 2, '0', STR_PAD_LEFT).'-'.str_pad((string) $position, 2, '0', STR_PAD_LEFT),
+                        'name' => "Bin L{$level}-P{$position}",
+                        'is_active' => true,
+                    ]);
+                }
             }
         }
     }

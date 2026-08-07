@@ -6,10 +6,8 @@ use App\Http\Requests\StoreBinRequest;
 use App\Http\Requests\UpdateBinRequest;
 use App\Http\Resources\BinResource;
 use App\Models\Bin;
-use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class BinController extends Controller
 {
@@ -40,12 +38,9 @@ class BinController extends Controller
     {
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['code'] = $data['level'].'-'.$data['position'];
 
-        $bin = DB::transaction(function () use ($data) {
-            $data['code'] = $data['code'] ?? CodeGenerator::next(Bin::class, 'BIN');
-
-            return Bin::create($data);
-        });
+        $bin = Bin::create($data);
 
         return new BinResource($bin->load('rack.warehouse')->loadCount('items'));
     }
@@ -59,7 +54,9 @@ class BinController extends Controller
 
     public function update(UpdateBinRequest $request, Bin $bin): BinResource
     {
-        $bin->update($request->validated());
+        $data = $request->validated();
+        $data['code'] = $data['level'].'-'.$data['position'];
+        $bin->update($data);
 
         return new BinResource($bin->fresh()->load('rack.warehouse')->loadCount('items'));
     }

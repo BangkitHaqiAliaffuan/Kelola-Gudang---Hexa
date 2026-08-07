@@ -47,7 +47,14 @@ export type WarehouseInput = z.infer<typeof warehouseSchema>;
 
 export const rackSchema = z.object({
   warehouse_id: z.coerce.number().int().positive("Gudang wajib dipilih"),
-  code,
+  aisle: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]$/, "Satu huruf (A–Z)"),
+  bay: z
+    .string()
+    .trim()
+    .regex(/^\d{2}$/, "Dua digit (contoh: 03)"),
   name,
   is_active: z.boolean().default(true),
 });
@@ -55,7 +62,14 @@ export type RackInput = z.infer<typeof rackSchema>;
 
 export const binSchema = z.object({
   rack_id: z.coerce.number().int().positive("Rak wajib dipilih"),
-  code,
+  level: z
+    .string()
+    .trim()
+    .regex(/^\d{2}$/, "Dua digit (contoh: 01)"),
+  position: z
+    .string()
+    .trim()
+    .regex(/^\d{2}$/, "Dua digit (contoh: 02)"),
   name,
   is_active: z.boolean().default(true),
 });

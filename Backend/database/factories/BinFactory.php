@@ -18,9 +18,14 @@ class BinFactory extends Factory
      */
     public function definition(): array
     {
+        $level = str_pad((string) $this->faker->numberBetween(1, 3), 2, '0', STR_PAD_LEFT);
+        $position = str_pad((string) $this->faker->unique()->numberBetween(1, 99), 2, '0', STR_PAD_LEFT);
+
         return [
             'rack_id' => Rack::factory(),
-            'code' => 'BIN-'.$this->faker->unique()->numberBetween(100, 999),
+            'level' => $level,
+            'position' => $position,
+            'code' => "{$level}-{$position}",
             'name' => ucwords($this->faker->unique()->words(2, true)),
             'is_active' => $this->faker->boolean(90),
         ];

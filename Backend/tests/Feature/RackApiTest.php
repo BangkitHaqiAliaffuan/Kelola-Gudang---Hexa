@@ -61,34 +61,58 @@ class RackApiTest extends TestCase
 
         $this->postJson('/api/master/racks', [
             'warehouse_id' => $warehouse->id,
-            'code' => 'RAK-999',
+            'aisle' => 'X',
+            'bay' => '99',
             'name' => 'Rak Gudang A',
         ])->assertCreated()
-            ->assertJsonPath('data.code', 'RAK-999')
+            ->assertJsonPath('data.code', 'X-99')
+            ->assertJsonPath('data.aisle', 'X')
+            ->assertJsonPath('data.bay', '99')
             ->assertJsonPath('data.name', 'Rak Gudang A')
             ->assertJsonPath('data.warehouse_name', $warehouse->name);
 
-        $this->assertDatabaseHas('racks', ['code' => 'RAK-999']);
+        $this->assertDatabaseHas('racks', ['code' => 'X-99']);
     }
 
-    public function test_store_auto_generates_code(): void
+    public function test_store_builds_code_from_components(): void
     {
         $warehouse = Warehouse::factory()->create();
 
         $this->postJson('/api/master/racks', [
             'warehouse_id' => $warehouse->id,
-            'name' => 'Rak Otomatis',
+            'aisle' => 'A',
+            'bay' => '01',
+            'name' => 'Rak A-01',
         ])->assertCreated()
-            ->assertJsonPath('data.code', 'RAK-001');
+            ->assertJsonPath('data.code', 'A-01');
 
-        $this->assertDatabaseHas('racks', ['code' => 'RAK-001']);
+        $this->assertDatabaseHas('racks', ['code' => 'A-01']);
+    }
+
+    public function test_store_rejects_duplicate_code_in_same_warehouse(): void
+    {
+        $warehouse = Warehouse::factory()->create();
+        Rack::factory()->create([
+            'warehouse_id' => $warehouse->id,
+            'aisle' => 'A',
+            'bay' => '01',
+            'code' => 'A-01',
+        ]);
+
+        $this->postJson('/api/master/racks', [
+            'warehouse_id' => $warehouse->id,
+            'aisle' => 'A',
+            'bay' => '01',
+            'name' => 'Duplikat',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['code']);
     }
 
     public function test_store_validates_required_fields(): void
     {
         $this->postJson('/api/master/racks', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'warehouse_id']);
+            ->assertJsonValidationErrors(['name', 'warehouse_id', 'aisle', 'bay']);
     }
 
     public function test_can_update_rack(): void
@@ -97,6 +121,8 @@ class RackApiTest extends TestCase
 
         $this->putJson("/api/master/racks/{$rack->id}", [
             'warehouse_id' => $rack->warehouse_id,
+            'aisle' => $rack->aisle,
+            'bay' => $rack->bay,
             'name' => 'Baru',
         ])->assertOk()
             ->assertJsonPath('data.name', 'Baru');

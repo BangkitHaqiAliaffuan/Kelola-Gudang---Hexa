@@ -61,6 +61,8 @@ export type Rack = {
   id: number;
   warehouse_id: number;
   warehouse_name?: string | null;
+  aisle: string;
+  bay: string;
   code: string;
   name: string;
   is_active: boolean;
@@ -74,7 +76,10 @@ export type Bin = {
   rack_id: number;
   rack_name?: string | null;
   warehouse_name?: string | null;
+  level: string;
+  position: string;
   code: string;
+  full_address?: string | null;
   name: string;
   is_active: boolean;
   item_count?: number;

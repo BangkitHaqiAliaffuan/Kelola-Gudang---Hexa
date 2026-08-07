@@ -6,10 +6,8 @@ use App\Http\Requests\StoreRackRequest;
 use App\Http\Requests\UpdateRackRequest;
 use App\Http\Resources\RackResource;
 use App\Models\Rack;
-use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class RackController extends Controller
 {
@@ -40,12 +38,9 @@ class RackController extends Controller
     {
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['code'] = $data['aisle'].'-'.$data['bay'];
 
-        $rack = DB::transaction(function () use ($data) {
-            $data['code'] = $data['code'] ?? CodeGenerator::next(Rack::class, 'RAK');
-
-            return Rack::create($data);
-        });
+        $rack = Rack::create($data);
 
         return new RackResource($rack->load('warehouse')->loadCount('bins'));
     }
@@ -59,7 +54,9 @@ class RackController extends Controller
 
     public function update(UpdateRackRequest $request, Rack $rack): RackResource
     {
-        $rack->update($request->validated());
+        $data = $request->validated();
+        $data['code'] = $data['aisle'].'-'.$data['bay'];
+        $rack->update($data);
 
         return new RackResource($rack->fresh()->load('warehouse')->loadCount('bins'));
     }

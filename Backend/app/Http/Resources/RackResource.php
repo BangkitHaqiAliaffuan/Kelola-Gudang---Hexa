@@ -13,6 +13,8 @@ class RackResource extends JsonResource
             'id' => $this->id,
             'warehouse_id' => $this->warehouse_id,
             'warehouse_name' => $this->whenLoaded('warehouse', fn () => $this->warehouse?->name),
+            'aisle' => $this->aisle,
+            'bay' => $this->bay,
             'code' => $this->code,
             'name' => $this->name,
             'is_active' => $this->is_active,

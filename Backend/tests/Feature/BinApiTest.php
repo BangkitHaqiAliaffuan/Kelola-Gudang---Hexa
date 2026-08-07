@@ -60,34 +60,58 @@ class BinApiTest extends TestCase
 
         $this->postJson('/api/master/bins', [
             'rack_id' => $rack->id,
-            'code' => 'BIN-999',
+            'level' => '02',
+            'position' => '07',
             'name' => 'Bin Rak A',
         ])->assertCreated()
-            ->assertJsonPath('data.code', 'BIN-999')
+            ->assertJsonPath('data.code', '02-07')
+            ->assertJsonPath('data.level', '02')
+            ->assertJsonPath('data.position', '07')
             ->assertJsonPath('data.name', 'Bin Rak A')
             ->assertJsonPath('data.rack_name', $rack->name);
 
-        $this->assertDatabaseHas('bins', ['code' => 'BIN-999']);
+        $this->assertDatabaseHas('bins', ['code' => '02-07']);
     }
 
-    public function test_store_auto_generates_code(): void
+    public function test_store_builds_code_from_components(): void
     {
         $rack = Rack::factory()->create();
 
         $this->postJson('/api/master/bins', [
             'rack_id' => $rack->id,
-            'name' => 'Bin Otomatis',
+            'level' => '01',
+            'position' => '02',
+            'name' => 'Bin 01-02',
         ])->assertCreated()
-            ->assertJsonPath('data.code', 'BIN-001');
+            ->assertJsonPath('data.code', '01-02');
 
-        $this->assertDatabaseHas('bins', ['code' => 'BIN-001']);
+        $this->assertDatabaseHas('bins', ['code' => '01-02']);
+    }
+
+    public function test_store_rejects_duplicate_code_in_same_rack(): void
+    {
+        $rack = Rack::factory()->create();
+        Bin::factory()->create([
+            'rack_id' => $rack->id,
+            'level' => '01',
+            'position' => '01',
+            'code' => '01-01',
+        ]);
+
+        $this->postJson('/api/master/bins', [
+            'rack_id' => $rack->id,
+            'level' => '01',
+            'position' => '01',
+            'name' => 'Duplikat',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['code']);
     }
 
     public function test_store_validates_required_fields(): void
     {
         $this->postJson('/api/master/bins', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'rack_id']);
+            ->assertJsonValidationErrors(['name', 'rack_id', 'level', 'position']);
     }
 
     public function test_can_update_bin(): void
@@ -96,6 +120,8 @@ class BinApiTest extends TestCase
 
         $this->putJson("/api/master/bins/{$bin->id}", [
             'rack_id' => $bin->rack_id,
+            'level' => $bin->level,
+            'position' => $bin->position,
             'name' => 'Baru',
         ])->assertOk()
             ->assertJsonPath('data.name', 'Baru');

@@ -166,14 +166,16 @@ export type WarehousePayload = {
 
 export type RackPayload = {
   warehouse_id: number;
-  code?: string;
+  aisle: string;
+  bay: string;
   name: string;
   is_active: boolean;
 };
 
 export type BinPayload = {
   rack_id: number;
-  code?: string;
+  level: string;
+  position: string;
   name: string;
   is_active: boolean;
 };

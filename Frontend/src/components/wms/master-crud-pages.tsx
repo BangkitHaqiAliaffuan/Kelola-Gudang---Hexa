@@ -502,8 +502,8 @@ export function BinPage() {
   const columns: Column<Bin>[] = [
     {
       key: "code",
-      label: "Kode",
-      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+      label: "Alamat Lengkap",
+      render: (r) => <span className="font-mono text-xs">{r.full_address ?? r.code}</span>,
     },
     {
       key: "name",
@@ -526,7 +526,9 @@ export function BinPage() {
         title="Bin Location"
         description="Titik penyimpanan terkecil di dalam rak"
         searchPlaceholder="Cari bin..."
-        searchText={(r) => `${r.code} ${r.name} ${r.rack_name ?? ""} ${r.warehouse_name ?? ""}`}
+        searchText={(r) =>
+          `${r.full_address ?? ""} ${r.code} ${r.name} ${r.rack_name ?? ""} ${r.warehouse_name ?? ""}`
+        }
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
@@ -550,7 +552,9 @@ export function BinPage() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{r.name}</p>
-              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {r.full_address ?? r.code}
+              </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {r.warehouse_name ?? "—"} • {r.rack_name ?? "—"} • {r.item_count ?? 0} SKU
               </p>

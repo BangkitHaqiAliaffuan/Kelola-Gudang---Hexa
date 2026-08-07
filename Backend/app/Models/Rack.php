@@ -13,6 +13,8 @@ class Rack extends Model
 
     protected $fillable = [
         'warehouse_id',
+        'aisle',
+        'bay',
         'code',
         'name',
         'is_active',
