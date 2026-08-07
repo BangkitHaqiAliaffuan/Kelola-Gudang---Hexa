@@ -6,8 +6,10 @@ use App\Http\Requests\StoreSubCategoryRequest;
 use App\Http\Requests\UpdateSubCategoryRequest;
 use App\Http\Resources\SubCategoryResource;
 use App\Models\SubCategory;
+use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SubCategoryController extends Controller
 {
@@ -38,7 +40,12 @@ class SubCategoryController extends Controller
     {
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
-        $subCategory = SubCategory::create($data);
+
+        $subCategory = DB::transaction(function () use ($data) {
+            $data['code'] = $data['code'] ?? CodeGenerator::next(SubCategory::class, 'SUB');
+
+            return SubCategory::create($data);
+        });
 
         return new SubCategoryResource($subCategory->load('category'));
     }

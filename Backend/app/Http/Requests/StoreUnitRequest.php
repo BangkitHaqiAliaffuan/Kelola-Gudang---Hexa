@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreMerkRequest extends FormRequest
+class StoreUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,9 +15,8 @@ class StoreMerkRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['nullable', 'string', 'max:20', Rule::unique('merks', 'code')],
-            'name' => ['required', 'string', 'max:150', Rule::unique('merks', 'name')],
-            'country' => ['nullable', 'string', 'max:100'],
+            'code' => ['nullable', 'string', 'max:20', Rule::unique('units', 'code')],
+            'name' => ['required', 'string', 'max:50', Rule::unique('units', 'name')],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

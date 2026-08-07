@@ -10,7 +10,6 @@ import {
   departments,
   projects,
   suppliers,
-  units,
   warehouses,
   workOrders,
 } from "@/lib/wms-data";
@@ -32,28 +31,6 @@ export const masterDatasets: Record<
   string,
   { title: string; description: string; headers: [string, string, string]; rows: Row[] }
 > = {
-  satuan: {
-    title: "Satuan",
-    description: "Unit of measure barang",
-    headers: ["Satuan", "Deskripsi", "Konversi"],
-    rows: make(
-      "UOM",
-      units.map((u, i) => ({
-        nama: u,
-        info: `Satuan ${u.toLowerCase()}`,
-        extra: `1 ${u} = ${1 + i * 2} PCS`,
-      })),
-    ),
-  },
-  gudang: {
-    title: "Gudang",
-    description: "Lokasi penyimpanan barang",
-    headers: ["Nama Gudang", "Kota", "Kapasitas"],
-    rows: make(
-      "GDG",
-      warehouses.map((w, i) => ({ nama: w.name, info: w.city, extra: `${(i + 4) * 500} m³` })),
-    ),
-  },
   rak: {
     title: "Rak",
     description: "Rak penyimpanan per gudang",

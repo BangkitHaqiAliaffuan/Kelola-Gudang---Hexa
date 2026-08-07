@@ -25,9 +25,9 @@ class UpdateItemRequest extends FormRequest
                 fn ($q) => $q->where('category_id', $this->input('category_id'))
             )],
             'brand_id' => ['nullable', 'integer', 'exists:merks,id'],
-            'unit_id' => ['nullable', 'string', 'max:20'],
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'preferred_supplier_id' => ['nullable', 'string', 'max:20'],
-            'default_warehouse_id' => ['nullable', 'string', 'max:20'],
+            'default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'default_rack_id' => ['nullable', 'string', 'max:20'],
             'default_bin_id' => ['nullable', 'string', 'max:20'],
             'weight' => ['nullable', 'numeric', 'min:0'],

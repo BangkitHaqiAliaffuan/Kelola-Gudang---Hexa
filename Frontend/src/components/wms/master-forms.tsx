@@ -25,10 +25,14 @@ import {
   itemSchema,
   merkSchema,
   subCategorySchema,
+  unitSchema,
+  warehouseSchema,
   type CategoryInput,
   type ItemInput,
   type MerkInput,
   type SubCategoryInput,
+  type UnitInput,
+  type WarehouseInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
 import {
@@ -37,18 +41,26 @@ import {
   useCreateItem,
   useCreateMerk,
   useCreateSubCategory,
+  useCreateUnit,
+  useCreateWarehouse,
   useMerks,
   useSubCategories,
+  useUnits,
   useUpdateCategory,
   useUpdateItem,
   useUpdateMerk,
   useUpdateSubCategory,
+  useUpdateUnit,
+  useUpdateWarehouse,
+  useWarehouses,
   type CategoryPayload,
   type ItemPayload,
   type MerkPayload,
   type SubCategoryPayload,
+  type UnitPayload,
+  type WarehousePayload,
 } from "@/hooks/use-master";
-import type { Category, ItemApi, Merk, SubCategory } from "@/lib/master-types";
+import type { Category, ItemApi, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
 
 function rowField(
   form: { setError: (n: string, o: { message: string }) => void },
@@ -57,6 +69,15 @@ function rowField(
 ) {
   const msg = fieldError(err, field);
   if (msg) form.setError(field, { message: msg });
+}
+
+function nextCode(codes: string[], prefix: string): string {
+  let max = 0;
+  for (const c of codes) {
+    const suffix = c.slice(prefix.length + 1);
+    if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
+  }
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
 export function CategoryFormDialog({
@@ -70,6 +91,11 @@ export function CategoryFormDialog({
 }) {
   const create = useCreateCategory();
   const update = useUpdateCategory();
+  const { data: cats } = useCategories();
+  const previewCode = nextCode(
+    (cats?.data ?? []).map((c) => c.code),
+    "KAT",
+  );
 
   return (
     <CrudFormDialog<CategoryInput>
@@ -91,10 +117,11 @@ export function CategoryFormDialog({
       }
       onSubmit={async (values, form) => {
         const payload: CategoryPayload = {
-          code: values.code.trim(),
           name: values.name.trim(),
           is_active: values.is_active,
         };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
         const desc = values.description.trim();
         if (desc) payload.description = desc;
         try {
@@ -123,7 +150,12 @@ export function CategoryFormDialog({
                 <FormItem>
                   <FormLabel>Kode Kategori</FormLabel>
                   <FormControl>
-                    <Input placeholder="KAT-001" className="rounded-xl" {...field} />
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -190,6 +222,11 @@ export function SubCategoryFormDialog({
   const create = useCreateSubCategory();
   const update = useUpdateSubCategory();
   const { data: cats } = useCategories();
+  const { data: subCats } = useSubCategories();
+  const previewCode = nextCode(
+    (subCats?.data ?? []).map((s) => s.code),
+    "SUB",
+  );
 
   return (
     <CrudFormDialog<SubCategoryInput>
@@ -212,10 +249,11 @@ export function SubCategoryFormDialog({
       onSubmit={async (values, form) => {
         const payload: SubCategoryPayload = {
           category_id: values.category_id,
-          code: values.code.trim(),
           name: values.name.trim(),
           is_active: values.is_active,
         };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
         try {
           if (initial) {
             await update.mutateAsync({ id: initial.id, ...payload });
@@ -274,7 +312,12 @@ export function SubCategoryFormDialog({
                 <FormItem>
                   <FormLabel>Kode Sub Kategori</FormLabel>
                   <FormControl>
-                    <Input placeholder="SUB-001" className="rounded-xl" {...field} />
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -327,6 +370,11 @@ export function MerkFormDialog({
 }) {
   const create = useCreateMerk();
   const update = useUpdateMerk();
+  const { data: merks } = useMerks();
+  const previewCode = nextCode(
+    (merks?.data ?? []).map((m) => m.code),
+    "MRK",
+  );
 
   return (
     <CrudFormDialog<MerkInput>
@@ -348,10 +396,11 @@ export function MerkFormDialog({
       }
       onSubmit={async (values, form) => {
         const payload: MerkPayload = {
-          code: values.code.trim(),
           name: values.name.trim(),
           is_active: values.is_active,
         };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
         const country = values.country.trim();
         if (country) payload.country = country;
         try {
@@ -380,7 +429,12 @@ export function MerkFormDialog({
                 <FormItem>
                   <FormLabel>Kode Merk</FormLabel>
                   <FormControl>
-                    <Input placeholder="MRK-001" className="rounded-xl" {...field} />
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -435,6 +489,266 @@ export function MerkFormDialog({
   );
 }
 
+export function UnitFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Unit | null;
+}) {
+  const create = useCreateUnit();
+  const update = useUpdateUnit();
+  const { data: unitRows } = useUnits();
+  const previewCode = nextCode(
+    (unitRows?.data ?? []).map((u) => u.code),
+    "UNT",
+  );
+
+  return (
+    <CrudFormDialog<UnitInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Satuan" : "Tambah Satuan"}
+      description="Satuan (unit of measure) untuk barang."
+      schema={unitSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              is_active: initial.is_active,
+            }
+          : { code: "", name: "", is_active: true }
+      }
+      onSubmit={async (values, form) => {
+        const payload: UnitPayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Satuan diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Satuan ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          if (!fieldError(err, "code") && !fieldError(err, "name"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Satuan</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Satuan</FormLabel>
+                  <FormControl>
+                    <Input placeholder="PCS" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="unit-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="unit-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function WarehouseFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Warehouse | null;
+}) {
+  const create = useCreateWarehouse();
+  const update = useUpdateWarehouse();
+  const { data: whRows } = useWarehouses();
+  const previewCode = nextCode(
+    (whRows?.data ?? []).map((w) => w.code),
+    "GDG",
+  );
+
+  return (
+    <CrudFormDialog<WarehouseInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Gudang" : "Tambah Gudang"}
+      description="Lokasi penyimpanan barang."
+      schema={warehouseSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              city: initial.city ?? "",
+              address: initial.address ?? "",
+              is_active: initial.is_active,
+            }
+          : { code: "", name: "", city: "", address: "", is_active: true }
+      }
+      onSubmit={async (values, form) => {
+        const payload: WarehousePayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        const city = values.city.trim();
+        if (city) payload.city = city;
+        const address = values.address.trim();
+        if (address) payload.address = address;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Gudang diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Gudang ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          if (!fieldError(err, "code") && !fieldError(err, "name"))
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Gudang</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Gudang</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Gudang Pusat Jakarta" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kota</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Opsional" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Alamat</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Opsional" className="rounded-xl" rows={2} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="warehouse-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="warehouse-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -449,6 +763,8 @@ export function ItemFormDialog({
   const { data: cats } = useCategories();
   const { data: subCats } = useSubCategories();
   const { data: merks } = useMerks();
+  const { data: units } = useUnits();
+  const { data: warehouses } = useWarehouses();
 
   const defaultValues = useMemo<ItemInput>(
     () =>
@@ -460,6 +776,8 @@ export function ItemFormDialog({
             category_id: initial.category_id,
             sub_category_id: initial.sub_category_id ?? "",
             brand_id: initial.brand_id ?? "",
+            unit_id: initial.unit_id ?? "",
+            default_warehouse_id: initial.default_warehouse_id ?? "",
             cost: initial.cost,
             price: initial.price,
             min_stock: initial.min,
@@ -476,6 +794,8 @@ export function ItemFormDialog({
             category_id: 0,
             sub_category_id: "",
             brand_id: "",
+            unit_id: "",
+            default_warehouse_id: "",
             cost: 0,
             price: 0,
             min_stock: 0,
@@ -503,6 +823,8 @@ export function ItemFormDialog({
     };
     if (v.sub_category_id) payload.sub_category_id = v.sub_category_id;
     if (v.brand_id) payload.brand_id = v.brand_id;
+    if (v.unit_id) payload.unit_id = v.unit_id;
+    if (v.default_warehouse_id) payload.default_warehouse_id = v.default_warehouse_id;
     if (v.max_stock != null) payload.max_stock = v.max_stock;
     if (v.weight != null) payload.weight = v.weight;
     return payload;
@@ -674,6 +996,64 @@ export function ItemFormDialog({
                           {merks?.data.map((m) => (
                             <SelectItem key={m.id} value={String(m.id)}>
                               {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="unit_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Satuan</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : ""}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Pilih satuan" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-72 rounded-xl">
+                          <SelectItem value="">Tidak ada</SelectItem>
+                          {units?.data.map((u) => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="default_warehouse_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gudang Default</FormLabel>
+                      <Select
+                        value={field.value ? String(field.value) : ""}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Pilih gudang" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-72 rounded-xl">
+                          <SelectItem value="">Tidak ada</SelectItem>
+                          {warehouses?.data.map((w) => (
+                            <SelectItem key={w.id} value={String(w.id)}>
+                              {w.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

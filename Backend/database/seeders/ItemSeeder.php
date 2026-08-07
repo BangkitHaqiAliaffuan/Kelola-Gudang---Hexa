@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\Merk;
 use App\Models\SubCategory;
+use App\Models\Unit;
+use App\Models\Warehouse;
 use Illuminate\Database\Seeder;
 
 class ItemSeeder extends Seeder
@@ -47,6 +49,8 @@ class ItemSeeder extends Seeder
         $categories = Category::orderBy('id')->get();
         $subByCategory = SubCategory::all()->groupBy('category_id');
         $merks = Merk::orderBy('id')->get();
+        $units = Unit::orderBy('id')->get();
+        $warehouses = Warehouse::orderBy('id')->get();
         $statuses = ['Aktif', 'Aktif', 'Aktif', 'Nonaktif'];
 
         for ($i = 0; $i < 300; $i++) {
@@ -67,6 +71,8 @@ class ItemSeeder extends Seeder
                 'category_id' => $category->id,
                 'sub_category_id' => $sub?->id,
                 'brand_id' => $merks[$i % $merks->count()]->id,
+                'unit_id' => $units[$i % $units->count()]->id,
+                'default_warehouse_id' => $warehouses[$i % $warehouses->count()]->id,
                 'weight' => round(($rnd() * 48) + 0.05, 2),
                 'dimension' => $int(5, 120).'x'.$int(5, 120).'x'.$int(1, 60).' cm',
                 'cost' => $cost,

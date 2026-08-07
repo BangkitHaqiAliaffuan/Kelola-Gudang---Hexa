@@ -34,3 +34,15 @@ UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded
 ## Backend (Laravel 13)
 
 PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). `items.stock`/`reserved` are denormalized today and will move to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) with the Persediaan module. Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
+
+## Multi-session protocol
+
+Multiple opencode sessions can run in this same directory at once (e.g. one on features, one on fixes). They share ONE working tree, ONE `main` branch, ONE test DB (`kelolagudang_test`), and ONE dev port pair (8000/8080). **Concurrent edits to the same file silently overwrite each other (last-writer-wins).** Follow this protocol to avoid corruption — it is cooperative, not enforced:
+
+1. **Claim before editing.** Edit `.dev/claims.md` (add `| <path> | <role> | claimed |`) before touching any file; release (`done`) when finished. Read it **before every edit** — a file claimed by another session is off-limits until released.
+2. **`git status` is the live truth.** Before starting work, run `git status` / `git diff --name-only`. Any file with uncommitted changes not made by you is considered owned by the other session — do not touch it.
+3. **Serialize overlapping files.** If two tasks need the same file, work sequentially, not in parallel. Never edit a file the other session is mid-edit on.
+4. **One session runs the runtime at a time.** Only one session runs `./dev.sh` / `composer test` / `php artisan migrate` at a time — ports 8000/8080 collide, and `RefreshDatabase` in tests wipes the shared `kelolagudang_test` DB, so two concurrent test runs corrupt each other's data.
+5. **Small commits per task.** Commit at task boundaries (only when the user asks) so claimed-file windows stay short. Stage only the files relevant to your task.
+6. **If you detect a conflict or stale file**, stop and report to the user — do not overwrite the other session's work.
+7. **The other session decides file ownership.** If unsure whether a file is yours to edit, ask the user (who coordinates between sessions).

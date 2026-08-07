@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
-import type { Category, ItemApi, Merk, SubCategory } from "@/lib/master-types";
+import type { Category, ItemApi, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
 
 // Data volume is small (~300 items), so fetch everything and let the UI
 // (DataTable) paginate + filter client-side, matching the existing UX.
@@ -10,6 +10,8 @@ const keys = {
   categories: ["master", "categories"] as const,
   subCategories: ["master", "sub-categories"] as const,
   merks: ["master", "merks"] as const,
+  units: ["master", "units"] as const,
+  warehouses: ["master", "warehouses"] as const,
   items: ["master", "items"] as const,
   item: (id: number) => ["master", "items", id] as const,
 };
@@ -38,6 +40,22 @@ export function useMerks() {
   });
 }
 
+export function useUnits() {
+  return useQuery({
+    queryKey: keys.units,
+    queryFn: () => api.get<Paginated<Unit>>(`/master/units?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useWarehouses() {
+  return useQuery({
+    queryKey: keys.warehouses,
+    queryFn: () => api.get<Paginated<Warehouse>>(`/master/warehouses?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
 export function useItems() {
   return useQuery({
     queryKey: keys.items,
@@ -55,7 +73,7 @@ export function useItem(id: number | undefined) {
 }
 
 export type CategoryPayload = {
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   is_active: boolean;
@@ -63,15 +81,29 @@ export type CategoryPayload = {
 
 export type SubCategoryPayload = {
   category_id: number;
-  code: string;
+  code?: string;
   name: string;
   is_active: boolean;
 };
 
 export type MerkPayload = {
-  code: string;
+  code?: string;
   name: string;
   country?: string;
+  is_active: boolean;
+};
+
+export type UnitPayload = {
+  code?: string;
+  name: string;
+  is_active: boolean;
+};
+
+export type WarehousePayload = {
+  code?: string;
+  name: string;
+  city?: string;
+  address?: string;
   is_active: boolean;
 };
 
@@ -82,6 +114,8 @@ export type ItemPayload = {
   category_id: number;
   sub_category_id?: number;
   brand_id?: number;
+  unit_id?: number;
+  default_warehouse_id?: number;
   cost: number;
   price: number;
   min_stock: number;
@@ -166,6 +200,57 @@ export function useDeleteMerk() {
   return useMutation({
     mutationFn: (id: number) => api.delete<{ message: string }>(`/master/merks/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.merks }),
+  });
+}
+
+export function useCreateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UnitPayload) => api.post<{ data: Unit }>("/master/units", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.units }),
+  });
+}
+
+export function useUpdateUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: UnitPayload & { id: number }) =>
+      api.put<{ data: Unit }>(`/master/units/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.units }),
+  });
+}
+
+export function useDeleteUnit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/units/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.units }),
+  });
+}
+
+export function useCreateWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: WarehousePayload) =>
+      api.post<{ data: Warehouse }>("/master/warehouses", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.warehouses }),
+  });
+}
+
+export function useUpdateWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: WarehousePayload & { id: number }) =>
+      api.put<{ data: Warehouse }>(`/master/warehouses/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.warehouses }),
+  });
+}
+
+export function useDeleteWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/warehouses/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.warehouses }),
   });
 }
 

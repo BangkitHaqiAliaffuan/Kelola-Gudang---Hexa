@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             SubCategorySeeder::class,
             MerkSeeder::class,
+            UnitSeeder::class,
+            WarehouseSeeder::class,
             ItemSeeder::class,
         ]);
     }

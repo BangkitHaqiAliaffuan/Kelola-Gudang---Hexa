@@ -8,11 +8,18 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
-import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "./data-table";
 import { PageHeader, Panel } from "./kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -77,38 +84,48 @@ export function MasterCrudPage<T extends { id: number }>({
       ? {
           key: "actions",
           label: "",
-          className: "w-16",
+          className: "w-10",
           sticky: "right",
           render: (r) => (
-            <div className="flex items-center gap-1">
-              {onEdit && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-lg"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(r);
-                  }}
-                  aria-label="Edit"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 rounded-lg text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget(r);
-                  }}
-                  aria-label="Hapus"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+            <div className="flex justify-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 rounded-lg"
+                    aria-label="Aksi"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36">
+                  {onEdit && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(r);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      {onEdit && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(r);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" /> Hapus
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ),
         }

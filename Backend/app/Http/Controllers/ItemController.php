@@ -15,7 +15,7 @@ class ItemController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Item::query()->with(['category', 'subCategory', 'brand']);
+        $query = Item::query()->with(['category', 'subCategory', 'brand', 'unit', 'warehouse']);
 
         if ($search = $request->query('search')) {
             $needle = strtolower($search);
@@ -48,19 +48,19 @@ class ItemController extends Controller
         $data['reserved'] = $data['reserved'] ?? 0;
         $item = Item::create($data);
 
-        return new ItemResource($item->load(['category', 'subCategory', 'brand']));
+        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse']));
     }
 
     public function show(Item $item): ItemResource
     {
-        return new ItemResource($item->load(['category', 'subCategory', 'brand']));
+        return new ItemResource($item->load(['category', 'subCategory', 'brand', 'unit', 'warehouse']));
     }
 
     public function update(UpdateItemRequest $request, Item $item): ItemResource
     {
         $item->update($request->validated());
 
-        return new ItemResource($item->fresh()->load(['category', 'subCategory', 'brand']));
+        return new ItemResource($item->fresh()->load(['category', 'subCategory', 'brand', 'unit', 'warehouse']));
     }
 
     public function destroy(Item $item): JsonResponse

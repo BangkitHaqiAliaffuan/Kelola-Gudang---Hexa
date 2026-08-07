@@ -35,6 +35,28 @@ export type Merk = {
   updated_at: string;
 };
 
+export type Unit = {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+  item_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Warehouse = {
+  id: number;
+  code: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  is_active: boolean;
+  item_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ItemApi = {
   id: number;
   sku: string;
@@ -45,6 +67,8 @@ export type ItemApi = {
   subCategory: string | null;
   sub_category_id: number | null;
   brand_id: number | null;
+  unit_id: number | null;
+  default_warehouse_id: number | null;
   // Reference tables ship with later master-data phases — null until then.
   brand: string | null;
   supplier: string | null;

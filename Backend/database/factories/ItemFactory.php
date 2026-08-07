@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\Merk;
 use App\Models\SubCategory;
+use App\Models\Unit;
+use App\Models\Warehouse;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -27,9 +29,9 @@ class ItemFactory extends Factory
             'category_id' => Category::factory(),
             'sub_category_id' => SubCategory::factory(),
             'brand_id' => Merk::factory(),
-            'unit_id' => null,
+            'unit_id' => Unit::factory(),
             'preferred_supplier_id' => null,
-            'default_warehouse_id' => null,
+            'default_warehouse_id' => Warehouse::factory(),
             'default_rack_id' => null,
             'default_bin_id' => null,
             'weight' => $this->faker->randomFloat(2, 0.05, 50),

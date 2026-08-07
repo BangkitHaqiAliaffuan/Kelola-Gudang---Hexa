@@ -16,7 +16,7 @@ class StoreSubCategoryRequest extends FormRequest
     {
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
-            'code' => ['required', 'string', 'max:20', Rule::unique('sub_categories', 'code')],
+            'code' => ['nullable', 'string', 'max:20', Rule::unique('sub_categories', 'code')],
             'name' => ['required', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
         ];

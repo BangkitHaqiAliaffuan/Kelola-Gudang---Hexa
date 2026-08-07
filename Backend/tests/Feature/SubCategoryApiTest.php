@@ -60,6 +60,26 @@ class SubCategoryApiTest extends TestCase
             ->assertJsonValidationErrors(['category_id']);
     }
 
+    public function test_store_auto_generates_code(): void
+    {
+        $category = Category::factory()->create();
+
+        $this->postJson('/api/master/sub-categories', [
+            'category_id' => $category->id,
+            'name' => 'Bantalan',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', 'SUB-001');
+
+        $this->postJson('/api/master/sub-categories', [
+            'category_id' => $category->id,
+            'name' => 'Sekrup',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', 'SUB-002');
+
+        $this->assertDatabaseHas('sub_categories', ['code' => 'SUB-001']);
+        $this->assertDatabaseHas('sub_categories', ['code' => 'SUB-002']);
+    }
+
     public function test_can_update_sub_category(): void
     {
         $sub = SubCategory::factory()->create(['name' => 'Lama']);

@@ -1,11 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GenericMasterPage, masterDatasets } from "@/components/wms/generic-master";
-import { KategoriPage, MerkPage, SubKategoriPage } from "@/components/wms/master-crud-pages";
+import {
+  GudangPage,
+  KategoriPage,
+  MerkPage,
+  SatuanPage,
+  SubKategoriPage,
+} from "@/components/wms/master-crud-pages";
 
 const apiTitles: Record<string, { title: string; description: string }> = {
   kategori: { title: "Kategori", description: "Pengelompokan utama barang" },
   "sub-kategori": { title: "Sub Kategori", description: "Turunan dari kategori barang" },
   merk: { title: "Merk", description: "Daftar merk / brand barang" },
+  satuan: { title: "Satuan", description: "Daftar satuan (unit of measure) barang" },
+  gudang: { title: "Gudang", description: "Daftar lokasi penyimpanan barang" },
 };
 
 export const Route = createFileRoute("/master/$section")({
@@ -31,5 +39,7 @@ function MasterSection() {
   if (section === "kategori") return <KategoriPage />;
   if (section === "sub-kategori") return <SubKategoriPage />;
   if (section === "merk") return <MerkPage />;
+  if (section === "satuan") return <SatuanPage />;
+  if (section === "gudang") return <GudangPage />;
   return <GenericMasterPage slug={section} />;
 }

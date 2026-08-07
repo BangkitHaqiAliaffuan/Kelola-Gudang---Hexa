@@ -60,4 +60,14 @@ class Item extends Model
     {
         return $this->belongsTo(Merk::class, 'brand_id');
     }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class, 'unit_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'default_warehouse_id');
+    }
 }

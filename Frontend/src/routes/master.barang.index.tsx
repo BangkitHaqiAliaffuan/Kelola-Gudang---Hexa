@@ -1,10 +1,26 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, Pencil, Plus, Search, Trash2, Upload, SlidersHorizontal } from "lucide-react";
+import {
+  Download,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  SlidersHorizontal,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel, Pill, ItemThumb, FilterSelect, ALL } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { ItemFormDialog } from "@/components/wms/master-forms";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -199,43 +215,51 @@ function MasterBarang() {
     {
       key: "cost",
       label: "Harga Pokok",
-      className: "text-right",
+      className: "whitespace-nowrap tabular-nums text-right",
       render: (r) => formatIDR(r.cost),
     },
     {
       key: "price",
       label: "Harga Jual",
-      className: "text-right",
+      className: "whitespace-nowrap tabular-nums text-right",
       render: (r) => formatIDR(r.price),
     },
     {
       key: "actions",
       label: "",
-      className: "w-24",
+      className: "w-10",
       sticky: "right",
       render: (r) => (
-        <span onClick={(e) => e.stopPropagation()} className="flex justify-end gap-1">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-lg"
-            onClick={() => {
-              setEditing(r);
-              setDialogOpen(true);
-            }}
-            aria-label="Edit"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-lg text-destructive"
-            onClick={() => setDeleteTarget(r)}
-            aria-label="Hapus"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <span onClick={(e) => e.stopPropagation()} className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 rounded-lg"
+                aria-label="Aksi barang"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuItem
+                onClick={() => {
+                  setEditing(r);
+                  setDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => openSingleDelete(r)}
+              >
+                <Trash2 className="h-4 w-4" /> Hapus
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       ),
     },

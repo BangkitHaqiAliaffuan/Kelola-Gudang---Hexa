@@ -63,7 +63,21 @@ class MerkApiTest extends TestCase
     {
         $this->postJson('/api/master/merks', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['code', 'name']);
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_store_auto_generates_code(): void
+    {
+        $this->postJson('/api/master/merks', ['name' => 'Nachi'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'MRK-001');
+
+        $this->postJson('/api/master/merks', ['name' => 'Bosch'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'MRK-002');
+
+        $this->assertDatabaseHas('merks', ['code' => 'MRK-001']);
+        $this->assertDatabaseHas('merks', ['code' => 'MRK-002']);
     }
 
     public function test_can_update_merk(): void

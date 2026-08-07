@@ -6,8 +6,10 @@ use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
+use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
@@ -34,7 +36,12 @@ class CategoryController extends Controller
     {
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
-        $category = Category::create($data);
+
+        $category = DB::transaction(function () use ($data) {
+            $data['code'] = $data['code'] ?? CodeGenerator::next(Category::class, 'KAT');
+
+            return Category::create($data);
+        });
 
         return new CategoryResource($category->loadCount('subCategories'));
     }

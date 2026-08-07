@@ -6,8 +6,10 @@ use App\Http\Requests\StoreMerkRequest;
 use App\Http\Requests\UpdateMerkRequest;
 use App\Http\Resources\MerkResource;
 use App\Models\Merk;
+use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MerkController extends Controller
 {
@@ -34,9 +36,14 @@ class MerkController extends Controller
     {
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
-        $merk = Merk::create($data);
 
-        return new MerkResource($merk->loadCount('items'));
+        $merk = DB::transaction(function () use ($data) {
+            $data['code'] = $data['code'] ?? CodeGenerator::next(Merk::class, 'MRK');
+
+            return Merk::create($data);
+        });
+
+        return new MerkResource($merk);
     }
 
     public function show(Merk $merk): MerkResource

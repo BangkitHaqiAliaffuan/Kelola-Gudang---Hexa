@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreMerkRequest extends FormRequest
+class UpdateUnitRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,10 +14,11 @@ class StoreMerkRequest extends FormRequest
 
     public function rules(): array
     {
+        $unit = $this->route('unit');
+
         return [
-            'code' => ['nullable', 'string', 'max:20', Rule::unique('merks', 'code')],
-            'name' => ['required', 'string', 'max:150', Rule::unique('merks', 'name')],
-            'country' => ['nullable', 'string', 'max:100'],
+            'code' => ['required', 'string', 'max:20', Rule::unique('units', 'code')->ignore($unit)],
+            'name' => ['required', 'string', 'max:50', Rule::unique('units', 'name')->ignore($unit)],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

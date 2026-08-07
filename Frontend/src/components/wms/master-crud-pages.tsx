@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { MasterCrudPage } from "./master-crud";
-import { CategoryFormDialog, MerkFormDialog, SubCategoryFormDialog } from "./master-forms";
+import {
+  CategoryFormDialog,
+  MerkFormDialog,
+  SubCategoryFormDialog,
+  UnitFormDialog,
+  WarehouseFormDialog,
+} from "./master-forms";
 import { EmptyState, Pill, TableSkeleton } from "./kit";
 import { type Column } from "./data-table";
 import {
@@ -16,10 +22,14 @@ import {
   useDeleteCategory,
   useDeleteMerk,
   useDeleteSubCategory,
+  useDeleteUnit,
+  useDeleteWarehouse,
   useMerks,
   useSubCategories,
+  useUnits,
+  useWarehouses,
 } from "@/hooks/use-master";
-import type { Category, Merk, SubCategory } from "@/lib/master-types";
+import type { Category, Merk, SubCategory, Unit, Warehouse } from "@/lib/master-types";
 
 function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
@@ -231,6 +241,144 @@ export function MerkPage() {
         )}
       />
       <MerkFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function SatuanPage() {
+  const { data, isLoading } = useUnits();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Unit | null>(null);
+  const del = useDeleteUnit();
+
+  const columns: Column<Unit>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Satuan",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    {
+      key: "item_count",
+      label: "Jumlah SKU",
+      render: (r) => (r.item_count ?? 0).toLocaleString("id-ID"),
+    },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  return (
+    <>
+      <MasterCrudPage<Unit>
+        title="Satuan"
+        description="Daftar satuan (unit of measure) barang"
+        searchPlaceholder="Cari satuan..."
+        searchText={(r) => `${r.code} ${r.name}`}
+        columns={columns}
+        rows={data?.data}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Satuan dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{r.item_count ?? 0} SKU</p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <UnitFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function GudangPage() {
+  const { data, isLoading } = useWarehouses();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Warehouse | null>(null);
+  const del = useDeleteWarehouse();
+
+  const columns: Column<Warehouse>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Gudang",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "city", label: "Kota", render: (r) => r.city ?? "—" },
+    { key: "address", label: "Alamat", render: (r) => r.address ?? "—" },
+    {
+      key: "item_count",
+      label: "Jumlah SKU",
+      render: (r) => (r.item_count ?? 0).toLocaleString("id-ID"),
+    },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  return (
+    <>
+      <MasterCrudPage<Warehouse>
+        title="Gudang"
+        description="Daftar lokasi penyimpanan barang"
+        searchPlaceholder="Cari gudang..."
+        searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""}`}
+        columns={columns}
+        rows={data?.data}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Gudang dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.city ?? "—"} • {r.item_count ?? 0} SKU
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <WarehouseFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
 }

@@ -53,7 +53,21 @@ class CategoryApiTest extends TestCase
     {
         $this->postJson('/api/master/categories', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['code', 'name']);
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_store_auto_generates_code(): void
+    {
+        $this->postJson('/api/master/categories', ['name' => 'Alat Laboratorium'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'KAT-001');
+
+        $this->postJson('/api/master/categories', ['name' => 'Alat Berat'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'KAT-002');
+
+        $this->assertDatabaseHas('categories', ['code' => 'KAT-001']);
+        $this->assertDatabaseHas('categories', ['code' => 'KAT-002']);
     }
 
     public function test_store_rejects_duplicate_code(): void
