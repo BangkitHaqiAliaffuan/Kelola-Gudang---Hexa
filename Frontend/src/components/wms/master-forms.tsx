@@ -1546,15 +1546,14 @@ export function SupplierFormDialog({
                 </FormItem>
               )}
             />
+            <p className="text-xs font-semibold text-muted-foreground">Data Bank (opsional)</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="bank_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Bank</FormLabel>
                     <FormControl>
                       <Input placeholder="BCA" className="rounded-xl" {...field} />
                     </FormControl>
@@ -1567,10 +1566,7 @@ export function SupplierFormDialog({
                 name="bank_account_no"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      No. Rekening{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>No. Rekening</FormLabel>
                     <FormControl>
                       <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
                     </FormControl>
@@ -1583,10 +1579,7 @@ export function SupplierFormDialog({
                 name="bank_account_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Atas Nama{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Atas Nama</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Nama pemilik rekening"
@@ -1964,15 +1957,14 @@ export function CustomerFormDialog({
                 )}
               />
             </div>
+            <p className="text-xs font-semibold text-muted-foreground">Data Bank (opsional)</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="bank_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Bank</FormLabel>
                     <FormControl>
                       <Input placeholder="BCA" className="rounded-xl" {...field} />
                     </FormControl>
@@ -1985,10 +1977,7 @@ export function CustomerFormDialog({
                 name="bank_account_no"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      No. Rekening{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>No. Rekening</FormLabel>
                     <FormControl>
                       <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
                     </FormControl>
@@ -2001,10 +1990,7 @@ export function CustomerFormDialog({
                 name="bank_account_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Atas Nama{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Atas Nama</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Nama pemilik rekening"
@@ -2334,15 +2320,14 @@ export function VendorFormDialog({
                 </FormItem>
               )}
             />
+            <p className="text-xs font-semibold text-muted-foreground">Data Bank (opsional)</p>
             <div className="grid gap-4 sm:grid-cols-3">
               <FormField
                 control={form.control}
                 name="bank_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Bank <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Bank</FormLabel>
                     <FormControl>
                       <Input placeholder="BCA" className="rounded-xl" {...field} />
                     </FormControl>
@@ -2355,10 +2340,7 @@ export function VendorFormDialog({
                 name="bank_account_no"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      No. Rekening{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>No. Rekening</FormLabel>
                     <FormControl>
                       <Input placeholder="Nomor rekening" className="rounded-xl" {...field} />
                     </FormControl>
@@ -2371,10 +2353,7 @@ export function VendorFormDialog({
                 name="bank_account_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Atas Nama{" "}
-                      <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
+                    <FormLabel>Atas Nama</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Nama pemilik rekening"
