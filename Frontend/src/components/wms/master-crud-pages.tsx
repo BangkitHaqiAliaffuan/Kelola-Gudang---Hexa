@@ -5,17 +5,21 @@ import {
   BinFormDialog,
   CategoryFormDialog,
   CustomerFormDialog,
+  DepartmentFormDialog,
   MerkFormDialog,
+  ProjectFormDialog,
   RackFormDialog,
   SubCategoryFormDialog,
   SupplierFormDialog,
   UnitFormDialog,
   VendorFormDialog,
   WarehouseFormDialog,
+  WorkOrderFormDialog,
 } from "./master-forms";
-import { ALL, EmptyState, FilterSelect, Pill, TableSkeleton } from "./kit";
+import { ALL, EmptyState, FilterSelect, Pill, TableSkeleton, type Tone } from "./kit";
 import { type Column } from "./data-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import {
   Dialog,
   DialogContent,
@@ -30,33 +34,49 @@ import {
   useDeleteBin,
   useDeleteCategory,
   useDeleteCustomer,
+  useDeleteDepartment,
   useDeleteMerk,
+  useDeleteProject,
   useDeleteRack,
   useDeleteSubCategory,
   useDeleteSupplier,
   useDeleteUnit,
   useDeleteVendor,
   useDeleteWarehouse,
+  useDeleteWorkOrder,
+  useDepartments,
   useMerks,
+  useProjects,
   useRacks,
   useSubCategories,
   useSuppliers,
   useUnits,
   useVendors,
   useWarehouses,
+  useWorkOrders,
 } from "@/hooks/use-master";
 import type {
   Bin,
   Category,
   Customer,
+  Department,
   Merk,
+  Project,
   Rack,
   SubCategory,
   Supplier,
   Unit,
   Vendor,
   Warehouse,
+  WorkOrder,
 } from "@/lib/master-types";
+
+function statusTone(status: string): Tone {
+  if (status === "Selesai") return "success";
+  if (status === "Berjalan") return "info";
+  if (status === "Ditunda") return "warning";
+  return "neutral";
+}
 
 function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
@@ -929,5 +949,331 @@ function CategorySubCategoriesDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function DepartemenPage() {
+  const { data, isLoading } = useDepartments();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Department | null>(null);
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const del = useDeleteDepartment();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) => statusFilter === ALL || r.is_active === (statusFilter === "Aktif"),
+  );
+
+  const columns: Column<Department>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Departemen",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "head", label: "Kepala Departemen", render: (r) => r.head ?? "—" },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `departments-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama Departemen" },
+        { key: "head", label: "Kepala Departemen" },
+        { key: "is_active", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<Department>
+        title="Departemen"
+        description="Daftar departemen / divisi"
+        searchPlaceholder="Cari departemen..."
+        searchText={(r) => `${r.code} ${r.name} ${r.head ?? ""}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Departemen dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <FilterSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="Semua Status"
+            options={["Aktif", "Nonaktif"]}
+          />
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                Kepala: {r.head ?? "—"}
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <DepartmentFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function ProyekPage() {
+  const { data, isLoading } = useProjects();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Project | null>(null);
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const del = useDeleteProject();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter((r) => statusFilter === ALL || r.status === statusFilter);
+
+  const range = (start?: string | null, end?: string | null) =>
+    start ? `${formatDate(start)}${end ? ` → ${formatDate(end)}` : ""}` : "—";
+
+  const columns: Column<Project>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama Proyek",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "pic", label: "PIC", render: (r) => r.pic ?? "—" },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
+    },
+    {
+      key: "budget",
+      label: "Anggaran",
+      render: (r) => (r.budget != null ? formatIDR(Number(r.budget)) : "—"),
+    },
+    { key: "period", label: "Periode", render: (r) => range(r.start_date, r.end_date) },
+    { key: "wo_count", label: "WO", render: (r) => r.work_orders_count ?? 0 },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `projects-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama Proyek" },
+        { key: "pic", label: "PIC" },
+        { key: "status", label: "Status" },
+        { key: "budget", label: "Anggaran" },
+        { key: "start_date", label: "Tanggal Mulai" },
+        { key: "end_date", label: "Tanggal Selesai" },
+        { key: "work_orders_count", label: "Jumlah WO" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<Project>
+        title="Proyek"
+        description="Daftar proyek pekerjaan"
+        searchPlaceholder="Cari proyek..."
+        searchText={(r) => `${r.code} ${r.name} ${r.pic ?? ""} ${r.status}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Proyek dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <FilterSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="Semua Status"
+            options={["Perencanaan", "Berjalan", "Selesai"]}
+          />
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                PIC: {r.pic ?? "—"} • {r.work_orders_count ?? 0} WO
+              </p>
+            </div>
+            <Pill tone={statusTone(r.status)}>{r.status}</Pill>
+          </div>
+        )}
+      />
+      <ProjectFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function WorkOrderPage() {
+  const { data, isLoading } = useWorkOrders();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<WorkOrder | null>(null);
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [projectFilter, setProjectFilter] = useState(ALL);
+  const del = useDeleteWorkOrder();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) =>
+      (statusFilter === ALL || r.status === statusFilter) &&
+      (projectFilter === ALL || r.project === projectFilter),
+  );
+
+  const range = (start?: string | null, end?: string | null) =>
+    start ? `${formatDate(start)}${end ? ` → ${formatDate(end)}` : ""}` : "—";
+
+  const columns: Column<WorkOrder>[] = [
+    {
+      key: "no",
+      label: "Nomor",
+      render: (r) => <span className="font-mono text-xs">{r.no}</span>,
+    },
+    { key: "project", label: "Proyek", render: (r) => r.project ?? "—" },
+    { key: "item", label: "Produk", render: (r) => r.item ?? "—" },
+    {
+      key: "target",
+      label: "Target",
+      render: (r) => (
+        <span className="font-medium">
+          {formatNumber(r.target_qty)} {r.unit ?? ""}
+        </span>
+      ),
+    },
+    { key: "schedule", label: "Jadwal", render: (r) => range(r.start_date, r.finish_date) },
+    { key: "pic", label: "PIC", render: (r) => r.pic ?? "—" },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
+    },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `work-orders-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "no", label: "Nomor" },
+        { key: "project", label: "Proyek" },
+        { key: "item", label: "Produk" },
+        { key: "target_qty", label: "Target" },
+        { key: "unit", label: "Satuan" },
+        { key: "start_date", label: "Tanggal Mulai" },
+        { key: "finish_date", label: "Tanggal Selesai" },
+        { key: "pic", label: "PIC" },
+        { key: "status", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<WorkOrder>
+        title="Work Order"
+        description="Daftar instruksi kerja produksi"
+        searchPlaceholder="Cari work order..."
+        searchText={(r) =>
+          `${r.no} ${r.project ?? ""} ${r.item ?? ""} ${r.pic ?? ""} ${r.status}`
+        }
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("Work order dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <>
+            <FilterSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="Semua Status"
+              options={["Perencanaan", "Berjalan", "Selesai", "Ditunda"]}
+            />
+            <FilterSelect
+              value={projectFilter}
+              onChange={setProjectFilter}
+              placeholder="Semua Proyek"
+              options={uniqueOptions(rows, (r) => r.project)}
+            />
+          </>
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.no}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {r.project ?? "—"} • {r.item ?? "—"}
+              </p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {formatNumber(r.target_qty)} {r.unit ?? ""} • PIC: {r.pic ?? "—"}
+              </p>
+            </div>
+            <Pill tone={statusTone(r.status)}>{r.status}</Pill>
+          </div>
+        )}
+      />
+      <WorkOrderFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
   );
 }

@@ -155,3 +155,40 @@ export const itemSchema = z
     path: ["max_stock"],
   });
 export type ItemInput = z.infer<typeof itemSchema>;
+
+const nullableFk = z.union([z.coerce.number().int().positive(), z.literal("")]).optional();
+const dateInput = z
+  .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal YYYY-MM-DD"), z.literal("")])
+  .optional();
+
+export const departmentSchema = z.object({
+  code,
+  name,
+  head_user_id: nullableFk,
+  is_active: z.boolean().default(true),
+});
+export type DepartmentInput = z.infer<typeof departmentSchema>;
+
+export const projectSchema = z.object({
+  code,
+  name,
+  pic_user_id: nullableFk,
+  start_date: dateInput,
+  end_date: dateInput,
+  status: z.enum(["Perencanaan", "Berjalan", "Selesai"]).default("Perencanaan"),
+  budget: z.coerce.number().min(0).optional(),
+});
+export type ProjectInput = z.infer<typeof projectSchema>;
+
+export const workOrderSchema = z.object({
+  no: z.string().trim().max(30, "Maksimal 30 karakter").optional(),
+  project_id: z.coerce.number().int().positive("Proyek wajib dipilih"),
+  item_id: z.coerce.number().int().positive("Barang wajib dipilih"),
+  unit_id: nullableFk,
+  target_qty: z.coerce.number().int().min(1, "Minimal 1"),
+  start_date: dateInput,
+  finish_date: dateInput,
+  pic_user_id: nullableFk,
+  status: z.enum(["Perencanaan", "Berjalan", "Selesai", "Ditunda"]).default("Perencanaan"),
+});
+export type WorkOrderInput = z.infer<typeof workOrderSchema>;

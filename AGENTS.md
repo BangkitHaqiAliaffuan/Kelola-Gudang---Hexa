@@ -23,7 +23,7 @@ Dev loop needs **TWO servers**:
 - Laravel API: `composer dev` in `Backend/` → `http://127.0.0.1:8000` (also runs queue:listen + pail + npm run dev).
 - Frontend: `npm run dev` in `Frontend/` → `http://localhost:8080` (default injected by `@lovable.dev/vite-tanstack-config` — not 8081). Vite proxies `/api` → `http://127.0.0.1:8000` (`vite.config.ts`). If master pages show "Tidak dapat terhubung ke server backend", the Laravel server isn't running.
 
-Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/logs/`), verifies ports 8000/8080 are free first, and kills both on Ctrl+C. Prefer this over running the two loops separately.
+Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/logs/`), verifies ports 8000/8080 are free first, and kills both on Ctrl+C. Prefer this over running the two loops separately. Note `dev.sh` is a bash script — on Windows run it from **Git Bash / MSYS**, not PowerShell. It starts a plain `php artisan serve` (no queue:listen/pail); `composer dev` is the full-loop alternative.
 
 `dev.sh` also starts an **ngrok tunnel** to the backend (skip with `SKIP_TUNNEL=1`) so the Vercel-deployed frontend can reach the local API from production. It prints `VITE_API_URL=<ngrok-url>/api` (also saved to `.dev/logs/ngrok-url.txt` and copied to clipboard). To use it: set that value in the Vercel project's Environment Variables and redeploy — the URL changes each ngrok restart. Backend CORS for this is enabled via `Backend/config/cors.php`.
 

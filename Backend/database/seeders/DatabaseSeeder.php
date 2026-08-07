@@ -23,6 +23,10 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             VendorSeeder::class,
             ItemSeeder::class,
+            UserSeeder::class,
+            DepartmentSeeder::class,
+            ProjectSeeder::class,
+            WorkOrderSeeder::class,
         ]);
     }
 }

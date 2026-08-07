@@ -24,25 +24,31 @@ import {
   binSchema,
   categorySchema,
   customerSchema,
+  departmentSchema,
   itemSchema,
   merkSchema,
+  projectSchema,
   rackSchema,
   subCategorySchema,
   supplierSchema,
   unitSchema,
   vendorSchema,
   warehouseSchema,
+  workOrderSchema,
   type BinInput,
   type CategoryInput,
   type CustomerInput,
+  type DepartmentInput,
   type ItemInput,
   type MerkInput,
+  type ProjectInput,
   type RackInput,
   type SubCategoryInput,
   type SupplierInput,
   type UnitInput,
   type VendorInput,
   type WarehouseInput,
+  type WorkOrderInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
 import {
@@ -51,17 +57,22 @@ import {
   useCreateBin,
   useCreateCategory,
   useCreateCustomer,
+  useCreateDepartment,
   useCreateItem,
   useCreateMerk,
+  useCreateProject,
   useCreateRack,
   useCreateSubCategory,
   useCreateSupplier,
   useCreateUnit,
   useCreateVendor,
   useCreateWarehouse,
+  useCreateWorkOrder,
   useCustomers,
+  useDepartments,
   useItems,
   useMerks,
+  useProjects,
   useRacks,
   useSubCategories,
   useSuppliers,
@@ -69,40 +80,52 @@ import {
   useUpdateBin,
   useUpdateCategory,
   useUpdateCustomer,
+  useUpdateDepartment,
   useUpdateItem,
   useUpdateMerk,
+  useUpdateProject,
   useUpdateRack,
   useUpdateSubCategory,
   useUpdateSupplier,
   useUpdateUnit,
   useUpdateVendor,
   useUpdateWarehouse,
+  useUpdateWorkOrder,
+  useUsers,
   useVendors,
   useWarehouses,
+  useWorkOrders,
   type BinPayload,
   type CategoryPayload,
   type CustomerPayload,
+  type DepartmentPayload,
   type ItemPayload,
   type MerkPayload,
+  type ProjectPayload,
   type RackPayload,
   type SubCategoryPayload,
   type SupplierPayload,
   type UnitPayload,
   type VendorPayload,
   type WarehousePayload,
+  type WorkOrderPayload,
 } from "@/hooks/use-master";
 import type {
   Bin,
   Category,
   Customer,
+  Department,
   ItemApi,
+  MasterUser,
   Merk,
+  Project,
   Rack,
   SubCategory,
   Supplier,
   Unit,
   Vendor,
   Warehouse,
+  WorkOrder,
 } from "@/lib/master-types";
 
 function rowField(
@@ -2468,6 +2491,711 @@ export function ItemFormDialog({
           </Form>
         );
       }}
+    />
+  );
+}
+
+export function DepartmentFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Department | null;
+}) {
+  const create = useCreateDepartment();
+  const update = useUpdateDepartment();
+  const { data: departments } = useDepartments();
+  const { data: users } = useUsers();
+  const previewCode = nextCode(
+    (departments?.data ?? []).map((d) => d.code),
+    "DEP",
+  );
+
+  return (
+    <CrudFormDialog<DepartmentInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Departemen" : "Tambah Departemen"}
+      description="Unit kerja peminta barang di dalam perusahaan."
+      schema={departmentSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              head_user_id: initial.head_user_id ?? "",
+              is_active: initial.is_active,
+            }
+          : { code: "", name: "", head_user_id: "", is_active: true }
+      }
+      onSubmit={async (values, form) => {
+        const payload: DepartmentPayload = {
+          name: values.name.trim(),
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        if (values.head_user_id) payload.head_user_id = values.head_user_id;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Departemen diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Departemen ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "head_user_id");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "head_user_id")
+          )
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Departemen</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Departemen</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Produksi" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="head_user_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Kepala <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <Select
+                    value={String(field.value ?? "")}
+                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih kepala" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {users?.data.map((u) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="department-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="department-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function ProjectFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: Project | null;
+}) {
+  const create = useCreateProject();
+  const update = useUpdateProject();
+  const { data: projects } = useProjects();
+  const { data: users } = useUsers();
+  const previewCode = nextCode(
+    (projects?.data ?? []).map((p) => p.code),
+    "PRJ",
+  );
+
+  return (
+    <CrudFormDialog<ProjectInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Proyek" : "Tambah Proyek"}
+      description="Proyek pemakaian material produksi."
+      schema={projectSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              pic_user_id: initial.pic_user_id ?? "",
+              start_date: initial.start_date ?? "",
+              end_date: initial.end_date ?? "",
+              status: initial.status as ProjectInput["status"],
+              budget: initial.budget ?? undefined,
+            }
+          : {
+              code: "",
+              name: "",
+              pic_user_id: "",
+              start_date: "",
+              end_date: "",
+              status: "Perencanaan",
+              budget: undefined,
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: ProjectPayload = {
+          name: values.name.trim(),
+          status: values.status,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        if (values.pic_user_id) payload.pic_user_id = values.pic_user_id;
+        if (values.start_date) payload.start_date = values.start_date;
+        if (values.end_date) payload.end_date = values.end_date;
+        if (values.budget != null) payload.budget = values.budget;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Proyek diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Proyek ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "pic_user_id");
+          rowField(form as never, err, "budget");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "pic_user_id") &&
+            !fieldError(err, "budget")
+          )
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode Proyek</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama Proyek</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Proyek Tol Cisumdawu" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="pic_user_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <Select
+                    value={String(field.value ?? "")}
+                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih PIC" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {users?.data.map((u) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Tanggal Mulai <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="rounded-xl"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="end_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Tanggal Selesai <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="rounded-xl"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Perencanaan">Perencanaan</SelectItem>
+                      <SelectItem value="Berjalan">Berjalan</SelectItem>
+                      <SelectItem value="Selesai">Selesai</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="budget"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Anggaran <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="1000"
+                      placeholder="250000000"
+                      className="rounded-xl"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function WorkOrderFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: WorkOrder | null;
+}) {
+  const create = useCreateWorkOrder();
+  const update = useUpdateWorkOrder();
+  const { data: workOrders } = useWorkOrders();
+  const { data: projects } = useProjects();
+  const { data: items } = useItems();
+  const { data: units } = useUnits();
+  const { data: users } = useUsers();
+  const previewNo = nextCode(
+    (workOrders?.data ?? []).map((w) => w.no),
+    "WO",
+  );
+
+  return (
+    <CrudFormDialog<WorkOrderInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit Work Order" : "Tambah Work Order"}
+      description="Perintah kerja produksi pemakai material."
+      schema={workOrderSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              no: initial.no,
+              project_id: initial.project_id,
+              item_id: initial.item_id,
+              unit_id: initial.unit_id ?? "",
+              target_qty: initial.target_qty,
+              start_date: initial.start_date ?? "",
+              finish_date: initial.finish_date ?? "",
+              pic_user_id: initial.pic_user_id ?? "",
+              status: initial.status as WorkOrderInput["status"],
+            }
+          : {
+              no: "",
+              project_id: 0,
+              item_id: 0,
+              unit_id: "",
+              target_qty: 1,
+              start_date: "",
+              finish_date: "",
+              pic_user_id: "",
+              status: "Perencanaan",
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: WorkOrderPayload = {
+          project_id: values.project_id,
+          item_id: values.item_id,
+          target_qty: values.target_qty,
+          status: values.status,
+        };
+        const no = values.no?.trim();
+        if (initial && no) payload.no = no;
+        if (values.unit_id) payload.unit_id = values.unit_id;
+        if (values.start_date) payload.start_date = values.start_date;
+        if (values.finish_date) payload.finish_date = values.finish_date;
+        if (values.pic_user_id) payload.pic_user_id = values.pic_user_id;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("Work order diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("Work order ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "no");
+          rowField(form as never, err, "project_id");
+          rowField(form as never, err, "item_id");
+          rowField(form as never, err, "target_qty");
+          if (
+            !fieldError(err, "no") &&
+            !fieldError(err, "project_id") &&
+            !fieldError(err, "item_id") &&
+            !fieldError(err, "target_qty")
+          )
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="no"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nomor WO</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewNo}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="project_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Proyek</FormLabel>
+                  <Select
+                    value={String(field.value)}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih proyek" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {projects?.data.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="item_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Produk / Barang</FormLabel>
+                  <Select
+                    value={String(field.value)}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih barang" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {items?.data.map((it) => (
+                        <SelectItem key={it.id} value={String(it.id)}>
+                          {it.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="unit_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Satuan <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <Select
+                      value={String(field.value ?? "")}
+                      onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Pilih satuan" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-72 rounded-xl">
+                        {units?.data.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="target_qty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Qty</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        className="rounded-xl"
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Tanggal Mulai <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="rounded-xl"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="finish_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Tanggal Selesai <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="rounded-xl"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="pic_user_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                  </FormLabel>
+                  <Select
+                    value={String(field.value ?? "")}
+                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih PIC" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-72 rounded-xl">
+                      {users?.data.map((u) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="Perencanaan">Perencanaan</SelectItem>
+                      <SelectItem value="Berjalan">Berjalan</SelectItem>
+                      <SelectItem value="Selesai">Selesai</SelectItem>
+                      <SelectItem value="Ditunda">Ditunda</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
     />
   );
 }

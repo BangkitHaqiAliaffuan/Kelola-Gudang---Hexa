@@ -5,7 +5,6 @@ import { PageHeader, Panel, Pill } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { departments, projects, workOrders } from "@/lib/wms-data";
 
 type Row = { id: string; kode: string; nama: string; info: string; extra: string; status: string };
 
@@ -24,45 +23,6 @@ export const masterDatasets: Record<
   string,
   { title: string; description: string; headers: [string, string, string]; rows: Row[] }
 > = {
-  departemen: {
-    title: "Departemen",
-    description: "Unit kerja peminta barang",
-    headers: ["Nama Departemen", "Kepala", "Jumlah Permintaan"],
-    rows: make(
-      "DEP",
-      departments.map((d, i) => ({
-        nama: d,
-        info: ["Bayu Pratama", "Dewi Lestari", "Agus Salim"][i % 3]!,
-        extra: `${34 + i * 12} permintaan`,
-      })),
-    ),
-  },
-  proyek: {
-    title: "Proyek",
-    description: "Proyek pemakaian material",
-    headers: ["Nama Proyek", "PIC", "Status"],
-    rows: make(
-      "PRJ",
-      projects.map((p, i) => ({
-        nama: p,
-        info: ["Rudi Hartono", "Siti Aminah"][i % 2]!,
-        extra: ["Berjalan", "Selesai", "Perencanaan"][i % 3]!,
-      })),
-    ),
-  },
-  "work-order": {
-    title: "Work Order",
-    description: "Perintah kerja produksi pemakai material",
-    headers: ["Nomor WO", "Proyek / Produk", "Target & Jadwal"],
-    rows: workOrders.map((w, i) => ({
-      id: `WOX-${i + 1}`,
-      kode: w.no,
-      nama: `${w.no} — ${w.product}`,
-      info: w.project,
-      extra: `${w.target} ${w.unit} · ${w.start} → ${w.finish}`,
-      status: w.status === "Selesai" ? "Selesai" : w.status === "Ditunda" ? "Nonaktif" : "Aktif",
-    })),
-  },
   user: {
     title: "User",
     description: "Pengguna aplikasi gudang",

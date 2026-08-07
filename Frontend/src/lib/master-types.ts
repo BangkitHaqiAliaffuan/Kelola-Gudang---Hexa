@@ -166,3 +166,55 @@ export type ItemApi = {
   created_at: string;
   updated_at: string;
 };
+
+export type MasterUser = {
+  id: number;
+  name: string;
+  email: string | null;
+  is_active: boolean;
+};
+
+export type Department = {
+  id: number;
+  code: string;
+  name: string;
+  head_user_id: number | null;
+  head: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Project = {
+  id: number;
+  code: string;
+  name: string;
+  pic_user_id: number | null;
+  pic: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  budget: number | null;
+  work_orders_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkOrder = {
+  id: number;
+  no: string;
+  project_id: number;
+  project: string | null;
+  item_id: number;
+  item: string | null;
+  unit_id: number | null;
+  unit: string | null;
+  target_qty: number;
+  start_date: string | null;
+  finish_date: string | null;
+  pic_user_id: number | null;
+  pic: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};

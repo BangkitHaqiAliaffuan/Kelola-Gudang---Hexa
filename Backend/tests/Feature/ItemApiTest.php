@@ -10,6 +10,7 @@ use App\Models\Rack;
 use App\Models\SubCategory;
 use App\Models\Supplier;
 use App\Models\Warehouse;
+use App\Models\WorkOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -432,5 +433,29 @@ class ItemApiTest extends TestCase
             'status' => 'Aktif',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['preferred_supplier_id']);
+    }
+
+    public function test_cannot_delete_item_used_by_work_order(): void
+    {
+        $category = Category::factory()->create();
+        $item = Item::factory()->create(['category_id' => $category->id]);
+        WorkOrder::factory()->create(['item_id' => $item->id]);
+
+        $this->deleteJson("/api/master/items/{$item->id}")
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('items', ['id' => $item->id]);
+    }
+
+    public function test_cannot_bulk_delete_item_used_by_work_order(): void
+    {
+        $category = Category::factory()->create();
+        $item = Item::factory()->create(['category_id' => $category->id]);
+        WorkOrder::factory()->create(['item_id' => $item->id]);
+
+        $this->postJson('/api/master/items/bulk-delete', ['ids' => [$item->id]])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('items', ['id' => $item->id]);
     }
 }

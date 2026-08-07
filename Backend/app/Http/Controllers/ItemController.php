@@ -8,6 +8,7 @@ use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Http\Resources\ItemResource;
 use App\Models\Item;
+use App\Models\WorkOrder;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,6 +75,12 @@ class ItemController extends Controller
 
     public function destroy(Item $item): JsonResponse
     {
+        if (WorkOrder::where('item_id', $item->id)->exists()) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena masih digunakan oleh work order.',
+            ], 422);
+        }
+
         $item->delete();
 
         return response()->json(['message' => 'Barang berhasil dihapus.'], 200);
@@ -81,7 +88,16 @@ class ItemController extends Controller
 
     public function bulkDestroy(BulkItemDeleteRequest $request): JsonResponse
     {
-        $deleted = Item::whereIn('id', $request->validated('ids'))->delete();
+        $ids = $request->validated('ids');
+
+        $inUse = WorkOrder::whereIn('item_id', $ids)->exists();
+        if ($inUse) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena masih digunakan oleh work order.',
+            ], 422);
+        }
+
+        $deleted = Item::whereIn('id', $ids)->delete();
 
         return response()->json([
             'message' => "{$deleted} barang berhasil dihapus.",

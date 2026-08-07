@@ -3,14 +3,17 @@ import { GenericMasterPage, masterDatasets } from "@/components/wms/generic-mast
 import {
   BinPage,
   CustomerPage,
+  DepartemenPage,
   GudangPage,
   KategoriPage,
   MerkPage,
+  ProyekPage,
   RakPage,
   SatuanPage,
   SubKategoriPage,
   SupplierPage,
   VendorPage,
+  WorkOrderPage,
 } from "@/components/wms/master-crud-pages";
 
 const apiTitles: Record<string, { title: string; description: string }> = {
@@ -24,6 +27,9 @@ const apiTitles: Record<string, { title: string; description: string }> = {
   supplier: { title: "Supplier", description: "Daftar pemasok barang" },
   customer: { title: "Customer", description: "Daftar pembeli / pelanggan" },
   vendor: { title: "Vendor", description: "Daftar penyedia jasa pendukung" },
+  departemen: { title: "Departemen", description: "Daftar departemen / divisi" },
+  proyek: { title: "Proyek", description: "Daftar proyek pekerjaan" },
+  "work-order": { title: "Work Order", description: "Daftar instruksi kerja produksi" },
 };
 
 export const Route = createFileRoute("/master/$section")({
@@ -56,5 +62,8 @@ function MasterSection() {
   if (section === "supplier") return <SupplierPage />;
   if (section === "customer") return <CustomerPage />;
   if (section === "vendor") return <VendorPage />;
+  if (section === "departemen") return <DepartemenPage />;
+  if (section === "proyek") return <ProyekPage />;
+  if (section === "work-order") return <WorkOrderPage />;
   return <GenericMasterPage slug={section} />;
 }

@@ -4,14 +4,18 @@ import type {
   Bin,
   Category,
   Customer,
+  Department,
   ItemApi,
+  MasterUser,
   Merk,
+  Project,
   Rack,
   SubCategory,
   Supplier,
   Unit,
   Vendor,
   Warehouse,
+  WorkOrder,
 } from "@/lib/master-types";
 
 // Data volume is small (~300 items), so fetch everything and let the UI
@@ -29,6 +33,10 @@ const keys = {
   suppliers: ["master", "suppliers"] as const,
   customers: ["master", "customers"] as const,
   vendors: ["master", "vendors"] as const,
+  users: ["master", "users"] as const,
+  departments: ["master", "departments"] as const,
+  projects: ["master", "projects"] as const,
+  workOrders: ["master", "work-orders"] as const,
   items: ["master", "items"] as const,
   item: (id: number) => ["master", "items", id] as const,
 };
@@ -117,6 +125,38 @@ export function useVendors() {
   return useQuery({
     queryKey: keys.vendors,
     queryFn: () => api.get<Paginated<Vendor>>(`/master/vendors?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: keys.users,
+    queryFn: () => api.get<Paginated<MasterUser>>(`/master/users?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useDepartments() {
+  return useQuery({
+    queryKey: keys.departments,
+    queryFn: () => api.get<Paginated<Department>>(`/master/departments?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useProjects() {
+  return useQuery({
+    queryKey: keys.projects,
+    queryFn: () => api.get<Paginated<Project>>(`/master/projects?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useWorkOrders() {
+  return useQuery({
+    queryKey: keys.workOrders,
+    queryFn: () => api.get<Paginated<WorkOrder>>(`/master/work-orders?per_page=${PER_PAGE}`),
     enabled: typeof window !== "undefined",
   });
 }
@@ -210,6 +250,35 @@ export type VendorPayload = {
   contact_phone?: string;
   email?: string;
   is_active: boolean;
+};
+
+export type DepartmentPayload = {
+  code?: string;
+  name: string;
+  head_user_id?: number;
+  is_active: boolean;
+};
+
+export type ProjectPayload = {
+  code?: string;
+  name: string;
+  pic_user_id?: number;
+  start_date?: string;
+  end_date?: string;
+  status?: string;
+  budget?: number;
+};
+
+export type WorkOrderPayload = {
+  no?: string;
+  project_id: number;
+  item_id: number;
+  unit_id?: number;
+  target_qty: number;
+  start_date?: string;
+  finish_date?: string;
+  pic_user_id?: number;
+  status?: string;
 };
 
 export type ItemPayload = {
@@ -529,5 +598,83 @@ export function useBulkUpdateItemStatus() {
     mutationFn: ({ ids, status }: { ids: number[]; status: "Aktif" | "Nonaktif" }) =>
       api.post<{ message: string; updated: number }>("/master/items/bulk-status", { ids, status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.items }),
+  });
+}
+
+export function useCreateDepartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DepartmentPayload) =>
+      api.post<{ data: Department }>("/master/departments", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.departments }),
+  });
+}
+
+export function useUpdateDepartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: DepartmentPayload & { id: number }) =>
+      api.put<{ data: Department }>(`/master/departments/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.departments }),
+  });
+}
+
+export function useDeleteDepartment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/departments/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.departments }),
+  });
+}
+
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ProjectPayload) =>
+      api.post<{ data: Project }>("/master/projects", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.projects }),
+  });
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: ProjectPayload & { id: number }) =>
+      api.put<{ data: Project }>(`/master/projects/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.projects }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/projects/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.projects }),
+  });
+}
+
+export function useCreateWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: WorkOrderPayload) =>
+      api.post<{ data: WorkOrder }>("/master/work-orders", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.workOrders }),
+  });
+}
+
+export function useUpdateWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: WorkOrderPayload & { id: number }) =>
+      api.put<{ data: WorkOrder }>(`/master/work-orders/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.workOrders }),
+  });
+}
+
+export function useDeleteWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/work-orders/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.workOrders }),
   });
 }
