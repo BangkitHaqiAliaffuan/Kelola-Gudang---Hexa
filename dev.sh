@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOGDIR="$ROOT/.dev/logs"
+mkdir -p "$LOGDIR"
+BACKEND_LOG="$LOGDIR/backend.log"
+FRONTEND_LOG="$LOGDIR/frontend.log"
+BACKEND_URL="http://127.0.0.1:8000/api/master/categories"
+FRONTEND_URL="http://localhost:8080/@vite/client"
+
+is_windows() {
+  case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+port_in_use() {
+  netstat -ano 2>/dev/null | grep -i listening | grep -E "[:.]$1( |\$)" >/dev/null
+}
+
+win_pid() {
+  ps -W 2>/dev/null | awk -v p="$1" '$1 == p { print $4 }'
+}
+
+BACKEND_PID=""
+FRONTEND_PID=""
+cleanup() {
+  trap - INT TERM EXIT
+  echo
+  echo "Menghentikan server..."
+  if is_windows; then
+    for pid in "$BACKEND_PID" "$FRONTEND_PID"; do
+      [ -n "$pid" ] || continue
+      wp="$(win_pid "$pid")"
+      if [ -n "$wp" ]; then
+        MSYS_NO_PATHCONV=1 taskkill //T //F //PID "$wp" >/dev/null 2>&1 || true
+      else
+        kill "$pid" >/dev/null 2>&1 || true
+      fi
+    done
+  else
+    set -m
+    [ -n "$BACKEND_PID" ] && { kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" || true; }
+    [ -n "$FRONTEND_PID" ] && { kill -- -"$FRONTEND_PID" 2>/dev/null || kill "$FRONTEND_PID" || true; }
+  fi
+  wait 2>/dev/null || true
+}
+trap cleanup INT TERM EXIT
+
+echo "Memeriksa port..."
+port_in_use 8000 && {
+  echo "✗ Port 8000 sudah terpakai (backend berjalan?). Matikan dulu: taskkill //PID <pid> //F"
+  exit 1
+}
+port_in_use 8080 && {
+  echo "✗ Port 8080 sudah terpakai (frontend berjalan?). Matikan dulu."
+  exit 1
+}
+
+echo "▶ Backend (Laravel)   → $BACKEND_URL   | log: $BACKEND_LOG"
+(cd "$ROOT/Backend" && exec php artisan serve) >"$BACKEND_LOG" 2>&1 &
+BACKEND_PID=$!
+echo "▶ Frontend (Vite)     → http://localhost:8080  | log: $FRONTEND_LOG"
+(cd "$ROOT/Frontend" && exec npm run dev) >"$FRONTEND_LOG" 2>&1 &
+FRONTEND_PID=$!
+
+wait_for() {
+  local url="$1" name="$2" tries=0 timeout="${4:-5}"
+  until curl -sf -o /dev/null --max-time "$timeout" "$url"; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge "$3" ]; then
+      echo "⚠ $name tidak kunjung siap — lihat log."
+      return 1
+    fi
+    sleep 1
+  done
+  echo "✓ $name siap."
+}
+wait_for "$BACKEND_URL" "Backend" 60 || true
+wait_for "$FRONTEND_URL" "Frontend" 30 3 || true
+
+echo "Ctrl+C untuk menghentikan kedua server."
+tail -n +1 -F "$BACKEND_LOG" "$FRONTEND_LOG"

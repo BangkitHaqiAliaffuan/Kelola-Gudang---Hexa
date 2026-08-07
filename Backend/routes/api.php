@@ -1,0 +1,16 @@
+<?php
+
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ItemController;
+use App\Http\Controllers\MerkController;
+use App\Http\Controllers\SubCategoryController;
+use Illuminate\Support\Facades\Route;
+
+Route::prefix('master')->group(function () {
+    Route::apiResource('categories', CategoryController::class);
+    Route::apiResource('sub-categories', SubCategoryController::class);
+    Route::apiResource('merks', MerkController::class);
+    Route::post('items/bulk-delete', [ItemController::class, 'bulkDestroy']);
+    Route::post('items/bulk-status', [ItemController::class, 'bulkUpdateStatus']);
+    Route::apiResource('items', ItemController::class);
+});
