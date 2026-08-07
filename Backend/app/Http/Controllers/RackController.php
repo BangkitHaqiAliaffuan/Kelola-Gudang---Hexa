@@ -39,6 +39,7 @@ class RackController extends Controller
         $data = $request->validated();
         $data['is_active'] = $data['is_active'] ?? true;
         $data['code'] = $data['aisle'].'-'.$data['bay'];
+        $data['name'] = $this->resolveName($data['name'] ?? null, $data['code']);
 
         $rack = Rack::create($data);
 
@@ -56,6 +57,7 @@ class RackController extends Controller
     {
         $data = $request->validated();
         $data['code'] = $data['aisle'].'-'.$data['bay'];
+        $data['name'] = $this->resolveName($data['name'] ?? null, $data['code']);
         $rack->update($data);
 
         return new RackResource($rack->fresh()->load('warehouse')->loadCount('bins'));
@@ -78,5 +80,12 @@ class RackController extends Controller
         $rack->delete();
 
         return response()->json(['message' => 'Rak berhasil dihapus.'], 200);
+    }
+
+    private function resolveName(?string $name, string $code): string
+    {
+        $trimmed = trim((string) $name);
+
+        return $trimmed === '' ? 'Rak '.$code : $trimmed;
     }
 }

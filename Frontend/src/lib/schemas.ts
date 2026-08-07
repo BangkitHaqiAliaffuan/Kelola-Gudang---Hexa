@@ -99,7 +99,7 @@ export const rackSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{2}$/, "Dua digit (contoh: 03)"),
-  name,
+  name: optionalText(150),
   is_active: z.boolean().default(true),
 });
 export type RackInput = z.infer<typeof rackSchema>;

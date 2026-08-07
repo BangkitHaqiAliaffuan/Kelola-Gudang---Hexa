@@ -35,7 +35,7 @@ class UpdateRackRequest extends FormRequest
                     ->where(fn ($q) => $q->where('warehouse_id', $this->input('warehouse_id')))
                     ->ignore($rack),
             ],
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

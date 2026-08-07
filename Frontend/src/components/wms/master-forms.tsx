@@ -881,7 +881,9 @@ export function RackFormDialog({
           warehouse_id: values.warehouse_id,
           aisle: values.aisle.trim().toUpperCase(),
           bay: values.bay.trim(),
-          name: values.name.trim(),
+          name:
+            (values.name ?? "").trim() ||
+            `Rak ${values.aisle.trim().toUpperCase()}-${values.bay.trim()}`,
           is_active: values.is_active,
         };
         try {
@@ -975,16 +977,23 @@ export function RackFormDialog({
                 />
               </div>
               <p className="-mt-2 text-xs text-muted-foreground">
-                Kode Rak otomatis: <span className="font-mono">{preview}</span>
+                Kode Rak otomatis: <span className="font-mono">{preview}</span> • Nama otomatis{" "}
+                <span className="font-mono">Rak {preview}</span> bila dikosongkan
               </p>
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nama Rak</FormLabel>
+                    <FormLabel>
+                      Nama Rak <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="Rak A" className="rounded-xl" {...field} />
+                      <Input
+                        placeholder="Rak Sparepart Elektronik"
+                        className="rounded-xl"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

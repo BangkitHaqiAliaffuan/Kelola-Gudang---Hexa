@@ -31,7 +31,7 @@ class StoreRackRequest extends FormRequest
                 'max:20',
                 Rule::unique('racks', 'code')->where(fn ($q) => $q->where('warehouse_id', $this->input('warehouse_id'))),
             ],
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['nullable', 'string', 'max:150'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

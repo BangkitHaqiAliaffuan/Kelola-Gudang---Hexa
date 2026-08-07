@@ -464,7 +464,7 @@ export function RakPage() {
     {
       key: "name",
       label: "Nama Rak",
-      render: (r) => <span className="font-medium">{r.name}</span>,
+      render: (r) => <span className="font-medium">{r.name ?? r.code}</span>,
     },
     { key: "warehouse", label: "Gudang", render: (r) => r.warehouse_name ?? "—" },
     {
@@ -481,7 +481,7 @@ export function RakPage() {
         title="Rak"
         description="Rak penyimpanan per gudang"
         searchPlaceholder="Cari rak..."
-        searchText={(r) => `${r.code} ${r.name} ${r.warehouse_name ?? ""}`}
+        searchText={(r) => `${r.code} ${r.name ?? ""} ${r.warehouse_name ?? ""}`}
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
@@ -504,7 +504,7 @@ export function RakPage() {
         mobileCard={(r) => (
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate text-sm font-semibold">{r.name ?? r.code}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {r.warehouse_name ?? "—"} • {r.bin_count ?? 0} bin

@@ -112,7 +112,22 @@ class RackApiTest extends TestCase
     {
         $this->postJson('/api/master/racks', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['name', 'warehouse_id', 'aisle', 'bay']);
+            ->assertJsonValidationErrors(['warehouse_id', 'aisle', 'bay']);
+    }
+
+    public function test_store_auto_fills_name_from_code_when_omitted(): void
+    {
+        $warehouse = Warehouse::factory()->create();
+
+        $this->postJson('/api/master/racks', [
+            'warehouse_id' => $warehouse->id,
+            'aisle' => 'X',
+            'bay' => '99',
+        ])->assertCreated()
+            ->assertJsonPath('data.code', 'X-99')
+            ->assertJsonPath('data.name', 'Rak X-99');
+
+        $this->assertDatabaseHas('racks', ['code' => 'X-99', 'name' => 'Rak X-99']);
     }
 
     public function test_can_update_rack(): void
