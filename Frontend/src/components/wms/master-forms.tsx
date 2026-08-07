@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormCombobox, type ComboboxOption } from "./form-combobox";
 import {
   Form,
   FormControl,
@@ -1096,29 +1097,27 @@ export function BinFormDialog({
               <FormField
                 control={form.control}
                 name="rack_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rak</FormLabel>
-                    <Select
-                      value={String(field.value)}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                    >
+                render={({ field }) => {
+                  const rackOptions: ComboboxOption[] = (racks?.data ?? []).map((r) => ({
+                    value: String(r.id),
+                    label: `${r.code} — ${r.name} (${r.warehouse_name ?? "—"})`,
+                    keywords: r.name,
+                  }));
+                  return (
+                    <FormItem>
+                      <FormLabel>Rak</FormLabel>
                       <FormControl>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Pilih rak" />
-                        </SelectTrigger>
+                        <FormCombobox
+                          value={String(field.value)}
+                          onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                          options={rackOptions}
+                          placeholder="Pilih rak"
+                        />
                       </FormControl>
-                      <SelectContent className="max-h-72 rounded-xl">
-                        {racks?.data.map((r) => (
-                          <SelectItem key={r.id} value={String(r.id)}>
-                            {r.code} — {r.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -2620,121 +2619,113 @@ export function ItemFormDialog({
                 <FormField
                   control={form.control}
                   name="category_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Kategori</FormLabel>
-                      <Select
-                        value={String(field.value)}
-                        onValueChange={(v) => field.onChange(Number(v))}
-                      >
+                  render={({ field }) => {
+                    const catOptions: ComboboxOption[] = (cats?.data ?? []).map((c) => ({
+                      value: String(c.id),
+                      label: c.name,
+                      keywords: c.code,
+                    }));
+                    return (
+                      <FormItem>
+                        <FormLabel>Kategori</FormLabel>
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
-                            <SelectValue placeholder="Pilih kategori" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={String(field.value)}
+                            onValueChange={(v) => field.onChange(Number(v))}
+                            options={catOptions}
+                            placeholder="Pilih kategori"
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          {cats?.data.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="sub_category_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Sub Kategori{" "}
-                        <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                      >
+                  render={({ field }) => {
+                    const subOptions: ComboboxOption[] = subs.map((s) => ({
+                      value: String(s.id),
+                      label: s.name,
+                      keywords: s.code,
+                    }));
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Sub Kategori{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
-                            <SelectValue placeholder="Pilih sub kategori" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                            options={subOptions}
+                            placeholder="Pilih sub kategori"
+                            allowEmpty
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          <SelectItem value="">Tidak ada</SelectItem>
-                          {subs.map((s) => (
-                            <SelectItem key={s.id} value={String(s.id)}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="brand_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Merk <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                      >
+                  render={({ field }) => {
+                    const merkOptions: ComboboxOption[] = (merks?.data ?? []).map((m) => ({
+                      value: String(m.id),
+                      label: m.name,
+                      keywords: m.code,
+                    }));
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Merk <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
-                            <SelectValue placeholder="Pilih merk" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                            options={merkOptions}
+                            placeholder="Pilih merk"
+                            allowEmpty
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          <SelectItem value="">Tidak ada</SelectItem>
-                          {merks?.data.map((m) => (
-                            <SelectItem key={m.id} value={String(m.id)}>
-                              {m.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="preferred_supplier_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Supplier{" "}
-                        <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                      >
+                  render={({ field }) => {
+                    const supplierOptions: ComboboxOption[] = (suppliers?.data ?? []).map((s) => ({
+                      value: String(s.id),
+                      label: s.name,
+                      keywords: s.code,
+                    }));
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Supplier{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
-                            <SelectValue placeholder="Pilih supplier" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                            options={supplierOptions}
+                            placeholder="Pilih supplier"
+                            allowEmpty
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          <SelectItem value="">Tidak ada</SelectItem>
-                          {suppliers?.data.map((s) => (
-                            <SelectItem key={s.id} value={String(s.id)}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -2810,32 +2801,28 @@ export function ItemFormDialog({
                   name="default_rack_id"
                   render={({ field }) => {
                     const selectedWh = form.watch("default_warehouse_id");
+                    const rackOptions: ComboboxOption[] = (rackRows?.data ?? [])
+                      .filter((r) => r.warehouse_id === selectedWh)
+                      .map((r) => ({
+                        value: String(r.id),
+                        label: `${r.code} — ${r.name} (${r.warehouse_name ?? "—"})`,
+                        keywords: r.name,
+                      }));
                     return (
                       <FormItem>
                         <FormLabel>Rak Default</FormLabel>
-                        <Select
-                          value={field.value ? String(field.value) : ""}
-                          onValueChange={(v) => {
-                            field.onChange(v === "" ? "" : Number(v));
-                            form.setValue("default_bin_id", "");
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="rounded-xl">
-                              <SelectValue placeholder="Pilih rak" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-72 rounded-xl">
-                            <SelectItem value="">Tidak ada</SelectItem>
-                            {rackRows?.data
-                              .filter((r) => r.warehouse_id === selectedWh)
-                              .map((r) => (
-                                <SelectItem key={r.id} value={String(r.id)}>
-                                  {r.code} — {r.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => {
+                              field.onChange(v === "" ? "" : Number(v));
+                              form.setValue("default_bin_id", "");
+                            }}
+                            options={rackOptions}
+                            placeholder="Pilih rak"
+                            allowEmpty
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     );
@@ -2846,29 +2833,25 @@ export function ItemFormDialog({
                   name="default_bin_id"
                   render={({ field }) => {
                     const selectedRack = form.watch("default_rack_id");
+                    const binOptions: ComboboxOption[] = (binRows?.data ?? [])
+                      .filter((b) => b.rack_id === selectedRack)
+                      .map((b) => ({
+                        value: String(b.id),
+                        label: `${b.code} — ${b.name}`,
+                        keywords: b.name,
+                      }));
                     return (
                       <FormItem>
                         <FormLabel>Bin Default</FormLabel>
-                        <Select
-                          value={field.value ? String(field.value) : ""}
-                          onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="rounded-xl">
-                              <SelectValue placeholder="Pilih bin" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-72 rounded-xl">
-                            <SelectItem value="">Tidak ada</SelectItem>
-                            {binRows?.data
-                              .filter((b) => b.rack_id === selectedRack)
-                              .map((b) => (
-                                <SelectItem key={b.id} value={String(b.id)}>
-                                  {b.code} — {b.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                            options={binOptions}
+                            placeholder="Pilih bin"
+                            allowEmpty
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     );
@@ -3542,56 +3525,52 @@ export function WorkOrderFormDialog({
             <FormField
               control={form.control}
               name="project_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Proyek</FormLabel>
-                  <Select
-                    value={String(field.value)}
-                    onValueChange={(v) => field.onChange(Number(v))}
-                  >
+              render={({ field }) => {
+                const projectOptions: ComboboxOption[] = (projects?.data ?? []).map((p) => ({
+                  value: String(p.id),
+                  label: p.name,
+                  keywords: p.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>Proyek</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Pilih proyek" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value)}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                        options={projectOptions}
+                        placeholder="Pilih proyek"
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {projects?.data.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}
               name="item_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Produk / Barang</FormLabel>
-                  <Select
-                    value={String(field.value)}
-                    onValueChange={(v) => field.onChange(Number(v))}
-                  >
+              render={({ field }) => {
+                const itemOptions: ComboboxOption[] = (items?.data ?? []).map((it) => ({
+                  value: String(it.id),
+                  label: it.name,
+                  keywords: [it.sku, it.internal_barcode].filter(Boolean).join(" "),
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>Produk / Barang</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Pilih barang" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value)}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                        options={itemOptions}
+                        placeholder="Pilih barang"
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {items?.data.map((it) => (
-                        <SelectItem key={it.id} value={String(it.id)}>
-                          {it.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <div className="grid grid-cols-2 gap-4">
               <FormField
