@@ -27,7 +27,7 @@ class VendorSeeder extends Seeder
                 'code' => 'VDR-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                 'name' => $vendor['name'],
                 'legal_name' => $vendor['name'],
-                'nib' => '9120'.str_pad((string) $i, 9, '0', STR_PAD_LEFT),
+                'nib' => '9122'.str_pad((string) $i, 9, '0', STR_PAD_LEFT),
                 'npwp' => Npwp::generate(),
                 'service_type' => $vendor['service_type'],
                 'contact_phone' => '021-'.(string) (8800000 + $i * 211),

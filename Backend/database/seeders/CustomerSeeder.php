@@ -35,7 +35,7 @@ class CustomerSeeder extends Seeder
                 'code' => 'CUS-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                 'name' => $customer['name'],
                 'legal_name' => $customer['name'],
-                'nib' => '9120'.str_pad((string) $i, 9, '0', STR_PAD_LEFT),
+                'nib' => '9121'.str_pad((string) $i, 9, '0', STR_PAD_LEFT),
                 'npwp' => Npwp::generate(),
                 'phone' => '021-'.(string) (7700000 + $i * 119),
                 'email' => 'sales@customer'.$i.'.co.id',

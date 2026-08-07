@@ -31,6 +31,14 @@ class ItemSeeder extends Seeder
         $int = static function (int $min, int $max) use ($rnd) {
             return (int) floor($rnd() * ($max - $min + 1)) + $min;
         };
+        $ean13 = static function (string $digits): string {
+            $sum = 0;
+            foreach (str_split($digits) as $pos => $digit) {
+                $sum += ((int) $digit) * (($pos % 2 === 0) ? 1 : 3);
+            }
+
+            return $digits.(string) ((10 - ($sum % 10)) % 10);
+        };
 
         $prefixes = [
             'Resistor', 'Kapasitor', 'Sensor Suhu', 'Motor DC', 'Katup Bola',
@@ -78,7 +86,7 @@ class ItemSeeder extends Seeder
 
             Item::create([
                 'sku' => 'SKU-'.(10001 + $i).'-'.str_pad((string) (1 + ($i % 9)), 3, '0', STR_PAD_LEFT),
-                'barcode' => '899'.str_pad((string) (10000000000 + $i * 7919), 10, '0', STR_PAD_LEFT),
+                'barcode' => $ean13('899'.str_pad((string) (1000000 + $i * 7919), 9, '0', STR_PAD_LEFT)),
                 'internal_barcode' => 'IB-'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
                 'name' => $pick($prefixes).' '.$pick($suffixes),
                 'category_id' => $category->id,

@@ -25,7 +25,7 @@ class ItemFactory extends Factory
         return [
             'sku' => 'SKU-'.$this->faker->unique()->numberBetween(10000, 99999).'-001',
             'barcode' => $this->faker->unique()->numerify('899##########'),
-            'internal_barcode' => 'IB-'.$this->faker->unique()->numerify('####'),
+            'internal_barcode' => 'IB-'.$this->faker->unique()->numerify('###'),
             'name' => ucwords($this->faker->unique()->words(3, true)),
             'category_id' => Category::factory(),
             'sub_category_id' => SubCategory::factory(),
