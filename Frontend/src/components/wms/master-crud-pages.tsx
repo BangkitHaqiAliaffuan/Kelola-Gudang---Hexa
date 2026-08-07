@@ -12,6 +12,7 @@ import {
   SubCategoryFormDialog,
   SupplierFormDialog,
   UnitFormDialog,
+  UserFormDialog,
   VendorFormDialog,
   WarehouseFormDialog,
   WorkOrderFormDialog,
@@ -21,6 +22,7 @@ import { CustomerDetailSheet, SupplierDetailSheet, VendorDetailSheet } from "./p
 import { type Column } from "./data-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { USER_ROLES } from "@/lib/schemas";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,7 @@ import {
   useDeleteSubCategory,
   useDeleteSupplier,
   useDeleteUnit,
+  useDeleteUser,
   useDeleteVendor,
   useDeleteWarehouse,
   useDeleteWorkOrder,
@@ -52,6 +55,7 @@ import {
   useSubCategories,
   useSuppliers,
   useUnits,
+  useUsers,
   useVendors,
   useWarehouses,
   useWorkOrders,
@@ -61,6 +65,7 @@ import type {
   Category,
   Customer,
   Department,
+  MasterUser,
   Merk,
   Project,
   Rack,
@@ -1332,6 +1337,111 @@ export function WorkOrderPage() {
         )}
       />
       <WorkOrderFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
+    </>
+  );
+}
+
+export function UserPage() {
+  const { data, isLoading } = useUsers();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<MasterUser | null>(null);
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [roleFilter, setRoleFilter] = useState(ALL);
+  const del = useDeleteUser();
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) =>
+      (statusFilter === ALL || r.is_active === (statusFilter === "Aktif")) &&
+      (roleFilter === ALL || r.role === roleFilter),
+  );
+
+  const columns: Column<MasterUser>[] = [
+    {
+      key: "code",
+      label: "Kode",
+      render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+    },
+    {
+      key: "name",
+      label: "Nama User",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    { key: "email", label: "Email", render: (r) => r.email ?? "—" },
+    { key: "role", label: "Role", render: (r) => <Pill tone="info">{r.role}</Pill> },
+    { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `users-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "code", label: "Kode" },
+        { key: "name", label: "Nama User" },
+        { key: "email", label: "Email" },
+        { key: "role", label: "Role" },
+        { key: "is_active", label: "Status" },
+      ]),
+    );
+  };
+
+  return (
+    <>
+      <MasterCrudPage<MasterUser>
+        title="User"
+        description="Pengguna aplikasi gudang"
+        searchPlaceholder="Cari user..."
+        searchText={(r) => `${r.code} ${r.name} ${r.email ?? ""} ${r.role}`}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onAdd={() => {
+          setEditing(null);
+          setDialogOpen(true);
+        }}
+        onEdit={(r) => {
+          setEditing(r);
+          setDialogOpen(true);
+        }}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.id);
+            toast.success("User dihapus");
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
+        filters={
+          <>
+            <FilterSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              placeholder="Semua Status"
+              options={["Aktif", "Nonaktif"]}
+            />
+            <FilterSelect
+              value={roleFilter}
+              onChange={setRoleFilter}
+              placeholder="Semua Role"
+              options={[...USER_ROLES]}
+            />
+          </>
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {r.email ?? "—"} • {r.role}
+              </p>
+            </div>
+            <ActivePill active={r.is_active} />
+          </div>
+        )}
+      />
+      <UserFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
   );
 }

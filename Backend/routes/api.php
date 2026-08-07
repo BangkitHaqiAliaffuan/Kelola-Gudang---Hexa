@@ -28,7 +28,7 @@ Route::prefix('master')->group(function () {
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('vendors', VendorController::class);
-    Route::apiResource('users', UserController::class)->only('index');
+    Route::apiResource('users', UserController::class);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('projects', ProjectController::class);
     Route::apiResource('work-orders', WorkOrderController::class);

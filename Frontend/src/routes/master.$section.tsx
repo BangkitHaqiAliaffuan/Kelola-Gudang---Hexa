@@ -12,6 +12,7 @@ import {
   SatuanPage,
   SubKategoriPage,
   SupplierPage,
+  UserPage,
   VendorPage,
   WorkOrderPage,
 } from "@/components/wms/master-crud-pages";
@@ -30,6 +31,7 @@ const apiTitles: Record<string, { title: string; description: string }> = {
   departemen: { title: "Departemen", description: "Daftar departemen / divisi" },
   proyek: { title: "Proyek", description: "Daftar proyek pekerjaan" },
   "work-order": { title: "Work Order", description: "Daftar instruksi kerja produksi" },
+  user: { title: "User", description: "Pengguna aplikasi gudang" },
 };
 
 export const Route = createFileRoute("/master/$section")({
@@ -65,5 +67,6 @@ function MasterSection() {
   if (section === "departemen") return <DepartemenPage />;
   if (section === "proyek") return <ProyekPage />;
   if (section === "work-order") return <WorkOrderPage />;
+  if (section === "user") return <UserPage />;
   return <GenericMasterPage slug={section} />;
 }

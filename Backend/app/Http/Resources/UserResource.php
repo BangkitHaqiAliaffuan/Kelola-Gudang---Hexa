@@ -11,9 +11,13 @@ class UserResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'code' => $this->code,
             'name' => $this->name,
             'email' => $this->email,
-            'is_active' => $this->is_active ?? true,
+            'role' => $this->role,
+            'is_active' => (bool) $this->is_active,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

@@ -701,3 +701,37 @@ export function useDeleteWorkOrder() {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.workOrders }),
   });
 }
+
+export type UserPayload = {
+  code?: string;
+  name: string;
+  email: string;
+  role: string;
+  password?: string;
+  is_active: boolean;
+};
+
+export function useCreateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UserPayload) => api.post<{ data: MasterUser }>("/master/users", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+  });
+}
+
+export function useUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: UserPayload & { id: number }) =>
+      api.put<{ data: MasterUser }>(`/master/users/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+  });
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ message: string }>(`/master/users/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+  });
+}

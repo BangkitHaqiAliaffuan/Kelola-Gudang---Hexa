@@ -247,6 +247,53 @@ export const projectSchema = z.object({
 });
 export type ProjectInput = z.infer<typeof projectSchema>;
 
+// Mirrors StoreUserRequest::ROLES / UpdateUserRequest in the backend.
+export const USER_ROLES = ["Administrator", "Supervisor", "Operator Gudang", "Auditor"] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+const emailRequired = z
+  .string()
+  .trim()
+  .email("Format email tidak valid")
+  .max(150, "Maksimal 150 karakter");
+
+const baseUserSchema = z.object({
+  code,
+  name,
+  email: emailRequired,
+  role: z.enum(USER_ROLES),
+  is_active: z.boolean().default(true),
+});
+
+export const createUserSchema = baseUserSchema
+  .extend({
+    password: z.string().min(8, "Minimal 8 karakter").max(64, "Maksimal 64 karakter"),
+    password_confirmation: z.string(),
+  })
+  .refine((v) => v.password === v.password_confirmation, {
+    message: "Konfirmasi password tidak sama",
+    path: ["password_confirmation"],
+  });
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+
+export const updateUserSchema = baseUserSchema
+  .extend({
+    password: z
+      .union([
+        z.string().min(8, "Minimal 8 karakter").max(64, "Maksimal 64 karakter"),
+        z.literal(""),
+      ])
+      .default(""),
+    password_confirmation: z.string().default(""),
+  })
+  .refine((v) => v.password === v.password_confirmation, {
+    message: "Konfirmasi password tidak sama",
+    path: ["password_confirmation"],
+  });
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+export type UserInput = UpdateUserInput;
+
 export const workOrderSchema = z.object({
   no: z.string().trim().max(30, "Maksimal 30 karakter").optional(),
   project_id: z.coerce.number().int().positive("Proyek wajib dipilih"),

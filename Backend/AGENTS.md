@@ -26,7 +26,7 @@ php artisan migrate --seed
 
 ## API conventions
 
-- Routes live in `routes/api.php` (registered via `withRouting(api: ...)` in `bootstrap/app.php`). No auth yet — endpoints are open; USER/ROLE/PERMISSION ship later.
+- Routes live in `routes/api.php` (registered via `withRouting(api: ...)` in `bootstrap/app.php`). No auth yet — endpoints are open; ROLE/PERMISSION ship later.
 - Controllers follow `apiResource` style: `index` (list), `store`, `show`, `update`, `destroy`.
 - **Non-`apiResource` extras** on `items`: `POST /api/master/items/bulk-delete` and `POST /api/master/items/bulk-status` (`ItemController::bulkDestroy` / `bulkUpdateStatus`, validated by `BulkItemDeleteRequest` / `BulkItemStatusRequest`).
 - `index` supports `search`, per-entity filters, and `per_page`. Responses use Laravel's default envelope: `{ data }` for single, `{ data, links, meta }` for paginated collections.
@@ -35,7 +35,7 @@ php artisan migrate --seed
 - Validation in `app/Http/Requests` (FormRequests); `code`/`sku`/`barcode` are unique with `Rule::unique(...)->ignore()` on update.
 - CORS is enabled via `config/cors.php` (`allowed_origins: *`, `supports_credentials: false`) so the Vercel-deployed frontend can call the ngrok tunnel (`dev.sh`) cross-origin. Tighten origins once auth ships.
 - Deleting a category that still has sub-categories/items, a rack with bins/items, a bin with items, a warehouse with racks/items, a supplier still referenced by items, or a project still referenced by work orders is blocked (422). Deleting an **item** referenced by a work order is also blocked (422) — `ItemController::destroy`/`bulkDestroy` guards on `items`→`work_orders` (`restrictOnDelete`).
-- **`users` is read-only**: only `GET /api/master/users` (index with `search`) is exposed; no store/update/delete routes (POST→405, DELETE→404). `/api/master/departments`, `/api/master/projects`, `/api/master/work-orders` are full `apiResource` CRUD.
+- **`users` is full `apiResource` CRUD** (store/update/destroy added on top of the original read-only index): `GET /api/master/users` (index with `search` over name/email/code), `POST`, `GET /{id}`, `PUT /{id}`, `DELETE /{id}`. Users carry `code` (`USR-###`, auto-generated via `CodeGenerator` when omitted), `role` (`Rule::in(['Administrator','Supervisor','Operator Gudang','Auditor'])`), and `is_active`. Passwords are `required|min:8|max:64|confirmed` on store, `nullable` on update (blank = unchanged); hashed via the model's `hashed` cast. Deleting a user nulls their `head_user_id`/`pic_user_id` references (`nullOnDelete`) — prefer toggling `is_active` off for offboarding. `/api/master/departments`, `/api/master/projects`, `/api/master/work-orders` are full `apiResource` CRUD.
 - Resources for relation fields use the **string-name + raw FK** pattern (like `ItemResource`): e.g. `head`/`pic`/`project`/`item`/`unit` render the related record's `name`/`code` via `whenLoaded(fn () => $this->project?->name)`, and raw FKs (`head_user_id`, `pic_user_id`, `project_id`, `item_id`, `unit_id`) are exposed for form prefill. `ProjectResource` also exposes `work_orders_count` via `whenCounted`.
 
 ## Schema notes

@@ -24,6 +24,7 @@ import {
 import {
   binSchema,
   categorySchema,
+  createUserSchema,
   customerSchema,
   departmentSchema,
   itemSchema,
@@ -33,9 +34,11 @@ import {
   subCategorySchema,
   supplierSchema,
   unitSchema,
+  updateUserSchema,
   vendorSchema,
   warehouseSchema,
   workOrderSchema,
+  USER_ROLES,
   type BinInput,
   type CategoryInput,
   type CustomerInput,
@@ -47,6 +50,7 @@ import {
   type SubCategoryInput,
   type SupplierInput,
   type UnitInput,
+  type UserInput,
   type VendorInput,
   type WarehouseInput,
   type WorkOrderInput,
@@ -66,6 +70,7 @@ import {
   useCreateSubCategory,
   useCreateSupplier,
   useCreateUnit,
+  useCreateUser,
   useCreateVendor,
   useCreateWarehouse,
   useCreateWorkOrder,
@@ -89,6 +94,7 @@ import {
   useUpdateSubCategory,
   useUpdateSupplier,
   useUpdateUnit,
+  useUpdateUser,
   useUpdateVendor,
   useUpdateWarehouse,
   useUpdateWorkOrder,
@@ -107,6 +113,7 @@ import {
   type SubCategoryPayload,
   type SupplierPayload,
   type UnitPayload,
+  type UserPayload,
   type VendorPayload,
   type WarehousePayload,
   type WorkOrderPayload,
@@ -3715,6 +3722,224 @@ export function WorkOrderFormDialog({
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      )}
+    />
+  );
+}
+
+export function UserFormDialog({
+  open,
+  onOpenChange,
+  initial,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: MasterUser | null;
+}) {
+  const create = useCreateUser();
+  const update = useUpdateUser();
+  const { data: users } = useUsers();
+  const previewCode = nextCode(
+    (users?.data ?? []).map((u) => u.code),
+    "USR",
+  );
+
+  return (
+    <CrudFormDialog<UserInput>
+      open={open}
+      onOpenChange={onOpenChange}
+      title={initial ? "Edit User" : "Tambah User"}
+      description="Akun pengguna aplikasi gudang."
+      schema={initial ? updateUserSchema : createUserSchema}
+      resetKey={initial ? `edit-${initial.id}` : "create"}
+      defaultValues={
+        initial
+          ? {
+              code: initial.code,
+              name: initial.name,
+              email: initial.email ?? "",
+              role: initial.role as UserInput["role"],
+              password: "",
+              password_confirmation: "",
+              is_active: initial.is_active,
+            }
+          : {
+              code: "",
+              name: "",
+              email: "",
+              role: "Operator Gudang",
+              password: "",
+              password_confirmation: "",
+              is_active: true,
+            }
+      }
+      onSubmit={async (values, form) => {
+        const payload: UserPayload = {
+          name: values.name.trim(),
+          email: values.email.trim(),
+          role: values.role,
+          is_active: values.is_active,
+        };
+        const code = values.code?.trim();
+        if (initial && code) payload.code = code;
+        if (values.password) payload.password = values.password;
+        try {
+          if (initial) {
+            await update.mutateAsync({ id: initial.id, ...payload });
+            toast.success("User diperbarui");
+          } else {
+            await create.mutateAsync(payload);
+            toast.success("User ditambahkan");
+          }
+          onOpenChange(false);
+        } catch (err) {
+          rowField(form as never, err, "code");
+          rowField(form as never, err, "name");
+          rowField(form as never, err, "email");
+          rowField(form as never, err, "role");
+          rowField(form as never, err, "password");
+          if (
+            !fieldError(err, "code") &&
+            !fieldError(err, "name") &&
+            !fieldError(err, "email") &&
+            !fieldError(err, "role") &&
+            !fieldError(err, "password")
+          )
+            toast.error((err as Error).message);
+        }
+      }}
+      renderFields={(form) => (
+        <Form {...form}>
+          <div className="grid gap-4">
+            <FormField
+              control={form.control}
+              name="code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kode User</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      disabled
+                      value={initial ? field.value : previewCode}
+                      className="rounded-xl"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nama User</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Rudi Hartono" className="rounded-xl" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="nama@kelolagudang.id"
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Pilih role" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                      {USER_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={initial ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password_confirmation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Konfirmasi Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={initial ? "Kosongkan jika tidak diubah" : "Ulangi password"}
+                      className="rounded-xl"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                  <Label htmlFor="user-active">Aktif</Label>
+                  <FormControl>
+                    <Switch
+                      id="user-active"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />
