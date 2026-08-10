@@ -28,6 +28,16 @@ win_pid() {
   ps -W 2>/dev/null | awk -v p="$1" '$1 == p { print $4 }'
 }
 
+kill_port_tree() {
+  local port="$1" pids pid
+  pids="$(netstat -ano 2>/dev/null | grep -i listening | grep -E "[:.]$port( |\$)" | awk '{print $NF}' | sort -u)"
+  [ -z "$pids" ] && return 0
+  for pid in $pids; do
+    if [ "$pid" -eq 0 ] 2>/dev/null; then continue; fi
+    taskkill //T //F //PID "$pid" >/dev/null 2>&1 || true
+  done
+}
+
 # --- Tunnel ngrok (opsional, untuk akses backend dari frontend produksi Vercel) ---
 start_tunnel() {
   [ "$SKIP_TUNNEL" = "1" ] && { echo "⏭ Tunnel ngrok dilewati (SKIP_TUNNEL=1)."; return; }
@@ -82,11 +92,14 @@ cleanup() {
       [ -n "$pid" ] || continue
       wp="$(win_pid "$pid")"
       if [ -n "$wp" ]; then
-        MSYS_NO_PATHCONV=1 taskkill //T //F //PID "$wp" >/dev/null 2>&1 || true
+        taskkill //T //F //PID "$wp" >/dev/null 2>&1 || true
       else
         kill "$pid" >/dev/null 2>&1 || true
       fi
     done
+    kill_port_tree 8000
+    kill_port_tree 8080
+    kill_port_tree 4040
   else
     set -m
     [ -n "$BACKEND_PID" ] && { kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" || true; }
