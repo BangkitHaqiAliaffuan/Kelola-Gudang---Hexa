@@ -48,7 +48,7 @@ export function FormCombobox({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
           {...buttonProps}
@@ -70,6 +70,8 @@ export function FormCombobox({
         align="start"
         sideOffset={4}
         className="w-(--radix-popover-trigger-width) p-0"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="h-9" />

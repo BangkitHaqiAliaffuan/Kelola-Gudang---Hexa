@@ -6,6 +6,7 @@ import { DataTable, type Column } from "./data-table";
 import { TrxDetailSheet } from "./trx-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
   customers,
   formatDate,
@@ -52,6 +53,7 @@ export function TransactionPage({
   section: string;
 }) {
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
@@ -62,12 +64,12 @@ export function TransactionPage({
       transactions.filter(
         (t) =>
           t.type === type &&
-          (!q || `${t.no} ${t.partner}`.toLowerCase().includes(q.toLowerCase())) &&
+          (!debouncedQ || `${t.no} ${t.partner}`.toLowerCase().includes(debouncedQ.toLowerCase())) &&
           (wh === ALL || t.warehouse === wh) &&
           (partner === ALL || t.partner === partner) &&
           (status === ALL || t.status === status),
       ),
-    [q, wh, partner, status, type],
+    [debouncedQ, wh, partner, status, type],
   );
 
   const columns: Column<Trx>[] = [

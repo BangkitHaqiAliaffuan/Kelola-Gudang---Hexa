@@ -10,6 +10,7 @@ import type {
   Merk,
   Project,
   Rack,
+  RoleCatalog,
   SubCategory,
   Supplier,
   Unit,
@@ -34,6 +35,7 @@ const keys = {
   customers: ["master", "customers"] as const,
   vendors: ["master", "vendors"] as const,
   users: ["master", "users"] as const,
+  roles: ["master", "roles"] as const,
   departments: ["master", "departments"] as const,
   projects: ["master", "projects"] as const,
   workOrders: ["master", "work-orders"] as const,
@@ -133,6 +135,14 @@ export function useUsers() {
   return useQuery({
     queryKey: keys.users,
     queryFn: () => api.get<Paginated<MasterUser>>(`/master/users?per_page=${PER_PAGE}`),
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useRoles() {
+  return useQuery({
+    queryKey: keys.roles,
+    queryFn: () => api.get<{ data: RoleCatalog[] }>("/master/roles"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -715,7 +725,10 @@ export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: UserPayload) => api.post<{ data: MasterUser }>("/master/users", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.users });
+      qc.invalidateQueries({ queryKey: keys.roles });
+    },
   });
 }
 
@@ -724,7 +737,10 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, ...payload }: UserPayload & { id: number }) =>
       api.put<{ data: MasterUser }>(`/master/users/${id}`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.users });
+      qc.invalidateQueries({ queryKey: keys.roles });
+    },
   });
 }
 
@@ -732,6 +748,9 @@ export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete<{ message: string }>(`/master/users/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.users }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.users });
+      qc.invalidateQueries({ queryKey: keys.roles });
+    },
   });
 }

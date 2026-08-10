@@ -8,6 +8,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\MerkController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
@@ -29,6 +30,7 @@ Route::prefix('master')->group(function () {
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('vendors', VendorController::class);
     Route::apiResource('users', UserController::class);
+    Route::get('roles', [RoleController::class, 'index']);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('projects', ProjectController::class);
     Route::apiResource('work-orders', WorkOrderController::class);

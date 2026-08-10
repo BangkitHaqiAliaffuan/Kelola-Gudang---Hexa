@@ -251,6 +251,46 @@ export type ProjectInput = z.infer<typeof projectSchema>;
 export const USER_ROLES = ["Administrator", "Supervisor", "Operator Gudang", "Auditor"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+export type AccessLevel = "Baca" | "Tulis" | "Kelola";
+
+export type RoleAccessEntry = {
+  module: string;
+  level: AccessLevel;
+};
+
+// Ilustratif — RBAC nyata (roles + permissions + gate) menyusul saat auth dikerjakan.
+// Pemetaan modul → level akses per role untuk halaman /master/role.
+export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
+  Administrator: [
+    { module: "Master Data", level: "Kelola" },
+    { module: "Transaksi", level: "Kelola" },
+    { module: "Persediaan", level: "Kelola" },
+    { module: "Stock Opname", level: "Kelola" },
+    { module: "Pengadaan", level: "Kelola" },
+    { module: "Laporan", level: "Kelola" },
+    { module: "System", level: "Kelola" },
+  ],
+  Supervisor: [
+    { module: "Master Data", level: "Baca" },
+    { module: "Transaksi", level: "Tulis" },
+    { module: "Persediaan", level: "Tulis" },
+    { module: "Stock Opname", level: "Baca" },
+    { module: "Pengadaan", level: "Tulis" },
+    { module: "Laporan", level: "Baca" },
+  ],
+  "Operator Gudang": [
+    { module: "Master Data", level: "Baca" },
+    { module: "Transaksi", level: "Tulis" },
+    { module: "Persediaan", level: "Tulis" },
+    { module: "Stock Opname", level: "Tulis" },
+  ],
+  Auditor: [
+    { module: "Semua Modul", level: "Baca" },
+    { module: "Laporan", level: "Baca" },
+    { module: "Audit Trails", level: "Baca" },
+  ],
+};
+
 const emailRequired = z
   .string()
   .trim()

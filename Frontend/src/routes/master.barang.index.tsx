@@ -45,6 +45,7 @@ import {
   useSubCategories,
 } from "@/hooks/use-master";
 import type { ItemApi } from "@/lib/master-types";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 
 export const Route = createFileRoute("/master/barang/")({
   head: () => ({
@@ -79,6 +80,7 @@ function MasterBarang() {
   const { data: subs } = useSubCategories();
   const { data: merks } = useMerks();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [cat, setCat] = useState(ALL);
   const [subCat, setSubCat] = useState(ALL);
   const [brand, setBrand] = useState(ALL);
@@ -102,10 +104,10 @@ function MasterBarang() {
       (data?.data ?? []).filter((it) => {
         const s = stockStatus(it).label;
         return (
-          (!q ||
+          (!debouncedQ ||
             `${it.name} ${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`
               .toLowerCase()
-              .includes(q.toLowerCase())) &&
+              .includes(debouncedQ.toLowerCase())) &&
           (cat === ALL || it.category === cat) &&
           (subCat === ALL || it.subCategory === subCat) &&
           (brand === ALL || it.brand === brand) &&
@@ -113,7 +115,7 @@ function MasterBarang() {
           (status === ALL || it.status === status)
         );
       }),
-    [data, q, cat, subCat, brand, stockF, status],
+    [data, debouncedQ, cat, subCat, brand, stockF, status],
   );
 
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);

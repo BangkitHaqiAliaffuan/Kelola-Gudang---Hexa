@@ -7,6 +7,7 @@ import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/componen
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
   formatDate,
   formatIDR,
@@ -52,6 +53,7 @@ type Row = { id: string; a: string; b: string; c: string; d: string; e: string }
 function Laporan() {
   const { report } = Route.useParams();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
 
   const isItemReport = ["stock", "stock-minimum", "dead-stock", "fast-moving", "nilai-persediaan"].includes(report);
@@ -85,7 +87,7 @@ function Laporan() {
       }));
 
   const rows = source.filter(
-    (r) => `${r.a} ${r.b}`.toLowerCase().includes(q.toLowerCase()) && (wh === ALL || r.c === wh),
+    (r) => `${r.a} ${r.b}`.toLowerCase().includes(debouncedQ.toLowerCase()) && (wh === ALL || r.c === wh),
   );
 
   const headers = isItemReport

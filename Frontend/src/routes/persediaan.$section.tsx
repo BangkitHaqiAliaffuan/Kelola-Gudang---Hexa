@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
   formatDate,
   formatIDR,
@@ -63,6 +64,7 @@ const unitOf = (t: Trx) => {
 function PersediaanSection() {
   const { section } = Route.useParams();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [detail, setDetail] = useState<Trx | null>(null);
 
   const { headers, data } = useMemo(() => {
@@ -118,7 +120,7 @@ function PersediaanSection() {
     };
   }, [section]);
 
-  const rows = data.filter((r) => `${r.a} ${r.b} ${r.c}`.toLowerCase().includes(q.toLowerCase()));
+  const rows = data.filter((r) => `${r.a} ${r.b} ${r.c}`.toLowerCase().includes(debouncedQ.toLowerCase()));
 
   const columns: Column<Row>[] = [
     {

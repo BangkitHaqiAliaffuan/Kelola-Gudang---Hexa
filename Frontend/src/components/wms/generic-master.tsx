@@ -5,6 +5,7 @@ import { PageHeader, Panel, Pill } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 
 type Row = { id: string; kode: string; nama: string; info: string; extra: string; status: string };
 
@@ -61,14 +62,15 @@ export const masterDatasets: Record<
 export function GenericMasterPage({ slug }: { slug: string }) {
   const ds = masterDatasets[slug];
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const rows = useMemo(
     () =>
       ds
         ? ds.rows.filter((r) =>
-            `${r.kode} ${r.nama} ${r.info}`.toLowerCase().includes(q.toLowerCase()),
+            `${r.kode} ${r.nama} ${r.info}`.toLowerCase().includes(debouncedQ.toLowerCase()),
           )
         : [],
-    [ds, q],
+    [ds, debouncedQ],
   );
 
   if (!ds) {

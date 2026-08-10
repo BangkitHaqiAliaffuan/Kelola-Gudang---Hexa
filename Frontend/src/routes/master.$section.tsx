@@ -9,6 +9,7 @@ import {
   MerkPage,
   ProyekPage,
   RakPage,
+  RolePage,
   SatuanPage,
   SubKategoriPage,
   SupplierPage,
@@ -68,5 +69,6 @@ function MasterSection() {
   if (section === "proyek") return <ProyekPage />;
   if (section === "work-order") return <WorkOrderPage />;
   if (section === "user") return <UserPage />;
+  if (section === "role") return <RolePage />;
   return <GenericMasterPage slug={section} />;
 }

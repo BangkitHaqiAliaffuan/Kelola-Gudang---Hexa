@@ -65,7 +65,7 @@ export function MasterCrudPage<T extends { id: number }>({
   mobileCard: (row: T) => ReactNode;
   rows: T[] | undefined;
   isLoading: boolean;
-  onAdd: () => void;
+  onAdd?: () => void;
   addLabel?: string;
   onRowClick?: (row: T) => void;
   onView?: (row: T) => void;
@@ -219,9 +219,11 @@ export function MasterCrudPage<T extends { id: number }>({
                 <Download className="h-4 w-4" /> Export CSV
               </Button>
             )}
-            <Button className="rounded-xl" onClick={onAdd}>
-              <Plus className="h-4 w-4" /> {addLabel}
-            </Button>
+            {onAdd && (
+              <Button className="rounded-xl" onClick={onAdd}>
+                <Plus className="h-4 w-4" /> {addLabel}
+              </Button>
+            )}
           </div>
         }
       />

@@ -201,6 +201,13 @@ export type MasterUser = {
   updated_at: string;
 };
 
+export type RoleCatalog = {
+  id: number;
+  name: string;
+  user_count: number;
+  active_user_count: number;
+};
+
 export type Department = {
   id: number;
   code: string;

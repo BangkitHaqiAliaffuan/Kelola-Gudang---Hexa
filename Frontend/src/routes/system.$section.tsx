@@ -6,6 +6,7 @@ import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/compone
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -61,6 +62,7 @@ const actionTone = (a: AuditLog["action"]): Tone =>
 
 function AuditTrails() {
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [action, setAction] = useState(ALL);
   const [module, setModule] = useState(ALL);
 
@@ -71,11 +73,11 @@ function AuditTrails() {
     () =>
       auditLogs.filter((l) => {
         const okQ =
-          !q ||
-          [l.user, l.record, l.module, l.ip].join(" ").toLowerCase().includes(q.toLowerCase());
+          !debouncedQ ||
+          [l.user, l.record, l.module, l.ip].join(" ").toLowerCase().includes(debouncedQ.toLowerCase());
         return okQ && (action === ALL || l.action === action) && (module === ALL || l.module === module);
       }),
-    [q, action, module],
+    [debouncedQ, action, module],
   );
 
   const columns: Column<AuditLog>[] = [

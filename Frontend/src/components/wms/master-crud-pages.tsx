@@ -22,7 +22,7 @@ import { CustomerDetailSheet, SupplierDetailSheet, VendorDetailSheet } from "./p
 import { type Column } from "./data-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
-import { USER_ROLES } from "@/lib/schemas";
+import { ROLE_ACCESS, USER_ROLES, type UserRole } from "@/lib/schemas";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +52,7 @@ import {
   useMerks,
   useProjects,
   useRacks,
+  useRoles,
   useSubCategories,
   useSuppliers,
   useUnits,
@@ -69,6 +70,7 @@ import type {
   Merk,
   Project,
   Rack,
+  RoleCatalog,
   SubCategory,
   Supplier,
   Unit,
@@ -86,6 +88,12 @@ function statusTone(status: string): Tone {
 
 function ActivePill({ active }: { active: boolean }) {
   return active ? <Pill tone="success">Aktif</Pill> : <Pill tone="neutral">Nonaktif</Pill>;
+}
+
+function levelTone(level: string): Tone {
+  if (level === "Kelola") return "brand";
+  if (level === "Tulis") return "info";
+  return "neutral";
 }
 
 function uniqueOptions<T>(rows: T[], pick: (r: T) => string | null | undefined): string[] {
@@ -1443,5 +1451,104 @@ export function UserPage() {
       />
       <UserFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editing} />
     </>
+  );
+}
+
+export function RolePage() {
+  const { data, isLoading } = useRoles();
+  const [levelFilter, setLevelFilter] = useState(ALL);
+
+  const rows = data?.data ?? [];
+  const filtered = rows.filter(
+    (r) =>
+      levelFilter === ALL ||
+      (ROLE_ACCESS[r.name as UserRole] ?? []).some((a) => a.level === levelFilter),
+  );
+
+  const columns: Column<RoleCatalog>[] = [
+    {
+      key: "name",
+      label: "Nama Role",
+      render: (r) => <span className="font-medium">{r.name}</span>,
+    },
+    {
+      key: "users",
+      label: "Jumlah User",
+      render: (r) => (
+        <span>
+          {formatNumber(r.user_count)}
+          <span className="ml-1 text-xs text-muted-foreground">
+            ({formatNumber(r.active_user_count)} aktif)
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "access",
+      label: "Hak Akses",
+      render: (r) => {
+        const access = ROLE_ACCESS[r.name as UserRole] ?? [];
+        return (
+          <div className="flex max-w-xl flex-wrap gap-1">
+            {access.map((a) => (
+              <Pill key={a.module} tone={levelTone(a.level)}>
+                {a.module} • {a.level}
+              </Pill>
+            ))}
+          </div>
+        );
+      },
+    },
+  ];
+
+  const exportCsv = () => {
+    downloadCsv(
+      `roles-${dateStamp()}.csv`,
+      toCsv(filtered, [
+        { key: "name", label: "Nama Role" },
+        { key: "user_count", label: "Jumlah User" },
+        { key: "active_user_count", label: "User Aktif" },
+      ]),
+    );
+  };
+
+  return (
+    <MasterCrudPage<RoleCatalog>
+      title="Role"
+      description="Hak akses pengguna"
+      searchPlaceholder="Cari role..."
+      searchText={(r) => r.name}
+      columns={columns}
+      rows={filtered}
+      isLoading={isLoading}
+      filters={
+        <FilterSelect
+          value={levelFilter}
+          onChange={setLevelFilter}
+          placeholder="Semua Hak Akses"
+          options={["Baca", "Tulis", "Kelola"]}
+        />
+      }
+      onExport={exportCsv}
+      mobileCard={(r) => {
+        const access = ROLE_ACCESS[r.name as UserRole] ?? [];
+        return (
+          <div>
+            <p className="truncate text-sm font-semibold">{r.name}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">
+              {formatNumber(r.user_count)} user ({formatNumber(r.active_user_count)} aktif)
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {access.slice(0, 3).map((a) => (
+                <Pill key={a.module} tone={levelTone(a.level)}>
+                  {a.module}
+                </Pill>
+              ))}
+              {access.length > 3 && <Pill tone="neutral">+{access.length - 3} modul</Pill>}
+            </div>
+          </div>
+        );
+      }}
+    />
   );
 }

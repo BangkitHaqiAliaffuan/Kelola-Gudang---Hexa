@@ -15,6 +15,7 @@ import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from 
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
   Sheet,
   SheetContent,
@@ -205,6 +206,7 @@ function PengadaanPage() {
   const { section } = Route.useParams();
   const cfg = sections[section as SectionKey];
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
   const [active, setActive] = useState<ProcDoc | null>(null);
 
@@ -217,14 +219,14 @@ function PengadaanPage() {
     () =>
       cfg.docs.filter((d) => {
         const okQ =
-          !q ||
+          !debouncedQ ||
           [d.no, d.supplier, d.reference, d.department, d.requester]
             .join(" ")
             .toLowerCase()
-            .includes(q.toLowerCase());
+            .includes(debouncedQ.toLowerCase());
         return okQ && (status === ALL || d.status === status);
       }),
-    [cfg.docs, q, status],
+    [cfg.docs, debouncedQ, status],
   );
 
   const totalValue = rows.reduce((a, b) => a + b.value, 0);

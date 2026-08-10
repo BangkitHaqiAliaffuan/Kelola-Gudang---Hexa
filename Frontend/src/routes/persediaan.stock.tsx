@@ -6,6 +6,7 @@ import { ALL, FilterSelect, PageHeader, Panel, Pill } from "@/components/wms/kit
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import {
   categories,
   formatIDR,
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/persediaan/stock")({
 
 function StockSaatIni() {
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
 
@@ -37,11 +39,12 @@ function StockSaatIni() {
     () =>
       items.filter(
         (it) =>
-          (!q || `${it.name} ${it.sku}`.toLowerCase().includes(q.toLowerCase())) &&
+          (!debouncedQ ||
+            `${it.name} ${it.sku}`.toLowerCase().includes(debouncedQ.toLowerCase())) &&
           (wh === ALL || it.warehouse === wh) &&
           (cat === ALL || it.category === cat),
       ),
-    [q, wh, cat],
+    [debouncedQ, wh, cat],
   );
 
   const columns: Column<Item>[] = [
