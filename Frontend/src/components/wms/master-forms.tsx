@@ -3767,12 +3767,15 @@ export function UserFormDialog({
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
         if (values.password) payload.password = values.password;
+        const body = values.password
+          ? { ...payload, password_confirmation: values.password_confirmation }
+          : payload;
         try {
           if (initial) {
-            await update.mutateAsync({ id: initial.id, ...payload });
+            await update.mutateAsync({ id: initial.id, ...body });
             toast.success("User diperbarui");
           } else {
-            await create.mutateAsync(payload);
+            await create.mutateAsync(body);
             toast.success("User ditambahkan");
           }
           onOpenChange(false);
