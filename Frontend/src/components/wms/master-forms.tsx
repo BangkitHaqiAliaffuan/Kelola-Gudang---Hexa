@@ -3868,44 +3868,36 @@ export function UserFormDialog({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      autoComplete="new-password"
-                      placeholder={initial ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
-                      className="rounded-xl"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                placeholder={initial ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
+                className="rounded-xl"
+                {...form.register("password")}
+              />
+              {form.formState.errors.password?.message && (
+                <p className="text-[0.8rem] font-medium text-destructive">
+                  {form.formState.errors.password.message}
+                </p>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="password_confirmation"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Konfirmasi Password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      autoComplete="new-password"
-                      placeholder={initial ? "Kosongkan jika tidak diubah" : "Ulangi password"}
-                      className="rounded-xl"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            </div>
+            <div className="space-y-2">
+              <Label>Konfirmasi Password</Label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                placeholder={initial ? "Kosongkan jika tidak diubah" : "Ulangi password"}
+                className="rounded-xl"
+                {...form.register("password_confirmation")}
+              />
+              {form.formState.errors.password_confirmation?.message && (
+                <p className="text-[0.8rem] font-medium text-destructive">
+                  {form.formState.errors.password_confirmation.message}
+                </p>
               )}
-            />
+            </div>
             <FormField
               control={form.control}
               name="is_active"
