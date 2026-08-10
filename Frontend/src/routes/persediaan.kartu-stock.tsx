@@ -1,17 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Boxes, Printer, Wallet } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { DataTable, type Column } from "@/components/wms/data-table";
 import {
   Select,
   SelectContent,
@@ -19,18 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  formatDate,
-  formatIDR,
-  formatNumber,
-  items,
-  stockCard,
-  trxFromStockCard,
-  valuationFactor,
-  valuationMethods,
-  type Trx,
-  type ValuationMethod,
-} from "@/lib/wms-data";
+import { useItems } from "@/hooks/use-master";
+import { useStockCard } from "@/hooks/use-persediaan";
+import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
+import { formatDate, formatIDR, formatNumber, valuationMethods, type Trx } from "@/lib/wms-data";
 
 export const Route = createFileRoute("/persediaan/kartu-stock")({
   head: () => ({
@@ -38,29 +33,153 @@ export const Route = createFileRoute("/persediaan/kartu-stock")({
       { title: "Kartu Stock — KelolaGudang" },
       { name: "description", content: "Riwayat mutasi masuk, keluar, dan saldo stok per barang." },
       { property: "og:title", content: "Kartu Stock — KelolaGudang" },
-      { property: "og:description", content: "Telusuri pergerakan stok tiap barang secara detail." },
+      {
+        property: "og:description",
+        content: "Telusuri pergerakan stok tiap barang secara detail.",
+      },
     ],
   }),
   component: KartuStock,
 });
 
 function KartuStock() {
-  const options = items.slice(0, 40);
-  const [id, setId] = useState(options[0]!.id);
+  const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const options = useMemo(() => (itemsData?.data ?? []).slice(0, 40), [itemsData]);
+  const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [detail, setDetail] = useState<Trx | null>(null);
-  const item = items.find((i) => i.id === id)!;
-  const rows = useMemo(() => stockCard(item), [item]);
-  const f = valuationFactor[method];
-  const unitCost = item.cost * f;
+  const activeId = id ?? options[0]?.id;
+
+  const cardFifo = useStockCard(activeId, "FIFO");
+  const cardAvg = useStockCard(activeId, "Average");
+  const cardMax = useStockCard(activeId, "Maximum Cost");
+  const card = method === "FIFO" ? cardFifo : method === "Average" ? cardAvg : cardMax;
+  const methodCards: Record<ValuationMethod, typeof card> = {
+    FIFO: cardFifo,
+    Average: cardAvg,
+    "Maximum Cost": cardMax,
+  };
+
+  const item = card.data?.data.item;
+  const cardData = card.data?.data;
+  const rows = useMemo(() => cardData?.rows ?? [], [cardData]);
+  const unit = item?.unit ?? "pcs";
+  const saldoAwal = cardData?.saldo_awal ?? 0;
+  const lastRow = rows[rows.length - 1];
 
   const totalMasuk = rows.reduce((a, r) => a + r.masuk, 0);
   const totalKeluar = rows.reduce((a, r) => a + r.keluar, 0);
-  const saldoAwal = (rows[rows.length - 1]?.saldo ?? item.stock) - (rows[rows.length - 1]?.masuk ?? 0);
-  const chart = [...rows]
-    .slice()
-    .reverse()
-    .map((r) => ({ date: formatDate(r.date).slice(0, 6), saldo: r.saldo, nilai: r.saldo * unitCost }));
+
+  const tableRows = useMemo(() => rows.map((r, i) => ({ ...r, id: `${r.no}-${i}` })), [rows]);
+
+  const chart = useMemo(
+    () =>
+      rows.map((r) => ({
+        date: formatDate(r.date).slice(0, 6),
+        saldo: r.saldo,
+        nilai: r.nilai,
+      })),
+    [rows],
+  );
+
+  const toTrx = (r: StockCardRowApi, it: NonNullable<typeof item>): Trx => {
+    const qty = r.masuk || r.keluar;
+    const type: Trx["type"] =
+      r.type === "Penerimaan"
+        ? "Barang Masuk"
+        : r.type === "Pengeluaran"
+          ? "Barang Keluar"
+          : "Stock Adjustment";
+    return {
+      id: `${it.id}-${r.no}`,
+      no: r.no,
+      type,
+      date: r.date,
+      warehouse: it.warehouse ?? "—",
+      partner: r.partner,
+      reference: r.reference,
+      qty,
+      value: qty * r.unit_cost,
+      status: "Selesai",
+      pic: r.pic,
+      lines: [{ name: it.name, sku: it.sku, qty, unit: r.unit ?? "pcs", price: r.unit_cost }],
+    };
+  };
+
+  const columns: Column<(typeof tableRows)[number]>[] = [
+    {
+      key: "date",
+      label: "Tanggal",
+      className: "whitespace-nowrap",
+      render: (r) => formatDate(r.date),
+    },
+    {
+      key: "no",
+      label: "Nomor",
+      className: "whitespace-nowrap",
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => item && setDetail(toTrx(r, item))}
+          className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          {r.no}
+        </button>
+      ),
+    },
+    {
+      key: "type",
+      label: "Jenis",
+      className: "min-w-[140px] whitespace-nowrap",
+      render: (r) => <Pill tone={r.masuk ? "success" : "warning"}>{r.type}</Pill>,
+    },
+    {
+      key: "unit",
+      label: "Satuan",
+      className: "w-[80px] whitespace-nowrap",
+      render: (r) => r.unit ?? "—",
+    },
+    {
+      key: "masuk",
+      label: "Masuk",
+      className: "text-right w-[100px] whitespace-nowrap text-success",
+      render: (r) => (r.masuk ? `+${formatNumber(r.masuk)}` : "-"),
+    },
+    {
+      key: "keluar",
+      label: "Keluar",
+      className: "text-right w-[100px] whitespace-nowrap text-destructive",
+      render: (r) => (r.keluar ? `-${formatNumber(r.keluar)}` : "-"),
+    },
+    {
+      key: "saldo",
+      label: "Saldo",
+      className: "text-right w-[100px] whitespace-nowrap font-semibold",
+      render: (r) => `${formatNumber(r.saldo)} ${r.unit ?? ""}`,
+    },
+    {
+      key: "nilai",
+      label: `Nilai (${method})`,
+      className: "text-right min-w-[130px] whitespace-nowrap",
+      render: (r) => formatIDR(r.nilai),
+    },
+    {
+      key: "pic",
+      label: "PIC",
+      className: "min-w-[120px] whitespace-nowrap",
+      render: (r) => r.pic,
+    },
+    {
+      key: "note",
+      label: "Catatan",
+      className: "max-w-[240px]",
+      render: (r) => (
+        <span className="block truncate text-muted-foreground" title={r.note}>
+          {r.note}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -94,13 +213,16 @@ function KartuStock() {
       />
 
       <Panel title="Pilih Barang">
-        <Select value={id} onValueChange={setId}>
+        <Select
+          value={activeId != null ? String(activeId) : ""}
+          onValueChange={(v) => setId(Number(v))}
+        >
           <SelectTrigger className="max-w-md rounded-xl">
-            <SelectValue />
+            <SelectValue placeholder="Pilih barang…" />
           </SelectTrigger>
           <SelectContent className="max-h-72 rounded-xl">
             {options.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
+              <SelectItem key={o.id} value={String(o.id)}>
                 {o.name} — {o.sku}
               </SelectItem>
             ))}
@@ -111,31 +233,34 @@ function KartuStock() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Saldo Awal"
-          value={`${formatNumber(Math.max(saldoAwal, 0))} ${item.unit}`}
+          value={`${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
           icon={Boxes}
           tone="info"
         />
         <StatCard
           label="Total Masuk"
-          value={`${formatNumber(totalMasuk)} ${item.unit}`}
+          value={`${formatNumber(totalMasuk)} ${unit}`}
           icon={ArrowDownLeft}
           tone="success"
         />
         <StatCard
           label="Total Keluar"
-          value={`${formatNumber(totalKeluar)} ${item.unit}`}
+          value={`${formatNumber(totalKeluar)} ${unit}`}
           icon={ArrowUpRight}
           tone="warning"
         />
         <StatCard
           label={`Nilai Akhir — ${method}`}
-          value={formatIDR(item.stock * unitCost)}
-          hint={`${formatNumber(item.stock)} ${item.unit} × ${formatIDR(unitCost)}`}
+          value={formatIDR(lastRow?.nilai ?? 0)}
+          hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.unit_cost ?? 0)}`}
           icon={Wallet}
         />
       </div>
 
-      <Panel title="Pergerakan Saldo Stok" description={`Satuan ${item.unit} · nilai memakai metode ${method}`}>
+      <Panel
+        title="Pergerakan Saldo Stok"
+        description={`Satuan ${unit} · nilai memakai metode ${method}`}
+      >
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={chart}>
             <defs>
@@ -148,7 +273,9 @@ function KartuStock() {
             <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis fontSize={12} tickLine={false} axisLine={false} width={50} />
             <Tooltip
-              formatter={(v: number, n) => (n === "nilai" ? formatIDR(v) : `${formatNumber(v)} ${item.unit}`)}
+              formatter={(v: number, n) =>
+                n === "nilai" ? formatIDR(v) : `${formatNumber(v)} ${unit}`
+              }
               contentStyle={{
                 borderRadius: 12,
                 border: "1px solid var(--border)",
@@ -168,116 +295,78 @@ function KartuStock() {
         </ResponsiveContainer>
       </Panel>
 
-      <Panel title="Nilai Stok per Metode" description="Perbandingan FIFO, Average, dan Maximum Cost">
+      <Panel
+        title="Nilai Stok per Metode"
+        description="Perbandingan FIFO, Average, dan Maximum Cost"
+      >
         <div className="grid gap-3 sm:grid-cols-3">
-          {valuationMethods.map((m) => (
-            <div
-              key={m}
-              className={cn(
-                "rounded-xl border p-4",
-                m === method ? "border-primary/40 bg-primary-soft" : "border-border",
-              )}
-            >
-              <p className="text-xs font-semibold text-muted-foreground">{m}</p>
-              <p className="mt-1 text-lg font-bold">{formatIDR(item.stock * item.cost * valuationFactor[m])}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                HPP {formatIDR(item.cost * valuationFactor[m])} / {item.unit}
-              </p>
-            </div>
-          ))}
+          {valuationMethods.map((m) => {
+            const c = methodCards[m];
+            const cRows = c.data?.data.rows ?? [];
+            const cLast = cRows[cRows.length - 1];
+            return (
+              <div
+                key={m}
+                className={cn(
+                  "rounded-xl border p-4",
+                  m === method ? "border-primary/40 bg-primary-soft" : "border-border",
+                )}
+              >
+                <p className="text-xs font-semibold text-muted-foreground">{m}</p>
+                <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  HPP {formatIDR(cLast?.unit_cost ?? 0)} / {unit}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </Panel>
 
-      <Panel title={item.name} description={`${item.sku} · saldo akhir ${formatNumber(item.stock)} ${item.unit}`}>
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs text-muted-foreground">
-                {[
-                  "Tanggal",
-                  "Nomor",
-                  "Jenis",
-                  "Satuan",
-                  "Masuk",
-                  "Keluar",
-                  "Saldo",
-                  `Nilai (${method})`,
-                  "PIC",
-                  "Catatan",
-                ].map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className="border-b border-border/60 transition-colors hover:bg-accent/40">
-                  <td className="px-3 py-2.5">{formatDate(r.date)}</td>
-                  <td className="px-3 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setDetail(trxFromStockCard(r, item))}
-                      className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline"
-                    >
-                      {r.no}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Pill tone={r.masuk ? "success" : "warning"}>{r.type}</Pill>
-                  </td>
-                  <td className="px-3 py-2.5">{r.unit}</td>
-                  <td className="px-3 py-2.5 text-right text-success">{r.masuk ? `+${r.masuk}` : "-"}</td>
-                  <td className="px-3 py-2.5 text-right text-destructive">{r.keluar ? `-${r.keluar}` : "-"}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold">
-                    {formatNumber(r.saldo)} {r.unit}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">{formatIDR(r.saldo * unitCost)}</td>
-                  <td className="px-3 py-2.5">{r.pic}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{r.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <Accordion type="single" collapsible className="space-y-2 md:hidden">
-          {rows.map((r, i) => (
-            <AccordionItem key={i} value={`r${i}`} className="rounded-xl border border-border px-4">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 pr-2 text-left">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{r.no}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(r.date)}</p>
-                  </div>
-                  <Pill tone={r.masuk ? "success" : "warning"}>
-                    {r.masuk ? `+${r.masuk}` : `-${r.keluar}`} {r.unit}
-                  </Pill>
+      <Panel
+        title={item?.name ?? "Memuat…"}
+        description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit}`}
+      >
+        <DataTable
+          columns={columns}
+          rows={tableRows}
+          pageSize={10}
+          loading={itemsLoading || card.isFetching}
+          onRowClick={(r) => item && setDetail(toTrx(r, item))}
+          mobileCard={(r) => (
+            <div className="space-y-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{r.no}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(r.date)}</p>
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="pb-4 text-xs text-muted-foreground">
+                <Pill tone={r.masuk ? "success" : "warning"}>
+                  {r.masuk ? `+${formatNumber(r.masuk)}` : `-${formatNumber(r.keluar)}`}{" "}
+                  {r.unit ?? ""}
+                </Pill>
+              </div>
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
                 <p>Jenis: {r.type}</p>
                 <p>
-                  Saldo: {formatNumber(r.saldo)} {r.unit}
+                  Saldo: {formatNumber(r.saldo)} {r.unit ?? ""}
                 </p>
                 <p>
-                  Nilai ({method}): {formatIDR(r.saldo * unitCost)}
+                  Nilai ({method}): {formatIDR(r.nilai)}
                 </p>
                 <p>PIC: {r.pic}</p>
-                <p>Catatan: {r.note}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 rounded-lg"
-                  onClick={() => setDetail(trxFromStockCard(r, item))}
-                >
-                  Lihat Detail
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+              </div>
+              <p className="truncate text-xs text-muted-foreground">Catatan: {r.note}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 rounded-lg"
+                onClick={() => item && setDetail(toTrx(r, item))}
+              >
+                Lihat Detail
+              </Button>
+            </div>
+          )}
+        />
       </Panel>
 
       <TrxDetailSheet trx={detail} onOpenChange={(o) => !o && setDetail(null)} editable={false} />

@@ -11,7 +11,7 @@
 
 # KelolaGudang Pro
 
-Warehouse Management System front-end demo (**KelolaGudang**, Indonesian UI). Most data is deterministic dummy data generated in `src/lib/wms-data.ts` (seeded PRNG). **Exception: the master-data pages (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin Location, Supplier, Customer, Vendor, Barang, Departemen, Proyek, Work Order, User, Role) are backed by the Laravel API** (`Backend/`) — no dummy fallback. The remaining modules (transaksi, persediaan, opname, pengadaan, laporan, system) are still UI-only dummy. Do not add server/business logic unless asked; the "API reference" pages under `/system/developer` are UI placeholders.
+Warehouse Management System front-end demo (**KelolaGudang**, Indonesian UI). Most data is deterministic dummy data generated in `src/lib/wms-data.ts` (seeded PRNG). **Exception: the master-data pages (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin Location, Supplier, Customer, Vendor, Barang, Departemen, Proyek, Work Order, User, Role) are backed by the Laravel API** (`Backend/`) — no dummy fallback. The remaining modules (transaksi, opname, pengadaan, laporan, system) are still UI-only dummy, **except the Persediaan pages `persediaan/stock` (Stock Saat Ini) and `persediaan/kartu-stock` (Kartu Stock), which are API-backed** (`GET /api/persediaan/stock`, `GET /api/persediaan/stock-card` — hooks in `src/hooks/use-persediaan.ts`, types in `src/lib/persediaan-types.ts`). `persediaan/nilai` and other persediaan sections remain dummy. Do not add server/business logic unless asked; the "API reference" pages under `/system/developer` are UI placeholders.
 
 ## Stack
 
@@ -25,7 +25,7 @@ TanStack Start (SSR) + React 19 + TanStack Router file-based routing + Vite + Ta
 - `master.barang.$id.tsx` sets a **static SSR `<head>` title** — the item name comes from a client-side query and can't be known during server render. Accepted tradeoff for API-backed detail pages.
 - Zod validation in `src/lib/schemas.ts` mirrors backend FormRequests; field errors map back onto the form via `form.setError(fieldError(...))`.
 - Shared CRUD scaffolding: `src/components/wms/master-crud.tsx` (`MasterCrudPage` table + `CrudFormDialog`, with optional `filters` and `onExport` props — the Supplier/Customer/Vendor pages use these for dropdown filters and real CSV export) and `src/components/wms/master-forms.tsx` (per-entity dialogs, incl. `RackFormDialog`/`BinFormDialog`, the `SupplierFormDialog`/`CustomerFormDialog`/`VendorFormDialog`, and the rak/bin/supplier selects on the Item form). `src/components/wms/master-crud-pages.tsx` has the Kategori/Sub Kategori/Merk/Satuan/Gudang/Rak/Bin/Supplier/Customer/Vendor/Departemen/Proyek/Work Order pages. CSV helpers live in `src/lib/csv.ts` (`toCsv`/`downloadCsv`, UTF-8 BOM for Excel).
-- `master.barang.$id.tsx` shows real API data, but its **Kartu Stock / Riwayat tabs are placeholders** fed by dummy `stockCard()` until the Persediaan module ships ITEM_STOCK.
+- `master.barang.$id.tsx` shows real API data, but its **Kartu Stock / Riwayat tabs are placeholders** fed by dummy `stockCard()` — the API-backed kartu stock lives on `/persediaan/kartu-stock`.
 
 ## Commands
 
