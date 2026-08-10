@@ -1,9 +1,41 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { authApi, type AuthSession } from "@/lib/auth-api";
-import { fetchCsrfCookie } from "@/lib/api";
+import { fetchCsrfCookie, isApiError } from "@/lib/api";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+/** Client-side marker that the user has logged in on this browser. */
+const AUTH_STORAGE_KEY = "kg-auth";
+
+type StoredUser = {
+  email: string | null;
+  name: string;
+  role: string;
+};
+
+function readStoredUser(): StoredUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as StoredUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredUser(user: { email: string | null; name: string; role: string }): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({ email: user.email, name: user.name, role: user.role } satisfies StoredUser),
+  );
+}
+
+function clearStoredUser(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -25,6 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     let cancelled = false;
 
+    // No localStorage login marker → no session in this browser; go straight to login.
+    if (!readStoredUser()) {
+      setStatus("unauthenticated");
+      return;
+    }
+
     (async () => {
       try {
         await fetchCsrfCookie();
@@ -33,8 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSession({ user: me.data, access: me.access });
           setStatus("authenticated");
         }
-      } catch {
-        if (!cancelled) setStatus("unauthenticated");
+      } catch (err) {
+        if (!cancelled) {
+          // Session really invalid (401) → drop the marker so next visit lands on login.
+          if (isApiError(err) && err.status === 401) clearStoredUser();
+          setStatus("unauthenticated");
+        }
       }
     })();
 
@@ -46,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     await fetchCsrfCookie();
     const next = await authApi.login(email, password);
+    writeStoredUser(next.data);
     setSession({ user: next.data, access: next.access });
     setStatus("authenticated");
   };
@@ -54,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
+      clearStoredUser();
       setSession(null);
       setStatus("unauthenticated");
     }

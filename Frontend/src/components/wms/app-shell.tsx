@@ -18,6 +18,7 @@ import {
   ArrowUpFromLine,
   QrCode,
   Check,
+  Loader2,
 } from "lucide-react";
 import { navGroups } from "./nav";
 import { Logo, Pill } from "./kit";
@@ -355,6 +356,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   if (pathname === "/login") return <>{children}</>;
+
+  // Auth not resolved (SSR/hydration) or the user is being bounced to /login:
+  // never paint the dashboard before the session is confirmed, so a browser
+  // without a login marker lands on the login page instead.
+  if (status !== "authenticated") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const displayName = user?.name ?? "";
   const initials =
