@@ -120,5 +120,9 @@ function readCookie(name: string): string | undefined {
 /** Fetch the Sanctum CSRF cookie so the next state-changing request carries a fresh X-XSRF-TOKEN. */
 export async function fetchCsrfCookie(): Promise<void> {
   if (typeof document === "undefined") return;
-  await fetch(CSRF_URL, { credentials: "include", headers: { Accept: "application/json" } });
+  const headers: Record<string, string> = { Accept: "application/json" };
+  // Same ngrok free-tier bypass as request() — the interstitial otherwise swallows
+  // this endpoint with an HTML page that has no CORS headers.
+  if (API_BASE !== "/api") headers["ngrok-skip-browser-warning"] = "true";
+  await fetch(CSRF_URL, { credentials: "include", headers });
 }
