@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Loader2, LogIn, ShieldCheck, Boxes, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
@@ -6,7 +6,6 @@ import { Logo } from "@/components/wms/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { fieldError, isApiError } from "@/lib/api";
 
@@ -46,6 +45,14 @@ function LoginPage() {
   useEffect(() => {
     if (status === "authenticated") navigate({ to: "/" });
   }, [status, navigate]);
+
+  if (status === "loading") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,10 +149,7 @@ function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Checkbox defaultChecked /> Ingat saya
-              </label>
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => toast.info("Hubungi administrator untuk reset kata sandi.")}
@@ -160,13 +164,6 @@ function LoginPage() {
               {loading ? "Memproses..." : "Masuk"}
             </Button>
           </form>
-
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            Belum memiliki akun?{" "}
-            <Link to="/" className="font-medium text-primary hover:underline">
-              kembali ke dashboard
-            </Link>
-          </p>
         </div>
       </div>
     </div>

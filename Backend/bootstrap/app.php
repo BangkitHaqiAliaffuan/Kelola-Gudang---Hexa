@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ConfigureCrossSiteCookie;
 use App\Http\Middleware\EnsureRoleAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+
+        $middleware->prepend(ConfigureCrossSiteCookie::class);
 
         $middleware->alias([
             'role.access' => EnsureRoleAccess::class,

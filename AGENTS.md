@@ -35,6 +35,14 @@ UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded
 
 PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). `items.stock`/`reserved` are denormalized today and will move to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) with the Persediaan module. Master data includes `racks`/`bins` (Rak / Bin Location) and `suppliers`/`customers`/`vendors` (Supplier / Customer / Vendor); `items.default_rack_id`/`default_bin_id`/`preferred_supplier_id` are FKs (`nullOnDelete`). Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
 
+### Never run `migrate:fresh` without explicit user instruction — SANGAT PENTING
+
+**`migrate:fresh` (and `migrate:fresh --seed`, or any command that drops/empties the dev DB `kelolagudang`) is FORBIDDEN unless the user explicitly tells you to run it.** `migrate:fresh` wipes ALL dev data (users, master data, stock, `role_permissions`); afterwards every login fails with "Kredensial yang Anda masukkan tidak cocok." because the `users` table is empty. If you think you need a fresh migration, **stop and ask the user first** — do not run it on your own initiative.
+
+- Schema changes go in a **new migration** + `php artisan migrate` — never `migrate:fresh`.
+- If the dev DB is already empty (e.g. someone fresh-migrated it), restore with `php artisan db:seed` in `Backend/` (seeders are non-idempotent, so only run them on an empty DB).
+- This also covers `composer setup` (its `migrate --seed` fails with duplicate-code errors on an already-seeded DB) and any tooling that resets the DB.
+
 ## Multi-session protocol
 
 Multiple opencode sessions can run in this same directory at once (e.g. one on features, one on fixes). They share ONE working tree, ONE `main` branch, ONE test DB (`kelolagudang_test`), and ONE dev port pair (8000/8080). **Concurrent edits to the same file silently overwrite each other (last-writer-wins).** Follow this protocol to avoid corruption — it is cooperative, not enforced:
