@@ -73,10 +73,7 @@ class ItemSeeder extends Seeder
             $sub = $subs->count() ? $subs->get($i % $subs->count()) : null;
 
             $cost = $int(2000, 4500000);
-            $stock = $int(0, 1500);
-            $reserved = $int(0, $stock);
             $status = $pick($statuses);
-            $reserved = $status === 'Nonaktif' ? 0 : $reserved;
 
             $warehouse = $warehouses[$i % $warehouses->count()];
             $racksOfWarehouse = $racks->where('warehouse_id', $warehouse->id)->values();
@@ -104,8 +101,10 @@ class ItemSeeder extends Seeder
                 'min_stock' => $int(2, 60),
                 'max_stock' => $int(80, 4000),
                 'lead_time' => $int(1, 21),
-                'stock' => $stock,
-                'reserved' => $reserved,
+                // Stock is derived from the movement ledger (StockMovementSeeder),
+                // not seeded as a raw number — keeps it reconciliable with the stock card.
+                'stock' => 0,
+                'reserved' => 0,
                 'status' => $status,
             ]);
         }

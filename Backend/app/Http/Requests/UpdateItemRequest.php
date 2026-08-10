@@ -38,8 +38,6 @@ class UpdateItemRequest extends FormRequest
             'min_stock' => ['required', 'integer', 'min:0'],
             'max_stock' => ['nullable', 'integer', 'min:0', 'gte:min_stock'],
             'lead_time' => ['nullable', 'integer', 'min:0'],
-            'stock' => ['sometimes', 'integer', 'min:0'],
-            'reserved' => ['sometimes', 'integer', 'min:0'],
             'status' => ['required', Rule::in(['Aktif', 'Nonaktif'])],
             'image_url' => ['nullable', 'url'],
         ];

@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Item;
+use App\Models\ItemStock;
 use App\Models\Project;
 use App\Models\Rack;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Vendor;
 use App\Models\Warehouse;
@@ -31,6 +33,8 @@ class DatabaseSeederConsistencyTest extends TestCase
         $this->assertWarehousesHaveStock();
         $this->assertRacksHaveBins();
         $this->assertRackNamesFollowCode();
+        $this->assertItemStockReconciles();
+        $this->assertStockLedgerConsistent();
         $this->assertWorkOrdersConsistent();
         $this->assertHeadPicsResolve();
     }
@@ -133,6 +137,50 @@ class DatabaseSeederConsistencyTest extends TestCase
     private function assertRackNamesFollowCode(): void
     {
         $this->assertSame(0, Rack::whereRaw("name <> 'Rak ' || code")->count());
+    }
+
+    private function assertItemStockReconciles(): void
+    {
+        $this->assertSame(0, ItemStock::whereColumn('reserved', '>', 'stock')->count());
+
+        $stockMismatch = Item::query()
+            ->whereRaw('items.stock <> COALESCE((SELECT SUM(stock) FROM item_stock WHERE item_stock.item_id = items.id), 0)')
+            ->count();
+        $this->assertSame(0, $stockMismatch);
+
+        $reservedMismatch = Item::query()
+            ->whereRaw('items.reserved <> COALESCE((SELECT SUM(reserved) FROM item_stock WHERE item_stock.item_id = items.id), 0)')
+            ->count();
+        $this->assertSame(0, $reservedMismatch);
+
+        $this->assertSame(0, Item::doesntHave('itemStocks')->count());
+        $this->assertSame(Item::count(), ItemStock::distinct()->count('item_id'));
+    }
+
+    private function assertStockLedgerConsistent(): void
+    {
+        $this->assertSame(0, StockMovement::whereNotIn('direction', ['IN', 'OUT'])->count());
+        $this->assertSame(0, StockMovement::where('qty', '<=', 0)->count());
+        $this->assertGreaterThan(Item::count(), StockMovement::count());
+
+        foreach (Item::cursor() as $item) {
+            $movements = StockMovement::where('item_id', $item->id)
+                ->orderBy('occurred_at')
+                ->orderBy('id')
+                ->get();
+
+            $this->assertTrue($movements->isNotEmpty(), "Item {$item->id} tidak punya mutasi stok.");
+
+            $balance = 0;
+            foreach ($movements as $movement) {
+                $balance += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
+                $this->assertGreaterThanOrEqual(0, $balance, "Saldo negatif pada item {$item->id}.");
+            }
+
+            $ledgerStock = (int) ItemStock::where('item_id', $item->id)->sum('stock');
+            $this->assertSame($ledgerStock, $balance, "item_stock != saldo akhir ledger untuk item {$item->id}.");
+            $this->assertSame($item->stock, $balance, "items.stock != saldo akhir ledger untuk item {$item->id}.");
+        }
     }
 
     private function assertWorkOrdersConsistent(): void

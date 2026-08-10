@@ -9,6 +9,7 @@ use App\Http\Controllers\MerkController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\StockController;
 use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
@@ -38,4 +39,9 @@ Route::prefix('master')->group(function () {
     Route::post('items/bulk-delete', [ItemController::class, 'bulkDestroy']);
     Route::post('items/bulk-status', [ItemController::class, 'bulkUpdateStatus']);
     Route::apiResource('items', ItemController::class);
+});
+
+Route::prefix('persediaan')->group(function () {
+    Route::get('stock', [StockController::class, 'index']);
+    Route::get('stock-card', [StockController::class, 'stockCard']);
 });
