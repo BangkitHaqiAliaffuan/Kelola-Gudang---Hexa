@@ -1,5 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell,
   ChevronDown,
@@ -23,6 +23,7 @@ import { navGroups } from "./nav";
 import { Logo, Pill } from "./kit";
 import { ProfileHelpDialog } from "./profile-dialog";
 import { themes, useTheme } from "./theme";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -44,6 +45,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { items, suppliers, transactions, warehouses, notifications } from "@/lib/wms-data";
+import { toast } from "sonner";
 
 const quickActions = [
   { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine },
@@ -64,13 +66,15 @@ const bottomNav = [
 function SidebarNav({
   collapsed,
   onNavigate,
+  visibleGroups,
 }: {
   collapsed: boolean;
   onNavigate?: () => void;
+  visibleGroups: typeof navGroups;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState<string[]>(() =>
-    navGroups
+    visibleGroups
       .filter((g) => g.children?.some((c) => pathname.startsWith(c.to.split("/")[1] ? `/${c.to.split("/")[1]}` : c.to)))
       .map((g) => g.label),
   );
@@ -81,7 +85,7 @@ function SidebarNav({
   return (
     <ScrollArea className="h-full px-3 py-4">
       <nav className="space-y-1">
-        {navGroups.map((group) => {
+        {visibleGroups.map((group) => {
           const Icon = group.icon;
           if (group.to) {
             const active = pathname === group.to;
@@ -316,12 +320,50 @@ function NotificationCenter() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const { status, user, hasModule, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
 
+  const onLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      toast.success("Anda telah keluar.");
+      navigate({ to: "/login" });
+    }
+  };
+
+  // Route guard: unauthenticated users go to /login; authenticated users skip it.
+  useEffect(() => {
+    if (status === "unauthenticated" && pathname !== "/login") {
+      navigate({ to: "/login" });
+    } else if (status === "authenticated" && pathname === "/login") {
+      navigate({ to: "/" });
+    }
+  }, [status, pathname, navigate]);
+
+  const visibleGroups = useMemo(
+    () =>
+      navGroups.filter((g) => {
+        if (g.label === "Dashboard" || g.label === "Barcode") return true;
+        return hasModule(g.label);
+      }),
+    [hasModule],
+  );
+
   if (pathname === "/login") return <>{children}</>;
+
+  const displayName = user?.name ?? "";
+  const initials =
+    displayName
+      .split(" ")
+      .map((p) => p[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
   return (
     <div className="min-h-screen bg-background">
@@ -340,7 +382,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Logo compact={collapsed} />
         </div>
         <div className="h-[calc(100vh-4rem)]">
-          <SidebarNav collapsed={collapsed} />
+          <SidebarNav collapsed={collapsed} visibleGroups={visibleGroups} />
         </div>
       </aside>
 
@@ -351,7 +393,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo />
           </div>
           <div className="h-[calc(100vh-4rem)]">
-            <SidebarNav collapsed={false} onNavigate={() => setMobileNav(false)} />
+            <SidebarNav
+              collapsed={false}
+              onNavigate={() => setMobileNav(false)}
+              visibleGroups={visibleGroups}
+            />
           </div>
         </SheetContent>
       </Sheet>
@@ -403,20 +449,21 @@ export function AppShell({ children }: { children: ReactNode }) {
               <ThemePicker />
               <NotificationCenter />
               <ProfileHelpDialog
-                trigger={
-                  <button
+                user={user ?? undefined}
+                onLogout={onLogout}
+                trigger={                  <button
                     type="button"
                     aria-label="Profil & bantuan"
                     className="ml-1 flex items-center gap-2 rounded-xl border border-border bg-card py-1 pl-1 pr-1 text-left transition-colors hover:bg-accent/50 sm:pr-3"
                   >
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-primary-soft text-xs font-bold text-primary">
-                        RH
+                        {initials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden leading-tight sm:block">
-                      <p className="text-xs font-semibold">Rudi Hartono</p>
-                      <p className="text-[11px] text-muted-foreground">Operator Gudang</p>
+                      <p className="text-xs font-semibold">{displayName}</p>
+                      <p className="text-[11px] text-muted-foreground">{user?.role ?? ""}</p>
                     </div>
                   </button>
                 }

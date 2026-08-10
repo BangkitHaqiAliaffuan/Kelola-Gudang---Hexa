@@ -18,6 +18,12 @@ class ItemApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_paginated_items(): void
     {
         Category::factory()->count(3)->create();

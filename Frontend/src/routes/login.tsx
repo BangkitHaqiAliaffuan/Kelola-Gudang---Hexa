@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, Loader2, LogIn, ShieldCheck, Boxes, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/wms/kit";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuth } from "@/hooks/use-auth";
+import { fieldError, isApiError } from "@/lib/api";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -35,19 +37,33 @@ const highlights = [
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { login, status } = useAuth();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("rudi.hartono@kelolagudang.id");
-  const [password, setPassword] = useState("kelolagudang");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (status === "authenticated") navigate({ to: "/" });
+  }, [status, navigate]);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await login(email, password);
       toast.success("Berhasil masuk. Selamat datang kembali!");
       navigate({ to: "/" });
-    }, 700);
+    } catch (err) {
+      if (isApiError(err)) {
+        const msg = fieldError(err, "email") ?? err.message;
+        toast.error(msg);
+      } else {
+        toast.error("Terjadi kesalahan. Coba lagi.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -146,9 +162,9 @@ function LoginPage() {
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            Demo UI tanpa autentikasi nyata ·{" "}
+            Belum memiliki akun?{" "}
             <Link to="/" className="font-medium text-primary hover:underline">
-              lewati ke dashboard
+              kembali ke dashboard
             </Link>
           </p>
         </div>

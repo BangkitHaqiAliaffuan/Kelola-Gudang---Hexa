@@ -10,6 +10,12 @@ class CustomerApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_paginated_customers(): void
     {
         Customer::factory()->count(5)->create();

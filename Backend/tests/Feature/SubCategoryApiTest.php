@@ -12,6 +12,12 @@ class SubCategoryApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_paginated_sub_categories_with_category_name(): void
     {
         $category = Category::factory()->create(['name' => 'Material Logam']);

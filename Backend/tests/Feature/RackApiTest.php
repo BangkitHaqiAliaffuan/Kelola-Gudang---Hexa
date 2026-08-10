@@ -13,6 +13,12 @@ class RackApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_paginated_racks(): void
     {
         Rack::factory()->count(5)->create();

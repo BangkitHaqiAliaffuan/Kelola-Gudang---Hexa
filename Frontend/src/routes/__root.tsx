@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/wms/app-shell";
+import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/components/wms/theme";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -136,10 +137,12 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AppShell>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </AppShell>
+        <AuthProvider>
+          <AppShell>
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <Outlet />
+          </AppShell>
+        </AuthProvider>
         <Toaster position="top-right" />
       </ThemeProvider>
     </QueryClientProvider>

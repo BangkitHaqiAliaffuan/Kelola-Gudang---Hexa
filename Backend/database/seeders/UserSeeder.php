@@ -26,7 +26,7 @@ class UserSeeder extends Seeder
                 'email' => strtolower(str_replace(' ', '.', $user['name'])).'@kelolagudang.id',
                 'role' => $user['role'],
                 'is_active' => true,
-                'password' => 'password',
+                'password' => 'IndomieGoreng',
             ]);
         }
     }

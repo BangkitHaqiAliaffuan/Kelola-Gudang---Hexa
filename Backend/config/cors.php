@@ -10,8 +10,9 @@ return [
     | `HandleCors` runs in the default global middleware stack, but only sends
     | headers when this file configures matching paths. Needed so the Vercel
     | production frontend can call the local backend through the ngrok tunnel
-    | (see `dev.sh`) — a cross-origin fetch. No auth/credentials yet, so `*`
-    | is acceptable; tighten `allowed_origins` once USER/ROLE ship.
+    | (see `dev.sh`) — a cross-origin fetch. Cookie-based auth needs
+    | `supports_credentials` and explicit origins (cannot be `*` with
+    | credentials), driven by `FRONTEND_URL` (comma-separated).
     |
     */
 
@@ -19,7 +20,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => array_values(array_filter(
+        explode(',', (string) env('FRONTEND_URL', 'http://localhost:8080'))
+    )),
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +32,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

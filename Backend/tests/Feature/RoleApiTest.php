@@ -12,6 +12,12 @@ class RoleApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_all_roles_in_enum_order(): void
     {
         $this->getJson('/api/master/roles')

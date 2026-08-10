@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BinController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
@@ -19,7 +20,13 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('master')->group(function () {
+Route::prefix('auth')->middleware('web')->group(function () {
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+});
+
+Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('sub-categories', SubCategoryController::class);
     Route::apiResource('merks', MerkController::class);

@@ -17,6 +17,8 @@ export default defineConfig({
       proxy: {
         // Dev-time API proxy → Laravel backend (php artisan serve on :8000).
         "/api": "http://127.0.0.1:8000",
+        // Sanctum SPA CSRF cookie endpoint (GET /sanctum/csrf-cookie) → Laravel.
+        "/sanctum": "http://127.0.0.1:8000",
       },
     },
   },

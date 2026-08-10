@@ -1,9 +1,9 @@
-import { useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Check, LogOut, Mail, Phone, ShieldCheck, Building2 } from "lucide-react";
+import { Check, LogOut, Mail, ShieldCheck, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Pill } from "./kit";
 import { themes, useTheme } from "./theme";
+import type { AuthUser } from "@/lib/auth-api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -71,10 +71,28 @@ function Row({ icon: Icon, label, value }: { icon: typeof Mail; label: string; v
   );
 }
 
-export function ProfileHelpDialog({ trigger }: { trigger: ReactNode }) {
+export function ProfileHelpDialog({
+  trigger,
+  user,
+  onLogout,
+}: {
+  trigger: ReactNode;
+  user?: AuthUser | undefined;
+  onLogout: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const navigate = useNavigate();
+
+  const name = user?.name ?? "Pengguna";
+  const role = user?.role ?? "";
+  const email = user?.email ?? "";
+  const initials =
+    name
+      .split(" ")
+      .map((p) => p[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -84,13 +102,13 @@ export function ProfileHelpDialog({ trigger }: { trigger: ReactNode }) {
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12">
               <AvatarFallback className="bg-primary-soft text-sm font-bold text-primary">
-                RH
+                {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <DialogTitle className="truncate text-base">Rudi Hartono</DialogTitle>
+              <DialogTitle className="truncate text-base">{name}</DialogTitle>
               <DialogDescription className="truncate text-xs">
-                Operator Gudang · Gudang Pusat Jakarta
+                {role} · Gudang Pusat Jakarta
               </DialogDescription>
             </div>
             <Pill tone="success" className="ml-auto hidden sm:inline-flex">
@@ -117,9 +135,8 @@ export function ProfileHelpDialog({ trigger }: { trigger: ReactNode }) {
           <ScrollArea className="max-h-[52vh]">
             <TabsContent value="profil" className="space-y-3 px-5 py-4">
               <div className="grid gap-2.5 sm:grid-cols-2">
-                <Row icon={Mail} label="Email" value="rudi.hartono@kelolagudang.id" />
-                <Row icon={Phone} label="Telepon" value="0812-3344-5566" />
-                <Row icon={ShieldCheck} label="Role" value="Operator Gudang" />
+                <Row icon={Mail} label="Email" value={email} />
+                <Row icon={ShieldCheck} label="Role" value={role} />
                 <Row icon={Building2} label="Perusahaan" value="PT Kelola Nusantara" />
               </div>
               <div className="rounded-xl border border-border p-3">
@@ -201,7 +218,7 @@ export function ProfileHelpDialog({ trigger }: { trigger: ReactNode }) {
             className="rounded-xl text-destructive hover:text-destructive"
             onClick={() => {
               setOpen(false);
-              navigate({ to: "/login" });
+              onLogout();
             }}
           >
             <LogOut className="h-4 w-4" />

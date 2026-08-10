@@ -10,6 +10,12 @@ class VendorApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->actingAsMasterAdmin();
+    }
+
     public function test_index_returns_paginated_vendors(): void
     {
         Vendor::factory()->count(5)->create();
