@@ -14,14 +14,18 @@ class RackSeeder extends Seeder
 
         foreach ($warehouses as $warehouse) {
             foreach (['A', 'B', 'C', 'D'] as $aisle) {
-                Rack::create([
-                    'warehouse_id' => $warehouse->id,
-                    'aisle' => $aisle,
-                    'bay' => '01',
-                    'code' => "{$aisle}-01",
-                    'name' => "Rak {$aisle} — {$warehouse->name}",
-                    'is_active' => true,
-                ]);
+                foreach (range(1, 3) as $bayNumber) {
+                    $bay = str_pad((string) $bayNumber, 2, '0', STR_PAD_LEFT);
+
+                    Rack::create([
+                        'warehouse_id' => $warehouse->id,
+                        'aisle' => $aisle,
+                        'bay' => $bay,
+                        'code' => "{$aisle}-{$bay}",
+                        'name' => "Rak {$aisle}-{$bay}",
+                        'is_active' => true,
+                    ]);
+                }
             }
         }
     }

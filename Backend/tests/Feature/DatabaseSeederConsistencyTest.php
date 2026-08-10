@@ -30,6 +30,7 @@ class DatabaseSeederConsistencyTest extends TestCase
         $this->assertItemValuesValid();
         $this->assertWarehousesHaveStock();
         $this->assertRacksHaveBins();
+        $this->assertRackNamesFollowCode();
         $this->assertWorkOrdersConsistent();
         $this->assertHeadPicsResolve();
     }
@@ -41,8 +42,8 @@ class DatabaseSeederConsistencyTest extends TestCase
         $this->assertDatabaseCount('merks', 12);
         $this->assertDatabaseCount('units', 9);
         $this->assertDatabaseCount('warehouses', 8);
-        $this->assertDatabaseCount('racks', 32);
-        $this->assertDatabaseCount('bins', 192);
+        $this->assertDatabaseCount('racks', 96);
+        $this->assertDatabaseCount('bins', 576);
         $this->assertDatabaseCount('suppliers', 20);
         $this->assertDatabaseCount('customers', 16);
         $this->assertDatabaseCount('vendors', 8);
@@ -127,6 +128,11 @@ class DatabaseSeederConsistencyTest extends TestCase
     private function assertRacksHaveBins(): void
     {
         $this->assertSame(0, Rack::whereDoesntHave('bins')->count());
+    }
+
+    private function assertRackNamesFollowCode(): void
+    {
+        $this->assertSame(0, Rack::whereRaw("name <> 'Rak ' || code")->count());
     }
 
     private function assertWorkOrdersConsistent(): void

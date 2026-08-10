@@ -20,13 +20,14 @@ class RackFactory extends Factory
     {
         $aisle = strtoupper($this->faker->randomElement(['A', 'B', 'C', 'D']));
         $bay = str_pad((string) $this->faker->unique()->numberBetween(1, 99), 2, '0', STR_PAD_LEFT);
+        $code = "{$aisle}-{$bay}";
 
         return [
             'warehouse_id' => Warehouse::factory(),
             'aisle' => $aisle,
             'bay' => $bay,
-            'code' => "{$aisle}-{$bay}",
-            'name' => ucwords($this->faker->unique()->words(2, true)),
+            'code' => $code,
+            'name' => "Rak {$code}",
             'is_active' => $this->faker->boolean(90),
         ];
     }
