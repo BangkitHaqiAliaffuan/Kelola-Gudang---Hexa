@@ -31,6 +31,7 @@ Route::prefix('master')->group(function () {
     Route::apiResource('vendors', VendorController::class);
     Route::apiResource('users', UserController::class);
     Route::get('roles', [RoleController::class, 'index']);
+    Route::put('roles/{role}', [RoleController::class, 'update']);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('projects', ProjectController::class);
     Route::apiResource('work-orders', WorkOrderController::class);

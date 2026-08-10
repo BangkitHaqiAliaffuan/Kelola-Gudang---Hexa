@@ -2,6 +2,9 @@
 // The API serializes items to match the legacy wms-data `Item` shape so shared
 // helpers (stockStatus, stockCard) keep working.
 
+import type { RoleAccessEntry } from "./schemas";
+
+
 export type Category = {
   id: number;
   code: string;
@@ -206,6 +209,7 @@ export type RoleCatalog = {
   name: string;
   user_count: number;
   active_user_count: number;
+  access: RoleAccessEntry[];
 };
 
 export type Department = {

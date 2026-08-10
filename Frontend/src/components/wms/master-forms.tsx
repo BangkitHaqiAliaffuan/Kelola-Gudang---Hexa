@@ -1,10 +1,20 @@
 import { toast } from "sonner";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { CrudFormDialog } from "./master-crud";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -22,6 +32,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
+  ACCESS_LEVELS,
+  ACCESS_MODULES,
   binSchema,
   categorySchema,
   createUserSchema,
@@ -39,6 +51,7 @@ import {
   warehouseSchema,
   workOrderSchema,
   USER_ROLES,
+  type AccessLevel,
   type BinInput,
   type CategoryInput,
   type CustomerInput,
@@ -47,6 +60,7 @@ import {
   type MerkInput,
   type ProjectInput,
   type RackInput,
+  type RoleAccessEntry,
   type SubCategoryInput,
   type SupplierInput,
   type UnitInput,
@@ -98,6 +112,7 @@ import {
   useUpdateVendor,
   useUpdateWarehouse,
   useUpdateWorkOrder,
+  useUpdateRole,
   useUsers,
   useVendors,
   useWarehouses,
@@ -128,6 +143,7 @@ import type {
   Merk,
   Project,
   Rack,
+  RoleCatalog,
   SubCategory,
   Supplier,
   Unit,
@@ -3921,5 +3937,108 @@ export function UserFormDialog({
         </Form>
       )}
     />
+  );
+}
+
+export function RoleEditDialog({
+  role,
+  onOpenChange,
+}: {
+  role: RoleCatalog | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const update = useUpdateRole();
+  const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
+
+  useEffect(() => {
+    if (role) {
+      const next: Record<string, AccessLevel | null> = {};
+      for (const module of ACCESS_MODULES) next[module] = null;
+      for (const entry of role.access) next[entry.module] = entry.level;
+      setDraft(next);
+    }
+  }, [role]);
+
+  const open = role !== null;
+  const saving = update.isPending;
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!role) return;
+
+    const access: RoleAccessEntry[] = ACCESS_MODULES.flatMap((module) => {
+      const level = draft[module];
+      return level ? [{ module, level }] : [];
+    });
+
+    try {
+      await update.mutateAsync({ role: role.name, access });
+      toast.success("Hak akses role diperbarui");
+      onOpenChange(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Edit Hak Akses — {role?.name}</DialogTitle>
+          <DialogDescription>Atur tingkat akses tiap modul untuk role ini.</DialogDescription>
+        </DialogHeader>
+        <form noValidate onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-xl border border-border">
+            <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground">
+              <span>Modul</span>
+              <span className="w-32 text-right">Hak Akses</span>
+            </div>
+            {ACCESS_MODULES.map((module) => (
+              <div
+                key={module}
+                className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
+              >
+                <span className="text-sm">{module}</span>
+                <Select
+                  value={draft[module] ?? "NONE"}
+                  onValueChange={(value) =>
+                    setDraft((draft) => ({
+                      ...draft,
+                      [module]: value === "NONE" ? null : (value as AccessLevel),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-32 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">Tidak Ada</SelectItem>
+                    {ACCESS_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => onOpenChange(false)}
+              disabled={saving}
+            >
+              Batal
+            </Button>
+            <Button type="submit" className="rounded-xl" disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />} Simpan
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

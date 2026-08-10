@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
+import type { RoleAccessEntry } from "@/lib/schemas";
 import type {
   Bin,
   Category,
@@ -144,6 +145,20 @@ export function useRoles() {
     queryKey: keys.roles,
     queryFn: () => api.get<{ data: RoleCatalog[] }>("/master/roles"),
     enabled: typeof window !== "undefined",
+  });
+}
+
+export type RolePermissionPayload = {
+  role: string;
+  access: RoleAccessEntry[];
+};
+
+export function useUpdateRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ role, access }: RolePermissionPayload) =>
+      api.put<{ data: RoleCatalog }>(`/master/roles/${encodeURIComponent(role)}`, { access }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.roles }),
   });
 }
 

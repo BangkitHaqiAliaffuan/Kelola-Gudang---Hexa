@@ -9,6 +9,7 @@ import {
   MerkFormDialog,
   ProjectFormDialog,
   RackFormDialog,
+  RoleEditDialog,
   SubCategoryFormDialog,
   SupplierFormDialog,
   UnitFormDialog,
@@ -1457,13 +1458,14 @@ export function UserPage() {
 export function RolePage() {
   const { data, isLoading } = useRoles();
   const [levelFilter, setLevelFilter] = useState(ALL);
+  const [editingRole, setEditingRole] = useState<RoleCatalog | null>(null);
 
   const rows = data?.data ?? [];
-  const filtered = rows.filter(
-    (r) =>
-      levelFilter === ALL ||
-      (ROLE_ACCESS[r.name as UserRole] ?? []).some((a) => a.level === levelFilter),
-  );
+  const filtered = rows.filter((r) => {
+    if (levelFilter === ALL) return true;
+    const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
+    return access.some((a) => a.level === levelFilter);
+  });
 
   const columns: Column<RoleCatalog>[] = [
     {
@@ -1487,7 +1489,7 @@ export function RolePage() {
       key: "access",
       label: "Hak Akses",
       render: (r) => {
-        const access = ROLE_ACCESS[r.name as UserRole] ?? [];
+        const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
         return (
           <div className="flex max-w-xl flex-wrap gap-1">
             {access.map((a) => (
@@ -1513,14 +1515,16 @@ export function RolePage() {
   };
 
   return (
-    <MasterCrudPage<RoleCatalog>
-      title="Role"
+    <>
+      <MasterCrudPage<RoleCatalog>
+        title="Role"
       description="Hak akses pengguna"
       searchPlaceholder="Cari role..."
       searchText={(r) => r.name}
       columns={columns}
       rows={filtered}
       isLoading={isLoading}
+      onEdit={(r) => setEditingRole(r)}
       filters={
         <FilterSelect
           value={levelFilter}
@@ -1531,7 +1535,7 @@ export function RolePage() {
       }
       onExport={exportCsv}
       mobileCard={(r) => {
-        const access = ROLE_ACCESS[r.name as UserRole] ?? [];
+        const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
         return (
           <div>
             <p className="truncate text-sm font-semibold">{r.name}</p>
@@ -1549,6 +1553,8 @@ export function RolePage() {
           </div>
         );
       }}
-    />
+      />
+      <RoleEditDialog role={editingRole} onOpenChange={(o) => !o && setEditingRole(null)} />
+    </>
   );
 }

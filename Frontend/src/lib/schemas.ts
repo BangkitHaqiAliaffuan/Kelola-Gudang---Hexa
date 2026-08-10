@@ -258,6 +258,20 @@ export type RoleAccessEntry = {
   level: AccessLevel;
 };
 
+// Mirrors RolePermission::MODULES / LEVELS in the backend.
+export const ACCESS_LEVELS = ["Baca", "Tulis", "Kelola"] as const;
+
+export const ACCESS_MODULES = [
+  "Master Data",
+  "Transaksi",
+  "Persediaan",
+  "Stock Opname",
+  "Pengadaan",
+  "Laporan",
+  "System",
+  "Audit Trails",
+] as const;
+
 // Ilustratif — RBAC nyata (roles + permissions + gate) menyusul saat auth dikerjakan.
 // Pemetaan modul → level akses per role untuk halaman /master/role.
 export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
