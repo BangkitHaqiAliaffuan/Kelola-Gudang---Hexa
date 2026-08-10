@@ -63,6 +63,11 @@ wait_for_tunnel() {
   if is_windows && command -v clip >/dev/null 2>&1; then
     printf '%s' "$NGROK_API_URL" | clip && echo "   ✓ VITE_API_URL disalin ke clipboard."
   fi
+  echo ""
+  echo "▶ Clearing Laravel config cache agar SANCTUM_STATEFUL_DOMAINS fresh..."
+  (cd "$ROOT/Backend" && php artisan config:clear) \
+    && echo "   ✓ Config cache cleared." \
+    || echo "   ⚠ Gagal clear config cache — jalankan manual: php artisan config:clear"
 }
 
 BACKEND_PID=""

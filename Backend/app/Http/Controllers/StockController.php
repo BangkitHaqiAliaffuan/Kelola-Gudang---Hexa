@@ -96,6 +96,7 @@ class StockController extends Controller
 
             if ($from !== null && $when->lt($from)) {
                 $opening += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
+
                 continue;
             }
 
