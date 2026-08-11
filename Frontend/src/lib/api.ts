@@ -39,7 +39,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   };
   if (init?.body) headers["Content-Type"] = "application/json";
   // ngrok free-tier intercepts browser requests with an HTML interstitial unless this header is set (see dev.sh).
-  if (API_BASE !== "/api") headers["ngrok-skip-browser-warning"] = "true";
+  // Send always — even same-origin calls travel through the Vercel rewrite and must reach ngrok intact.
+  headers["ngrok-skip-browser-warning"] = "true";
 
   // Sanctum SPA: every state-changing request needs the XSRF token (from the XSRF-TOKEN cookie).
   const method = (init?.method ?? "GET").toUpperCase();
@@ -123,6 +124,6 @@ export async function fetchCsrfCookie(): Promise<void> {
   const headers: Record<string, string> = { Accept: "application/json" };
   // Same ngrok free-tier bypass as request() — the interstitial otherwise swallows
   // this endpoint with an HTML page that has no CORS headers.
-  if (API_BASE !== "/api") headers["ngrok-skip-browser-warning"] = "true";
+  headers["ngrok-skip-browser-warning"] = "true";
   await fetch(CSRF_URL, { credentials: "include", headers });
 }

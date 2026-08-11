@@ -63,15 +63,20 @@ wait_for_tunnel() {
     sleep 1
   done
   NGROK_PUBLIC_URL="$url"
-  NGROK_API_URL="${url%/}/api"
   printf '%s\n' "$NGROK_PUBLIC_URL" >"$NGROK_URL_FILE"
   echo "✓ Tunnel ngrok siap → $NGROK_PUBLIC_URL"
   echo ""
-  echo "⚠ Koneksi produksi (Vercel):"
-  echo "   Set VITE_API_URL=\"$NGROK_API_URL\" → Project Settings → Environment Variables → Redeploy."
-  echo "   (URL ngrok berubah tiap restart — update env & redeploy tiap kali.)"
+  echo "⚠ Koneksi produksi (Vercel) — same-origin proxy:"
+  VERCEL_JSON="$ROOT/Frontend/vercel.json"
+  if [ -f "$VERCEL_JSON" ]; then
+    sed -i -e "s|https://NGROK-URL\.ngrok-free\.app|$url|g" "$VERCEL_JSON"
+    echo "   ✓ Frontend/vercel.json → destination $url (commit + redeploy Vercel)."
+  else
+    echo "   ⚠ Frontend/vercel.json tidak ditemukan — buat dengan destination → $url."
+  fi
+  echo "   (URL ngrok berubah tiap restart — update vercel.json & redeploy tiap kali.)"
   if is_windows && command -v clip >/dev/null 2>&1; then
-    printf '%s' "$NGROK_API_URL" | clip && echo "   ✓ VITE_API_URL disalin ke clipboard."
+    printf '%s' "$url" | clip && echo "   ✓ URL ngrok disalin ke clipboard."
   fi
   echo ""
   echo "▶ Clearing Laravel config cache agar SANCTUM_STATEFUL_DOMAINS fresh..."

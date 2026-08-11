@@ -2,8 +2,8 @@
 
 Warehouse Management System (WMS) monorepo. Two sibling sub-projects with **no root manifest**. Git repo lives at the root (branch `main`, remote `origin` → `https://github.com/BangkitHaqiAliaffuan/Kelola-Gudang---Hexa.git`) — commit from the root, not inside a sub-project. The Frontend is Lovable-connected, so never force-push or rewrite published history. Each sub-project has its own detailed AGENTS.md — read the relevant one before touching its code.
 
-- `Frontend/` — the active product: TanStack Start + React 19 UI demo (Indonesian UI). `Frontend/AGENTS.md` is authoritative and detailed — commands, routing, tooling gotchas, and data conventions live there.
-- `Backend/` — Laravel 13 API powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang — API-backed since 2026). `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
+- `Frontend/` — the active product: TanStack Start + React 19 UI demo (Indonesian UI), with real Sanctum SPA login. `Frontend/AGENTS.md` is authoritative and detailed — commands, routing, tooling gotchas, and data conventions live there.
+- `Backend/` — Laravel 13 API. Since 2026 the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang, User, Role) is API-backed behind Sanctum session auth + `role.access` RBAC middleware; the Persediaan module (`item_stock`, `GET /api/persediaan/stock` + `/stock-card`) also shipped. `Backend/AGENTS.md` holds the API conventions, schema notes, and env setup.
 
 ## Git rules
 
@@ -21,19 +21,23 @@ Warehouse Management System (WMS) monorepo. Two sibling sub-projects with **no r
 Dev loop needs **TWO servers**:
 
 - Laravel API: `composer dev` in `Backend/` → `http://127.0.0.1:8000` (also runs queue:listen + pail + npm run dev).
-- Frontend: `npm run dev` in `Frontend/` → `http://localhost:8080` (default injected by `@lovable.dev/vite-tanstack-config` — not 8081). Vite proxies `/api` → `http://127.0.0.1:8000` (`vite.config.ts`). If master pages show "Tidak dapat terhubung ke server backend", the Laravel server isn't running.
+- Frontend: `npm run dev` in `Frontend/` → `http://localhost:8080` (default injected by `@lovable.dev/vite-tanstack-config` — not 8081). Vite proxies `/api` and `/sanctum` → `http://127.0.0.1:8000` (`vite.config.ts`). If master pages show "Tidak dapat terhubung ke server backend", the Laravel server isn't running.
 
 Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/logs/`), verifies ports 8000/8080 are free first, and kills both on Ctrl+C. Prefer this over running the two loops separately. Note `dev.sh` is a bash script — on Windows run it from **Git Bash / MSYS**, not PowerShell. It starts a plain `php artisan serve` (no queue:listen/pail); `composer dev` is the full-loop alternative.
 
-`dev.sh` also starts an **ngrok tunnel** to the backend (skip with `SKIP_TUNNEL=1`) so the Vercel-deployed frontend can reach the local API from production. It prints `VITE_API_URL=<ngrok-url>/api` (also saved to `.dev/logs/ngrok-url.txt` and copied to clipboard). To use it: set that value in the Vercel project's Environment Variables and redeploy — the URL changes each ngrok restart. Backend CORS for this is enabled via `Backend/config/cors.php`.
+`dev.sh` also starts an **ngrok tunnel** to the backend (skip with `SKIP_TUNNEL=1`) so the Vercel-deployed frontend can reach the local API from production. Production now talks **same-origin**: the deployed build keeps `VITE_API_URL` unset (falls back to `/api`), and `Frontend/vercel.json` rewrites `/api/*` and `/sanctum/*` → the ngrok URL — the same-origin proxy mirrors the dev Vite proxy (`vite.config.ts`), which is what makes Sanctum SPA session auth work without third-party cookies. `dev.sh` prints the URL (also saved to `.dev/logs/ngrok-url.txt`), copies it to the clipboard, and **auto-injects it into `Frontend/vercel.json`** on each tunnel start — the URL changes each ngrok restart, so commit + redeploy Vercel every restart. Do **not** set `VITE_API_URL` on Vercel anymore (that made calls cross-site → 3rd-party cookies → 419 CSRF in modern browsers). Backend CORS for the (now mostly unused) cross-site path is still enabled via `Backend/config/cors.php`.
 
 ## Frontend
 
-UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded PRNG), except the API-backed master pages. Managed by **bun** (both `bun.lock` and `package-lock.json` must stay in sync). No typecheck script — use `npx tsc --noEmit`. The real product requirements are in `Frontend/README.md`. Full details in `Frontend/AGENTS.md`.
+UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded PRNG), except the API-backed master pages and the Persediaan pages `persediaan/stock` (Stock Saat Ini) + `persediaan/kartu-stock` (Kartu Stock). Real Sanctum SPA login: seeded test accounts (all password `IndomieGoreng`) in `Frontend/docs/akun-login.md` — Administrator is `USR-001 Rudi Hartono` (`rudi.hartono@kelolagudang.id`). Managed by **bun** (both `bun.lock` and `package-lock.json` must stay in sync). No typecheck script — use `npx tsc --noEmit`. The real product requirements are in `Frontend/README.md`. Full details in `Frontend/AGENTS.md`.
 
 ## Backend (Laravel 13)
 
-PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). `items.stock`/`reserved` are denormalized today and will move to an `ITEM_STOCK` table (composite PK `item_id, warehouse_id, bin_id`) with the Persediaan module. Master data includes `racks`/`bins` (Rak / Bin Location) and `suppliers`/`customers`/`vendors` (Supplier / Customer / Vendor); `items.default_rack_id`/`default_bin_id`/`preferred_supplier_id` are FKs (`nullOnDelete`). Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
+PostgreSQL 18 at `127.0.0.1:5432` (user `postgres`, password `postgres`), **NOT on PATH** — use full path `C:/Program Files/PostgreSQL/18/bin/psql.exe` (`createdb.exe`). Dev DB `kelolagudang`, test DB `kelolagudang_test` (per `phpunit.xml`). The Persediaan module normalized stock into `item_stock` (composite PK `item_id, warehouse_id, bin_id`) plus `stock_movements`; `items.stock`/`reserved` are still denormalized carryovers. Master data includes `racks`/`bins` (Rak / Bin Location) and `suppliers`/`customers`/`vendors` (Supplier / Customer / Vendor); `items.default_rack_id`/`default_bin_id`/`preferred_supplier_id` are FKs (`nullOnDelete`). Full commands, API conventions, and schema notes in `Backend/AGENTS.md`.
+
+### Auth & RBAC (since 2026)
+
+Real Sanctum SPA session login — the API is NOT open anymore. `POST /api/auth/login` (throttled 5/min), `GET /api/auth/me`, `POST /api/auth/logout`. `/api/master/*` requires session + `role.access:Master Data` (`EnsureRoleAccess`, level needed per HTTP verb: GET/HEAD=Baca, POST/PUT/PATCH=Tulis, DELETE=Kelola). `role_permissions` maps role→`{module, level}` and is editable via `PUT /api/master/roles/{role}`. Persediaan endpoints are mounted outside that group (no `role.access` middleware today). The frontend fetches `/sanctum/csrf-cookie` and sends `X-XSRF-TOKEN`; a `kg-auth` localStorage marker gates the `/login` redirect. Committed by `b4455fd` — do not claim "auth ships later".
 
 ### Never run `migrate:fresh` without explicit user instruction — SANGAT PENTING
 
