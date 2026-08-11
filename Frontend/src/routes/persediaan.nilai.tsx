@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
+import { valuationMethodLabels } from "@/lib/persediaan-types";
 import { cn } from "@/lib/utils";
 import {
   categories,
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/persediaan/nilai")({
       { title: "Nilai Persediaan — KelolaGudang" },
       {
         name: "description",
-        content: "Analisis nilai persediaan dengan metode FIFO, Average, dan Maximum Cost.",
+        content: "Analisis nilai persediaan dengan metode FIFO, Average, dan Estimasi Maksimum.",
       },
       { property: "og:title", content: "Nilai Persediaan — KelolaGudang" },
       { property: "og:description", content: "Bandingkan nilai stok antar metode perhitungan." },
@@ -75,7 +76,7 @@ function NilaiPersediaan() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {m}
+                {valuationMethodLabels[m]}
               </button>
             ))}
           </div>
@@ -83,7 +84,7 @@ function NilaiPersediaan() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Total Nilai Stock" value={formatIDR(total)} hint={`metode ${method}`} icon={Wallet} />
+        <StatCard label="Total Nilai Stock" value={formatIDR(total)} hint={`metode ${valuationMethodLabels[method]}`} icon={Wallet} />
         <StatCard
           label="Barang Termahal"
           value={formatIDR(sorted[0]!.stock * sorted[0]!.cost * f)}
@@ -102,7 +103,7 @@ function NilaiPersediaan() {
         <StatCard label="Fast Moving" value={String(fast.length)} hint="bergerak < 20 hari" icon={Zap} tone="warning" />
       </div>
 
-      <Panel title={`Nilai per Kategori — ${method}`} description="Nilai berubah mengikuti metode yang dipilih">
+      <Panel title={`Nilai per Kategori — ${valuationMethodLabels[method]}`} description="Nilai berubah mengikuti metode yang dipilih">
         <ResponsiveContainer width="100%" height={330}>
           <BarChart data={byCategory} layout="vertical" margin={{ left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
@@ -152,7 +153,7 @@ function NilaiPersediaan() {
               return (
                 <div key={m} className="rounded-xl border border-border p-3">
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                    <p className="truncate text-sm font-medium">{m}</p>
+                    <p className="truncate text-sm font-medium">{valuationMethodLabels[m]}</p>
                     <Pill tone={m === method ? "brand" : "neutral"}>{formatIDR(v)}</Pill>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-muted">

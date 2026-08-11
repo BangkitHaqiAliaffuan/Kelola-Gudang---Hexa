@@ -25,6 +25,7 @@ import {
 import { useItems } from "@/hooks/use-master";
 import { useStockCard } from "@/hooks/use-persediaan";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
+import { valuationMethodLabels } from "@/lib/persediaan-types";
 import { formatDate, formatIDR, formatNumber, valuationMethods, type Trx } from "@/lib/wms-data";
 
 export const Route = createFileRoute("/persediaan/kartu-stock")({
@@ -201,7 +202,7 @@ function KartuStock() {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {m}
+                  {valuationMethodLabels[m]}
                 </button>
               ))}
             </div>
@@ -250,16 +251,16 @@ function KartuStock() {
           tone="warning"
         />
         <StatCard
-          label={`Nilai Akhir — ${method}`}
+          label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
           value={formatIDR(lastRow?.nilai ?? 0)}
-          hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.unit_cost ?? 0)}`}
+          hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
           icon={Wallet}
         />
       </div>
 
       <Panel
         title="Pergerakan Saldo Stok"
-        description={`Satuan ${unit} · nilai memakai metode ${method}`}
+        description={`Satuan ${unit} · nilai memakai metode ${valuationMethodLabels[method]}`}
       >
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={chart}>
@@ -297,7 +298,7 @@ function KartuStock() {
 
       <Panel
         title="Nilai Stok per Metode"
-        description="Perbandingan FIFO, Average, dan Maximum Cost"
+        description="Perbandingan FIFO, Average, dan Estimasi Maksimum"
       >
         <div className="grid gap-3 sm:grid-cols-3">
           {valuationMethods.map((m) => {
@@ -312,10 +313,10 @@ function KartuStock() {
                   m === method ? "border-primary/40 bg-primary-soft" : "border-border",
                 )}
               >
-                <p className="text-xs font-semibold text-muted-foreground">{m}</p>
+                <p className="text-xs font-semibold text-muted-foreground">{valuationMethodLabels[m]}</p>
                 <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  HPP {formatIDR(cLast?.unit_cost ?? 0)} / {unit}
+                  HPP {formatIDR(cLast?.method_cost ?? 0)} / {unit}
                 </p>
               </div>
             );

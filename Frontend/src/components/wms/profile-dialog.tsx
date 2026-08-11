@@ -41,7 +41,7 @@ const tutorials = [
   },
   {
     q: "Membaca Kartu Stock & nilai persediaan",
-    a: "Kartu Stock menampilkan saldo awal, mutasi masuk/keluar, dan saldo akhir per barang lengkap dengan satuan. Nilai persediaan dapat dibandingkan dengan metode FIFO, Average, dan Maximum Cost.",
+    a: "Kartu Stock menampilkan saldo awal, mutasi masuk/keluar, dan saldo akhir per barang lengkap dengan satuan. Nilai persediaan dapat dibandingkan dengan metode FIFO, Average, dan Estimasi Maksimum.",
   },
   {
     q: "Menjalankan Stock Opname",

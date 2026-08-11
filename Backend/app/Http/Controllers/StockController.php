@@ -88,44 +88,60 @@ class StockController extends Controller
             ->orderBy('id')
             ->get();
 
+        // Fold the full ledger (up to `to`) so FIFO layers / moving-average basis
+        // carry across the `from` boundary, but only emit rows inside [from, to].
         $opening = 0;
-        $inRange = [];
+        $saldo = 0;
+        $fifoLayers = [];
+        $onHandQty = 0;
+        $onHandValue = 0.0;
+        $maxCost = null;
+        $rows = [];
 
         foreach ($movements as $movement) {
             $when = $movement->occurred_at;
-
-            if ($from !== null && $when->lt($from)) {
-                $opening += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
-
-                continue;
-            }
 
             if ($to !== null && $when->gt($to)) {
                 break;
             }
 
-            $inRange[] = $movement;
-        }
+            $beforeFrom = $from !== null && $when->lt($from);
 
-        $saldo = $opening;
-        $runningQty = 0;
-        $runningCost = 0.0;
-        $maxCost = null;
-        $rows = [];
-
-        foreach ($inRange as $movement) {
             $saldo += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
 
             if ($movement->direction === 'IN') {
-                $runningQty += $movement->qty;
-                $runningCost += $movement->qty * $movement->unit_cost;
+                $fifoLayers[] = ['qty' => $movement->qty, 'cost' => $movement->unit_cost];
+                $onHandQty += $movement->qty;
+                $onHandValue += $movement->qty * $movement->unit_cost;
                 $maxCost = $maxCost === null ? $movement->unit_cost : max($maxCost, $movement->unit_cost);
+            } else {
+                $remaining = $movement->qty;
+                while ($remaining > 0 && $fifoLayers !== []) {
+                    $take = min($remaining, $fifoLayers[0]['qty']);
+                    $fifoLayers[0]['qty'] -= $take;
+                    $remaining -= $take;
+
+                    if ($fifoLayers[0]['qty'] === 0) {
+                        array_shift($fifoLayers);
+                    }
+                }
+
+                $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
+                $onHandValue -= $movement->qty * $avg;
+                $onHandQty -= $movement->qty;
             }
 
+            if ($beforeFrom) {
+                $opening += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
+
+                continue;
+            }
+
+            $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
             $unitCost = match ($method) {
-                'Average' => $runningQty > 0 ? $runningCost / $runningQty : ($item->cost ?? 0),
+                'Average' => $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0),
                 'Maximum Cost' => $maxCost ?? $item->cost ?? 0,
-                default => $item->cost ?? 0,
+                default => $saldo > 0 ? $fifoValue / $saldo : ($item->cost ?? 0),
             };
 
             $rows[] = [
@@ -138,6 +154,7 @@ class StockController extends Controller
                 'saldo' => $saldo,
                 'unit' => $item->unit?->name,
                 'unit_cost' => $movement->unit_cost,
+                'method_cost' => round($unitCost, 2),
                 'nilai' => round($saldo * $unitCost, 2),
                 'pic' => $movement->pic,
                 'note' => $movement->note,

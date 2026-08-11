@@ -3,6 +3,12 @@
 
 export type ValuationMethod = "FIFO" | "Average" | "Maximum Cost";
 
+export const valuationMethodLabels: Record<ValuationMethod, string> = {
+  FIFO: "FIFO",
+  Average: "Average",
+  "Maximum Cost": "Estimasi Maksimum",
+};
+
 export type StockRowApi = {
   id: string;
   item_id: number;
@@ -34,6 +40,7 @@ export type StockCardRowApi = {
   saldo: number;
   unit: string | null;
   unit_cost: number;
+  method_cost: number;
   nilai: number;
   pic: string;
   note: string;

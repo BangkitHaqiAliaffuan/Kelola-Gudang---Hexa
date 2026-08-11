@@ -2,8 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\Rack;
+use App\Models\StockMovement;
+use App\Models\Warehouse;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -115,8 +120,141 @@ class StockApiTest extends TestCase
 
             foreach ($data['rows'] as $row) {
                 $this->assertGreaterThanOrEqual(0, $row['nilai']);
+                $this->assertGreaterThanOrEqual(0, $row['method_cost']);
             }
         }
+    }
+
+    public function test_stock_card_valuation_methods(): void
+    {
+        $item = Item::factory()->create([
+            'sku' => 'SKU-TEST-001',
+            'barcode' => '8990000000001',
+            'internal_barcode' => 'IB-401',
+            'cost' => 0,
+        ]);
+        $warehouse = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $warehouse->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        ItemStock::updateOrInsert(
+            ['item_id' => $item->id, 'warehouse_id' => $warehouse->id, 'bin_id' => $bin->id],
+            ['stock' => 250, 'reserved' => 0, 'unit_cost_avg' => 2100, 'updated_at' => now()]
+        );
+
+        $base = CarbonImmutable::parse('2026-08-01 08:00:00');
+        $movements = [
+            ['IN', 100, 1000, 'Penerimaan', 'BM/2026/00001', $base],
+            ['IN', 100, 2000, 'Penerimaan', 'BM/2026/00002', $base->addMinutes(10)],
+            ['OUT', 50, 1500, 'Pengeluaran', 'BK/2026/00001', $base->addMinutes(20)],
+            ['IN', 100, 3000, 'Penerimaan', 'BM/2026/00003', $base->addMinutes(30)],
+        ];
+
+        foreach ($movements as [$direction, $qty, $cost, $type, $no, $when]) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'warehouse_id' => $warehouse->id,
+                'rack_id' => $rack->id,
+                'bin_id' => $bin->id,
+                'direction' => $direction,
+                'qty' => $qty,
+                'movement_type' => $type,
+                'reference_no' => $no,
+                'partner' => 'Test',
+                'unit_cost' => $cost,
+                'pic' => 'Test',
+                'note' => 'Test',
+                'occurred_at' => $when,
+            ]);
+        }
+
+        // FIFO — layers peeled oldest-first; ending value = remaining layers.
+        $fifo = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&method=FIFO')
+            ->assertOk()
+            ->json('data');
+        $this->assertSame(0, $fifo['saldo_awal']);
+        $this->assertSame(250, $fifo['saldo_akhir']);
+        $this->assertCount(4, $fifo['rows']);
+        $this->assertEqualsWithDelta(100000.0, $fifo['rows'][0]['nilai'], 0.01); // 100 @ 1000
+        $this->assertEqualsWithDelta(300000.0, $fifo['rows'][1]['nilai'], 0.01); // 200 @ 1500
+        $this->assertEqualsWithDelta(250000.0, $fifo['rows'][2]['nilai'], 0.01); // 50@1000 + 100@2000
+        $this->assertEqualsWithDelta(550000.0, $fifo['rows'][3]['nilai'], 0.01); // + 100@3000
+        $this->assertEqualsWithDelta(1666.67, $fifo['rows'][2]['method_cost'], 0.01);
+        $this->assertEqualsWithDelta(2200.0, $fifo['rows'][3]['method_cost'], 0.01);
+
+        // Moving average (perpetual) — avg re-computed per purchase, unchanged on OUT.
+        $avg = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&method='.urlencode('Average'))
+            ->assertOk()
+            ->json('data');
+        $this->assertEqualsWithDelta(1000.0, $avg['rows'][0]['method_cost'], 0.01);
+        $this->assertEqualsWithDelta(1500.0, $avg['rows'][1]['method_cost'], 0.01);
+        $this->assertEqualsWithDelta(1500.0, $avg['rows'][2]['method_cost'], 0.01); // OUT doesn't change avg
+        $this->assertEqualsWithDelta(2100.0, $avg['rows'][3]['method_cost'], 0.01); // (225000+300000)/250
+        $this->assertEqualsWithDelta(525000.0, $avg['rows'][3]['nilai'], 0.01);
+
+        // Maximum Cost — max purchase cost × saldo.
+        $max = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&method='.urlencode('Maximum Cost'))
+            ->assertOk()
+            ->json('data');
+        $this->assertEqualsWithDelta(3000.0, $max['rows'][3]['method_cost'], 0.01);
+        $this->assertEqualsWithDelta(750000.0, $max['rows'][3]['nilai'], 0.01);
+    }
+
+    public function test_stock_card_valuation_carries_across_from_boundary(): void
+    {
+        $item = Item::factory()->create([
+            'sku' => 'SKU-TEST-002',
+            'barcode' => '8990000000002',
+            'internal_barcode' => 'IB-402',
+            'cost' => 0,
+        ]);
+        $warehouse = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $warehouse->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $base = CarbonImmutable::parse('2026-08-01 08:00:00');
+        $movements = [
+            ['IN', 100, 1000, 'Penerimaan', 'BM/2026/00001', $base],
+            ['IN', 100, 2000, 'Penerimaan', 'BM/2026/00002', $base->addMinutes(10)],
+            ['OUT', 50, 1500, 'Pengeluaran', 'BK/2026/00001', $base->addMinutes(20)],
+            ['IN', 100, 3000, 'Penerimaan', 'BM/2026/00003', $base->addMinutes(30)],
+        ];
+
+        foreach ($movements as [$direction, $qty, $cost, $type, $no, $when]) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'warehouse_id' => $warehouse->id,
+                'rack_id' => $rack->id,
+                'bin_id' => $bin->id,
+                'direction' => $direction,
+                'qty' => $qty,
+                'movement_type' => $type,
+                'reference_no' => $no,
+                'partner' => 'Test',
+                'unit_cost' => $cost,
+                'pic' => 'Test',
+                'note' => 'Test',
+                'occurred_at' => $when,
+            ]);
+        }
+
+        // `from` after the OUT — opening layers (50@1000, 100@2000) must carry in.
+        $from = urlencode($movements[2][5]->addMinutes(1)->toIso8601String());
+
+        $fifo = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&from='.$from.'&method=FIFO')
+            ->assertOk()
+            ->json('data');
+        $this->assertSame(150, $fifo['saldo_awal']);
+        $this->assertSame(250, $fifo['saldo_akhir']);
+        $this->assertCount(1, $fifo['rows']);
+        $this->assertEqualsWithDelta(550000.0, $fifo['rows'][0]['nilai'], 0.01);
+
+        $avg = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&from='.$from.'&method='.urlencode('Average'))
+            ->assertOk()
+            ->json('data');
+        $this->assertSame(150, $avg['saldo_awal']);
+        $this->assertEqualsWithDelta(2100.0, $avg['rows'][0]['method_cost'], 0.01);
+        $this->assertEqualsWithDelta(525000.0, $avg['rows'][0]['nilai'], 0.01);
     }
 
     public function test_stock_card_requires_valid_item(): void
