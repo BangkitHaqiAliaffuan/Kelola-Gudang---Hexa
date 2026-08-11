@@ -11,6 +11,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StockDocumentController;
 use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UnitController;
@@ -20,7 +21,7 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WorkOrderController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('auth')->middleware('web')->group(function () {
+Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
     Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
@@ -48,7 +49,11 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('items', ItemController::class);
 });
 
-Route::prefix('persediaan')->group(function () {
+Route::prefix('persediaan')->middleware('auth:sanctum')->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-card', [StockController::class, 'stockCard']);
+    Route::get('stock-documents', [StockDocumentController::class, 'index']);
+    Route::get('stock-documents/{stockDocument}', [StockDocumentController::class, 'show']);
+    Route::post('stock-documents/{stockDocument}/post', [StockDocumentController::class, 'post']);
+    Route::post('stock-documents/{stockDocument}/cancel', [StockDocumentController::class, 'cancel']);
 });

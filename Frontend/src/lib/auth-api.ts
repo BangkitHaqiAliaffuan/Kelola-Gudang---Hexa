@@ -22,9 +22,13 @@ type AuthResponse = {
   access: RoleAccessEntry[];
 };
 
+type LoginResponse = AuthResponse & {
+  token: string;
+};
+
 export const authApi = {
   me: () => api.get<AuthResponse>("/auth/me"),
   login: (email: string, password: string) =>
-    api.post<AuthResponse>("/auth/login", { email, password }),
+    api.post<LoginResponse>("/auth/login", { email, password }),
   logout: () => api.post<{ message: string }>("/auth/logout", {}),
 };

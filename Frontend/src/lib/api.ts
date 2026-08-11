@@ -1,8 +1,5 @@
 const API_BASE = (import.meta.env["VITE_API_URL"] as string | undefined) ?? "/api";
 
-// Sanctum SPA: the CSRF cookie endpoint lives on the app origin (not under /api).
-const CSRF_URL = `${API_BASE.replace(/\/api$/, "")}/sanctum/csrf-cookie`;
-
 export type Paginated<T> = {
   data: T[];
   links?: {
@@ -33,6 +30,22 @@ export class ApiError extends Error {
   }
 }
 
+/** Bearer token for the Sanctum API (issued on login, stored in localStorage). */
+const TOKEN_STORAGE_KEY = "kg-token";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  if (typeof window !== "undefined") window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  if (typeof window !== "undefined") window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -42,36 +55,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Send always — even same-origin calls travel through the Vercel rewrite and must reach ngrok intact.
   headers["ngrok-skip-browser-warning"] = "true";
 
-  // Sanctum SPA: every state-changing request needs the XSRF token (from the XSRF-TOKEN cookie).
-  const method = (init?.method ?? "GET").toUpperCase();
-  if (method !== "GET" && method !== "HEAD") {
-    const xsrf = readCookie("XSRF-TOKEN");
-    if (xsrf) headers["X-XSRF-TOKEN"] = xsrf;
-  }
+  const token = getAuthToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: "include" });
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   } catch {
     throw new ApiError(
       0,
       "Tidak dapat terhubung ke server backend. Pastikan Laravel berjalan (composer dev).",
     );
-  }
-
-  // 419 = CSRF token mismatch (e.g. token expired). Refresh the cookie once and retry.
-  if (res.status === 419 && method !== "GET" && method !== "HEAD") {
-    await fetchCsrfCookie();
-    const xsrf = readCookie("XSRF-TOKEN");
-    if (xsrf) headers["X-XSRF-TOKEN"] = xsrf;
-    try {
-      res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: "include" });
-    } catch {
-      throw new ApiError(
-        0,
-        "Tidak dapat terhubung ke server backend. Pastikan Laravel berjalan (composer dev).",
-      );
-    }
   }
 
   if (!res.ok) {
@@ -109,21 +103,4 @@ export function fieldError(err: unknown, field: string): string | undefined {
 
 export function isApiError(err: unknown): err is ApiError {
   return err instanceof ApiError;
-}
-
-/** Read a browser cookie, URL-decoding the value (Laravel encodes the XSRF token). */
-function readCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]!) : undefined;
-}
-
-/** Fetch the Sanctum CSRF cookie so the next state-changing request carries a fresh X-XSRF-TOKEN. */
-export async function fetchCsrfCookie(): Promise<void> {
-  if (typeof document === "undefined") return;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  // Same ngrok free-tier bypass as request() — the interstitial otherwise swallows
-  // this endpoint with an HTML page that has no CORS headers.
-  headers["ngrok-skip-browser-warning"] = "true";
-  await fetch(CSRF_URL, { credentials: "include", headers });
 }

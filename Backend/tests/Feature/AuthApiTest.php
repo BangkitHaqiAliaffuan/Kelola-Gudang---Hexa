@@ -5,20 +5,14 @@ namespace Tests\Feature;
 use App\Models\RolePermission;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
-use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->withoutMiddleware(PreventRequestForgery::class);
-    }
 
     public function test_login_success_returns_user_and_access(): void
     {
@@ -34,6 +28,7 @@ class AuthApiTest extends TestCase
             'password' => 'IndomieGoreng',
         ])
             ->assertOk()
+            ->assertJsonStructure(['data', 'access', 'token'])
             ->assertJsonPath('data.email', 'rudi@kelolagudang.id')
             ->assertJsonPath('data.role', 'Administrator')
             ->assertJsonPath('access.0.module', 'Master Data');
@@ -119,11 +114,25 @@ class AuthApiTest extends TestCase
     public function test_logout_succeeds_when_authenticated(): void
     {
         $user = User::factory()->create();
+        $token = $user->createToken('test')->plainTextToken;
 
-        $this->actingAs($user, 'sanctum')
+        $this->withToken($token)
             ->postJson('/api/auth/logout')
             ->assertOk()
             ->assertJsonPath('message', 'Berhasil keluar.');
+    }
+
+    public function test_logout_revokes_token(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->postJson('/api/auth/logout')->assertOk();
+
+        // Guard mem-memoize user antar request dalam satu test; reset agar dibaca ulang dari DB.
+        Auth::forgetGuards();
+
+        $this->withToken($token)->getJson('/api/auth/me')->assertUnauthorized();
     }
 
     public function test_master_routes_require_authentication(): void

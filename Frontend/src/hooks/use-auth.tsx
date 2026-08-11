@@ -1,41 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { authApi, type AuthSession } from "@/lib/auth-api";
-import { fetchCsrfCookie, isApiError } from "@/lib/api";
+import { clearAuthToken, getAuthToken, isApiError, setAuthToken } from "@/lib/api";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
-
-/** Client-side marker that the user has logged in on this browser. */
-const AUTH_STORAGE_KEY = "kg-auth";
-
-type StoredUser = {
-  email: string | null;
-  name: string;
-  role: string;
-};
-
-function readStoredUser(): StoredUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredUser(user: { email: string | null; name: string; role: string }): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(
-    AUTH_STORAGE_KEY,
-    JSON.stringify({ email: user.email, name: user.name, role: user.role } satisfies StoredUser),
-  );
-}
-
-function clearStoredUser(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(AUTH_STORAGE_KEY);
-}
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -57,15 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     let cancelled = false;
 
-    // No localStorage login marker → no session in this browser; go straight to login.
-    if (!readStoredUser()) {
+    // No stored token → no session in this browser; go straight to login.
+    if (!getAuthToken()) {
       setStatus("unauthenticated");
       return;
     }
 
     (async () => {
       try {
-        await fetchCsrfCookie();
         const me = await authApi.me();
         if (!cancelled) {
           setSession({ user: me.data, access: me.access });
@@ -73,8 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         if (!cancelled) {
-          // Session really invalid (401) → drop the marker so next visit lands on login.
-          if (isApiError(err) && err.status === 401) clearStoredUser();
+          // Token really invalid (401) → drop it so next visit lands on login.
+          if (isApiError(err) && err.status === 401) clearAuthToken();
           setStatus("unauthenticated");
         }
       }
@@ -86,9 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await fetchCsrfCookie();
     const next = await authApi.login(email, password);
-    writeStoredUser(next.data);
+    setAuthToken(next.token);
     setSession({ user: next.data, access: next.access });
     setStatus("authenticated");
   };
@@ -97,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
-      clearStoredUser();
+      clearAuthToken();
       setSession(null);
       setStatus("unauthenticated");
     }
@@ -114,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status !== "authenticated" ||
         session!.access.some((a) => a.module === module || a.module === "Semua Modul"),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [status, session],
   );
 

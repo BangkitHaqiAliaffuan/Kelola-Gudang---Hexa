@@ -8,15 +8,16 @@ return [
     |--------------------------------------------------------------------------
     |
     | `HandleCors` runs in the default global middleware stack, but only sends
-    | headers when this file configures matching paths. Needed so the Vercel
-    | production frontend can call the local backend through the ngrok tunnel
-    | (see `dev.sh`) — a cross-origin fetch. Cookie-based auth needs
-    | `supports_credentials` and explicit origins (cannot be `*` with
-    | credentials), driven by `FRONTEND_URL` (comma-separated).
+    | headers when this file configures matching paths. Kept for any direct
+    | cross-origin access to the API (e.g. tooling hitting the ngrok tunnel).
+    | The SPA now calls the backend same-origin through the Vercel rewrite
+    | (Frontend/vercel.json), and auth is bearer-token based, so CORS is not
+    | engaged for normal browser traffic. Origins come from `FRONTEND_URL`
+    | (comma-separated).
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*'],
 
     'allowed_methods' => ['*'],
 

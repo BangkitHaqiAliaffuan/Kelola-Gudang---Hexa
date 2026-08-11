@@ -7,7 +7,6 @@ use App\Models\RolePermission;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -34,20 +33,18 @@ class AuthController extends Controller
             ]);
         }
 
-        Auth::login($user);
-        $request->session()->regenerate();
+        $token = $user->createToken('kg-session')->plainTextToken;
 
         return response()->json([
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
+            'token' => $token,
         ]);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Berhasil keluar.']);
     }
