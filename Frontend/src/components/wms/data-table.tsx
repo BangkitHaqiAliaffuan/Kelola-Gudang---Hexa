@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { EmptyState, TableSkeleton } from "./kit";
@@ -9,8 +9,20 @@ export type Column<T> = {
   label: string;
   className?: string;
   sticky?: "left" | "right";
+  sortable?: boolean;
   render: (row: T) => ReactNode;
 };
+
+type SortState = { key: string; dir: "asc" | "desc" };
+
+function sortValue(row: unknown, key: string): unknown {
+  return (row as Record<string, unknown>)[key];
+}
+
+function compare(a: unknown, b: unknown): number {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a ?? "").localeCompare(String(b ?? ""), "id");
+}
 
 export function DataTable<T extends { id: string | number }>({
   columns,
@@ -28,9 +40,37 @@ export function DataTable<T extends { id: string | number }>({
   onRowClick?: (row: T) => void;
 }) {
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState | null>(null);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
-  const slice = rows.slice((current - 1) * pageSize, current * pageSize);
+  const sorted = useMemo(() => {
+    if (!sort) return rows;
+    const { key, dir } = sort;
+    return [...rows].sort((a, b) => {
+      const cmp = compare(sortValue(a, key), sortValue(b, key));
+      return dir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sort]);
+  const slice = sorted.slice((current - 1) * pageSize, current * pageSize);
+
+  const toggleSort = (key: string) => {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+    setPage(1);
+  };
+
+  const SortIcon = ({ colKey }: { colKey: string }) => {
+    const active = sort?.key === colKey;
+    if (!active) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground opacity-60" />;
+    return sort.dir === "asc" ? (
+      <ArrowUp className="h-3.5 w-3.5 text-primary" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 text-primary" />
+    );
+  };
 
   if (loading) return <TableSkeleton rows={pageSize} cols={Math.min(columns.length, 6)} />;
   if (!rows.length)
@@ -57,7 +97,19 @@ export function DataTable<T extends { id: string | number }>({
                     c.className,
                   )}
                 >
-                  {c.label}
+                  {c.sortable ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(c.key)}
+                      className="inline-flex items-center gap-1.5 select-none"
+                      aria-label={`Urutkan berdasarkan ${c.label}`}
+                    >
+                      {c.label}
+                      <SortIcon colKey={c.key} />
+                    </button>
+                  ) : (
+                    c.label
+                  )}
                 </th>
               ))}
             </tr>

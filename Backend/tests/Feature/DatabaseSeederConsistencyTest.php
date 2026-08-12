@@ -8,6 +8,8 @@ use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\Project;
 use App\Models\Rack;
+use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\Vendor;
@@ -35,6 +37,7 @@ class DatabaseSeederConsistencyTest extends TestCase
         $this->assertRackNamesFollowCode();
         $this->assertItemStockReconciles();
         $this->assertStockLedgerConsistent();
+        $this->assertStockDocumentsConsistent();
         $this->assertWorkOrdersConsistent();
         $this->assertHeadPicsResolve();
     }
@@ -141,20 +144,20 @@ class DatabaseSeederConsistencyTest extends TestCase
 
     private function assertItemStockReconciles(): void
     {
-        $this->assertSame(0, ItemStock::whereColumn('reserved', '>', 'stock')->count());
+        $this->assertSame(0, ItemStock::whereColumn('reserved', '>', 'stock')->count(), 'itemstock reserved > stock');
 
         $stockMismatch = Item::query()
             ->whereRaw('items.stock <> COALESCE((SELECT SUM(stock) FROM item_stock WHERE item_stock.item_id = items.id), 0)')
             ->count();
-        $this->assertSame(0, $stockMismatch);
+        $this->assertSame(0, $stockMismatch, 'items.stock mismatch');
 
         $reservedMismatch = Item::query()
             ->whereRaw('items.reserved <> COALESCE((SELECT SUM(reserved) FROM item_stock WHERE item_stock.item_id = items.id), 0)')
             ->count();
-        $this->assertSame(0, $reservedMismatch);
+        $this->assertSame(0, $reservedMismatch, 'items.reserved mismatch');
 
-        $this->assertSame(0, Item::doesntHave('itemStocks')->count());
-        $this->assertSame(Item::count(), ItemStock::distinct()->count('item_id'));
+        $this->assertSame(0, Item::doesntHave('itemStocks')->count(), 'items without item_stock');
+        $this->assertSame(Item::count(), ItemStock::distinct()->count('item_id'), 'item_stock per item');
     }
 
     private function assertStockLedgerConsistent(): void
@@ -181,6 +184,31 @@ class DatabaseSeederConsistencyTest extends TestCase
             $this->assertSame($ledgerStock, $balance, "item_stock != saldo akhir ledger untuk item {$item->id}.");
             $this->assertSame($item->stock, $balance, "items.stock != saldo akhir ledger untuk item {$item->id}.");
         }
+    }
+
+    private function assertStockDocumentsConsistent(): void
+    {
+        $this->assertSame(0, StockDocument::whereNull('posted_at')->where('status', 'Selesai')->count());
+        $this->assertSame(0, StockDocument::whereNotNull('posted_at')->where('status', '!=', 'Selesai')->count());
+        $this->assertSame(0, StockDocument::whereNotIn('type', StockDocument::TYPES)->count());
+        $this->assertSame(0, StockDocument::whereNotIn('status', StockDocument::STATUSES)->count());
+        $this->assertSame(0, StockDocument::doesntHave('lines')->count());
+
+        // Setiap mutasi di ledger bersumber dari dokumen.
+        $this->assertSame(0, StockMovement::whereNull('stock_document_id')->count());
+
+        // Transfer Gudang memproduksi sepasang OUT/IN per baris dokumen yang diposting.
+        $postedTransferLines = StockDocumentLine::whereHas('document', fn ($q) => $q
+            ->where('type', 'Transfer Gudang')
+            ->where('status', 'Selesai'))->count();
+        $this->assertSame(
+            $postedTransferLines * 2,
+            StockMovement::where('movement_type', 'Transfer Gudang')->count()
+        );
+        $this->assertSame(
+            0,
+            StockMovement::where('movement_type', 'Transfer Gudang')->whereNull('pair_id')->count()
+        );
     }
 
     private function assertWorkOrdersConsistent(): void

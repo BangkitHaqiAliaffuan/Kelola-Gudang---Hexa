@@ -1,0 +1,227 @@
+import { Printer } from "lucide-react";
+import { toast } from "sonner";
+import { Pill, type Tone } from "./kit";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import type {
+  StockDocumentApi,
+  StockDocumentLineApi,
+  StockDocumentStatus,
+} from "@/lib/persediaan-types";
+
+const statusTone = (s: StockDocumentStatus): Tone =>
+  s === "Selesai"
+    ? "success"
+    : s === "Draft"
+      ? "neutral"
+      : s === "Dibatalkan"
+        ? "danger"
+        : "warning";
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border px-3 py-2">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="truncate text-sm font-semibold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function lineQty(line: StockDocumentLineApi): string {
+  if (line.system_qty != null && line.actual_qty != null) {
+    const variance = line.variance ?? 0;
+    const sign = variance > 0 ? "+" : variance < 0 ? "−" : "";
+    return `${formatNumber(line.actual_qty)} ${line.unit ?? ""} (${sign}${formatNumber(Math.abs(variance))})`;
+  }
+  return `${formatNumber(line.qty ?? 0)} ${line.unit ?? ""}`;
+}
+
+/**
+ * Nilai rupiah satu baris. Baris Stock Opname tidak punya qty tunggal — mutasinya
+ * adalah selisih stok fisik vs sistem (variance), konsisten dengan StockDocumentLine::moveQty().
+ */
+function lineValue(line: StockDocumentLineApi): number {
+  return Math.abs(line.variance ?? line.qty ?? 0) * line.unit_cost;
+}
+
+function isOpnameLine(line: StockDocumentLineApi): boolean {
+  return line.system_qty != null && line.actual_qty != null;
+}
+
+function varianceSign(variance: number): string {
+  return variance > 0 ? "+" : variance < 0 ? "−" : "";
+}
+
+/** Sel Qty tabel: Stock Opname ditampilkan colok Sistem/Fisik/Selisih. */
+function LineQtyCells({ line, opname }: { line: StockDocumentLineApi; opname: boolean }) {
+  if (!opname) {
+    return <td className="whitespace-nowrap px-3 py-2 text-right">{lineQty(line)}</td>;
+  }
+
+  const variance = line.variance ?? 0;
+  const tone = variance > 0 ? "text-success" : variance < 0 ? "text-destructive" : "text-success";
+
+  return (
+    <>
+      <td className="whitespace-nowrap px-3 py-2 text-right">
+        {formatNumber(line.system_qty ?? 0)} {line.unit ?? ""}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-right">
+        {formatNumber(line.actual_qty ?? 0)} {line.unit ?? ""}
+      </td>
+      <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${tone}`}>
+        {variance === 0 ? "Netral" : `${varianceSign(variance)}${formatNumber(Math.abs(variance))}`}
+      </td>
+    </>
+  );
+}
+
+export function StockDocumentSheet({
+  doc,
+  onOpenChange,
+}: {
+  doc: StockDocumentApi | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const lines = doc?.lines ?? [];
+  const isOpname = lines.length > 0 && lines.every(isOpnameLine);
+
+  return (
+    <Sheet open={!!doc} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
+      >
+        {doc && (
+          <>
+            <SheetHeader className="border-b border-border px-5 py-4 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <SheetTitle className="font-mono text-base">{doc.no}</SheetTitle>
+                <Pill tone={statusTone(doc.status)}>{doc.status}</Pill>
+              </div>
+              <SheetDescription>
+                {doc.type} · {formatDate(doc.document_date)} · PIC {doc.pic ?? "—"}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <Field label="Jenis Dokumen" value={doc.type} />
+                <Field label="Tanggal" value={formatDate(doc.document_date)} />
+                <Field label="Gudang" value={doc.warehouse ?? "—"} />
+                <Field
+                  label={doc.destination ? "Gudang Tujuan" : "Partner / Tujuan"}
+                  value={doc.destination ?? doc.partner ?? "—"}
+                />
+                <Field label="Referensi" value={doc.reference_no ?? "—"} />
+                <Field label="Dibuat oleh" value={doc.created_by ?? doc.pic ?? "—"} />
+              </div>
+
+              <div className="rounded-xl border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <p className="text-sm font-semibold">Daftar Barang</p>
+                </div>
+                <div className="hidden overflow-x-auto sm:block">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-xs text-muted-foreground">
+                        {(isOpname
+                          ? [
+                              "Barang",
+                              "SKU",
+                              "Sistem",
+                              "Fisik",
+                              "Selisih",
+                              "Bin",
+                              "Harga",
+                              "Subtotal",
+                            ]
+                          : ["Barang", "SKU", "Qty", "Bin", "Harga", "Subtotal"]
+                        ).map((h) => (
+                          <th
+                            key={h}
+                            className="whitespace-nowrap px-3 py-2 text-left font-semibold"
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.map((l) => (
+                        <tr key={l.id} className="border-b border-border/60 last:border-0">
+                          <td className="max-w-[240px] truncate px-3 py-2">{l.name ?? "—"}</td>
+                          <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
+                            {l.sku ?? "—"}
+                          </td>
+                          <LineQtyCells line={l} opname={isOpname} />
+                          <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
+                            {l.to_bin ? `${l.from_bin ?? "—"} → ${l.to_bin}` : (l.from_bin ?? "—")}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right">
+                            {formatIDR(l.unit_cost)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                            {formatIDR(lineValue(l))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="space-y-2 p-3 sm:hidden">
+                  {lines.map((l) => (
+                    <div key={l.id} className="rounded-lg border border-border p-2.5">
+                      <p className="text-sm font-medium">{l.name ?? "—"}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{l.sku ?? "—"}</p>
+                      <div className="mt-1 flex justify-between text-xs">
+                        <span>
+                          {isOpname
+                            ? `Sistem ${formatNumber(l.system_qty ?? 0)} · Fisik ${formatNumber(l.actual_qty ?? 0)} (${varianceSign(l.variance ?? 0)}${formatNumber(Math.abs(l.variance ?? 0))})`
+                            : lineQty(l)}
+                        </span>
+                        <b>{formatIDR(lineValue(l))}</b>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
+                  <span className="font-medium">Jumlah Baris</span>
+                  <span className="text-right font-semibold">{lines.length}</span>
+                  <span className="font-medium">Total Nilai</span>
+                  <span className="text-right text-base font-bold">
+                    {formatIDR(lines.reduce((sum, l) => sum + lineValue(l), 0))}
+                  </span>
+                </div>
+              </div>
+
+              {doc.note && (
+                <div className="rounded-xl border border-border px-4 py-3">
+                  <p className="text-xs font-semibold text-muted-foreground">Catatan</p>
+                  <p className="mt-1 text-sm">{doc.note}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-card px-5 py-3">
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => toast.success("Dokumen dikirim ke printer")}
+              >
+                <Printer className="h-4 w-4" /> Cetak
+              </Button>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

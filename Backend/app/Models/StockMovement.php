@@ -25,6 +25,9 @@ class StockMovement extends Model
         'note',
         'occurred_at',
         'created_by',
+        'stock_document_id',
+        'line_no',
+        'pair_id',
     ];
 
     protected $casts = [
@@ -56,5 +59,15 @@ class StockMovement extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function stockDocument(): BelongsTo
+    {
+        return $this->belongsTo(StockDocument::class, 'stock_document_id');
+    }
+
+    public function pair(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'pair_id');
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\StockMinimumResource;
 use App\Http\Resources\StockRowResource;
 use App\Models\Item;
 use App\Models\ItemStock;
@@ -59,6 +60,90 @@ class StockController extends Controller
             ->paginate($request->integer('per_page', 20));
 
         return StockRowResource::collection($rows);
+    }
+
+    /**
+     * Stock Minimum — per-item shortfall report. One row per item (stock summed
+     * across locations), with average daily demand (only real consumption:
+     * movement_type 'Pengeluaran'), days of cover, and a suggested reorder qty.
+     */
+    public function stockMinimum(Request $request)
+    {
+        $data = $request->validate([
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'days' => ['nullable', 'integer', Rule::in([14, 30, 60, 90])],
+        ]);
+
+        $days = (int) ($data['days'] ?? 30);
+        $cutoff = now()->subDays($days);
+        $warehouseId = $data['warehouse_id'] ?? null;
+
+        $query = Item::query()
+            ->select('items.*')
+            ->with(['category', 'supplier', 'unit'])
+            ->when($data['category_id'] ?? null, fn ($q, $categoryId) => $q->where('items.category_id', $categoryId));
+
+        if ($needle = strtolower((string) ($data['search'] ?? ''))) {
+            $query->where(function ($q) use ($needle) {
+                $q->whereRaw('LOWER(items.name) LIKE ?', ["%{$needle}%"])
+                    ->orWhereRaw('LOWER(items.sku) LIKE ?', ["%{$needle}%"]);
+            });
+        }
+
+        $stockScope = ItemStock::query()->whereColumn('item_id', 'items.id');
+        if ($warehouseId !== null) {
+            $stockScope->where('warehouse_id', $warehouseId);
+        }
+
+        $query->addSelect([
+            'total_stock' => (clone $stockScope)->selectRaw('COALESCE(SUM(stock), 0)'),
+            'total_reserved' => (clone $stockScope)->selectRaw('COALESCE(SUM(reserved), 0)'),
+        ]);
+
+        $usageByItem = StockMovement::query()
+            ->selectRaw('item_id, SUM(qty) AS used')
+            ->where('direction', 'OUT')
+            ->where('movement_type', 'Pengeluaran')
+            ->where('occurred_at', '>=', $cutoff)
+            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->groupBy('item_id')
+            ->pluck('used', 'item_id');
+
+        $rows = $query->orderBy('items.name')->paginate($request->integer('per_page', 20));
+
+        $rows->getCollection()->transform(function (Item $item) use ($usageByItem, $days) {
+            $totalStock = (int) ($item->total_stock ?? 0);
+            $reserved = (int) ($item->total_reserved ?? 0);
+            $available = max(0, $totalStock - $reserved);
+            $min = $item->min_stock;
+            $max = $item->max_stock;
+            $leadTime = $item->lead_time;
+
+            $adu = $days > 0 ? ((int) ($usageByItem[$item->id] ?? 0)) / $days : 0.0;
+
+            $suggested = $max !== null
+                ? max(0, $max - $available)
+                : max(0, (int) ceil($adu * $leadTime + $min - $available));
+
+            $status = match (true) {
+                $totalStock <= 0 => 'Habis',
+                $min > 0 && $available <= 0 => 'Kritis',
+                $min > 0 && $available <= $min => 'Menipis',
+                default => 'Normal',
+            };
+
+            $item->available = $available;
+            $item->avg_daily_usage = round($adu, 2);
+            $item->days_of_cover = $adu > 0 && $totalStock > 0 ? round($totalStock / $adu, 1) : null;
+            $item->suggested_qty = $suggested;
+            $item->status = $status;
+
+            return $item;
+        });
+
+        return StockMinimumResource::collection($rows);
     }
 
     /**

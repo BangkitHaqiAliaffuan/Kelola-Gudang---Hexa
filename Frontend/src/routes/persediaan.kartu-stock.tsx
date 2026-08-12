@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Boxes, Printer, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Boxes, Printer, Search, Wallet } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -10,18 +10,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
+import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { FormCombobox } from "@/components/wms/form-combobox";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems } from "@/hooks/use-master";
 import { useStockCard } from "@/hooks/use-persediaan";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
@@ -45,7 +41,7 @@ export const Route = createFileRoute("/persediaan/kartu-stock")({
 
 function KartuStock() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
-  const options = useMemo(() => (itemsData?.data ?? []).slice(0, 40), [itemsData]);
+  const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [detail, setDetail] = useState<Trx | null>(null);
@@ -72,6 +68,36 @@ function KartuStock() {
   const totalKeluar = rows.reduce((a, r) => a + r.keluar, 0);
 
   const tableRows = useMemo(() => rows.map((r, i) => ({ ...r, id: `${r.no}-${i}` })), [rows]);
+
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
+  const [jenis, setJenis] = useState(ALL);
+  const [pic, setPic] = useState(ALL);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
+  const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
+
+  const filteredRows = useMemo(
+    () =>
+      tableRows.filter((r) => {
+        if (
+          debouncedQ &&
+          !`${r.no} ${r.reference} ${r.note} ${r.pic} ${r.partner}`
+            .toLowerCase()
+            .includes(debouncedQ.toLowerCase())
+        )
+          return false;
+        if (jenis !== ALL && r.type !== jenis) return false;
+        if (pic !== ALL && r.pic !== pic) return false;
+        const d = r.date.slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      }),
+    [tableRows, debouncedQ, jenis, pic, dateFrom, dateTo],
+  );
 
   const chart = useMemo(
     () =>
@@ -112,12 +138,14 @@ function KartuStock() {
       key: "date",
       label: "Tanggal",
       className: "whitespace-nowrap",
+      sortable: true,
       render: (r) => formatDate(r.date),
     },
     {
       key: "no",
       label: "Nomor",
       className: "whitespace-nowrap",
+      sortable: true,
       render: (r) => (
         <button
           type="button"
@@ -132,42 +160,49 @@ function KartuStock() {
       key: "type",
       label: "Jenis",
       className: "min-w-[140px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <Pill tone={r.masuk ? "success" : "warning"}>{r.type}</Pill>,
     },
     {
       key: "unit",
       label: "Satuan",
       className: "w-[80px] whitespace-nowrap",
+      sortable: true,
       render: (r) => r.unit ?? "—",
     },
     {
       key: "masuk",
       label: "Masuk",
       className: "text-right w-[100px] whitespace-nowrap text-success",
+      sortable: true,
       render: (r) => (r.masuk ? `+${formatNumber(r.masuk)}` : "-"),
     },
     {
       key: "keluar",
       label: "Keluar",
       className: "text-right w-[100px] whitespace-nowrap text-destructive",
+      sortable: true,
       render: (r) => (r.keluar ? `-${formatNumber(r.keluar)}` : "-"),
     },
     {
       key: "saldo",
       label: "Saldo",
       className: "text-right w-[100px] whitespace-nowrap font-semibold",
+      sortable: true,
       render: (r) => `${formatNumber(r.saldo)} ${r.unit ?? ""}`,
     },
     {
       key: "nilai",
       label: `Nilai (${method})`,
       className: "text-right min-w-[130px] whitespace-nowrap",
+      sortable: true,
       render: (r) => formatIDR(r.nilai),
     },
     {
       key: "pic",
       label: "PIC",
       className: "min-w-[120px] whitespace-nowrap",
+      sortable: true,
       render: (r) => r.pic,
     },
     {
@@ -214,21 +249,18 @@ function KartuStock() {
       />
 
       <Panel title="Pilih Barang">
-        <Select
+        <FormCombobox
           value={activeId != null ? String(activeId) : ""}
           onValueChange={(v) => setId(Number(v))}
-        >
-          <SelectTrigger className="max-w-md rounded-xl">
-            <SelectValue placeholder="Pilih barang…" />
-          </SelectTrigger>
-          <SelectContent className="max-h-72 rounded-xl">
-            {options.map((o) => (
-              <SelectItem key={o.id} value={String(o.id)}>
-                {o.name} — {o.sku}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={options.map((o) => ({
+            value: String(o.id),
+            label: `${o.name} — ${o.sku}`,
+            keywords: `${o.name} ${o.sku} ${o.internal_barcode ?? ""}`.trim(),
+          }))}
+          placeholder="Pilih barang…"
+          searchPlaceholder="Cari nama atau SKU…"
+          className="max-w-md"
+        />
       </Panel>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -328,9 +360,48 @@ function KartuStock() {
         title={item?.name ?? "Memuat…"}
         description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit}`}
       >
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="relative xl:col-span-2">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari nomor, referensi, catatan, PIC…"
+              className="rounded-xl pl-9"
+            />
+          </div>
+          <FilterSelect
+            className="w-full"
+            value={jenis}
+            onChange={setJenis}
+            placeholder="Semua Jenis"
+            options={jenisOptions}
+          />
+          <FilterSelect
+            className="w-full"
+            value={pic}
+            onChange={setPic}
+            placeholder="Semua PIC"
+            options={picOptions}
+          />
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9 rounded-xl"
+            aria-label="Dari tanggal"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9 rounded-xl"
+            aria-label="Sampai tanggal"
+          />
+        </div>
         <DataTable
           columns={columns}
-          rows={tableRows}
+          rows={filteredRows}
           pageSize={10}
           loading={itemsLoading || card.isFetching}
           onRowClick={(r) => item && setDetail(toTrx(r, item))}

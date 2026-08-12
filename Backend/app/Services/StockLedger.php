@@ -79,23 +79,28 @@ class StockLedger
 
     /**
      * Distribute a total reserved quantity across an item's stock rows
-     * (weighted by current stock) and sync the item total.
+     * (weighted by current stock) and sync the item total. The item total is
+     * derived from the distributed per-bin amounts so items.reserved always
+     * reconciles with item_stock (floor rounding may shave a few units).
      */
     public function setReserved(int $itemId, int $reserved): void
     {
         $rows = ItemStock::where('item_id', $itemId)->get();
         $total = (int) $rows->sum('stock');
 
+        $allocations = [];
         foreach ($rows as $row) {
-            $rowReserved = $total > 0 ? (int) floor($reserved * $row->stock / $total) : 0;
-            ItemStock::where('item_id', $row->item_id)
-                ->where('warehouse_id', $row->warehouse_id)
-                ->where('bin_id', $row->bin_id)
-                ->update(['reserved' => $rowReserved]);
+            $allocations[$row->bin_id] = $total > 0 ? (int) floor($reserved * $row->stock / $total) : 0;
+        }
+
+        foreach ($allocations as $binId => $alloc) {
+            ItemStock::where('item_id', $itemId)
+                ->where('bin_id', $binId)
+                ->update(['reserved' => $alloc]);
         }
 
         Item::where('id', $itemId)->update([
-            'reserved' => min($reserved, (int) ItemStock::where('item_id', $itemId)->sum('stock')),
+            'reserved' => min(array_sum($allocations), $total),
         ]);
     }
 }
