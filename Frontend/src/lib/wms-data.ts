@@ -10,11 +10,18 @@ function mulberry32(a: number) {
   };
 }
 const rnd = mulberry32(20260731);
-const pick = <T,>(arr: T[]) => arr[Math.floor(rnd() * arr.length)]!;
+const pick = <T>(arr: T[]) => arr[Math.floor(rnd() * arr.length)]!;
 const int = (min: number, max: number) => Math.floor(rnd() * (max - min + 1)) + min;
 
-export const formatIDR = (n: number) =>
-  "Rp " + Math.round(n).toLocaleString("id-ID");
+export const formatIDR = (n: number) => "Rp " + Math.round(n).toLocaleString("id-ID");
+// Compact IDR for stat cards / KPI values: "Rp 725 M", "Rp 12,9 M", "Rp 850 rb".
+// Below 1 juta falls back to the full format so small amounts stay readable.
+const compactIDR = new Intl.NumberFormat("id-ID", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+export const formatIDRCompact = (n: number) =>
+  Math.abs(n) >= 1_000_000 ? "Rp " + compactIDR.format(n) : formatIDR(n);
 export const formatNumber = (n: number) => n.toLocaleString("id-ID");
 export const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("id-ID", {
@@ -176,14 +183,7 @@ export const customers = Array.from({ length: 40 }, (_, i) => ({
   segment: pick(["Retail", "Distributor", "Proyek", "Korporat"]),
 }));
 
-export const departments = [
-  "Produksi",
-  "Maintenance",
-  "Logistik",
-  "QC",
-  "Proyek",
-  "Umum",
-];
+export const departments = ["Produksi", "Maintenance", "Logistik", "QC", "Proyek", "Umum"];
 export const projects = [
   "Proyek Tol Cisumdawu",
   "Renovasi Line 3",
@@ -291,8 +291,7 @@ const prefixOf: Record<TrxType, string> = {
 };
 
 export const transactions: Trx[] = Array.from({ length: 2000 }, (_, i) => {
-  const type =
-    i % 3 === 0 ? "Barang Masuk" : i % 3 === 1 ? "Barang Keluar" : pick(trxTypes);
+  const type = i % 3 === 0 ? "Barang Masuk" : i % 3 === 1 ? "Barang Keluar" : pick(trxTypes);
   const d = new Date(2026, 6, 31);
   d.setDate(d.getDate() - int(0, 330));
   const lines = Array.from({ length: int(1, 5) }, () => {
@@ -419,9 +418,7 @@ export const opnameSessions = warehouses.slice(0, 5).map((w, i) => {
     diff: int(0, 24),
     pic: pick(pics),
     status: (i === 0 ? "Berjalan" : i === 1 ? "Berjalan" : i === 2 ? "Dijadwalkan" : "Selesai") as
-      | "Berjalan"
-      | "Dijadwalkan"
-      | "Selesai",
+      "Berjalan" | "Dijadwalkan" | "Selesai",
   };
 });
 

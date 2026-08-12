@@ -94,6 +94,37 @@ export type StockCardApi = {
   rows: StockCardRowApi[];
 };
 
+// ---- Nilai Persediaan (GET /api/persediaan/valuation) ----
+// One row per item: on-hand value under each valuation method (FIFO, Average,
+// Maximum Cost), folded from the movement ledger, plus movement recency.
+
+export const stockMovingTypes = ["Fast", "Medium", "Slow", "Dead"] as const;
+
+export type StockMoving = (typeof stockMovingTypes)[number];
+
+export type StockValuationApi = {
+  id: number;
+  item_id: number;
+  sku: string | null;
+  name: string | null;
+  unit: string | null;
+  category: string | null;
+  min: number | null;
+  max: number | null;
+  cost: number;
+  stock: number;
+  reserved: number;
+  available: number;
+  unit_cost_fifo: number;
+  unit_cost_avg: number;
+  unit_cost_max: number;
+  nilai_fifo: number;
+  nilai_avg: number;
+  nilai_max: number;
+  last_move_at: string | null;
+  moving: StockMoving;
+};
+
 // ---- Mutasi Stock (dokumen) ----
 
 export const stockDocumentTypes = [
@@ -129,10 +160,13 @@ export type StockDocumentLineApi = {
   system_qty: number | null;
   actual_qty: number | null;
   variance: number | null;
+  direction: "IN" | "OUT" | null;
   from_bin_id: number | null;
   from_bin: string | null;
+  from_rack: string | null;
   to_bin_id: number | null;
   to_bin: string | null;
+  to_rack: string | null;
   unit_cost: number;
   note: string | null;
 };

@@ -1,6 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, Search, TriangleAlert, PackageX, Truck } from "lucide-react";
+import {
+  Download,
+  Maximize2,
+  Minimize2,
+  Search,
+  TriangleAlert,
+  PackageX,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   ALL,
@@ -19,6 +27,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { cn } from "@/lib/utils";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockMinimumApi, StockMinimumStatus } from "@/lib/persediaan-types";
 
@@ -50,6 +59,8 @@ const DEFAULT_DAYS = 30;
 
 const severityOptions = ["Habis", "Kritis", "Menipis"] as const;
 
+const FS_HIDDEN_COLUMNS = new Set(["available", "lead"]);
+
 const statusTone: Record<StockMinimumStatus, Tone> = {
   Habis: "danger",
   Kritis: "danger",
@@ -72,6 +83,7 @@ function StockMinimum() {
   const [days, setDays] = useState(String(DEFAULT_DAYS));
   const [severity, setSeverity] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const { data: warehouses } = useWarehouses();
   const { data: cats } = useCategories();
@@ -162,6 +174,7 @@ function StockMinimum() {
       key: "name",
       label: "Barang",
       className: "min-w-[200px]",
+      sortable: true,
       render: (r) => (
         <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>
           {r.name ?? "—"}
@@ -172,12 +185,14 @@ function StockMinimum() {
       key: "sku",
       label: "SKU",
       className: "w-[110px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <span className="font-mono text-xs">{r.sku ?? "—"}</span>,
     },
     {
       key: "category",
       label: "Kategori",
       className: "min-w-[130px] whitespace-nowrap",
+      sortable: true,
       render: (r) => r.category ?? "—",
     },
     {
@@ -185,6 +200,7 @@ function StockMinimum() {
       label: "Stok",
       className: "text-right w-[110px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.total_stock,
       render: (r) => (
         <b>
           {formatNumber(r.total_stock)} {r.unit ?? ""}
@@ -210,6 +226,7 @@ function StockMinimum() {
       label: "ADU",
       className: "text-right w-[90px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.avg_daily_usage,
       render: (r) => formatNumber(r.avg_daily_usage),
     },
     {
@@ -217,6 +234,7 @@ function StockMinimum() {
       label: "Hari Sisa",
       className: "text-right w-[100px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.days_of_cover,
       render: (r) => (r.days_of_cover != null ? `${formatNumber(r.days_of_cover)} h` : "—"),
     },
     {
@@ -224,6 +242,7 @@ function StockMinimum() {
       label: "Lead Time",
       className: "text-right w-[100px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.lead_time,
       render: (r) => `${r.lead_time} hari`,
     },
     {
@@ -231,6 +250,7 @@ function StockMinimum() {
       label: "Usulan",
       className: "text-right min-w-[110px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.suggested_qty,
       render: (r) => (
         <b className={r.suggested_qty > 0 ? "text-primary" : ""}>
           {formatNumber(r.suggested_qty)} {r.unit ?? ""}
@@ -242,109 +262,135 @@ function StockMinimum() {
       label: "Nilai",
       className: "text-right min-w-[130px] whitespace-nowrap",
       sortable: true,
+      sortAccessor: (r) => r.suggested_qty * r.cost,
       render: (r) => formatIDR(r.suggested_qty * r.cost),
     },
     {
       key: "status",
       label: "Status",
       className: "w-[100px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <Pill tone={statusTone[r.status]}>{statusLabel[r.status]}</Pill>,
     },
   ];
 
+  const displayColumns = fullscreen
+    ? columns.filter((c) => !FS_HIDDEN_COLUMNS.has(c.key))
+    : columns;
+
   return (
     <>
-      <PageHeader
-        title="Stock Minimum"
-        description={`Barang dengan stok di bawah minimum • pemakaian ${days} hari terakhir`}
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Stock Minimum"
+          description={`Barang dengan stok di bawah minimum • pemakaian ${days} hari terakhir`}
+          actions={
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handleExport}
+              disabled={rows.length === 0}
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+          }
+        />
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            label="Perlu Restock"
+            value={formatNumber(stats.perlu)}
+            hint="di bawah minimum"
+            icon={TriangleAlert}
+            tone="warning"
+          />
+          <StatCard
+            label="Nilai Kebutuhan"
+            value={formatIDR(stats.nilai)}
+            hint="total usulan restock"
+            icon={PackageX}
+            tone="brand"
+          />
+          <StatCard
+            label="Barang Habis"
+            value={formatNumber(stats.habis)}
+            hint="stok nol"
+            icon={TriangleAlert}
+            tone="danger"
+          />
+          <StatCard
+            label="Supplier Terkait"
+            value={formatNumber(stats.suppliers)}
+            hint="untuk restock"
+            icon={Truck}
+            tone="info"
+          />
+        </div>
+
+        <Panel title="Filter">
+          <div className="grid gap-3 md:grid-cols-5">
+            <div className="relative md:col-span-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari barang, SKU, supplier..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full"
+              value={wh}
+              onChange={setWh}
+              placeholder="Semua Gudang"
+              options={warehouseNames}
+            />
+            <FilterSelect
+              className="w-full"
+              value={cat}
+              onChange={setCat}
+              placeholder="Semua Kategori"
+              options={categoryNames}
+            />
+            <FilterSelect
+              className="w-full"
+              value={days}
+              onChange={setDays}
+              placeholder="Periode"
+              options={DAYS_OPTIONS}
+            />
+            <FilterSelect
+              className="w-full"
+              value={severity}
+              onChange={setSeverity}
+              placeholder="Semua Status"
+              options={[...severityOptions]}
+            />
+          </div>
+        </Panel>
+      </div>
+
+      <Panel
+        title="Daftar Stock Minimum"
+        description={`${formatNumber(rows.length)} barang`}
         actions={
           <Button
             variant="outline"
+            size="sm"
             className="rounded-xl"
-            onClick={handleExport}
-            disabled={rows.length === 0}
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
           >
-            <Download className="h-4 w-4" /> Export CSV
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
           </Button>
         }
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Perlu Restock"
-          value={formatNumber(stats.perlu)}
-          hint="di bawah minimum"
-          icon={TriangleAlert}
-          tone="warning"
-        />
-        <StatCard
-          label="Nilai Kebutuhan"
-          value={formatIDR(stats.nilai)}
-          hint="total usulan restock"
-          icon={PackageX}
-          tone="brand"
-        />
-        <StatCard
-          label="Barang Habis"
-          value={formatNumber(stats.habis)}
-          hint="stok nol"
-          icon={TriangleAlert}
-          tone="danger"
-        />
-        <StatCard
-          label="Supplier Terkait"
-          value={formatNumber(stats.suppliers)}
-          hint="untuk restock"
-          icon={Truck}
-          tone="info"
-        />
-      </div>
-
-      <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="relative md:col-span-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari barang, SKU, supplier..."
-              className="rounded-xl pl-9"
-            />
-          </div>
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouseNames}
-          />
-          <FilterSelect
-            className="w-full"
-            value={cat}
-            onChange={setCat}
-            placeholder="Semua Kategori"
-            options={categoryNames}
-          />
-          <FilterSelect
-            className="w-full"
-            value={days}
-            onChange={setDays}
-            placeholder="Periode"
-            options={DAYS_OPTIONS}
-          />
-          <FilterSelect
-            className="w-full"
-            value={severity}
-            onChange={setSeverity}
-            placeholder="Semua Status"
-            options={[...severityOptions]}
-          />
-        </div>
-      </Panel>
-
-      <Panel title="Daftar Stock Minimum" description={`${formatNumber(rows.length)} barang`}>
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
-          columns={columns}
+          columns={displayColumns}
           rows={rows}
           pageSize={12}
           loading={isLoading}

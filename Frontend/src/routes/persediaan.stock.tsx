@@ -70,6 +70,7 @@ function StockSaatIni() {
       key: "name",
       label: "Barang",
       className: "min-w-[220px]",
+      sortable: true,
       render: (r) => (
         <span className="block max-w-[280px] truncate font-medium" title={r.name ?? ""}>
           {r.name ?? "—"}
@@ -80,48 +81,62 @@ function StockSaatIni() {
       key: "sku",
       label: "SKU",
       className: "w-[110px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <span className="font-mono text-xs">{r.sku ?? "—"}</span>,
     },
     {
       key: "unit",
       label: "Satuan",
       className: "w-[90px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <Pill tone="neutral">{r.unit ?? "—"}</Pill>,
     },
     {
       key: "wh",
       label: "Gudang",
       className: "min-w-[140px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.warehouse,
       render: (r) => r.warehouse ?? "—",
     },
     {
       key: "rak",
       label: "Rak",
       className: "w-[80px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.rack,
       render: (r) => r.rack ?? "—",
     },
     {
       key: "bin",
       label: "Bin",
       className: "w-[90px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.bin,
       render: (r) => r.bin ?? "—",
     },
     {
       key: "qty",
       label: "Qty",
       className: "text-right w-[110px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.stock,
       render: (r) => `${formatNumber(r.stock)} ${r.unit ?? ""}`,
     },
     {
       key: "res",
       label: "Reserved",
       className: "text-right w-[110px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.reserved,
       render: (r) => `${formatNumber(r.reserved)} ${r.unit ?? ""}`,
     },
     {
       key: "avl",
       label: "Available",
       className: "text-right w-[110px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.available,
       render: (r) => (
         <b>
           {formatNumber(r.available)} {r.unit ?? ""}
@@ -132,24 +147,29 @@ function StockSaatIni() {
       key: "min",
       label: "Minimum",
       className: "text-right w-[110px] whitespace-nowrap",
+      sortable: true,
       render: (r) => (r.min != null ? `${formatNumber(r.min)} ${r.unit ?? ""}` : "—"),
     },
     {
       key: "max",
       label: "Maximum",
       className: "text-right w-[110px] whitespace-nowrap",
+      sortable: true,
       render: (r) => (r.max != null ? `${formatNumber(r.max)} ${r.unit ?? ""}` : "—"),
     },
     {
       key: "val",
       label: "Nilai Stock",
       className: "text-right min-w-[130px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.stock * r.cost,
       render: (r) => formatIDR(r.stock * r.cost),
     },
     {
       key: "status",
       label: "Status",
       className: "w-[100px] whitespace-nowrap",
+      sortable: true,
       render: (r) => <Pill tone={statusTone[r.status]}>{r.status}</Pill>,
     },
   ];

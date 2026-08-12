@@ -8,6 +8,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AuthApiTest extends TestCase
@@ -16,16 +17,18 @@ class AuthApiTest extends TestCase
 
     public function test_login_success_returns_user_and_access(): void
     {
+        $password = Str::password(16);
+
         $user = User::factory()->create([
             'email' => 'rudi@kelolagudang.id',
-            'password' => 'IndomieGoreng',
+            'password' => Hash::make($password),
             'role' => 'Administrator',
         ]);
         RolePermission::create(['role' => 'Administrator', 'module' => 'Master Data', 'level' => 'Kelola']);
 
         $this->postJson('/api/auth/login', [
             'email' => 'rudi@kelolagudang.id',
-            'password' => 'IndomieGoreng',
+            'password' => $password,
         ])
             ->assertOk()
             ->assertJsonStructure(['data', 'access', 'token'])
@@ -38,7 +41,6 @@ class AuthApiTest extends TestCase
     {
         User::factory()->create([
             'email' => 'rudi@kelolagudang.id',
-            'password' => 'IndomieGoreng',
         ]);
 
         $this->postJson('/api/auth/login', [
@@ -51,21 +53,23 @@ class AuthApiTest extends TestCase
     {
         $this->postJson('/api/auth/login', [
             'email' => 'tidak.ada@kelolagudang.id',
-            'password' => 'IndomieGoreng',
+            'password' => 'salah123',
         ])->assertUnprocessable()->assertJsonValidationErrors(['email']);
     }
 
     public function test_login_inactive_user_rejected(): void
     {
+        $password = Str::password(16);
+
         User::factory()->create([
             'email' => 'rudi@kelolagudang.id',
-            'password' => 'IndomieGoreng',
+            'password' => Hash::make($password),
             'is_active' => false,
         ]);
 
         $this->postJson('/api/auth/login', [
             'email' => 'rudi@kelolagudang.id',
-            'password' => 'IndomieGoreng',
+            'password' => $password,
         ])->assertUnprocessable()->assertJsonValidationErrors(['email']);
     }
 
@@ -163,20 +167,24 @@ class AuthApiTest extends TestCase
     public function test_role_permissions_are_exposed_for_login_user(): void
     {
         $this->seed(RolePermissionSeeder::class);
-        $user = User::factory()->create(['role' => 'Supervisor', 'password' => 'IndomieGoreng']);
+
+        $password = Str::password(16);
+        $user = User::factory()->create(['role' => 'Supervisor', 'password' => Hash::make($password)]);
 
         $this->postJson('/api/auth/login', [
             'email' => $user->email,
-            'password' => 'IndomieGoreng',
+            'password' => $password,
         ])
             ->assertOk()
             ->assertJsonPath('access.0.module', 'Master Data')
             ->assertJsonPath('access.0.level', 'Baca');
     }
 
-    public function test_seeded_user_password_matches(): void
+    public function test_factory_password_is_bcrypt_hash_not_plaintext(): void
     {
-        $user = User::factory()->create(['password' => 'IndomieGoreng']);
-        $this->assertTrue(Hash::check('IndomieGoreng', $user->password));
+        $user = User::factory()->create();
+
+        $this->assertStringStartsWith('$2y$', $user->password);
+        $this->assertFalse(Hash::needsRehash($user->password));
     }
 }

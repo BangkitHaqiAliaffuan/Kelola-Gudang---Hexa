@@ -32,6 +32,7 @@ import { Progress } from "@/components/ui/progress";
 import {
   activities,
   formatIDR,
+  formatIDRCompact,
   formatNumber,
   items,
   lowStock,
@@ -98,16 +99,76 @@ function Dashboard() {
   const running = opnameSessions.filter((o) => o.status === "Berjalan");
 
   const stats = [
-    { label: "Total Item", value: formatNumber(items.reduce((a, b) => a + b.stock, 0)), hint: "seluruh gudang", icon: Package, tone: "brand" as const },
-    { label: "Total SKU", value: formatNumber(items.length), hint: "barang aktif terdaftar", icon: Barcode, tone: "info" as const },
-    { label: "Total Gudang", value: String(warehouses.length), hint: "lokasi penyimpanan", icon: Warehouse, tone: "neutral" as const },
-    { label: "Barang Masuk Hari Ini", value: formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)), hint: `${masukToday.length} transaksi`, icon: ArrowDownToLine, tone: "success" as const },
-    { label: "Barang Keluar Hari Ini", value: formatNumber(keluarToday.reduce((a, b) => a + b.qty, 0)), hint: `${keluarToday.length} transaksi`, icon: ArrowUpFromLine, tone: "warning" as const },
-    { label: "Stock Menipis", value: formatNumber(lowStock.length), hint: "di bawah minimum", icon: TriangleAlert, tone: "warning" as const },
-    { label: "Stock Habis", value: formatNumber(outStock.length), hint: "perlu restock segera", icon: PackageX, tone: "danger" as const },
-    { label: "Nilai Persediaan", value: formatIDR(totalValue), hint: "metode FIFO", icon: Wallet, tone: "brand" as const },
-    { label: "Pending Approval", value: String(pending), hint: "menunggu supervisor", icon: CheckCheck, tone: "info" as const },
-    { label: "Stock Opname Berjalan", value: String(running.length), hint: "sesi aktif", icon: ClipboardCheck, tone: "success" as const },
+    {
+      label: "Total Item",
+      value: formatNumber(items.reduce((a, b) => a + b.stock, 0)),
+      hint: "seluruh gudang",
+      icon: Package,
+      tone: "brand" as const,
+    },
+    {
+      label: "Total SKU",
+      value: formatNumber(items.length),
+      hint: "barang aktif terdaftar",
+      icon: Barcode,
+      tone: "info" as const,
+    },
+    {
+      label: "Total Gudang",
+      value: String(warehouses.length),
+      hint: "lokasi penyimpanan",
+      icon: Warehouse,
+      tone: "neutral" as const,
+    },
+    {
+      label: "Barang Masuk Hari Ini",
+      value: formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)),
+      hint: `${masukToday.length} transaksi`,
+      icon: ArrowDownToLine,
+      tone: "success" as const,
+    },
+    {
+      label: "Barang Keluar Hari Ini",
+      value: formatNumber(keluarToday.reduce((a, b) => a + b.qty, 0)),
+      hint: `${keluarToday.length} transaksi`,
+      icon: ArrowUpFromLine,
+      tone: "warning" as const,
+    },
+    {
+      label: "Stock Menipis",
+      value: formatNumber(lowStock.length),
+      hint: "di bawah minimum",
+      icon: TriangleAlert,
+      tone: "warning" as const,
+    },
+    {
+      label: "Stock Habis",
+      value: formatNumber(outStock.length),
+      hint: "perlu restock segera",
+      icon: PackageX,
+      tone: "danger" as const,
+    },
+    {
+      label: "Nilai Persediaan",
+      value: formatIDRCompact(totalValue),
+      hint: "metode FIFO",
+      icon: Wallet,
+      tone: "brand" as const,
+    },
+    {
+      label: "Pending Approval",
+      value: String(pending),
+      hint: "menunggu supervisor",
+      icon: CheckCheck,
+      tone: "info" as const,
+    },
+    {
+      label: "Stock Opname Berjalan",
+      value: String(running.length),
+      hint: "sesi aktif",
+      icon: ClipboardCheck,
+      tone: "success" as const,
+    },
   ];
 
   return (
@@ -153,7 +214,12 @@ function Dashboard() {
                 <YAxis tickLine={false} axisLine={false} fontSize={12} width={40} />
                 <Tooltip {...chartTooltip} />
                 <Bar dataKey="masuk" name="Masuk" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="keluar" name="Keluar" fill="var(--primary-glow)" radius={[6, 6, 0, 0]} />
+                <Bar
+                  dataKey="keluar"
+                  name="Keluar"
+                  fill="var(--primary-glow)"
+                  radius={[6, 6, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}

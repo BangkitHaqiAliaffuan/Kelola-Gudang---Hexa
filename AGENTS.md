@@ -29,7 +29,7 @@ Convenience wrapper: `./dev.sh` at the root starts both servers (logs to `.dev/l
 
 ## Frontend
 
-UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded PRNG), except the API-backed master pages and the Persediaan pages `persediaan/stock` (Stock Saat Ini), `persediaan/kartu-stock` (Kartu Stock), `persediaan/mutasi` (Mutasi Stock), `persediaan/stock-minimum` (Stock Minimum). Real Sanctum login: seeded test accounts (all password `IndomieGoreng`) in `Frontend/docs/akun-login.md` — Administrator is `USR-001 Rudi Hartono` (`rudi.hartono@kelolagudang.id`). Managed by **bun** (both `bun.lock` and `package-lock.json` must stay in sync). No typecheck script — use `npx tsc --noEmit`. The real product requirements are in `Frontend/README.md`. Full details in `Frontend/AGENTS.md`.
+UI-only WMS demo — deterministic dummy data from `src/lib/wms-data.ts` (seeded PRNG), except the API-backed master pages and the Persediaan pages `persediaan/stock` (Stock Saat Ini), `persediaan/kartu-stock` (Kartu Stock), `persediaan/mutasi` (Mutasi Stock), `persediaan/stock-minimum` (Stock Minimum). Real Sanctum login: seeded test accounts (password dari `DEMO_PASSWORD` di `Backend/.env` — lihat `Frontend/docs/akun-login.md`); Administrator is `USR-001 Rudi Hartono` (`rudi.hartono@kelolagudang.id`). Managed by **bun** (both `bun.lock` and `package-lock.json` must stay in sync). No typecheck script — use `npx tsc --noEmit`. The real product requirements are in `Frontend/README.md`. Full details in `Frontend/AGENTS.md`.
 
 ## Backend (Laravel 13)
 
@@ -45,6 +45,7 @@ Real Sanctum **bearer-token** auth — the API is NOT open anymore. `POST /api/a
 
 - Schema changes go in a **new migration** + `php artisan migrate` — never `migrate:fresh`.
 - If the dev DB is already empty (e.g. someone fresh-migrated it), restore with `php artisan db:seed` in `Backend/` (seeders are non-idempotent, so only run them on an empty DB).
+- **`UserSeeder` memakai `DEMO_PASSWORD` dari `Backend/.env` (wajib diisi — seeder melempar exception bila kosong; placeholder di `Backend/.env.example`).** Tidak ada password literal yang boleh tersimpan di repo; jika perlu merotasi password akun yang sudah ter-seed, jalankan perintah tinker yang tertera di `Frontend/docs/akun-login.md`.
 - This also covers `composer setup` (its `migrate --seed` fails with duplicate-code errors on an already-seeded DB) and any tooling that resets the DB.
 
 ## Multi-session protocol

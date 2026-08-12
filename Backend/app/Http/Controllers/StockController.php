@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\StockMinimumResource;
 use App\Http\Resources\StockRowResource;
+use App\Http\Resources\StockValuationResource;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Validation\Rule;
 
 class StockController extends Controller
@@ -272,5 +275,132 @@ class StockController extends Controller
                 'rows' => $rows,
             ],
         ]);
+    }
+
+    /**
+     * Nilai Persediaan — one row per item with the on-hand value under each
+     * valuation method (FIFO, Average, Maximum Cost), folded from the movement
+     * ledger exactly like Kartu Stock. Also classifies how recently each item
+     * moved (Fast/Medium/Slow/Dead) for the dead-stock dashboard.
+     */
+    public function valuation(Request $request): AnonymousResourceCollection
+    {
+        $data = $request->validate([
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        $warehouseId = $data['warehouse_id'] ?? null;
+
+        $query = Item::query()
+            ->with(['category', 'unit'])
+            ->when($data['category_id'] ?? null, fn ($q, $categoryId) => $q->where('items.category_id', $categoryId));
+
+        if ($needle = strtolower((string) ($data['search'] ?? ''))) {
+            $query->where(function ($q) use ($needle) {
+                $q->whereRaw('LOWER(items.name) LIKE ?', ["%{$needle}%"])
+                    ->orWhereRaw('LOWER(items.sku) LIKE ?', ["%{$needle}%"]);
+            });
+        }
+
+        $items = $query->orderBy('items.name')->get();
+        $itemIds = $items->pluck('id');
+
+        $movements = StockMovement::query()
+            ->whereIn('item_id', $itemIds)
+            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('item_id');
+
+        $reservedByItem = ItemStock::query()
+            ->whereIn('item_id', $itemIds)
+            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->selectRaw('item_id, COALESCE(SUM(reserved), 0) AS reserved')
+            ->groupBy('item_id')
+            ->pluck('reserved', 'item_id');
+
+        $now = now();
+
+        $items = $items->map(function (Item $item) use ($movements, $reservedByItem, $now) {
+            $fifoLayers = [];
+            $onHandQty = 0;
+            $onHandValue = 0.0;
+            $maxCost = null;
+            $saldo = 0;
+            $lastMove = null;
+
+            foreach ($movements->get($item->id, collect()) as $movement) {
+                $lastMove = $movement->occurred_at;
+                $saldo += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
+
+                if ($movement->direction === 'IN') {
+                    $fifoLayers[] = ['qty' => $movement->qty, 'cost' => $movement->unit_cost];
+                    $onHandQty += $movement->qty;
+                    $onHandValue += $movement->qty * $movement->unit_cost;
+                    $maxCost = $maxCost === null ? $movement->unit_cost : max($maxCost, $movement->unit_cost);
+                } else {
+                    $remaining = $movement->qty;
+                    while ($remaining > 0 && $fifoLayers !== []) {
+                        $take = min($remaining, $fifoLayers[0]['qty']);
+                        $fifoLayers[0]['qty'] -= $take;
+                        $remaining -= $take;
+
+                        if ($fifoLayers[0]['qty'] === 0) {
+                            array_shift($fifoLayers);
+                        }
+                    }
+
+                    $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
+                    $onHandValue -= $movement->qty * $avg;
+                    $onHandQty -= $movement->qty;
+                }
+            }
+
+            $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
+            $stock = max(0, $saldo);
+            $reserved = (int) ($reservedByItem[$item->id] ?? 0);
+
+            $unitCostFifo = round($stock > 0 ? $fifoValue / $stock : ($item->cost ?? 0), 2);
+            $unitCostAvg = round($onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0), 2);
+            $unitCostMax = round($maxCost ?? $item->cost ?? 0, 2);
+
+            $daysAgo = $lastMove !== null ? (int) $lastMove->diffInDays($now) : PHP_INT_MAX;
+            $moving = match (true) {
+                $daysAgo > 150 => 'Dead',
+                $daysAgo > 60 => 'Slow',
+                $daysAgo > 20 => 'Medium',
+                default => 'Fast',
+            };
+
+            $item->stock = $stock;
+            $item->reserved = $reserved;
+            $item->available = max(0, $stock - $reserved);
+            $item->unit_cost_fifo = $unitCostFifo;
+            $item->unit_cost_avg = $unitCostAvg;
+            $item->unit_cost_max = $unitCostMax;
+            $item->nilai_fifo = round($stock * $unitCostFifo, 2);
+            $item->nilai_avg = round($stock * $unitCostAvg, 2);
+            $item->nilai_max = round($stock * $unitCostMax, 2);
+            $item->last_move_at = $lastMove?->toIso8601String();
+            $item->moving = $moving;
+
+            return $item;
+        });
+
+        $perPage = (int) ($data['per_page'] ?? 20);
+        $page = Paginator::resolveCurrentPage('page');
+        $items = new LengthAwarePaginator(
+            $items->forPage($page, $perPage),
+            $items->count(),
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath()],
+        );
+
+        return StockValuationResource::collection($items);
     }
 }

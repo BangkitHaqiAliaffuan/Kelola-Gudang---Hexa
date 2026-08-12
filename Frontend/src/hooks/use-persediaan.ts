@@ -5,6 +5,7 @@ import type {
   StockDocumentApi,
   StockMinimumApi,
   StockRowApi,
+  StockValuationApi,
   ValuationMethod,
 } from "@/lib/persediaan-types";
 
@@ -34,18 +35,22 @@ export function useStockCard(itemId: number | undefined, method: ValuationMethod
   });
 }
 
-export function useStockDocuments() {
+export function useStockDocuments(params: { type?: string } = {}) {
+  const { type } = params;
   return useQuery({
-    queryKey: ["persediaan", "stock-documents"],
-    queryFn: () =>
-      api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?per_page=${DOCS_PER_PAGE}`),
+    queryKey: ["persediaan", "stock-documents", "list", type ?? null],
+    queryFn: () => {
+      const sp = new URLSearchParams({ per_page: String(DOCS_PER_PAGE) });
+      if (type) sp.set("type", type);
+      return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
+    },
     enabled: typeof window !== "undefined",
   });
 }
 
 export function useStockDocument(id: number | undefined) {
   return useQuery({
-    queryKey: ["persediaan", "stock-documents", id],
+    queryKey: ["persediaan", "stock-documents", "detail", id],
     queryFn: () => api.get<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}`),
     enabled: id != null && typeof window !== "undefined",
   });
@@ -67,6 +72,25 @@ export function useStockMinimum(
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
       if (categoryId != null) sp.set("category_id", String(categoryId));
       return api.get<Paginated<StockMinimumApi>>(`/persediaan/stock-minimum?${sp.toString()}`);
+    },
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useStockValuation(
+  params: {
+    warehouseId?: number | null;
+    categoryId?: number | null;
+  } = {},
+) {
+  const { warehouseId, categoryId } = params;
+  return useQuery({
+    queryKey: ["persediaan", "valuation", warehouseId ?? null, categoryId ?? null],
+    queryFn: () => {
+      const sp = new URLSearchParams({ per_page: String(PER_PAGE) });
+      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
+      if (categoryId != null) sp.set("category_id", String(categoryId));
+      return api.get<Paginated<StockValuationApi>>(`/persediaan/valuation?${sp.toString()}`);
     },
     enabled: typeof window !== "undefined",
   });

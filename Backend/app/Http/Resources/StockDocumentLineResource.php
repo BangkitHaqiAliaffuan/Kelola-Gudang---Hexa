@@ -22,10 +22,13 @@ class StockDocumentLineResource extends JsonResource
             'variance' => $this->system_qty !== null && $this->actual_qty !== null
                 ? (int) $this->actual_qty - (int) $this->system_qty
                 : null,
+            'direction' => $this->whenLoaded('movement', fn () => $this->movement?->direction),
             'from_bin_id' => $this->from_bin_id,
             'from_bin' => $this->whenLoaded('fromBin', fn () => $this->fromBin?->code),
+            'from_rack' => $this->whenLoaded('fromBin.rack', fn () => $this->fromBin?->rack?->code),
             'to_bin_id' => $this->to_bin_id,
             'to_bin' => $this->whenLoaded('toBin', fn () => $this->toBin?->code),
+            'to_rack' => $this->whenLoaded('toBin.rack', fn () => $this->toBin?->rack?->code),
             'unit_cost' => $this->unit_cost,
             'note' => $this->note,
         ];

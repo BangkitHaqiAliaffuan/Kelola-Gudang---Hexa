@@ -53,6 +53,7 @@ Route::prefix('persediaan')->middleware('auth:sanctum')->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-minimum', [StockController::class, 'stockMinimum']);
     Route::get('stock-card', [StockController::class, 'stockCard']);
+    Route::get('valuation', [StockController::class, 'valuation']);
     Route::get('stock-documents', [StockDocumentController::class, 'index']);
     Route::get('stock-documents/{stockDocument}', [StockDocumentController::class, 'show']);
     Route::post('stock-documents/{stockDocument}/post', [StockDocumentController::class, 'post']);

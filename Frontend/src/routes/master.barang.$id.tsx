@@ -11,8 +11,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ItemFormDialog } from "@/components/wms/master-forms";
-import { formatDate, formatIDR, formatNumber, items, stockCard, warehouses } from "@/lib/wms-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatDate, formatIDR, formatNumber, warehouses } from "@/lib/wms-data";
 import { useItem } from "@/hooks/use-master";
+import { useStockCard } from "@/hooks/use-persediaan";
 import type { ItemApi } from "@/lib/master-types";
 
 export const Route = createFileRoute("/master/barang/$id")({
@@ -88,6 +90,8 @@ function DetailBarang() {
   const { data, isLoading } = useItem(Number(id));
   const [editing, setEditing] = useState<ItemApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const item = data?.data;
+  const { data: cardData, isLoading: cardLoading } = useStockCard(item?.id, "FIFO");
 
   if (isLoading) {
     return (
@@ -97,7 +101,6 @@ function DetailBarang() {
     );
   }
 
-  const item = data?.data;
   if (!item) {
     return (
       <>
@@ -115,10 +118,7 @@ function DetailBarang() {
     );
   }
 
-  // Kartu Stock & Riwayat are UI placeholders until the Persediaan module —
-  // feed them a stable dummy item (seeded from the real id).
-  const dummyItem = items[(item.id - 1) % items.length]!;
-  const card = stockCard(dummyItem);
+  const card = cardData?.data.rows ?? [];
   const s = stockStatus(item);
   const categoryLabel = `${item.category ?? "—"}${item.subCategory ? ` / ${item.subCategory}` : ""}`;
 
@@ -230,33 +230,46 @@ function DetailBarang() {
             </TabsContent>
 
             <TabsContent value="kartu" className="m-0 p-5">
-              <Accordion type="single" collapsible className="space-y-2">
-                {card.map((row, i) => (
-                  <AccordionItem
-                    key={i}
-                    value={`r${i}`}
-                    className="rounded-xl border border-border px-4"
-                  >
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-2">
-                        <div className="min-w-0 text-left">
-                          <p className="truncate text-sm font-medium">{row.no}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(row.date)}</p>
+              {cardLoading ? (
+                <div className="space-y-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 rounded-xl" />
+                  ))}
+                </div>
+              ) : card.length === 0 ? (
+                <EmptyState
+                  title="Belum ada mutasi"
+                  description="Tidak ada pergerakan stok untuk barang ini."
+                />
+              ) : (
+                <Accordion type="single" collapsible className="space-y-2">
+                  {card.map((row, i) => (
+                    <AccordionItem
+                      key={i}
+                      value={`r${i}`}
+                      className="rounded-xl border border-border px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 pr-2">
+                          <div className="min-w-0 text-left">
+                            <p className="truncate text-sm font-medium">{row.no}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(row.date)}</p>
+                          </div>
+                          <Pill tone={row.masuk ? "success" : "warning"}>
+                            {row.masuk ? `+${row.masuk}` : `-${row.keluar}`}
+                          </Pill>
                         </div>
-                        <Pill tone={row.masuk ? "success" : "warning"}>
-                          {row.masuk ? `+${row.masuk}` : `-${row.keluar}`}
-                        </Pill>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="grid grid-cols-2 gap-3 pb-4 sm:grid-cols-4">
-                      <Field label="Jenis" value={row.type} />
-                      <Field label="Saldo" value={formatNumber(row.saldo)} />
-                      <Field label="PIC" value={row.pic} />
-                      <Field label="Catatan" value={row.note} />
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
+                      </AccordionTrigger>
+                      <AccordionContent className="grid grid-cols-2 gap-3 pb-4 sm:grid-cols-4">
+                        <Field label="Jenis" value={row.type} />
+                        <Field label="Saldo" value={formatNumber(row.saldo)} />
+                        <Field label="PIC" value={row.pic} />
+                        <Field label="Catatan" value={row.note} />
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
             </TabsContent>
 
             <TabsContent value="barcode" className="m-0 grid gap-4 p-5 sm:grid-cols-2">
@@ -269,19 +282,32 @@ function DetailBarang() {
             </TabsContent>
 
             <TabsContent value="riwayat" className="m-0 p-5">
-              <ol className="relative space-y-4 border-l border-border pl-5">
-                {card.slice(0, 8).map((row, i) => (
-                  <li key={i} className="relative">
-                    <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
-                    <p className="text-sm font-medium">
-                      {row.type} · {row.no}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(row.date)} — {row.pic} — saldo {formatNumber(row.saldo)}
-                    </p>
-                  </li>
-                ))}
-              </ol>
+              {cardLoading ? (
+                <div className="space-y-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 rounded-xl" />
+                  ))}
+                </div>
+              ) : card.length === 0 ? (
+                <EmptyState
+                  title="Belum ada riwayat"
+                  description="Riwayat pergerakan stok akan tampil di sini."
+                />
+              ) : (
+                <ol className="relative space-y-4 border-l border-border pl-5">
+                  {card.slice(0, 8).map((row, i) => (
+                    <li key={i} className="relative">
+                      <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
+                      <p className="text-sm font-medium">
+                        {row.type} · {row.no}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(row.date)} — {row.pic} — saldo {formatNumber(row.saldo)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </TabsContent>
 
             <TabsContent value="lampiran" className="m-0 space-y-3 p-5">

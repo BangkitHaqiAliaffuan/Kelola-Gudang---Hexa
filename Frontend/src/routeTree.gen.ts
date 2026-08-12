@@ -17,7 +17,7 @@ import { Route as LaporanReportRouteImport } from './routes/laporan.$report'
 import { Route as MasterSectionRouteImport } from './routes/master.$section'
 import { Route as OpnameSectionRouteImport } from './routes/opname.$section'
 import { Route as PengadaanSectionRouteImport } from './routes/pengadaan.$section'
-import { Route as PersediaanSectionRouteImport } from './routes/persediaan.$section'
+import { Route as PersediaanAdjustmentRouteImport } from './routes/persediaan.adjustment'
 import { Route as PersediaanKartuStockRouteImport } from './routes/persediaan.kartu-stock'
 import { Route as PersediaanMutasiRouteImport } from './routes/persediaan.mutasi'
 import { Route as PersediaanNilaiRouteImport } from './routes/persediaan.nilai'
@@ -73,9 +73,9 @@ const PengadaanSectionRoute = PengadaanSectionRouteImport.update({
   path: '/pengadaan/$section',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PersediaanSectionRoute = PersediaanSectionRouteImport.update({
-  id: '/persediaan/$section',
-  path: '/persediaan/$section',
+const PersediaanAdjustmentRoute = PersediaanAdjustmentRouteImport.update({
+  id: '/persediaan/adjustment',
+  path: '/persediaan/adjustment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersediaanKartuStockRoute = PersediaanKartuStockRouteImport.update({
@@ -158,7 +158,7 @@ export interface FileRoutesByFullPath {
   '/master/$section': typeof MasterSectionRoute
   '/opname/$section': typeof OpnameSectionRoute
   '/pengadaan/$section': typeof PengadaanSectionRoute
-  '/persediaan/$section': typeof PersediaanSectionRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -183,7 +183,7 @@ export interface FileRoutesByTo {
   '/master/$section': typeof MasterSectionRoute
   '/opname/$section': typeof OpnameSectionRoute
   '/pengadaan/$section': typeof PengadaanSectionRoute
-  '/persediaan/$section': typeof PersediaanSectionRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -209,7 +209,7 @@ export interface FileRoutesById {
   '/master/$section': typeof MasterSectionRoute
   '/opname/$section': typeof OpnameSectionRoute
   '/pengadaan/$section': typeof PengadaanSectionRoute
-  '/persediaan/$section': typeof PersediaanSectionRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -236,7 +236,7 @@ export interface FileRouteTypes {
     | '/master/$section'
     | '/opname/$section'
     | '/pengadaan/$section'
-    | '/persediaan/$section'
+    | '/persediaan/adjustment'
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
@@ -261,7 +261,7 @@ export interface FileRouteTypes {
     | '/master/$section'
     | '/opname/$section'
     | '/pengadaan/$section'
-    | '/persediaan/$section'
+    | '/persediaan/adjustment'
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
@@ -286,7 +286,7 @@ export interface FileRouteTypes {
     | '/master/$section'
     | '/opname/$section'
     | '/pengadaan/$section'
-    | '/persediaan/$section'
+    | '/persediaan/adjustment'
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
@@ -312,7 +312,7 @@ export interface RootRouteChildren {
   MasterSectionRoute: typeof MasterSectionRoute
   OpnameSectionRoute: typeof OpnameSectionRoute
   PengadaanSectionRoute: typeof PengadaanSectionRoute
-  PersediaanSectionRoute: typeof PersediaanSectionRoute
+  PersediaanAdjustmentRoute: typeof PersediaanAdjustmentRoute
   PersediaanKartuStockRoute: typeof PersediaanKartuStockRoute
   PersediaanMutasiRoute: typeof PersediaanMutasiRoute
   PersediaanNilaiRoute: typeof PersediaanNilaiRoute
@@ -386,11 +386,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PengadaanSectionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/persediaan/$section': {
-      id: '/persediaan/$section'
-      path: '/persediaan/$section'
-      fullPath: '/persediaan/$section'
-      preLoaderRoute: typeof PersediaanSectionRouteImport
+    '/persediaan/adjustment': {
+      id: '/persediaan/adjustment'
+      path: '/persediaan/adjustment'
+      fullPath: '/persediaan/adjustment'
+      preLoaderRoute: typeof PersediaanAdjustmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/persediaan/kartu-stock': {
@@ -516,7 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   MasterSectionRoute: MasterSectionRoute,
   OpnameSectionRoute: OpnameSectionRoute,
   PengadaanSectionRoute: PengadaanSectionRoute,
-  PersediaanSectionRoute: PersediaanSectionRoute,
+  PersediaanAdjustmentRoute: PersediaanAdjustmentRoute,
   PersediaanKartuStockRoute: PersediaanKartuStockRoute,
   PersediaanMutasiRoute: PersediaanMutasiRoute,
   PersediaanNilaiRoute: PersediaanNilaiRoute,

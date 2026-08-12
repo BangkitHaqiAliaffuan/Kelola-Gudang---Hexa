@@ -59,28 +59,65 @@ function varianceSign(variance: number): string {
   return variance > 0 ? "+" : variance < 0 ? "−" : "";
 }
 
-/** Sel Qty tabel: Stock Opname ditampilkan colok Sistem/Fisik/Selisih. */
-function LineQtyCells({ line, opname }: { line: StockDocumentLineApi; opname: boolean }) {
-  if (!opname) {
-    return <td className="whitespace-nowrap px-3 py-2 text-right">{lineQty(line)}</td>;
+/** Arah pergerakan satu baris: dari movement (posting) atau fallback tanda qty (draft). */
+function lineDirection(line: StockDocumentLineApi): "IN" | "OUT" {
+  return line.direction ?? ((line.qty ?? 0) < 0 ? "OUT" : "IN");
+}
+
+function lineSignedQty(line: StockDocumentLineApi): number {
+  const qty = Math.abs(line.qty ?? 0);
+  return lineDirection(line) === "IN" ? qty : -qty;
+}
+
+function lineLocation(line: StockDocumentLineApi): string {
+  const from = [line.from_rack, line.from_bin].filter(Boolean).join(" · ") || "—";
+  if (!line.to_bin) return from;
+  const to = [line.to_rack, line.to_bin].filter(Boolean).join(" · ") || "—";
+  return `${from} → ${to}`;
+}
+
+/** Sel Qty tabel: Stock Opname menampilkan colok Sistem/Fisik/Selisih, Stock Adjustment pill arah + qty bertanda. */
+function LineQtyCells({
+  line,
+  mode,
+}: {
+  line: StockDocumentLineApi;
+  mode: "plain" | "opname" | "adjustment";
+}) {
+  if (mode === "opname") {
+    const variance = line.variance ?? 0;
+    const tone = variance > 0 ? "text-success" : variance < 0 ? "text-destructive" : "text-success";
+
+    return (
+      <>
+        <td className="whitespace-nowrap px-3 py-2 text-right">
+          {formatNumber(line.system_qty ?? 0)} {line.unit ?? ""}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2 text-right">
+          {formatNumber(line.actual_qty ?? 0)} {line.unit ?? ""}
+        </td>
+        <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${tone}`}>
+          {variance === 0 ? "Netral" : `${varianceSign(variance)}${formatNumber(Math.abs(variance))}`}
+        </td>
+      </>
+    );
   }
 
-  const variance = line.variance ?? 0;
-  const tone = variance > 0 ? "text-success" : variance < 0 ? "text-destructive" : "text-success";
+  if (mode === "adjustment") {
+    const inDir = lineDirection(line) === "IN";
+    return (
+      <>
+        <td className="whitespace-nowrap px-3 py-2">
+          <Pill tone={inDir ? "success" : "danger"}>{inDir ? "Koreksi Naik" : "Koreksi Turun"}</Pill>
+        </td>
+        <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${inDir ? "text-success" : "text-destructive"}`}>
+          {inDir ? "+" : "−"}{formatNumber(Math.abs(line.qty ?? 0))} {line.unit ?? ""}
+        </td>
+      </>
+    );
+  }
 
-  return (
-    <>
-      <td className="whitespace-nowrap px-3 py-2 text-right">
-        {formatNumber(line.system_qty ?? 0)} {line.unit ?? ""}
-      </td>
-      <td className="whitespace-nowrap px-3 py-2 text-right">
-        {formatNumber(line.actual_qty ?? 0)} {line.unit ?? ""}
-      </td>
-      <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${tone}`}>
-        {variance === 0 ? "Netral" : `${varianceSign(variance)}${formatNumber(Math.abs(variance))}`}
-      </td>
-    </>
-  );
+  return <td className="whitespace-nowrap px-3 py-2 text-right">{lineQty(line)}</td>;
 }
 
 export function StockDocumentSheet({
@@ -92,6 +129,15 @@ export function StockDocumentSheet({
 }) {
   const lines = doc?.lines ?? [];
   const isOpname = lines.length > 0 && lines.every(isOpnameLine);
+  const isAdjustment = doc?.type === "Stock Adjustment";
+  const mode: "plain" | "opname" | "adjustment" = isOpname ? "opname" : isAdjustment ? "adjustment" : "plain";
+
+  const upLines = lines.filter((l) => lineDirection(l) === "IN");
+  const downLines = lines.filter((l) => lineDirection(l) === "OUT");
+  const totalUp = upLines.reduce((s, l) => s + Math.abs(l.qty ?? 0), 0);
+  const totalDown = downLines.reduce((s, l) => s + Math.abs(l.qty ?? 0), 0);
+  const netValue = lines.reduce((s, l) => s + lineSignedQty(l) * l.unit_cost, 0);
+  const unit = lines[0]?.unit ?? "";
 
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>
@@ -132,18 +178,11 @@ export function StockDocumentSheet({
                   <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-xs text-muted-foreground">
-                        {(isOpname
-                          ? [
-                              "Barang",
-                              "SKU",
-                              "Sistem",
-                              "Fisik",
-                              "Selisih",
-                              "Bin",
-                              "Harga",
-                              "Subtotal",
-                            ]
-                          : ["Barang", "SKU", "Qty", "Bin", "Harga", "Subtotal"]
+                        {(mode === "opname"
+                          ? ["Barang", "SKU", "Sistem", "Fisik", "Selisih", "Lokasi", "Harga", "Subtotal"]
+                          : mode === "adjustment"
+                            ? ["Barang", "SKU", "Arah", "Qty", "Lokasi", "Harga", "Subtotal"]
+                            : ["Barang", "SKU", "Qty", "Lokasi", "Harga", "Subtotal"]
                         ).map((h) => (
                           <th
                             key={h}
@@ -161,9 +200,9 @@ export function StockDocumentSheet({
                           <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
                             {l.sku ?? "—"}
                           </td>
-                          <LineQtyCells line={l} opname={isOpname} />
+                          <LineQtyCells line={l} mode={mode} />
                           <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
-                            {l.to_bin ? `${l.from_bin ?? "—"} → ${l.to_bin}` : (l.from_bin ?? "—")}
+                            {lineLocation(l)}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 text-right">
                             {formatIDR(l.unit_cost)}
@@ -183,22 +222,54 @@ export function StockDocumentSheet({
                       <p className="font-mono text-xs text-muted-foreground">{l.sku ?? "—"}</p>
                       <div className="mt-1 flex justify-between text-xs">
                         <span>
-                          {isOpname
+                          {mode === "opname"
                             ? `Sistem ${formatNumber(l.system_qty ?? 0)} · Fisik ${formatNumber(l.actual_qty ?? 0)} (${varianceSign(l.variance ?? 0)}${formatNumber(Math.abs(l.variance ?? 0))})`
-                            : lineQty(l)}
+                            : mode === "adjustment"
+                              ? `${lineDirection(l) === "IN" ? "Koreksi Naik" : "Koreksi Turun"} · ${lineDirection(l) === "IN" ? "+" : "−"}${formatNumber(Math.abs(l.qty ?? 0))} ${l.unit ?? ""}`
+                              : lineQty(l)}
                         </span>
                         <b>{formatIDR(lineValue(l))}</b>
                       </div>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{lineLocation(l)}</p>
                     </div>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
-                  <span className="font-medium">Jumlah Baris</span>
-                  <span className="text-right font-semibold">{lines.length}</span>
-                  <span className="font-medium">Total Nilai</span>
-                  <span className="text-right text-base font-bold">
-                    {formatIDR(lines.reduce((sum, l) => sum + lineValue(l), 0))}
-                  </span>
+                  {mode === "adjustment" ? (
+                    <>
+                      <span className="font-medium">Baris Naik</span>
+                      <span className="text-right font-semibold text-success">
+                        {upLines.length}
+                      </span>
+                      <span className="font-medium">Baris Turun</span>
+                      <span className="text-right font-semibold text-destructive">
+                        {downLines.length}
+                      </span>
+                      <span className="font-medium">Total Bertambah</span>
+                      <span className="text-right font-semibold text-success">
+                        +{formatNumber(totalUp)} {unit}
+                      </span>
+                      <span className="font-medium">Total Berkurang</span>
+                      <span className="text-right font-semibold text-destructive">
+                        −{formatNumber(totalDown)} {unit}
+                      </span>
+                      <span className="font-medium">Nilai Bersih</span>
+                      <span
+                        className={`text-right text-base font-bold ${netValue >= 0 ? "text-success" : "text-destructive"}`}
+                      >
+                        {formatIDR(netValue)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium">Jumlah Baris</span>
+                      <span className="text-right font-semibold">{lines.length}</span>
+                      <span className="font-medium">Total Nilai</span>
+                      <span className="text-right text-base font-bold">
+                        {formatIDR(lines.reduce((sum, l) => sum + lineValue(l), 0))}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

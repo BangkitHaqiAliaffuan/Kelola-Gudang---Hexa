@@ -1,4 +1,4 @@
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate, useMatches } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -39,12 +39,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { items, suppliers, transactions, warehouses, notifications } from "@/lib/wms-data";
 import { toast } from "sonner";
 
@@ -76,7 +71,11 @@ function SidebarNav({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState<string[]>(() =>
     visibleGroups
-      .filter((g) => g.children?.some((c) => pathname.startsWith(c.to.split("/")[1] ? `/${c.to.split("/")[1]}` : c.to)))
+      .filter((g) =>
+        g.children?.some((c) =>
+          pathname.startsWith(c.to.split("/")[1] ? `/${c.to.split("/")[1]}` : c.to),
+        ),
+      )
       .map((g) => g.label),
   );
 
@@ -264,10 +263,7 @@ function ThemePicker() {
                 theme === t.id ? "border-primary/40 bg-primary-soft" : "border-border",
               )}
             >
-              <span
-                className="h-4 w-4 shrink-0 rounded-full"
-                style={{ background: t.swatch }}
-              />
+              <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: t.swatch }} />
               <span className="truncate">{t.label}</span>
               {theme === t.id && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
             </button>
@@ -355,7 +351,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     [hasModule],
   );
 
-  if (pathname === "/login") return <>{children}</>;
+  // Show the bare login page (no sidebar) as long as /login is the committed
+  // route match. Gate on `useMatches`, not `pathname`: during a navigation the
+  // router updates `location` before it commits the new `matches`, so a
+  // pathname check would paint the dashboard sidebar while the login page is
+  // still the active match (the lingering overlap after login).
+  const matches = useMatches();
+  const isLogin = matches[matches.length - 1]?.routeId === "/login";
+
+  if (isLogin) return <>{children}</>;
 
   // Auth not resolved (SSR/hydration) or the user is being bounced to /login:
   // never paint the dashboard before the session is confirmed, so a browser
@@ -414,7 +418,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </SheetContent>
       </Sheet>
 
-      <div className={cn("transition-[padding] duration-300", collapsed ? "lg:pl-[76px]" : "lg:pl-[260px]")}>
+      <div
+        className={cn(
+          "transition-[padding] duration-300",
+          collapsed ? "lg:pl-[76px]" : "lg:pl-[260px]",
+        )}
+      >
         <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-xl">
           <div className="grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:px-5">
             <div className="flex items-center gap-1">
@@ -463,7 +472,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <ProfileHelpDialog
                 user={user ?? undefined}
                 onLogout={onLogout}
-                trigger={                  <button
+                trigger={
+                  <button
                     type="button"
                     aria-label="Profil & bantuan"
                     className="ml-1 flex items-center gap-2 rounded-xl border border-border bg-card py-1 pl-1 pr-1 text-left transition-colors hover:bg-accent/50 sm:pr-3"

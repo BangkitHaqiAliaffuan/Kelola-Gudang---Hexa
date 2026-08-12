@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Loader2, LogIn, ShieldCheck, Boxes, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,14 +29,27 @@ export const Route = createFileRoute("/login")({
 });
 
 const highlights = [
-  { icon: Boxes, title: "Stok real-time", desc: "Pantau saldo, reserved, dan available per gudang." },
-  { icon: ShieldCheck, title: "Audit trail", desc: "Setiap aktivitas tercatat rapi dan dapat ditelusuri." },
-  { icon: BarChart3, title: "Laporan lengkap", desc: "Mutasi, nilai persediaan, dead stock, fast moving." },
+  {
+    icon: Boxes,
+    title: "Stok real-time",
+    desc: "Pantau saldo, reserved, dan available per gudang.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Audit trail",
+    desc: "Setiap aktivitas tercatat rapi dan dapat ditelusuri.",
+  },
+  {
+    icon: BarChart3,
+    title: "Laporan lengkap",
+    desc: "Mutasi, nilai persediaan, dead stock, fast moving.",
+  },
 ];
 
 function LoginPage() {
   const navigate = useNavigate();
   const { login, status } = useAuth();
+  const routerStatus = useRouterState({ select: (s) => s.status });
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -54,13 +67,26 @@ function LoginPage() {
     );
   }
 
+  // Login succeeded but the dashboard route is still mounting (router status
+  // "pending"). Keep the full-screen spinner so the swap to the dashboard is a
+  // single clean commit instead of a frozen login form / stray sidebar.
+  if (status === "authenticated" && routerStatus === "pending") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Menyiapkan dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await login(email, password);
       toast.success("Berhasil masuk. Selamat datang kembali!");
-      navigate({ to: "/" });
     } catch (err) {
       if (isApiError(err)) {
         const msg = fieldError(err, "email") ?? err.message;
@@ -88,7 +114,10 @@ function LoginPage() {
           </h2>
           <div className="space-y-3">
             {highlights.map((h) => (
-              <div key={h.title} className="flex items-start gap-3 rounded-2xl bg-white/12 p-3.5 backdrop-blur-sm">
+              <div
+                key={h.title}
+                className="flex items-start gap-3 rounded-2xl bg-white/12 p-3.5 backdrop-blur-sm"
+              >
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20">
                   <h.icon className="h-5 w-5" />
                 </span>
@@ -160,7 +189,11 @@ function LoginPage() {
             </div>
 
             <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4" />
+              )}
               {loading ? "Memproses..." : "Masuk"}
             </Button>
           </form>

@@ -11,37 +11,24 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatNumber } from "@/lib/wms-data";
-import {
-  stockDocumentStatuses,
-  stockDocumentTypes,
-  type StockDocumentApi,
-  type StockDocumentType,
-} from "@/lib/persediaan-types";
+import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 
-export const Route = createFileRoute("/persediaan/mutasi")({
+const ADJUSTMENT_TYPE = "Stock Adjustment";
+
+export const Route = createFileRoute("/persediaan/adjustment")({
   head: () => ({
     meta: [
-      { title: "Mutasi Stock — KelolaGudang" },
+      { title: "Stock Adjustment — KelolaGudang" },
       {
         name: "description",
-        content:
-          "Daftar dokumen mutasi stock: penerimaan, pengeluaran, transfer, penyesuaian, dan opname.",
+        content: "Dokumen penyesuaian stok: koreksi selisih stok fisik vs sistem.",
       },
-      { property: "og:title", content: "Mutasi Stock — KelolaGudang" },
-      { property: "og:description", content: "Dokumen mutasi stock lengkap dari ledger." },
+      { property: "og:title", content: "Stock Adjustment — KelolaGudang" },
+      { property: "og:description", content: "Riwayat penyesuaian stok dari ledger." },
     ],
   }),
-  component: MutasiStock,
+  component: StockAdjustment,
 });
-
-const typeTone = (t: StockDocumentType): Tone =>
-  t === "Penerimaan"
-    ? "success"
-    : t === "Pengeluaran"
-      ? "warning"
-      : t === "Stock Adjustment"
-        ? "warning"
-        : "info";
 
 const statusTone = (s: StockDocumentApi["status"]): Tone =>
   s === "Selesai"
@@ -52,30 +39,40 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         ? "danger"
         : "warning";
 
-function MutasiStock() {
-  const { data, isLoading } = useStockDocuments();
+function StockAdjustment() {
+  const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
   const { data: warehouses } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [type, setType] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [wh, setWh] = useState(ALL);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail } = useStockDocument(selectedId ?? undefined);
 
+  const dayOk = (day: string) => {
+    if (dateFrom && dateTo) return day >= dateFrom && day <= dateTo;
+    if (dateFrom) return day === dateFrom;
+    if (dateTo) return day === dateTo;
+    return true;
+  };
+
   const rows = useMemo(
     () =>
-      (data?.data ?? []).filter(
-        (d) =>
+      (data?.data ?? []).filter((d) => {
+        const day = d.document_date.slice(0, 10);
+        return (
           (!debouncedQ ||
             `${d.no} ${d.partner ?? ""} ${d.note ?? ""}`
               .toLowerCase()
               .includes(debouncedQ.toLowerCase())) &&
-          (type === ALL || d.type === type) &&
           (status === ALL || d.status === status) &&
-          (wh === ALL || d.warehouse === wh),
-      ),
-    [data, debouncedQ, type, status, wh],
+          (wh === ALL || d.warehouse === wh) &&
+          dayOk(day)
+        );
+      }),
+    [data, debouncedQ, status, wh, dateFrom, dateTo],
   );
 
   const columns: Column<StockDocumentApi>[] = [
@@ -94,19 +91,11 @@ function MutasiStock() {
       render: (r) => formatDate(r.document_date),
     },
     {
-      key: "type",
-      label: "Jenis",
-      className: "min-w-[140px] whitespace-nowrap",
-      sortable: true,
-      render: (r) => <Pill tone={typeTone(r.type)}>{r.type}</Pill>,
-    },
-    {
       key: "warehouse",
       label: "Gudang",
       className: "min-w-[150px] whitespace-nowrap",
       sortable: true,
-      render: (r) =>
-        r.destination ? `${r.warehouse ?? "—"} → ${r.destination}` : (r.warehouse ?? "—"),
+      render: (r) => r.warehouse ?? "—",
     },
     {
       key: "line_count",
@@ -127,8 +116,8 @@ function MutasiStock() {
   return (
     <>
       <PageHeader
-        title="Mutasi Stock"
-        description="Dokumen mutasi stock yang telah diposting ke ledger"
+        title="Stock Adjustment"
+        description="Dokumen penyesuaian stok yang telah diposting ke ledger"
         actions={
           <Button
             variant="outline"
@@ -140,7 +129,7 @@ function MutasiStock() {
         }
       />
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -150,13 +139,6 @@ function MutasiStock() {
               className="rounded-xl pl-9"
             />
           </div>
-          <FilterSelect
-            className="w-full"
-            value={type}
-            onChange={setType}
-            placeholder="Semua Jenis"
-            options={[...stockDocumentTypes]}
-          />
           <FilterSelect
             className="w-full"
             value={status}
@@ -171,9 +153,33 @@ function MutasiStock() {
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
           />
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Dari Tanggal
+            </label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9 rounded-xl"
+              aria-label="Dari tanggal"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Sampai Tanggal
+            </label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9 rounded-xl"
+              aria-label="Sampai tanggal"
+            />
+          </div>
         </div>
       </Panel>
-      <Panel title="Daftar Dokumen" description={`${formatNumber(rows.length)} dokumen`}>
+      <Panel title="Daftar Penyesuaian" description={`${formatNumber(rows.length)} dokumen`}>
         <DataTable
           columns={columns}
           rows={rows}
@@ -187,12 +193,9 @@ function MutasiStock() {
                 <Pill tone={statusTone(r.status)}>{r.status}</Pill>
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {formatDate(r.document_date)} · {r.type}
+                {formatDate(r.document_date)} · {r.warehouse ?? "—"}
               </p>
-              <p className="text-xs">
-                <b>{r.warehouse ?? "—"}</b>
-                {r.destination ? ` → ${r.destination}` : ""} · {formatNumber(r.line_count)} baris
-              </p>
+              <p className="text-xs">{formatNumber(r.line_count)} baris</p>
             </div>
           )}
         />

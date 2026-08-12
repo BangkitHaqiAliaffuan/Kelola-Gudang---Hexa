@@ -117,6 +117,7 @@ class StockDocumentSeeder extends Seeder
                     'warehouse_id' => $item->default_warehouse_id,
                     'rack_id' => $item->default_rack_id,
                     'bin_id' => $item->default_bin_id,
+                    'from_bin_id' => $item->default_bin_id,
                     'direction' => $direction,
                     'qty' => $qty,
                     'unit_cost' => $currentCost,
@@ -295,7 +296,74 @@ class StockDocumentSeeder extends Seeder
             }
         }
 
-        // ---- Phase 5: a few non-posted documents (lines but no movements) ----
+        // ---- Phase 5: bring a subset of items below their minimum (consumption),
+        //      so the Stock Minimum report has a realistic spread (Habis/Kritis/Menipis) ----
+        $depleteDate = $ref->setTime(23, 57, 0);
+        $depleteLines = [];
+
+        foreach ($items as $item) {
+            $balance = (int) ($finalBalance[$item->id] ?? 0);
+            $min = (int) $item->min_stock;
+
+            // Skip transferred items (finalBalance ignores the transfer split) and
+            // items already at/below their minimum (no room to consume below it).
+            if (isset($transferredItems[$item->id]) || $balance <= $min || $rnd() >= 0.20) {
+                continue;
+            }
+
+            $bucket = $rnd();
+            if ($bucket < 0.10) {
+                $target = 0;                                                              // Habis
+            } elseif ($bucket < 0.35) {
+                $target = max(1, (int) ceil($min * 0.2));                                  // Kritis ketat
+            } else {
+                $target = $int(max(1, (int) ceil($min * 0.4)), max(1, $min));              // Menipis lebar
+            }
+
+            $consumed = $balance - $target;
+            if ($consumed < 1) {
+                continue;
+            }
+
+            $depleteLines[$item->default_warehouse_id][] = [
+                'item' => $item,
+                'qty' => -$consumed,
+                'unit_cost' => $item->cost,
+                'from_bin_id' => $item->default_bin_id,
+                'to_bin_id' => null,
+                'from_warehouse_id' => $item->default_warehouse_id,
+                'direction' => 'OUT',
+                'final' => $target,
+            ];
+        }
+
+        foreach ($depleteLines as $warehouseId => $lines) {
+            while ($lines !== []) {
+                $groupSize = min($int(3, 6), count($lines));
+                if ($groupSize < 2) {
+                    break;
+                }
+
+                $group = array_splice($lines, 0, $groupSize);
+
+                foreach ($group as $line) {
+                    $finalBalance[$line['item']->id] = $line['final'];
+                }
+
+                $documents[] = [
+                    'type' => 'Pengeluaran',
+                    'day' => $depleteDate->startOfDay()->toDateTimeString(),
+                    'warehouse_id' => $warehouseId,
+                    'date' => $depleteDate,
+                    'partner' => 'Departemen Produksi',
+                    'pic' => $pick(self::PICS),
+                    'note' => 'Pemakaian produksi (stok tersisa di bawah minimum)',
+                    'lines' => $group,
+                ];
+            }
+        }
+
+        // ---- Phase 6: a few non-posted documents (lines but no movements) ----
         $nonPostedTypes = ['Penerimaan', 'Pengeluaran', 'Stock Adjustment', 'Transfer Gudang'];
         $nonPostedStatuses = ['Draft', 'Menunggu Approval', 'Dibatalkan'];
 

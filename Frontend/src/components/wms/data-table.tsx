@@ -10,6 +10,7 @@ export type Column<T> = {
   className?: string;
   sticky?: "left" | "right";
   sortable?: boolean;
+  sortAccessor?: (row: T) => unknown;
   render: (row: T) => ReactNode;
 };
 
@@ -46,11 +47,13 @@ export function DataTable<T extends { id: string | number }>({
   const sorted = useMemo(() => {
     if (!sort) return rows;
     const { key, dir } = sort;
+    const col = columns.find((c) => c.key === key);
+    const get = col?.sortAccessor ?? ((r: T) => sortValue(r, key));
     return [...rows].sort((a, b) => {
-      const cmp = compare(sortValue(a, key), sortValue(b, key));
+      const cmp = compare(get(a), get(b));
       return dir === "asc" ? cmp : -cmp;
     });
-  }, [rows, sort]);
+  }, [rows, sort, columns]);
   const slice = sorted.slice((current - 1) * pageSize, current * pageSize);
 
   const toggleSort = (key: string) => {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\StockDocumentResource;
 use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
 use App\Services\StockDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -61,7 +62,11 @@ class StockDocumentController extends Controller
             'lines.item.unit',
             'lines.fromBin.rack',
             'lines.toBin.rack',
+            'movements',
         ]);
+
+        $byLine = $stockDocument->movements->keyBy('line_no');
+        $stockDocument->lines->each(fn (StockDocumentLine $line) => $line->setRelation('movement', $byLine->get($line->line_no)));
 
         return new StockDocumentResource($stockDocument);
     }
