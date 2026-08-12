@@ -22,7 +22,7 @@ export function FilterSelect({
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
-  options: string[];
+  options: Array<string | { value: string; label: string }>;
   className?: string;
 }) {
   return (
@@ -32,11 +32,14 @@ export function FilterSelect({
       </SelectTrigger>
       <SelectContent className="max-h-72 rounded-xl">
         <SelectItem value={ALL}>{placeholder}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
-          </SelectItem>
-        ))}
+        {options.map((o) => {
+          const entry = typeof o === "string" ? { value: o, label: o } : o;
+          return (
+            <SelectItem key={entry.value} value={entry.value}>
+              {entry.label}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

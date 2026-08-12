@@ -34,7 +34,7 @@ class StockDocumentSeeder extends Seeder
         'Stock Opname' => 'SO',
     ];
 
-    private const MAX_LINES_PER_DOCUMENT = 4;
+    private const MAX_LINES_PER_DOCUMENT = 6;
 
     public function run(): void
     {
@@ -214,58 +214,85 @@ class StockDocumentSeeder extends Seeder
             $transferredItems[$item->id] = true;
         }
 
-        // ---- Phase 4: stock opname (variance = actual - system) ----
+        // ---- Phase 4: stock opname (variance = actual - system), multi-SKU per doc ----
         $opnameDate = $ref->setTime(23, 56, 0);
         $opnamedItems = [];
 
-        foreach ($items as $item) {
-            if (isset($transferredItems[$item->id]) || ($finalBalance[$item->id] ?? 0) < 1 || $rnd() >= 0.15 || count($opnamedItems) >= 20) {
-                continue;
+        foreach ($warehouses as $warehouse) {
+            if (count($opnamedItems) >= 100) {
+                break;
             }
 
-            $system = $finalBalance[$item->id];
-            $mismatch = $rnd() < 0.7;
-
-            if ($mismatch) {
-                $maxDelta = max(1, (int) ceil($system * 0.3));
-                if ($rnd() < 0.55) {
-                    $delta = min($int(1, $maxDelta), $system);
-                    $actual = $system - $delta;
-                } else {
-                    $delta = $int(1, $maxDelta);
-                    $actual = $system + $delta;
+            $candidates = [];
+            foreach ($items as $item) {
+                if ($item->default_warehouse_id !== $warehouse->id) {
+                    continue;
                 }
-                $finalBalance[$item->id] = $actual;
-            } else {
-                $delta = 0;
-                $actual = $system;
+                if (isset($transferredItems[$item->id]) || ($finalBalance[$item->id] ?? 0) < 1 || $rnd() >= 0.15) {
+                    continue;
+                }
+                $candidates[] = $item;
             }
 
-            $documents[] = [
-                'type' => 'Stock Opname',
-                'day' => $opnameDate->startOfDay()->toDateTimeString(),
-                'warehouse_id' => $item->default_warehouse_id,
-                'destination_warehouse_id' => null,
-                'date' => $opnameDate,
-                'partner' => null,
-                'pic' => $pick(self::PICS),
-                'note' => 'Opname stok (hitung fisik)',
-                'lines' => [
-                    [
-                        'item' => $item,
-                        'system_qty' => $system,
-                        'actual_qty' => $actual,
-                        'delta' => $delta,
-                        'unit_cost' => $item->cost,
-                        'from_bin_id' => $item->default_bin_id,
-                        'to_bin_id' => null,
-                        'from_warehouse_id' => $item->default_warehouse_id,
-                        'direction' => $delta > 0 ? 'IN' : ($delta < 0 ? 'OUT' : null),
-                    ],
-                ],
-            ];
+            $candidates = array_slice($candidates, 0, $int(8, 12));
 
-            $opnamedItems[$item->id] = true;
+            $lines = [];
+            foreach ($candidates as $item) {
+                $system = $finalBalance[$item->id];
+                $mismatch = $rnd() < 0.7;
+
+                if ($mismatch) {
+                    $maxDelta = max(1, (int) ceil($system * 0.3));
+                    if ($rnd() < 0.55) {
+                        $delta = min($int(1, $maxDelta), $system);
+                        $actual = $system - $delta;
+                    } else {
+                        $delta = $int(1, $maxDelta);
+                        $actual = $system + $delta;
+                    }
+                } else {
+                    $delta = 0;
+                    $actual = $system;
+                }
+
+                $lines[] = [
+                    'item' => $item,
+                    'system_qty' => $system,
+                    'actual_qty' => $actual,
+                    'delta' => $delta,
+                    'unit_cost' => $item->cost,
+                    'from_bin_id' => $item->default_bin_id,
+                    'to_bin_id' => null,
+                    'from_warehouse_id' => $item->default_warehouse_id,
+                    'direction' => $delta > 0 ? 'IN' : ($delta < 0 ? 'OUT' : null),
+                ];
+            }
+
+            while ($lines !== []) {
+                $groupSize = min($int(3, 6), count($lines));
+                if ($groupSize < 2) {
+                    break;
+                }
+
+                $group = array_splice($lines, 0, $groupSize);
+
+                foreach ($group as $line) {
+                    $finalBalance[$line['item']->id] = $line['actual_qty'];
+                    $opnamedItems[$line['item']->id] = true;
+                }
+
+                $documents[] = [
+                    'type' => 'Stock Opname',
+                    'day' => $opnameDate->startOfDay()->toDateTimeString(),
+                    'warehouse_id' => $warehouse->id,
+                    'destination_warehouse_id' => null,
+                    'date' => $opnameDate,
+                    'partner' => null,
+                    'pic' => $pick(self::PICS),
+                    'note' => 'Opname stok (hitung fisik)',
+                    'lines' => $group,
+                ];
+            }
         }
 
         // ---- Phase 5: a few non-posted documents (lines but no movements) ----
