@@ -13,6 +13,7 @@ class BinResource extends JsonResource
             'id' => $this->id,
             'rack_id' => $this->rack_id,
             'rack_name' => $this->whenLoaded('rack', fn () => $this->rack?->name),
+            'warehouse_id' => $this->whenLoaded('rack', fn () => $this->rack?->warehouse_id),
             'warehouse_name' => $this->whenLoaded('rack', fn () => $this->rack?->warehouse?->name),
             'level' => $this->level,
             'position' => $this->position,

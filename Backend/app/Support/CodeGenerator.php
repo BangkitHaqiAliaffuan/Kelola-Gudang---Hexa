@@ -34,11 +34,13 @@ class CodeGenerator
     }
 
     /**
-     * Year-scoped sequence: `{PREFIX}/{YEAR}/####` (e.g. WO/2026/0001).
+     * Year-scoped sequence: `{PREFIX}/{YEAR}/{####}` (e.g. WO/2026/0001).
      * The counter resets each calendar year; only codes under the current
      * year's head (`{PREFIX}/{YEAR}/`) are considered when deriving the next number.
+     * `$width` sets the zero-padded number width (default 4, e.g. stock documents
+     * use 5: BM/2026/00123).
      */
-    public static function nextYearly(string $model, string $prefix, string $column = 'code'): string
+    public static function nextYearly(string $model, string $prefix, string $column = 'code', int $width = 4): string
     {
         $instance = new $model;
 
@@ -48,7 +50,7 @@ class CodeGenerator
 
         $head = $prefix.'/'.date('Y');
 
-        return DB::transaction(function () use ($instance, $head, $column) {
+        return DB::transaction(function () use ($instance, $head, $column, $width) {
             DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ["code:{$instance->getTable()}:{$column}:{$head}"]);
 
             $next = $instance->query()
@@ -60,7 +62,7 @@ class CodeGenerator
                     return max($carry ?? 0, $number);
                 }, null);
 
-            return $head.'/'.str_pad((string) (($next ?? 0) + 1), 4, '0', STR_PAD_LEFT);
+            return $head.'/'.str_pad((string) (($next ?? 0) + 1), $width, '0', STR_PAD_LEFT);
         });
     }
 }

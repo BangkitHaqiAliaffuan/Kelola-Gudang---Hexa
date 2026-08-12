@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\ItemStock;
 use App\Models\StockMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -99,5 +100,53 @@ class StockMinimumApiTest extends TestCase
         $row = Item::query()->first();
         $this->assertNotNull($row);
         $this->assertIsNumeric($usageQuery);
+    }
+
+    public function test_warehouse_filter_scopes_stock_and_usage(): void
+    {
+        // Pick two warehouses that each have item_stock rows.
+        $warehouseIds = ItemStock::distinct()->pluck('warehouse_id')->take(2);
+        if ($warehouseIds->count() < 2) {
+            $this->markTestSkipped('Need at least 2 warehouses with item_stock rows.');
+        }
+
+        [$wh1Id, $wh2Id] = [$warehouseIds->first(), $warehouseIds->last()];
+
+        $r1 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh1Id}&per_page=500")
+            ->assertOk()
+            ->json('data');
+
+        $r2 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh2Id}&per_page=500")
+            ->assertOk()
+            ->json('data');
+
+        // Every row returned for wh1 must have a total_stock equal to
+        // the per-warehouse item_stock sum — not the global total.
+        foreach ($r1 as $row) {
+            $expected = (int) ItemStock::where('item_id', $row['item_id'])
+                ->where('warehouse_id', $wh1Id)
+                ->sum('stock');
+            $this->assertSame(
+                $expected,
+                $row['total_stock'],
+                "total_stock for item {$row['sku']} in warehouse {$wh1Id} should be {$expected}, got {$row['total_stock']}"
+            );
+        }
+
+        // At least one item must have a different total_stock between the two
+        // warehouses — proving the filter actually changes the data.
+        $allSame = true;
+        foreach ($r1 as $row1) {
+            $row2 = collect($r2)->firstWhere('item_id', $row1['item_id']);
+            if ($row2 && $row1['total_stock'] !== $row2['total_stock']) {
+                $allSame = false;
+                break;
+            }
+        }
+
+        $this->assertFalse(
+            $allSame,
+            'total_stock should differ for at least one item between the two warehouses — filter is not working.'
+        );
     }
 }

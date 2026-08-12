@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { BarangMasukForm } from "@/components/wms/barang-masuk-form";
 import { TransactionFormPage } from "@/components/wms/transaction-form";
 import { trxSections } from "@/lib/trx-sections";
 
@@ -22,6 +23,11 @@ export const Route = createFileRoute("/transaksi/entri/$section")({
 function TambahTransaksi() {
   const { section } = Route.useParams();
   const cfg = trxSections[section] ?? trxSections["masuk"]!;
+
+  if (section === "masuk") {
+    return <BarangMasukForm />;
+  }
+
   return (
     <TransactionFormPage
       variant={cfg.variant}

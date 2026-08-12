@@ -4,7 +4,6 @@
 
 import type { RoleAccessEntry } from "./schemas";
 
-
 export type Category = {
   id: number;
   code: string;
@@ -78,6 +77,7 @@ export type Bin = {
   id: number;
   rack_id: number;
   rack_name?: string | null;
+  warehouse_id: number | null;
   warehouse_name?: string | null;
   level: string;
   position: string;

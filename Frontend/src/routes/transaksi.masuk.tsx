@@ -1,22 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { TransactionPage } from "@/components/wms/transaction-page";
+import { BarangMasukPage } from "@/components/wms/transaksi-masuk";
 
 export const Route = createFileRoute("/transaksi/masuk")({
   head: () => ({
     meta: [
       { title: "Barang Masuk — KelolaGudang" },
-      { name: "description", content: "Catat penerimaan barang dari supplier dengan scan barcode." },
+      { name: "description", content: "Catat penerimaan barang dari supplier." },
       { property: "og:title", content: "Barang Masuk — KelolaGudang" },
-      { property: "og:description", content: "Transaksi penerimaan barang gudang." },
+      { property: "og:description", content: "Penerimaan barang gudang dari supplier." },
     ],
   }),
-  component: () => (
-    <TransactionPage
-      variant="masuk"
-      type="Barang Masuk"
-      section="masuk"
-      title="Barang Masuk"
-      description="Penerimaan barang dari supplier"
-    />
-  ),
+  component: BarangMasukPage,
 });

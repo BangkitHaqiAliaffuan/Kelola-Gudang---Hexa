@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Services\StockDocumentService;
+use App\Support\CodeGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class StockDocumentController extends Controller
@@ -30,7 +33,9 @@ class StockDocumentController extends Controller
 
         $query = StockDocument::query()
             ->with(['warehouse', 'destination'])
-            ->withCount('lines');
+            ->withCount('lines')
+            ->withSum('lines as qty_total', 'qty')
+            ->withSum('lines as value_total', DB::raw('qty * unit_cost'));
 
         if ($needle = strtolower((string) ($data['search'] ?? ''))) {
             $query->where(function ($q) use ($needle) {
@@ -51,6 +56,57 @@ class StockDocumentController extends Controller
         return StockDocumentResource::collection(
             $query->paginate((int) $request->query('per_page', 20))
         );
+    }
+
+    /**
+     * Simpan dokumen baru (scope: Penerimaan). Bila `status` = Selesai, dokumen
+     * langsung diposting sehingga stok bergerak; Draft hanya menyimpan dokumen.
+     */
+    public function store(StoreStockDocumentRequest $request)
+    {
+        $data = $request->validated();
+
+        try {
+            $document = DB::transaction(function () use ($data, $request) {
+                $document = StockDocument::create([
+                    'no' => CodeGenerator::nextYearly(StockDocument::class, 'BM', 'no', 5),
+                    'type' => $data['type'],
+                    'status' => $data['status'],
+                    'document_date' => $data['document_date'],
+                    'warehouse_id' => $data['warehouse_id'],
+                    'partner' => $data['partner'] ?? null,
+                    'reference_no' => $data['reference_no'] ?? null,
+                    'pic' => $data['pic'] ?? null,
+                    'note' => $data['note'] ?? null,
+                    'created_by' => $request->user()?->id,
+                ]);
+
+                foreach ($data['lines'] as $index => $line) {
+                    StockDocumentLine::create([
+                        'document_id' => $document->id,
+                        'line_no' => $index + 1,
+                        'item_id' => $line['item_id'],
+                        'qty' => $line['qty'],
+                        'unit_cost' => $line['unit_cost'],
+                        'to_bin_id' => $line['to_bin_id'],
+                        'from_bin_id' => $line['from_bin_id'] ?? null,
+                        'note' => $line['note'] ?? null,
+                    ]);
+                }
+
+                if ($data['status'] === 'Selesai') {
+                    $this->service->post($document);
+                }
+
+                return $document;
+            });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return (new StockDocumentResource($document->load([
+            'warehouse', 'destination', 'creator', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+        ])->loadCount('lines')))->response()->setStatusCode(201);
     }
 
     public function show(StockDocument $stockDocument): StockDocumentResource

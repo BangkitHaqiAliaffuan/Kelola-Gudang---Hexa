@@ -111,7 +111,12 @@ class StockDocumentService
             ];
         }
 
-        $bin = $line->fromBin ?? $line->item->bin;
+        // Arah IN memprioritaskan bin tujuan (to_bin_id); bin asal dipakai sebagai
+        // fallback agar dokumen lama (BM/BK/ADJ yang hanya mengisi from_bin_id) tetap
+        // terposting. Arah OUT memakai bin asal (sumber stok).
+        $bin = $direction === 'IN'
+            ? ($line->toBin ?? $line->fromBin ?? $line->item->bin)
+            : ($line->fromBin ?? $line->item->bin);
 
         return [[
             ...$base,

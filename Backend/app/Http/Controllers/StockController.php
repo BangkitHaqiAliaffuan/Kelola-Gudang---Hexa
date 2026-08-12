@@ -110,7 +110,7 @@ class StockController extends Controller
             ->where('direction', 'OUT')
             ->where('movement_type', 'Pengeluaran')
             ->where('occurred_at', '>=', $cutoff)
-            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->groupBy('item_id')
             ->pluck('used', 'item_id');
 
@@ -310,7 +310,7 @@ class StockController extends Controller
 
         $movements = StockMovement::query()
             ->whereIn('item_id', $itemIds)
-            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->orderBy('occurred_at')
             ->orderBy('id')
             ->get()
@@ -318,7 +318,7 @@ class StockController extends Controller
 
         $reservedByItem = ItemStock::query()
             ->whereIn('item_id', $itemIds)
-            ->when($warehouseId !== null, fn ($q, $wh) => $q->where('warehouse_id', $wh))
+            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->selectRaw('item_id, COALESCE(SUM(reserved), 0) AS reserved')
             ->groupBy('item_id')
             ->pluck('reserved', 'item_id');

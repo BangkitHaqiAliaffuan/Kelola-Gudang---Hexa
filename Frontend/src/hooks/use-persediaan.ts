@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
 import type {
   StockCardApi,
   StockDocumentApi,
+  StockDocumentPayload,
   StockMinimumApi,
   StockRowApi,
   StockValuationApi,
@@ -53,6 +54,15 @@ export function useStockDocument(id: number | undefined) {
     queryKey: ["persediaan", "stock-documents", "detail", id],
     queryFn: () => api.get<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}`),
     enabled: id != null && typeof window !== "undefined",
+  });
+}
+
+export function useCreateStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: StockDocumentPayload) =>
+      api.post<{ data: StockDocumentApi }>("/persediaan/stock-documents", payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents"] }),
   });
 }
 

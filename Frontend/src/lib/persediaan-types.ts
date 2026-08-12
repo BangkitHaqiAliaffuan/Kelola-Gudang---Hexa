@@ -188,5 +188,33 @@ export type StockDocumentApi = {
   posted_at: string | null;
   created_by: string | null;
   line_count: number;
+  qty_total?: number;
+  value_total?: number;
   lines?: StockDocumentLineApi[];
+};
+
+// ---- Pembuatan dokumen (POST /api/persediaan/stock-documents) ----
+// Scope saat ini: Penerimaan. Baris memakai `to_bin_id` sebagai bin tujuan
+// (arah IN memprioritaskan to_bin di service); `from_bin_id` opsional untuk
+// tipe lain di masa depan.
+
+export type StockDocumentLinePayload = {
+  item_id: number;
+  qty: number;
+  unit_cost: number;
+  to_bin_id: number;
+  from_bin_id?: number | null;
+  note?: string | null;
+};
+
+export type StockDocumentPayload = {
+  type: "Penerimaan";
+  status: "Draft" | "Selesai";
+  document_date: string;
+  warehouse_id: number;
+  partner: string | null;
+  reference_no: string | null;
+  pic?: string | null;
+  note: string | null;
+  lines: StockDocumentLinePayload[];
 };
