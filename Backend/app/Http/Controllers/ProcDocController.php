@@ -7,7 +7,9 @@ use App\Http\Requests\UpdateProcDocRequest;
 use App\Http\Resources\ProcDocResource;
 use App\Models\Item;
 use App\Models\ProcDoc;
+use App\Models\ProcDocApproval;
 use App\Models\ProcDocLine;
+use App\Support\ApprovalEngine;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,8 +23,10 @@ class ProcDocController extends Controller
         'department',
         'supplier',
         'requester',
+        'activeApprover',
         'approver',
         'creator',
+        'approvals.approver',
         'lines.item.unit',
     ];
 
@@ -156,34 +160,38 @@ class ProcDocController extends Controller
     public function submit(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
         if (! $procDoc->isDraft()) {
-            return response()->json(['message' => 'Hanya Purchase Request berstatus Draft yang dapat diajukan.'], 422);
+            return response()->json(['message' => 'Hanya dokumen pengadaan berstatus Draft yang dapat diajukan.'], 422);
         }
 
         $procDoc->update(['status' => 'Menunggu Approval', 'submitted_at' => now()]);
 
+        ApprovalEngine::start($procDoc);
+
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
     /**
-     * Setujui Purchase Request yang menunggu approval.
+     * Setujui dokumen pengadaan yang menunggu approval (approver ditunjuk
+     * atau user Pengadaan Kelola; requester tidak boleh menyetujui sendiri).
      */
     public function approve(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
         if (! $procDoc->isPendingApproval()) {
-            return response()->json(['message' => 'Hanya Purchase Request berstatus Menunggu Approval yang dapat disetujui.'], 422);
+            return response()->json(['message' => 'Hanya dokumen pengadaan berstatus Menunggu Approval yang dapat disetujui.'], 422);
         }
 
-        $procDoc->update([
-            'status' => 'Disetujui',
-            'approved_by' => request()->user()?->id,
-            'approved_at' => now(),
-        ]);
+        $user = request()->user();
+        if (! ApprovalEngine::canDecide($procDoc, (int) $user?->id)) {
+            return response()->json(['message' => 'Anda tidak berwenang menyetujui dokumen ini.'], 403);
+        }
+
+        ApprovalEngine::decide($procDoc, (int) $user->id, 'Disetujui', null);
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
     /**
-     * Tolak Purchase Request yang menunggu approval — alasan penolakan wajib.
+     * Tolak dokumen pengadaan yang menunggu approval — alasan penolakan wajib.
      */
     public function reject(Request $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
@@ -192,29 +200,39 @@ class ProcDocController extends Controller
         ]);
 
         if (! $procDoc->isPendingApproval()) {
-            return response()->json(['message' => 'Hanya Purchase Request berstatus Menunggu Approval yang dapat ditolak.'], 422);
+            return response()->json(['message' => 'Hanya dokumen pengadaan berstatus Menunggu Approval yang dapat ditolak.'], 422);
         }
 
-        $procDoc->update([
-            'status' => 'Ditolak',
-            'approved_by' => $request->user()?->id,
-            'approved_at' => now(),
-            'decision_note' => $data['decision_note'],
-        ]);
+        if (! ApprovalEngine::canDecide($procDoc, (int) $request->user()?->id)) {
+            return response()->json(['message' => 'Anda tidak berwenang menolak dokumen ini.'], 403);
+        }
+
+        ApprovalEngine::decide($procDoc, (int) $request->user()?->id, 'Ditolak', $data['decision_note']);
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
     /**
-     * Batalkan Purchase Request (Draft atau Menunggu Approval).
+     * Batalkan dokumen pengadaan (Draft atau Menunggu Approval).
      */
     public function cancel(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
         if (! $procDoc->isDraft() && ! $procDoc->isPendingApproval()) {
-            return response()->json(['message' => 'Purchase Request dengan status ini tidak dapat dibatalkan.'], 422);
+            return response()->json(['message' => 'Dokumen pengadaan dengan status ini tidak dapat dibatalkan.'], 422);
         }
 
-        $procDoc->update(['status' => 'Dibatalkan']);
+        $wasPending = $procDoc->isPendingApproval();
+
+        $procDoc->update([
+            'status' => 'Dibatalkan',
+            'approver_user_id' => null,
+        ]);
+
+        if ($wasPending) {
+            ProcDocApproval::where('proc_doc_id', $procDoc->id)
+                ->where('status', 'Menunggu')
+                ->delete();
+        }
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }

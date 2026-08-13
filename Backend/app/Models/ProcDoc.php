@@ -35,6 +35,7 @@ class ProcDoc extends Model
         'reference',
         'note',
         'submitted_at',
+        'approver_user_id',
         'approved_by',
         'approved_at',
         'decision_note',
@@ -76,6 +77,16 @@ class ProcDoc extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function activeApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approver_user_id');
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(ProcDocApproval::class, 'proc_doc_id')->orderBy('level');
     }
 
     public function creator(): BelongsTo
