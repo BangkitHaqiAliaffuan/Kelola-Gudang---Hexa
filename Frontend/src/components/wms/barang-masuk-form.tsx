@@ -5,6 +5,16 @@ import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +60,7 @@ export function BarangMasukForm() {
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
+  const [confirmPosting, setConfirmPosting] = useState(false);
 
   const binsInWarehouse = useMemo(
     () =>
@@ -430,12 +441,39 @@ export function BarangMasukForm() {
         </Button>
         <Button
           className="rounded-xl"
-          onClick={() => submit("Selesai")}
+          onClick={() => setConfirmPosting(true)}
           disabled={create.isPending || !canCreate}
         >
           <Save className="h-4 w-4" /> Simpan & Posting
         </Button>
       </div>
+
+      <AlertDialog open={confirmPosting} onOpenChange={(o) => !o && setConfirmPosting(false)}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Posting dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen akan diposting dan stok langsung ter-update. Tindakan ini tidak dapat
+              dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setConfirmPosting(false)}>
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirmPosting(false);
+                void submit("Selesai");
+              }}
+            >
+              Ya, Posting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

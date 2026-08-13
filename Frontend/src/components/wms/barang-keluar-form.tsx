@@ -5,6 +5,16 @@ import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +69,7 @@ export function BarangKeluarForm() {
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
+  const [confirmPosting, setConfirmPosting] = useState(false);
 
   const binsInWarehouse = useMemo(
     () =>
@@ -101,30 +112,74 @@ export function BarangKeluarForm() {
     [binsInWarehouse],
   );
 
-  // Ketersediaan per (barang, bin) dari /persediaan/stock; dipakai hanya sebagai
-  // peringatan proaktif — validasi otoritatif tetap server saat posting.
+  // Ketersediaan per (barang, bin) dari /persediaan/stock; dipakai sebagai
+  // peringatan proaktif + penyaringan opsi barang per bin — validasi
+  // otoritatif tetap server saat posting.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of stockRows?.data ?? []) map.set(`${r.item_id}:${r.bin_id}`, r.available);
     return map;
   }, [stockRows]);
 
+  const availableItemIdsByBin = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const r of stockRows?.data ?? []) {
+      if (r.available <= 0) continue;
+      const binKey = String(r.bin_id);
+      const set = map.get(binKey) ?? new Set<string>();
+      set.add(String(r.item_id));
+      map.set(binKey, set);
+    }
+    return map;
+  }, [stockRows]);
+
   const lineAvailable = (l: FormLine): number | undefined =>
     l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
 
+  const lineItemOptions = (l: FormLine): ComboboxOption[] => {
+    if (!l.binId) return itemOptions;
+    const availableIds = availableItemIdsByBin.get(l.binId);
+    if (!availableIds) return [];
+    return itemOptions.filter((o) => availableIds.has(o.value));
+  };
+
   const totalQty = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0), [lines]);
 
-  const patchLine = (key: string, patch: Partial<FormLine>) =>
-    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const patchLine = (
+    key: string,
+    patch: Partial<FormLine> | ((line: FormLine) => Partial<FormLine>),
+  ) =>
+    setLines((prev) =>
+      prev.map((l) =>
+        l.key === key ? { ...l, ...(typeof patch === "function" ? patch(l) : patch) } : l,
+      ),
+    );
 
   const pickItem = (key: string, itemId: string) => {
-    const item = items?.data.find((x) => String(x.id) === itemId);
-    patchLine(key, {
-      itemId,
-      binId:
+    patchLine(key, (line) => {
+      const item = items?.data.find((x) => String(x.id) === itemId);
+      const defaultBin =
         item?.default_bin_id != null && binsInWarehouse.some((b) => b.id === item.default_bin_id)
           ? String(item.default_bin_id)
-          : "",
+          : "";
+      return {
+        itemId,
+        ...(line.binId ? {} : { binId: defaultBin }),
+      };
+    });
+  };
+
+  const pickBin = (key: string, binId: string) => {
+    patchLine(key, (line) => {
+      if (line.binId === binId) return {};
+      const availableIds = binId ? availableItemIdsByBin.get(binId) : undefined;
+      const keepItem = availableIds
+        ? Boolean(line.itemId && availableIds.has(line.itemId))
+        : Boolean(line.itemId);
+      return {
+        binId,
+        ...(keepItem ? {} : { itemId: "" }),
+      };
     });
   };
 
@@ -234,6 +289,8 @@ export function BarangKeluarForm() {
               options={warehouseOptions}
               placeholder="Pilih Gudang"
               searchPlaceholder="Cari gudang..."
+              side="bottom"
+              avoidCollisions={false}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -248,6 +305,8 @@ export function BarangKeluarForm() {
               placeholder="Customer / Departemen / Proyek"
               searchPlaceholder="Cari tujuan..."
               allowEmpty
+              side="bottom"
+              avoidCollisions={false}
             />
           </div>
           <div className="space-y-1.5">
@@ -293,7 +352,7 @@ export function BarangKeluarForm() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Tersedia", ""].map((h) => (
+                {["Asal Bin", "Barang", "Qty", "Tersedia", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -306,30 +365,34 @@ export function BarangKeluarForm() {
                 const overStock = available !== undefined && (Number(l.qty) || 0) > available;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
-                    <td className="w-[320px] px-3 py-2 align-top">
-                      <FormCombobox
-                        value={l.itemId}
-                        onValueChange={(v) => pickItem(l.key, v)}
-                        options={itemOptions}
-                        placeholder="Pilih barang / scan barcode"
-                        searchPlaceholder="Cari nama, SKU, barcode..."
-                      />
-                      {lineError(i, "item_id") && (
-                        <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
-                      )}
-                    </td>
                     <td className="w-[220px] px-3 py-2 align-top">
                       <FormCombobox
                         value={l.binId}
-                        onValueChange={(v) => patchLine(l.key, { binId: v })}
+                        onValueChange={(v) => pickBin(l.key, v)}
                         options={binOptions}
                         placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                       {lineError(i, "from_bin_id") && (
                         <p className="mt-1 text-xs text-destructive">
                           {lineError(i, "from_bin_id")}
                         </p>
+                      )}
+                    </td>
+                    <td className="w-[320px] px-3 py-2 align-top">
+                      <FormCombobox
+                        value={l.itemId}
+                        onValueChange={(v) => pickItem(l.key, v)}
+                        options={lineItemOptions(l)}
+                        placeholder="Pilih barang / scan barcode"
+                        searchPlaceholder="Cari nama, SKU, barcode..."
+                        side="bottom"
+                        avoidCollisions={false}
+                      />
+                      {lineError(i, "item_id") && (
+                        <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
                       )}
                     </td>
                     <td className="px-3 py-2 align-top">
@@ -379,16 +442,20 @@ export function BarangKeluarForm() {
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
                   <FormCombobox
-                    value={l.itemId}
-                    onValueChange={(v) => pickItem(l.key, v)}
-                    options={itemOptions}
-                    placeholder="Pilih barang"
-                  />
-                  <FormCombobox
                     value={l.binId}
-                    onValueChange={(v) => patchLine(l.key, { binId: v })}
+                    onValueChange={(v) => pickBin(l.key, v)}
                     options={binOptions}
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
+                    side="bottom"
+                    avoidCollisions={false}
+                  />
+                  <FormCombobox
+                    value={l.itemId}
+                    onValueChange={(v) => pickItem(l.key, v)}
+                    options={lineItemOptions(l)}
+                    placeholder="Pilih barang"
+                    side="bottom"
+                    avoidCollisions={false}
                   />
                   <div className="flex items-center gap-2">
                     <Input
@@ -446,7 +513,7 @@ export function BarangKeluarForm() {
             </Button>
             <Button
               className="rounded-xl"
-              onClick={() => submit("Selesai")}
+              onClick={() => setConfirmPosting(true)}
               disabled={create.isPending}
             >
               <Save className="h-4 w-4" /> Simpan & Posting
@@ -454,6 +521,33 @@ export function BarangKeluarForm() {
           </>
         )}
       </div>
+
+      <AlertDialog open={confirmPosting} onOpenChange={(o) => !o && setConfirmPosting(false)}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Posting dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen akan diposting dan stok langsung ter-update. Tindakan ini tidak dapat
+              dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setConfirmPosting(false)}>
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl"
+              onClick={(e) => {
+                e.preventDefault();
+                setConfirmPosting(false);
+                void submit("Selesai");
+              }}
+            >
+              Ya, Posting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -26,6 +26,8 @@ export type FormComboboxProps = {
   searchPlaceholder?: string;
   emptyLabel?: string;
   allowEmpty?: boolean;
+  side?: "top" | "right" | "bottom" | "left";
+  avoidCollisions?: boolean;
 } & ButtonProps;
 
 export function FormCombobox({
@@ -36,6 +38,8 @@ export function FormCombobox({
   searchPlaceholder = "Cari...",
   emptyLabel = "Tidak ada",
   allowEmpty = false,
+  side,
+  avoidCollisions,
   className,
   ...buttonProps
 }: FormComboboxProps) {
@@ -72,6 +76,8 @@ export function FormCombobox({
         className="w-(--radix-popover-trigger-width) p-0"
         onWheel={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
+        {...(side ? { side } : {})}
+        {...(avoidCollisions !== undefined ? { avoidCollisions } : {})}
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="h-9" />

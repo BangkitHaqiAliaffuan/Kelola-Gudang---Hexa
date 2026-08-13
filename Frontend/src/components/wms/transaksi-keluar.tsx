@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
+import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -10,6 +10,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import { cn } from "@/lib/utils";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
@@ -34,6 +35,7 @@ export function BarangKeluarPage() {
   const [purpose, setPurpose] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const { data: detail } = useStockDocument(selectedId ?? undefined);
 
   const purposes = useMemo(
@@ -133,56 +135,76 @@ export function BarangKeluarPage() {
 
   return (
     <>
-      <PageHeader
-        title="Barang Keluar"
-        description="Pengeluaran barang ke customer, produksi, departemen, atau proyek"
-        actions={
-          canCreate && (
-            <Button asChild className="rounded-xl">
-              <Link to="/transaksi/entri/$section" params={{ section: "keluar" }}>
-                <Plus className="h-4 w-4" /> Buat Barang Keluar
-              </Link>
-            </Button>
-          )
-        }
-      />
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Barang Keluar"
+          description="Pengeluaran barang ke customer, produksi, departemen, atau proyek"
+          actions={
+            canCreate && (
+              <Button asChild className="rounded-xl">
+                <Link to="/transaksi/entri/$section" params={{ section: "keluar" }}>
+                  <Plus className="h-4 w-4" /> Buat Barang Keluar
+                </Link>
+              </Button>
+            )
+          }
+        />
 
-      <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, tujuan, gudang, PIC, tanggal, referensi, status..."
-              className="rounded-xl pl-9"
+        <Panel title="Filter">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, tujuan, gudang, PIC, tanggal, referensi, status..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full"
+              value={wh}
+              onChange={setWh}
+              placeholder="Semua Gudang"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+            />
+            <FilterSelect
+              className="w-full"
+              value={purpose}
+              onChange={setPurpose}
+              placeholder="Semua Tujuan"
+              options={purposes}
+            />
+            <FilterSelect
+              className="w-full"
+              value={status}
+              onChange={setStatus}
+              placeholder="Semua Status"
+              options={[...stockDocumentStatuses]}
             />
           </div>
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-          />
-          <FilterSelect
-            className="w-full"
-            value={purpose}
-            onChange={setPurpose}
-            placeholder="Semua Tujuan"
-            options={purposes}
-          />
-          <FilterSelect
-            className="w-full"
-            value={status}
-            onChange={setStatus}
-            placeholder="Semua Status"
-            options={[...stockDocumentStatuses]}
-          />
-        </div>
-      </Panel>
+        </Panel>
+      </div>
 
-      <Panel title="Daftar Pengeluaran" description={`${formatNumber(rows.length)} dokumen`}>
+      <Panel
+        title="Daftar Pengeluaran"
+        description={`${formatNumber(rows.length)} dokumen`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
+          </Button>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}
