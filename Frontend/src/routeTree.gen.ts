@@ -35,8 +35,11 @@ import { Route as TransaksiReturPenjualanRouteImport } from './routes/transaksi.
 import { Route as TransaksiTransferRouteImport } from './routes/transaksi.transfer'
 import { Route as MasterBarangIndexRouteImport } from './routes/master.barang.index'
 import { Route as MasterBarangIdRouteImport } from './routes/master.barang.$id'
+import { Route as PengadaanPurchaseOrderIndexRouteImport } from './routes/pengadaan.purchase-order.index'
 import { Route as PengadaanPurchaseOrderNewRouteImport } from './routes/pengadaan.purchase-order.new'
+import { Route as PengadaanPurchaseRequestIndexRouteImport } from './routes/pengadaan.purchase-request.index'
 import { Route as PengadaanPurchaseRequestNewRouteImport } from './routes/pengadaan.purchase-request.new'
+import { Route as PengadaanReceiveGoodsIndexRouteImport } from './routes/pengadaan.receive-goods.index'
 import { Route as PengadaanReceiveGoodsNewRouteImport } from './routes/pengadaan.receive-goods.new'
 import { Route as TransaksiEntriSectionRouteImport } from './routes/transaksi.entri.$section'
 import { Route as PengadaanPurchaseOrderEditIdRouteImport } from './routes/pengadaan.purchase-order.edit.$id'
@@ -175,17 +178,35 @@ const MasterBarangIdRoute = MasterBarangIdRouteImport.update({
   path: '/master/barang/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PengadaanPurchaseOrderIndexRoute =
+  PengadaanPurchaseOrderIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PengadaanPurchaseOrderRoute,
+  } as any)
 const PengadaanPurchaseOrderNewRoute =
   PengadaanPurchaseOrderNewRouteImport.update({
     id: '/new',
     path: '/new',
     getParentRoute: () => PengadaanPurchaseOrderRoute,
   } as any)
+const PengadaanPurchaseRequestIndexRoute =
+  PengadaanPurchaseRequestIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PengadaanPurchaseRequestRoute,
+  } as any)
 const PengadaanPurchaseRequestNewRoute =
   PengadaanPurchaseRequestNewRouteImport.update({
     id: '/new',
     path: '/new',
     getParentRoute: () => PengadaanPurchaseRequestRoute,
+  } as any)
+const PengadaanReceiveGoodsIndexRoute =
+  PengadaanReceiveGoodsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => PengadaanReceiveGoodsRoute,
   } as any)
 const PengadaanReceiveGoodsNewRoute =
   PengadaanReceiveGoodsNewRouteImport.update({
@@ -253,6 +274,9 @@ export interface FileRoutesByFullPath {
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang/': typeof MasterBarangIndexRoute
+  '/pengadaan/purchase-order/': typeof PengadaanPurchaseOrderIndexRoute
+  '/pengadaan/purchase-request/': typeof PengadaanPurchaseRequestIndexRoute
+  '/pengadaan/receive-goods/': typeof PengadaanReceiveGoodsIndexRoute
   '/pengadaan/purchase-order/edit/$id': typeof PengadaanPurchaseOrderEditIdRoute
   '/pengadaan/purchase-order/print/$id': typeof PengadaanPurchaseOrderPrintIdRoute
   '/pengadaan/purchase-request/edit/$id': typeof PengadaanPurchaseRequestEditIdRoute
@@ -267,9 +291,6 @@ export interface FileRoutesByTo {
   '/master/$section': typeof MasterSectionRoute
   '/opname/$section': typeof OpnameSectionRoute
   '/pengadaan/$section': typeof PengadaanSectionRoute
-  '/pengadaan/purchase-order': typeof PengadaanPurchaseOrderRouteWithChildren
-  '/pengadaan/purchase-request': typeof PengadaanPurchaseRequestRouteWithChildren
-  '/pengadaan/receive-goods': typeof PengadaanReceiveGoodsRouteWithChildren
   '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
@@ -289,6 +310,9 @@ export interface FileRoutesByTo {
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang': typeof MasterBarangIndexRoute
+  '/pengadaan/purchase-order': typeof PengadaanPurchaseOrderIndexRoute
+  '/pengadaan/purchase-request': typeof PengadaanPurchaseRequestIndexRoute
+  '/pengadaan/receive-goods': typeof PengadaanReceiveGoodsIndexRoute
   '/pengadaan/purchase-order/edit/$id': typeof PengadaanPurchaseOrderEditIdRoute
   '/pengadaan/purchase-order/print/$id': typeof PengadaanPurchaseOrderPrintIdRoute
   '/pengadaan/purchase-request/edit/$id': typeof PengadaanPurchaseRequestEditIdRoute
@@ -326,6 +350,9 @@ export interface FileRoutesById {
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang/': typeof MasterBarangIndexRoute
+  '/pengadaan/purchase-order/': typeof PengadaanPurchaseOrderIndexRoute
+  '/pengadaan/purchase-request/': typeof PengadaanPurchaseRequestIndexRoute
+  '/pengadaan/receive-goods/': typeof PengadaanReceiveGoodsIndexRoute
   '/pengadaan/purchase-order/edit/$id': typeof PengadaanPurchaseOrderEditIdRoute
   '/pengadaan/purchase-order/print/$id': typeof PengadaanPurchaseOrderPrintIdRoute
   '/pengadaan/purchase-request/edit/$id': typeof PengadaanPurchaseRequestEditIdRoute
@@ -364,6 +391,9 @@ export interface FileRouteTypes {
     | '/pengadaan/receive-goods/new'
     | '/transaksi/entri/$section'
     | '/master/barang/'
+    | '/pengadaan/purchase-order/'
+    | '/pengadaan/purchase-request/'
+    | '/pengadaan/receive-goods/'
     | '/pengadaan/purchase-order/edit/$id'
     | '/pengadaan/purchase-order/print/$id'
     | '/pengadaan/purchase-request/edit/$id'
@@ -378,9 +408,6 @@ export interface FileRouteTypes {
     | '/master/$section'
     | '/opname/$section'
     | '/pengadaan/$section'
-    | '/pengadaan/purchase-order'
-    | '/pengadaan/purchase-request'
-    | '/pengadaan/receive-goods'
     | '/persediaan/adjustment'
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
@@ -400,6 +427,9 @@ export interface FileRouteTypes {
     | '/pengadaan/receive-goods/new'
     | '/transaksi/entri/$section'
     | '/master/barang'
+    | '/pengadaan/purchase-order'
+    | '/pengadaan/purchase-request'
+    | '/pengadaan/receive-goods'
     | '/pengadaan/purchase-order/edit/$id'
     | '/pengadaan/purchase-order/print/$id'
     | '/pengadaan/purchase-request/edit/$id'
@@ -436,6 +466,9 @@ export interface FileRouteTypes {
     | '/pengadaan/receive-goods/new'
     | '/transaksi/entri/$section'
     | '/master/barang/'
+    | '/pengadaan/purchase-order/'
+    | '/pengadaan/purchase-request/'
+    | '/pengadaan/receive-goods/'
     | '/pengadaan/purchase-order/edit/$id'
     | '/pengadaan/purchase-order/print/$id'
     | '/pengadaan/purchase-request/edit/$id'
@@ -656,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MasterBarangIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pengadaan/purchase-order/': {
+      id: '/pengadaan/purchase-order/'
+      path: '/'
+      fullPath: '/pengadaan/purchase-order/'
+      preLoaderRoute: typeof PengadaanPurchaseOrderIndexRouteImport
+      parentRoute: typeof PengadaanPurchaseOrderRoute
+    }
     '/pengadaan/purchase-order/new': {
       id: '/pengadaan/purchase-order/new'
       path: '/new'
@@ -663,12 +703,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PengadaanPurchaseOrderNewRouteImport
       parentRoute: typeof PengadaanPurchaseOrderRoute
     }
+    '/pengadaan/purchase-request/': {
+      id: '/pengadaan/purchase-request/'
+      path: '/'
+      fullPath: '/pengadaan/purchase-request/'
+      preLoaderRoute: typeof PengadaanPurchaseRequestIndexRouteImport
+      parentRoute: typeof PengadaanPurchaseRequestRoute
+    }
     '/pengadaan/purchase-request/new': {
       id: '/pengadaan/purchase-request/new'
       path: '/new'
       fullPath: '/pengadaan/purchase-request/new'
       preLoaderRoute: typeof PengadaanPurchaseRequestNewRouteImport
       parentRoute: typeof PengadaanPurchaseRequestRoute
+    }
+    '/pengadaan/receive-goods/': {
+      id: '/pengadaan/receive-goods/'
+      path: '/'
+      fullPath: '/pengadaan/receive-goods/'
+      preLoaderRoute: typeof PengadaanReceiveGoodsIndexRouteImport
+      parentRoute: typeof PengadaanReceiveGoodsRoute
     }
     '/pengadaan/receive-goods/new': {
       id: '/pengadaan/receive-goods/new'
@@ -717,6 +771,7 @@ declare module '@tanstack/react-router' {
 
 interface PengadaanPurchaseOrderRouteChildren {
   PengadaanPurchaseOrderNewRoute: typeof PengadaanPurchaseOrderNewRoute
+  PengadaanPurchaseOrderIndexRoute: typeof PengadaanPurchaseOrderIndexRoute
   PengadaanPurchaseOrderEditIdRoute: typeof PengadaanPurchaseOrderEditIdRoute
   PengadaanPurchaseOrderPrintIdRoute: typeof PengadaanPurchaseOrderPrintIdRoute
 }
@@ -724,6 +779,7 @@ interface PengadaanPurchaseOrderRouteChildren {
 const PengadaanPurchaseOrderRouteChildren: PengadaanPurchaseOrderRouteChildren =
   {
     PengadaanPurchaseOrderNewRoute: PengadaanPurchaseOrderNewRoute,
+    PengadaanPurchaseOrderIndexRoute: PengadaanPurchaseOrderIndexRoute,
     PengadaanPurchaseOrderEditIdRoute: PengadaanPurchaseOrderEditIdRoute,
     PengadaanPurchaseOrderPrintIdRoute: PengadaanPurchaseOrderPrintIdRoute,
   }
@@ -735,12 +791,14 @@ const PengadaanPurchaseOrderRouteWithChildren =
 
 interface PengadaanPurchaseRequestRouteChildren {
   PengadaanPurchaseRequestNewRoute: typeof PengadaanPurchaseRequestNewRoute
+  PengadaanPurchaseRequestIndexRoute: typeof PengadaanPurchaseRequestIndexRoute
   PengadaanPurchaseRequestEditIdRoute: typeof PengadaanPurchaseRequestEditIdRoute
 }
 
 const PengadaanPurchaseRequestRouteChildren: PengadaanPurchaseRequestRouteChildren =
   {
     PengadaanPurchaseRequestNewRoute: PengadaanPurchaseRequestNewRoute,
+    PengadaanPurchaseRequestIndexRoute: PengadaanPurchaseRequestIndexRoute,
     PengadaanPurchaseRequestEditIdRoute: PengadaanPurchaseRequestEditIdRoute,
   }
 
@@ -751,10 +809,12 @@ const PengadaanPurchaseRequestRouteWithChildren =
 
 interface PengadaanReceiveGoodsRouteChildren {
   PengadaanReceiveGoodsNewRoute: typeof PengadaanReceiveGoodsNewRoute
+  PengadaanReceiveGoodsIndexRoute: typeof PengadaanReceiveGoodsIndexRoute
 }
 
 const PengadaanReceiveGoodsRouteChildren: PengadaanReceiveGoodsRouteChildren = {
   PengadaanReceiveGoodsNewRoute: PengadaanReceiveGoodsNewRoute,
+  PengadaanReceiveGoodsIndexRoute: PengadaanReceiveGoodsIndexRoute,
 }
 
 const PengadaanReceiveGoodsRouteWithChildren =
