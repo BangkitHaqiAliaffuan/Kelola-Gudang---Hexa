@@ -61,17 +61,20 @@ class StockDocumentController extends Controller
     }
 
     /**
-     * Simpan dokumen baru (scope: Penerimaan, Pengeluaran & Transfer Gudang).
+     * Simpan dokumen baru (scope: Penerimaan, Pengeluaran, Transfer Gudang,
+     * Retur Pembelian & Retur Penjualan).
      * Bila `status` = Selesai, dokumen langsung diposting sehingga stok bergerak;
      * Draft hanya menyimpan dokumen. Transfer Gudang memakai warehouse_id sebagai
      * gudang asal + destination_warehouse_id sebagai tujuan dan disimpan dengan
-     * qty positif (StockDocumentService mengeluarkan pasangan OUT+IN).
+     * qty positif (StockDocumentService mengeluarkan pasangan OUT+IN). Retur
+     * Pembelian diperlakukan seperti pengeluaran (qty dinegasi, stok keluar ke
+     * supplier); Retur Penjualan seperti penerimaan (stok masuk dari customer).
      */
     public function store(StoreStockDocumentRequest $request)
     {
         $data = $request->validated();
 
-        $isOutbound = $data['type'] === 'Pengeluaran';
+        $isOutbound = in_array($data['type'], ['Pengeluaran', 'Retur Pembelian'], true);
         $isTransfer = $data['type'] === 'Transfer Gudang';
         $fromBins = ($isOutbound || $isTransfer)
             ? Bin::with('rack')
@@ -82,7 +85,7 @@ class StockDocumentController extends Controller
 
         try {
             $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $fromBins) {
-                $prefix = $isTransfer ? 'TF' : ($isOutbound ? 'BK' : 'BM');
+                $prefix = $isTransfer ? 'TF' : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK') : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM'));
 
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
@@ -103,10 +106,11 @@ class StockDocumentController extends Controller
                         'document_id' => $document->id,
                         'line_no' => $index + 1,
                         'item_id' => $line['item_id'],
-                        // Konvensi ledger: qty garis bertanda. Pengeluaran disimpan negatif
-                        // sehingga moveDirection() → OUT dan moveQty() (abs) menghasilkan
-                        // movement OUT yang benar di StockDocumentService. Transfer Gudang
-                        // tetap positif: service yang merilis pasangan OUT+IN.
+                        // Konvensi ledger: qty garis bertanda. Pengeluaran & Retur Pembelian
+                        // disimpan negatif sehingga moveDirection() → OUT dan moveQty() (abs)
+                        // menghasilkan movement OUT yang benar di StockDocumentService. Transfer
+                        // Gudang & Retur Penjualan tetap positif: Transfer merilis pasangan
+                        // OUT+IN di service, Retur Penjualan adalah stok masuk (IN).
                         'qty' => $isOutbound ? -abs($line['qty']) : $line['qty'],
                         'unit_cost' => ($isOutbound || $isTransfer)
                             ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
@@ -134,9 +138,10 @@ class StockDocumentController extends Controller
 
     /**
      * Biaya rata-rata (moving average) sebuah item di sebuah bin. Dipakai untuk
-     * mengisi unit_cost baris Pengeluaran sehingga agregat nilai (qty * unit_cost)
-     * dan detail dokumen akurat — posting itu sendiri memakai AVG yang sama via
-     * StockDocumentService::costAt(), jadi dua sumber ini selalu konsisten.
+     * mengisi unit_cost baris Pengeluaran & Retur Pembelian sehingga agregat nilai
+     * (qty * unit_cost) dan detail dokumen akurat — posting itu sendiri memakai AVG
+     * yang sama via StockDocumentService::costAt(), jadi dua sumber ini selalu
+     * konsisten.
      */
     private function averageCost(int $itemId, int $binId, $bins): ?float
     {

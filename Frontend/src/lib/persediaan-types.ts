@@ -195,7 +195,7 @@ export type StockDocumentApi = {
 };
 
 // ---- Pembuatan dokumen (POST /api/persediaan/stock-documents) ----
-// Scope: Penerimaan, Pengeluaran & Transfer Gudang.
+// Scope: Penerimaan, Pengeluaran, Transfer Gudang, Retur Pembelian & Retur Penjualan.
 // - Penerimaan: baris memakai `to_bin_id` (arah IN memprioritaskan to_bin di
 //   service); `from_bin_id` opsional. `unit_cost` diambil dari input.
 // - Pengeluaran: baris memakai `from_bin_id` (sumber stok, arah OUT); `to_bin_id`
@@ -205,8 +205,13 @@ export type StockDocumentApi = {
 //   tujuan (wajib, beda gudang). Baris memakai `from_bin_id` (bin sumber di gudang
 //   asal) + `to_bin_id` (bin tujuan di gudang tujuan). `unit_cost` dibiarkan kosong
 //   (server memakai moving average di bin asal). `qty` selalu positif.
+// - Retur Pembelian: perilaku = Pengeluaran (arah OUT, `from_bin_id` wajib, qty
+//   dinegasi server, unit_cost di-backfill), nomor `RP/YYYY/#####`, partner = supplier.
+// - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, unit_cost
+//   dari input), nomor `RJ/YYYY/#####`, partner = customer.
 
-export type StockDocumentTypeToStore = "Penerimaan" | "Pengeluaran" | "Transfer Gudang";
+export type StockDocumentTypeToStore =
+  "Penerimaan" | "Pengeluaran" | "Transfer Gudang" | "Retur Pembelian" | "Retur Penjualan";
 
 export type StockDocumentLinePayload = {
   item_id: number;

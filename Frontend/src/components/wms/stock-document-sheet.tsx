@@ -97,7 +97,9 @@ function LineQtyCells({
           {formatNumber(line.actual_qty ?? 0)} {line.unit ?? ""}
         </td>
         <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${tone}`}>
-          {variance === 0 ? "Netral" : `${varianceSign(variance)}${formatNumber(Math.abs(variance))}`}
+          {variance === 0
+            ? "Netral"
+            : `${varianceSign(variance)}${formatNumber(Math.abs(variance))}`}
         </td>
       </>
     );
@@ -108,10 +110,15 @@ function LineQtyCells({
     return (
       <>
         <td className="whitespace-nowrap px-3 py-2">
-          <Pill tone={inDir ? "success" : "danger"}>{inDir ? "Koreksi Naik" : "Koreksi Turun"}</Pill>
+          <Pill tone={inDir ? "success" : "danger"}>
+            {inDir ? "Koreksi Naik" : "Koreksi Turun"}
+          </Pill>
         </td>
-        <td className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${inDir ? "text-success" : "text-destructive"}`}>
-          {inDir ? "+" : "−"}{formatNumber(Math.abs(line.qty ?? 0))} {line.unit ?? ""}
+        <td
+          className={`whitespace-nowrap px-3 py-2 text-right font-semibold ${inDir ? "text-success" : "text-destructive"}`}
+        >
+          {inDir ? "+" : "−"}
+          {formatNumber(Math.abs(line.qty ?? 0))} {line.unit ?? ""}
         </td>
       </>
     );
@@ -130,7 +137,11 @@ export function StockDocumentSheet({
   const lines = doc?.lines ?? [];
   const isOpname = lines.length > 0 && lines.every(isOpnameLine);
   const isAdjustment = doc?.type === "Stock Adjustment";
-  const mode: "plain" | "opname" | "adjustment" = isOpname ? "opname" : isAdjustment ? "adjustment" : "plain";
+  const mode: "plain" | "opname" | "adjustment" = isOpname
+    ? "opname"
+    : isAdjustment
+      ? "adjustment"
+      : "plain";
 
   const upLines = lines.filter((l) => lineDirection(l) === "IN");
   const downLines = lines.filter((l) => lineDirection(l) === "OUT");
@@ -163,7 +174,15 @@ export function StockDocumentSheet({
                 <Field label="Tanggal" value={formatDate(doc.document_date)} />
                 <Field label="Gudang" value={doc.warehouse ?? "—"} />
                 <Field
-                  label={doc.destination ? "Gudang Tujuan" : "Partner / Tujuan"}
+                  label={
+                    doc.destination
+                      ? "Gudang Tujuan"
+                      : doc.type === "Retur Pembelian"
+                        ? "Supplier"
+                        : doc.type === "Retur Penjualan"
+                          ? "Customer"
+                          : "Partner / Tujuan"
+                  }
                   value={doc.destination ?? doc.partner ?? "—"}
                 />
                 <Field label="Referensi" value={doc.reference_no ?? "—"} />
@@ -179,7 +198,16 @@ export function StockDocumentSheet({
                     <thead>
                       <tr className="border-b border-border text-xs text-muted-foreground">
                         {(mode === "opname"
-                          ? ["Barang", "SKU", "Sistem", "Fisik", "Selisih", "Lokasi", "Harga", "Subtotal"]
+                          ? [
+                              "Barang",
+                              "SKU",
+                              "Sistem",
+                              "Fisik",
+                              "Selisih",
+                              "Lokasi",
+                              "Harga",
+                              "Subtotal",
+                            ]
                           : mode === "adjustment"
                             ? ["Barang", "SKU", "Arah", "Qty", "Lokasi", "Harga", "Subtotal"]
                             : ["Barang", "SKU", "Qty", "Lokasi", "Harga", "Subtotal"]
@@ -230,7 +258,9 @@ export function StockDocumentSheet({
                         </span>
                         <b>{formatIDR(lineValue(l))}</b>
                       </div>
-                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{lineLocation(l)}</p>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                        {lineLocation(l)}
+                      </p>
                     </div>
                   ))}
                 </div>

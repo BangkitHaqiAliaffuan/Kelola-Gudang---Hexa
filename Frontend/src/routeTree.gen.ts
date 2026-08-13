@@ -27,6 +27,8 @@ import { Route as SystemSectionRouteImport } from './routes/system.$section'
 import { Route as TransaksiSectionRouteImport } from './routes/transaksi.$section'
 import { Route as TransaksiKeluarRouteImport } from './routes/transaksi.keluar'
 import { Route as TransaksiMasukRouteImport } from './routes/transaksi.masuk'
+import { Route as TransaksiReturPembelianRouteImport } from './routes/transaksi.retur-pembelian'
+import { Route as TransaksiReturPenjualanRouteImport } from './routes/transaksi.retur-penjualan'
 import { Route as TransaksiTransferRouteImport } from './routes/transaksi.transfer'
 import { Route as MasterBarangIndexRouteImport } from './routes/master.barang.index'
 import { Route as MasterBarangIdRouteImport } from './routes/master.barang.$id'
@@ -123,6 +125,16 @@ const TransaksiMasukRoute = TransaksiMasukRouteImport.update({
   path: '/transaksi/masuk',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransaksiReturPembelianRoute = TransaksiReturPembelianRouteImport.update({
+  id: '/transaksi/retur-pembelian',
+  path: '/transaksi/retur-pembelian',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransaksiReturPenjualanRoute = TransaksiReturPenjualanRouteImport.update({
+  id: '/transaksi/retur-penjualan',
+  path: '/transaksi/retur-penjualan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TransaksiTransferRoute = TransaksiTransferRouteImport.update({
   id: '/transaksi/transfer',
   path: '/transaksi/transfer',
@@ -168,6 +180,8 @@ export interface FileRoutesByFullPath {
   '/transaksi/$section': typeof TransaksiSectionRoute
   '/transaksi/keluar': typeof TransaksiKeluarRoute
   '/transaksi/masuk': typeof TransaksiMasukRoute
+  '/transaksi/retur-pembelian': typeof TransaksiReturPembelianRoute
+  '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
@@ -193,6 +207,8 @@ export interface FileRoutesByTo {
   '/transaksi/$section': typeof TransaksiSectionRoute
   '/transaksi/keluar': typeof TransaksiKeluarRoute
   '/transaksi/masuk': typeof TransaksiMasukRoute
+  '/transaksi/retur-pembelian': typeof TransaksiReturPembelianRoute
+  '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
@@ -219,6 +235,8 @@ export interface FileRoutesById {
   '/transaksi/$section': typeof TransaksiSectionRoute
   '/transaksi/keluar': typeof TransaksiKeluarRoute
   '/transaksi/masuk': typeof TransaksiMasukRoute
+  '/transaksi/retur-pembelian': typeof TransaksiReturPembelianRoute
+  '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
@@ -246,6 +264,8 @@ export interface FileRouteTypes {
     | '/transaksi/$section'
     | '/transaksi/keluar'
     | '/transaksi/masuk'
+    | '/transaksi/retur-pembelian'
+    | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
     | '/transaksi/entri/$section'
@@ -271,6 +291,8 @@ export interface FileRouteTypes {
     | '/transaksi/$section'
     | '/transaksi/keluar'
     | '/transaksi/masuk'
+    | '/transaksi/retur-pembelian'
+    | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
     | '/transaksi/entri/$section'
@@ -296,6 +318,8 @@ export interface FileRouteTypes {
     | '/transaksi/$section'
     | '/transaksi/keluar'
     | '/transaksi/masuk'
+    | '/transaksi/retur-pembelian'
+    | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
     | '/transaksi/entri/$section'
@@ -322,6 +346,8 @@ export interface RootRouteChildren {
   TransaksiSectionRoute: typeof TransaksiSectionRoute
   TransaksiKeluarRoute: typeof TransaksiKeluarRoute
   TransaksiMasukRoute: typeof TransaksiMasukRoute
+  TransaksiReturPembelianRoute: typeof TransaksiReturPembelianRoute
+  TransaksiReturPenjualanRoute: typeof TransaksiReturPenjualanRoute
   TransaksiTransferRoute: typeof TransaksiTransferRoute
   MasterBarangIdRoute: typeof MasterBarangIdRoute
   TransaksiEntriSectionRoute: typeof TransaksiEntriSectionRouteWithChildren
@@ -456,6 +482,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransaksiMasukRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transaksi/retur-pembelian': {
+      id: '/transaksi/retur-pembelian'
+      path: '/transaksi/retur-pembelian'
+      fullPath: '/transaksi/retur-pembelian'
+      preLoaderRoute: typeof TransaksiReturPembelianRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transaksi/retur-penjualan': {
+      id: '/transaksi/retur-penjualan'
+      path: '/transaksi/retur-penjualan'
+      fullPath: '/transaksi/retur-penjualan'
+      preLoaderRoute: typeof TransaksiReturPenjualanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/transaksi/transfer': {
       id: '/transaksi/transfer'
       path: '/transaksi/transfer'
@@ -526,6 +566,8 @@ const rootRouteChildren: RootRouteChildren = {
   TransaksiSectionRoute: TransaksiSectionRoute,
   TransaksiKeluarRoute: TransaksiKeluarRoute,
   TransaksiMasukRoute: TransaksiMasukRoute,
+  TransaksiReturPembelianRoute: TransaksiReturPembelianRoute,
+  TransaksiReturPenjualanRoute: TransaksiReturPenjualanRoute,
   TransaksiTransferRoute: TransaksiTransferRoute,
   MasterBarangIdRoute: MasterBarangIdRoute,
   TransaksiEntriSectionRoute: TransaksiEntriSectionRouteWithChildren,
@@ -534,13 +576,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

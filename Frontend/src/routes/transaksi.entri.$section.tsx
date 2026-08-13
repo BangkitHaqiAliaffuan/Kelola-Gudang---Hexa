@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { BarangKeluarForm } from "@/components/wms/barang-keluar-form";
 import { BarangMasukForm } from "@/components/wms/barang-masuk-form";
+import { ReturPembelianForm } from "@/components/wms/retur-pembelian-form";
+import { ReturPenjualanForm } from "@/components/wms/retur-penjualan-form";
 import { TransferGudangForm } from "@/components/wms/transfer-gudang-form";
 import { TransactionFormPage } from "@/components/wms/transaction-form";
 import { PageHeader } from "@/components/wms/kit";
@@ -14,8 +16,8 @@ const sectionModule: Record<string, string> = {
   masuk: "Persediaan",
   keluar: "Persediaan",
   transfer: "Persediaan",
-  "retur-pembelian": "Transaksi",
-  "retur-penjualan": "Transaksi",
+  "retur-pembelian": "Persediaan",
+  "retur-penjualan": "Persediaan",
   peminjaman: "Transaksi",
   pengembalian: "Transaksi",
 };
@@ -80,6 +82,14 @@ function TambahTransaksi() {
 
   if (section === "transfer") {
     return <TransferGudangForm />;
+  }
+
+  if (section === "retur-pembelian") {
+    return <ReturPembelianForm />;
+  }
+
+  if (section === "retur-penjualan") {
+    return <ReturPenjualanForm />;
   }
 
   return (

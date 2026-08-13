@@ -541,6 +541,262 @@ class StoreStockDocumentApiTest extends TestCase
         $this->assertSame($before, StockDocument::count());
     }
 
+    public function test_store_retur_pembelian_draft_creates_document_without_movements(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Sumber Jaya',
+            'reference_no' => 'PO-00123',
+            'note' => 'Alasan: Cacat',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'from_bin_id' => $bin->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->where('data.status', 'Draft')
+                ->where('data.type', 'Retur Pembelian')
+                ->where('data.partner', 'PT Sumber Jaya')
+                ->where('data.reference_no', 'PO-00123')
+                ->where('data.warehouse_id', $wh->id)
+                ->where('data.line_count', 1)
+                ->where('data.no', fn ($v) => (bool) preg_match('/^RP\/\d{4}\/\d{5}$/', (string) $v))
+                ->has('data.lines', 1)
+                ->where('data.lines.0.from_bin_id', $bin->id)
+                ->where('data.lines.0.to_bin_id', null)
+                ->where('data.lines.0.item_id', $item->id)
+                ->where('data.lines.0.qty', -5));
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $this->assertNull($doc->posted_at);
+        $this->assertSame(0, $doc->movements()->count());
+    }
+
+    public function test_store_retur_pembelian_posted_moves_stock_out(): void
+    {
+        $item = $this->makeItem();
+        [$wh, $rack, $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Sumber Jaya',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 4, 'from_bin_id' => $bin->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.posted_at', fn ($v) => $v !== null)
+            ->assertJsonPath('data.lines.0.qty', -4)
+            ->assertJsonPath('data.lines.0.from_bin_id', $bin->id)
+            ->assertJsonPath('data.lines.0.to_bin_id', null)
+            ->assertJsonPath('data.lines.0.unit_cost', 1500);
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'direction' => 'OUT',
+            'qty' => 4,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $rack->id,
+            'bin_id' => $bin->id,
+            'unit_cost' => 1500.0,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+            'stock' => 6,
+        ]);
+    }
+
+    public function test_store_retur_pembelian_insufficient_stock_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $before = StockDocument::count();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 100, 'from_bin_id' => $bin->id],
+            ],
+        ]);
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('Stok tidak mencukupi', (string) $res->json('message'));
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_retur_pembelian_requires_from_bin(): void
+    {
+        $item = $this->makeItem();
+        [$wh] = $this->makeLocation();
+        $before = StockDocument::count();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.from_bin_id');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_retur_penjualan_draft_creates_document_without_movements(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Aneka Mandiri',
+            'reference_no' => 'SJ-00456',
+            'note' => 'Alasan: Salah Barang',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 7, 'unit_cost' => 1800, 'to_bin_id' => $bin->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->where('data.status', 'Draft')
+                ->where('data.type', 'Retur Penjualan')
+                ->where('data.partner', 'PT Aneka Mandiri')
+                ->where('data.reference_no', 'SJ-00456')
+                ->where('data.warehouse_id', $wh->id)
+                ->where('data.line_count', 1)
+                ->where('data.no', fn ($v) => (bool) preg_match('/^RJ\/\d{4}\/\d{5}$/', (string) $v))
+                ->has('data.lines', 1)
+                ->where('data.lines.0.to_bin_id', $bin->id)
+                ->where('data.lines.0.from_bin_id', null)
+                ->where('data.lines.0.item_id', $item->id)
+                ->where('data.lines.0.qty', 7));
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $this->assertNull($doc->posted_at);
+        $this->assertSame(0, $doc->movements()->count());
+    }
+
+    public function test_store_retur_penjualan_posted_moves_stock_in(): void
+    {
+        $item = $this->makeItem();
+        [$wh, $rack, $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Aneka Mandiri',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'unit_cost' => 1800, 'to_bin_id' => $bin->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.posted_at', fn ($v) => $v !== null)
+            ->assertJsonPath('data.lines.0.qty', 3)
+            ->assertJsonPath('data.lines.0.to_bin_id', $bin->id)
+            ->assertJsonPath('data.lines.0.from_bin_id', null)
+            ->assertJsonPath('data.lines.0.unit_cost', 1800);
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'direction' => 'IN',
+            'qty' => 3,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $rack->id,
+            'bin_id' => $bin->id,
+            'unit_cost' => 1800.0,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+            'stock' => 3,
+        ]);
+    }
+
+    public function test_store_retur_penjualan_requires_to_bin(): void
+    {
+        $item = $this->makeItem();
+        [$wh] = $this->makeLocation();
+        $before = StockDocument::count();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.to_bin_id');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_retur_penjualan_bin_not_in_warehouse_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh] = $this->makeLocation();
+        [, , $otherBin] = $this->makeLocation();
+        $before = StockDocument::count();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'unit_cost' => 1000, 'to_bin_id' => $otherBin->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.to_bin_id');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
     private function makeItem(): Item
     {
         $unique = random_int(10000, 99999);
