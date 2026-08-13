@@ -133,6 +133,34 @@ export function BarangKeluarForm() {
     return map;
   }, [stockRows]);
 
+  // Bin-bin yang benar-benar berisi stok di gudang terpilih — dipakai sebagai
+  // scope dropdown bin agar operator tidak diganggu 72 bin kosong.
+  const stockedBinIds = useMemo(() => {
+    const set = new Set<number>();
+    if (!warehouseId) return set;
+    for (const r of stockRows?.data ?? []) {
+      if (r.stock > 0 && r.warehouse_id === Number(warehouseId)) set.add(r.bin_id);
+    }
+    return set;
+  }, [stockRows, warehouseId]);
+
+  // Kandidat bin per barang di gudang terpilih, diurutkan available desc —
+  // dasar auto-suggest bin saat barang dipilih.
+  const binCandidatesByItem = useMemo(() => {
+    const map = new Map<string, { bin_id: number; available: number }[]>();
+    if (!warehouseId) return map;
+    for (const r of stockRows?.data ?? []) {
+      if (r.stock <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
+      const list = map.get(String(r.item_id)) ?? [];
+      list.push({ bin_id: r.bin_id, available: r.available });
+      map.set(String(r.item_id), list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.available - a.available || a.bin_id - b.bin_id);
+    }
+    return map;
+  }, [stockRows, warehouseId]);
+
   const lineAvailable = (l: FormLine): number | undefined =>
     l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
 
@@ -142,6 +170,21 @@ export function BarangKeluarForm() {
     if (!availableIds) return [];
     return itemOptions.filter((o) => availableIds.has(o.value));
   };
+
+  // Dropdown bin scoped: hanya bin berisi stok di gudang ini; saat barang sudah
+  // dipilih, hanya bin yang memegang barang tersebut (berisi stok).
+  const lineBinOptions = (l: FormLine): ComboboxOption[] => {
+    if (!warehouseId) return [];
+    if (l.itemId) {
+      const candidates = binCandidatesByItem.get(l.itemId) ?? [];
+      const ids = new Set(candidates.map((c) => c.bin_id));
+      return binOptions.filter((o) => ids.has(Number(o.value)));
+    }
+    return binOptions.filter((o) => stockedBinIds.has(Number(o.value)));
+  };
+
+  const hasStockInWarehouse = (l: FormLine): boolean =>
+    !l.itemId || (binCandidatesByItem.get(l.itemId)?.length ?? 0) > 0;
 
   const totalQty = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0), [lines]);
 
@@ -158,30 +201,22 @@ export function BarangKeluarForm() {
   const pickItem = (key: string, itemId: string) => {
     patchLine(key, (line) => {
       const item = items?.data.find((x) => String(x.id) === itemId);
-      const defaultBin =
-        item?.default_bin_id != null && binsInWarehouse.some((b) => b.id === item.default_bin_id)
+      const candidates = binCandidatesByItem.get(itemId) ?? [];
+      const currentValid = Boolean(
+        line.binId && candidates.some((c) => c.bin_id === Number(line.binId)),
+      );
+      if (currentValid) return { itemId };
+      const preferredBin =
+        item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
-          : "";
-      return {
-        itemId,
-        ...(line.binId ? {} : { binId: defaultBin }),
-      };
+          : candidates[0]
+            ? String(candidates[0].bin_id)
+            : "";
+      return { itemId, binId: preferredBin };
     });
   };
 
-  const pickBin = (key: string, binId: string) => {
-    patchLine(key, (line) => {
-      if (line.binId === binId) return {};
-      const availableIds = binId ? availableItemIdsByBin.get(binId) : undefined;
-      const keepItem = availableIds
-        ? Boolean(line.itemId && availableIds.has(line.itemId))
-        : Boolean(line.itemId);
-      return {
-        binId,
-        ...(keepItem ? {} : { itemId: "" }),
-      };
-    });
-  };
+  const pickBin = (key: string, binId: string) => patchLine(key, { binId });
 
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
@@ -352,7 +387,7 @@ export function BarangKeluarForm() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Asal Bin", "Barang", "Qty", "Tersedia", ""].map((h) => (
+                {["Barang", "Asal Bin", "Qty", "Tersedia", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -365,22 +400,6 @@ export function BarangKeluarForm() {
                 const overStock = available !== undefined && (Number(l.qty) || 0) > available;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
-                    <td className="w-[220px] px-3 py-2 align-top">
-                      <FormCombobox
-                        value={l.binId}
-                        onValueChange={(v) => pickBin(l.key, v)}
-                        options={binOptions}
-                        placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
-                        searchPlaceholder="Cari bin / rak..."
-                        side="top"
-                        avoidCollisions={false}
-                      />
-                      {lineError(i, "from_bin_id") && (
-                        <p className="mt-1 text-xs text-destructive">
-                          {lineError(i, "from_bin_id")}
-                        </p>
-                      )}
-                    </td>
                     <td className="w-[320px] px-3 py-2 align-top">
                       <FormCombobox
                         value={l.itemId}
@@ -390,10 +409,31 @@ export function BarangKeluarForm() {
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
-                        loading={Boolean(l.binId) && stockLoading}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
+                      )}
+                    </td>
+                    <td className="w-[220px] px-3 py-2 align-top">
+                      <FormCombobox
+                        value={l.binId}
+                        onValueChange={(v) => pickBin(l.key, v)}
+                        options={lineBinOptions(l)}
+                        placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
+                        searchPlaceholder="Cari bin / rak..."
+                        side="top"
+                        avoidCollisions={false}
+                        loading={stockLoading}
+                      />
+                      {l.itemId && !hasStockInWarehouse(l) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Stok tidak tersedia di gudang ini.
+                        </p>
+                      )}
+                      {lineError(i, "from_bin_id") && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {lineError(i, "from_bin_id")}
+                        </p>
                       )}
                     </td>
                     <td className="px-3 py-2 align-top">
@@ -443,22 +483,27 @@ export function BarangKeluarForm() {
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
                   <FormCombobox
-                    value={l.binId}
-                    onValueChange={(v) => pickBin(l.key, v)}
-                    options={binOptions}
-                    placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
+                    value={l.itemId}
+                    onValueChange={(v) => pickItem(l.key, v)}
+                    options={lineItemOptions(l)}
+                    placeholder="Pilih barang / scan barcode"
                     side="top"
                     avoidCollisions={false}
                   />
                   <FormCombobox
-                    value={l.itemId}
-                    onValueChange={(v) => pickItem(l.key, v)}
-                    options={lineItemOptions(l)}
-                    placeholder="Pilih barang"
+                    value={l.binId}
+                    onValueChange={(v) => pickBin(l.key, v)}
+                    options={lineBinOptions(l)}
+                    placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
-                    loading={Boolean(l.binId) && stockLoading}
+                    loading={stockLoading}
                   />
+                  {l.itemId && !hasStockInWarehouse(l) && (
+                    <p className="text-xs text-muted-foreground">
+                      Stok tidak tersedia di gudang ini.
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
