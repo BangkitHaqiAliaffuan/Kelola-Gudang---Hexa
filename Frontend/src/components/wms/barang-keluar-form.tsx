@@ -372,7 +372,7 @@ export function BarangKeluarForm() {
                         options={binOptions}
                         placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
-                        side="bottom"
+                        side="top"
                         avoidCollisions={false}
                       />
                       {lineError(i, "from_bin_id") && (
@@ -388,7 +388,7 @@ export function BarangKeluarForm() {
                         options={lineItemOptions(l)}
                         placeholder="Pilih barang / scan barcode"
                         searchPlaceholder="Cari nama, SKU, barcode..."
-                        side="bottom"
+                        side="top"
                         avoidCollisions={false}
                         loading={Boolean(l.binId) && stockLoading}
                       />
@@ -447,7 +447,7 @@ export function BarangKeluarForm() {
                     onValueChange={(v) => pickBin(l.key, v)}
                     options={binOptions}
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
-                    side="bottom"
+                    side="top"
                     avoidCollisions={false}
                   />
                   <FormCombobox
@@ -455,7 +455,7 @@ export function BarangKeluarForm() {
                     onValueChange={(v) => pickItem(l.key, v)}
                     options={lineItemOptions(l)}
                     placeholder="Pilih barang"
-                    side="bottom"
+                    side="top"
                     avoidCollisions={false}
                     loading={Boolean(l.binId) && stockLoading}
                   />

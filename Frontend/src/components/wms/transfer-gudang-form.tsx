@@ -395,7 +395,7 @@ export function TransferGudangForm() {
                         options={fromBinOptions}
                         placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
-                        side="bottom"
+                        side="top"
                         avoidCollisions={false}
                       />
                       {lineError(i, "from_bin_id") && (
@@ -411,7 +411,7 @@ export function TransferGudangForm() {
                         options={lineItemOptions(l)}
                         placeholder="Pilih barang / scan barcode"
                         searchPlaceholder="Cari nama, SKU, barcode..."
-                        side="bottom"
+                        side="top"
                         avoidCollisions={false}
                         loading={Boolean(l.fromBinId) && stockLoading}
                       />
@@ -446,7 +446,7 @@ export function TransferGudangForm() {
                         options={toBinOptions}
                         placeholder={destinationId ? "Pilih Bin Tujuan" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
-                        side="bottom"
+                        side="top"
                         avoidCollisions={false}
                       />
                       {lineError(i, "to_bin_id") && (
@@ -484,7 +484,7 @@ export function TransferGudangForm() {
                     onValueChange={(v) => pickFromBin(l.key, v)}
                     options={fromBinOptions}
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
-                    side="bottom"
+                    side="top"
                     avoidCollisions={false}
                   />
                   <FormCombobox
@@ -492,7 +492,7 @@ export function TransferGudangForm() {
                     onValueChange={(v) => pickItem(l.key, v)}
                     options={lineItemOptions(l)}
                     placeholder="Pilih barang"
-                    side="bottom"
+                    side="top"
                     avoidCollisions={false}
                     loading={Boolean(l.fromBinId) && stockLoading}
                   />
@@ -501,7 +501,7 @@ export function TransferGudangForm() {
                     onValueChange={(v) => patchLine(l.key, { toBinId: v })}
                     options={toBinOptions}
                     placeholder={destinationId ? "Pilih Bin Tujuan" : "Pilih Gudang dulu"}
-                    side="bottom"
+                    side="top"
                     avoidCollisions={false}
                   />
                   <div className="flex items-center gap-2">
