@@ -19,6 +19,14 @@ class RoleAccessTest extends TestCase
         return $user;
     }
 
+    private function userWithPersediaanLevel(string $level): User
+    {
+        $user = User::factory()->create(['role' => 'Operator Gudang']);
+        RolePermission::create(['role' => 'Operator Gudang', 'module' => 'Persediaan', 'level' => $level]);
+
+        return $user;
+    }
+
     public function test_baca_allows_read_but_blocks_write(): void
     {
         $user = $this->userWithMasterLevel('Baca');
@@ -68,5 +76,43 @@ class RoleAccessTest extends TestCase
     public function test_unauthenticated_request_is_unauthorized(): void
     {
         $this->getJson('/api/master/categories')->assertUnauthorized();
+    }
+
+    public function test_persediaan_baca_allows_read_but_blocks_write(): void
+    {
+        $user = $this->userWithPersediaanLevel('Baca');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/persediaan/stock-documents')
+            ->assertOk();
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/persediaan/stock-documents', [])
+            ->assertForbidden();
+    }
+
+    public function test_persediaan_tulis_allows_write(): void
+    {
+        $user = $this->userWithPersediaanLevel('Tulis');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/persediaan/stock-documents')
+            ->assertOk();
+
+        // Middleware passes (Tulis ≥ Tulis), so the request reaches validation
+        // and yields 422 — not 403 from the RBAC guard.
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/persediaan/stock-documents', [])
+            ->assertStatus(422);
+    }
+
+    public function test_persediaan_without_permission_forbids_everything(): void
+    {
+        $user = User::factory()->create(['role' => 'Supervisor']);
+        RolePermission::create(['role' => 'Supervisor', 'module' => 'Laporan', 'level' => 'Kelola']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/persediaan/stock-documents')
+            ->assertForbidden();
     }
 }

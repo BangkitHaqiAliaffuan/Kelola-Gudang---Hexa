@@ -10,6 +10,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 
 const statusTone = (s: StockDocumentApi["status"]): Tone =>
@@ -40,19 +41,23 @@ export function BarangMasukPage() {
     [data],
   );
 
+  const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const searchIndex = useMemo(
+    () => new Map((data?.data ?? []).map((d) => [d.id, buildStockDocumentSearchText(d)])),
+    [data],
+  );
+
   const rows = useMemo(
     () =>
       (data?.data ?? []).filter(
         (d) =>
-          (!debouncedQ ||
-            `${d.no} ${d.partner ?? ""} ${d.reference_no ?? ""} ${d.note ?? ""}`
-              .toLowerCase()
-              .includes(debouncedQ.toLowerCase())) &&
+          (!qn || searchIndex.get(d.id)!.includes(qn)) &&
           (wh === ALL || d.warehouse === wh) &&
           (partner === ALL || d.partner === partner) &&
           (status === ALL || d.status === status),
       ),
-    [data, debouncedQ, wh, partner, status],
+    [data, qn, searchIndex, wh, partner, status],
   );
 
   const columns: Column<StockDocumentApi>[] = [
@@ -144,7 +149,7 @@ export function BarangMasukPage() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, supplier, referensi..."
+              placeholder="Cari nomor, supplier, gudang, PIC, tanggal, referensi, status..."
               className="rounded-xl pl-9"
             />
           </div>

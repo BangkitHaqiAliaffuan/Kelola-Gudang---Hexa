@@ -49,7 +49,7 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('items', ItemController::class);
 });
 
-Route::prefix('persediaan')->middleware('auth:sanctum')->group(function () {
+Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan'])->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-minimum', [StockController::class, 'stockMinimum']);
     Route::get('stock-card', [StockController::class, 'stockCard']);
