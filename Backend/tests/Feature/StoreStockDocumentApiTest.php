@@ -21,7 +21,6 @@ class StoreStockDocumentApiTest extends TestCase
     {
         parent::setUp();
         $this->actingAsMasterAdmin();
-        $this->seed();
     }
 
     public function test_store_penerimaan_draft_creates_document_without_movements(): void
