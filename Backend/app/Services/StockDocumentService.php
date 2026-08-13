@@ -128,8 +128,22 @@ class StockDocumentService
             'qty' => $qty,
             'unit_cost' => $direction === 'IN'
                 ? (float) $line->unit_cost
-                : $this->costAt($line->item_id, $bin),
+                : ($this->usesPurchaseCost($document, $line)
+                    ? (float) $line->unit_cost
+                    : $this->costAt($line->item_id, $bin)),
         ]];
+    }
+
+    /**
+     * Retur Pembelian mencatat OUT dengan harga beli asal dari baris Penerimaan
+     * sumber (di-backfill controller saat simpan). Aman untuk rata-rata: ledger
+     * menghitung unit_cost_avg hanya dari movement IN, jadi baris OUT dengan harga
+     * beli asal tidak menggeser moving average stok. Retur manual (tanpa link)
+     * memakai nilai backfill = moving average yang sama.
+     */
+    private function usesPurchaseCost(StockDocument $document, StockDocumentLine $line): bool
+    {
+        return $document->type === 'Retur Pembelian' && (float) $line->unit_cost > 0;
     }
 
     /**

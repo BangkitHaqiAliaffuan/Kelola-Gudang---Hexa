@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\Bin;
+use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -28,6 +30,14 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::exists('warehouses', 'id'),
                 Rule::requiredIf(fn () => $this->input('type') === 'Transfer Gudang'),
                 'different:warehouse_id',
+            ],
+            // Retur Pembelian: dokumen Barang Masuk (Penerimaan) sumber — wajib
+            // ketika source_document_id dikirim; hanya sah untuk tipe Retur Pembelian.
+            'source_document_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('stock_documents', 'id'),
+                Rule::prohibitedIf(fn () => $this->input('type') !== 'Retur Pembelian'),
             ],
             'partner' => ['nullable', 'string', 'max:255'],
             'reference_no' => ['nullable', 'string', 'max:255'],
@@ -56,6 +66,12 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::requiredIf(fn () => in_array($this->input('type'), ['Pengeluaran', 'Transfer Gudang', 'Retur Pembelian'], true)),
             ],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
+            'lines.*.source_line_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('stock_document_lines', 'id'),
+                Rule::requiredIf(fn () => $this->input('type') === 'Retur Pembelian' && ! empty($this->input('source_document_id'))),
+            ],
         ];
     }
 
@@ -118,6 +134,128 @@ class StoreStockDocumentRequest extends FormRequest
                                 'Bin harus berada di gudang yang dipilih.'
                             );
                         }
+                    }
+                }
+            },
+            function (Validator $validator) {
+                $type = $this->input('type');
+                $sourceDocumentId = $this->input('source_document_id');
+                $lines = $this->input('lines') ?? [];
+
+                if ($type !== 'Retur Pembelian' || ! $sourceDocumentId || ! $lines) {
+                    return;
+                }
+
+                $source = StockDocument::with('lines')->find((int) $sourceDocumentId);
+
+                if (! $source) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber tidak ditemukan.');
+
+                    return;
+                }
+
+                if ($source->type !== 'Penerimaan') {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berjenis Penerimaan (Barang Masuk).');
+
+                    return;
+                }
+
+                if ($source->status !== 'Selesai') {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berstatus Selesai (sudah diposting).');
+
+                    return;
+                }
+
+                if ((int) $source->warehouse_id !== (int) $this->input('warehouse_id')) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berada di gudang yang sama dengan retur.');
+
+                    return;
+                }
+
+                $sourceLines = $source->lines->keyBy('id');
+
+                if ($sourceLines->isEmpty()) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber tidak memiliki baris barang.');
+
+                    return;
+                }
+
+                // Total qty yang sudah di-retur (dokumen Retur Pembelian non-Dibatalkan)
+                // per baris sumber, dijumlahkan dengan qty pada request ini agar
+                // pembagian ke beberapa baris ikut terhitung.
+                $returnedByLine = StockDocumentLine::query()
+                    ->whereNotNull('source_line_id')
+                    ->whereIn('source_line_id', $sourceLines->keys())
+                    ->whereHas('document', fn ($q) => $q
+                        ->where('type', 'Retur Pembelian')
+                        ->where('status', '!=', 'Dibatalkan'))
+                    ->get()
+                    ->groupBy('source_line_id')
+                    ->map(fn ($group) => $group->sum(fn ($l) => abs((int) $l->qty)));
+
+                $requestedByLine = [];
+
+                foreach ($lines as $line) {
+                    $sourceLineId = $line['source_line_id'] ?? null;
+
+                    if (! $sourceLineId) {
+                        continue;
+                    }
+
+                    $requestedByLine[(int) $sourceLineId] = (int) ($requestedByLine[(int) $sourceLineId] ?? 0) + abs((int) $line['qty']);
+                }
+
+                foreach ($lines as $index => $line) {
+                    $sourceLineId = $line['source_line_id'] ?? null;
+
+                    if (! $sourceLineId) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris wajib merujuk baris dokumen sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    $sourceLine = $sourceLines->get((int) $sourceLineId);
+
+                    if (! $sourceLine) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris sumber bukan milik dokumen sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    if ((int) $sourceLine->item_id !== (int) $line['item_id']) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris retur harus memakai barang yang sama dengan baris sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    $sourceBinId = (int) ($sourceLine->to_bin_id ?? 0);
+
+                    if ($sourceBinId && (int) ($line['from_bin_id'] ?? 0) !== $sourceBinId) {
+                        $validator->errors()->add(
+                            "lines.{$index}.from_bin_id",
+                            'Bin asal harus sama dengan bin tujuan baris sumber (Penerimaan).'
+                        );
+                    }
+
+                    $sourceQty = (int) $sourceLine->qty;
+                    $alreadyReturned = (int) ($returnedByLine->get((int) $sourceLineId) ?? 0);
+                    $requested = (int) ($requestedByLine[(int) $sourceLineId] ?? 0);
+
+                    if ($alreadyReturned + $requested > $sourceQty) {
+                        $remaining = max(0, $sourceQty - $alreadyReturned);
+                        $validator->errors()->add(
+                            "lines.{$index}.qty",
+                            "Qty melebihi sisa barang dari dokumen sumber (sisa {$remaining})."
+                        );
                     }
                 }
             },

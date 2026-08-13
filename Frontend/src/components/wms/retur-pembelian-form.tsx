@@ -20,9 +20,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useBins, useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
-import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
+import {
+  useCreateStockDocument,
+  useStockDocument,
+  useStockDocuments,
+  useStockRows,
+} from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
-import { formatNumber } from "@/lib/wms-data";
+import { formatDate, formatNumber } from "@/lib/wms-data";
 import type { StockDocumentPayload } from "@/lib/persediaan-types";
 
 const returReasons = ["Cacat", "Kelebihan Kirim", "Salah Barang", "Kadaluarsa", "Lainnya"];
@@ -56,6 +61,7 @@ export function ReturPembelianForm() {
 
   const [warehouseId, setWarehouseId] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [sourceDocId, setSourceDocId] = useState("");
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");
@@ -64,6 +70,13 @@ export function ReturPembelianForm() {
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
+
+  // Dokumen Penerimaan (Barang Masuk) Selesai yang bisa jadi sumber retur.
+  const { data: incomingDocs, isLoading: incomingLoading } = useStockDocuments({
+    type: "Penerimaan",
+    status: "Selesai",
+  });
+  const { data: sourceDetail } = useStockDocument(sourceDocId ? Number(sourceDocId) : undefined);
 
   const binsInWarehouse = useMemo(
     () =>
@@ -81,6 +94,28 @@ export function ReturPembelianForm() {
   const supplierOptions: ComboboxOption[] = useMemo(
     () => (suppliers?.data ?? []).map((s) => ({ value: s.name, label: s.name })),
     [suppliers],
+  );
+
+  // Dokumen Barang Masuk (Penerimaan Selesai) di gudang terpilih — difilter juga
+  // oleh supplier bila sudah dipilih. Barang retur harus berasal dari salah satu
+  // baris dokumen ini (validasi server: cap qty per baris + harga beli asal).
+  const sourceDocOptions: ComboboxOption[] = useMemo(() => {
+    const docs = (incomingDocs?.data ?? []).filter(
+      (d) =>
+        (!warehouseId || d.warehouse_id === Number(warehouseId)) &&
+        (!supplier || d.partner === supplier),
+    );
+    return docs.map((d) => ({
+      value: String(d.id),
+      label: `${d.no} · ${formatDate(d.document_date)}${d.partner ? ` · ${d.partner}` : ""}`,
+      keywords: `${d.no} ${d.partner ?? ""} ${d.reference_no ?? ""}`,
+    }));
+  }, [incomingDocs, warehouseId, supplier]);
+
+  // Baris barang dari dokumen sumber terpilih (qty positif = yang diterima).
+  const sourceLines = useMemo(
+    () => (sourceDocId ? (sourceDetail?.data.lines ?? []) : []).filter((l) => (l.qty ?? 0) > 0),
+    [sourceDocId, sourceDetail],
   );
 
   const reasonOptions: ComboboxOption[] = useMemo(
@@ -160,7 +195,25 @@ export function ReturPembelianForm() {
   const lineAvailable = (l: FormLine): number | undefined =>
     l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
 
+  // Baris sumber untuk sebuah barang (dari dokumen Penerimaan terpilih). Bin asal
+  // retur wajib bin tujuan baris sumber; qty maksimum = qty diterima baris sumber.
+  const lineSource = (l: FormLine) => {
+    if (!sourceLines.length || !l.itemId) return undefined;
+    return (
+      sourceLines.find(
+        (s) =>
+          s.item_id === Number(l.itemId) &&
+          (s.to_bin_id == null || s.to_bin_id === Number(l.binId)),
+      ) ?? sourceLines.find((s) => s.item_id === Number(l.itemId))
+    );
+  };
+
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
+    // Dengan dokumen sumber, barang dibatasi pada baris Penerimaan sumber.
+    if (sourceDocId) {
+      const ids = new Set(sourceLines.map((s) => s.item_id));
+      return itemOptions.filter((o) => ids.has(Number(o.value)));
+    }
     if (!l.binId) return itemOptions;
     const availableIds = availableItemIdsByBin.get(l.binId);
     if (!availableIds) return [];
@@ -168,9 +221,15 @@ export function ReturPembelianForm() {
   };
 
   // Dropdown bin scoped: hanya bin berisi stok di gudang ini; saat barang sudah
-  // dipilih, hanya bin yang memegang barang tersebut (berisi stok).
+  // dipilih, hanya bin yang memegang barang tersebut (berisi stok). Dengan dokumen
+  // sumber, bin hanya yang dipakai baris sumber (bin tujuan Penerimaan).
   const lineBinOptions = (l: FormLine): ComboboxOption[] => {
     if (!warehouseId) return [];
+    if (sourceDocId) {
+      const src = lineSource(l);
+      if (!l.itemId || !src || src.to_bin_id == null) return [];
+      return binOptions.filter((o) => Number(o.value) === src.to_bin_id);
+    }
     if (l.itemId) {
       const candidates = binCandidatesByItem.get(l.itemId) ?? [];
       const ids = new Set(candidates.map((c) => c.bin_id));
@@ -196,6 +255,14 @@ export function ReturPembelianForm() {
 
   const pickItem = (key: string, itemId: string) => {
     patchLine(key, (line) => {
+      // Dengan dokumen sumber: bin dikunci ke bin tujuan baris Penerimaan sumber.
+      if (sourceDocId) {
+        const src = lineSource({ ...line, itemId });
+        return {
+          itemId,
+          binId: src?.to_bin_id != null ? String(src.to_bin_id) : "",
+        };
+      }
       const item = items?.data.find((x) => String(x.id) === itemId);
       const candidates = binCandidatesByItem.get(itemId) ?? [];
       const currentValid = Boolean(
@@ -216,7 +283,17 @@ export function ReturPembelianForm() {
 
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
+    setSourceDocId("");
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
+  };
+
+  // Pilih dokumen Penerimaan sumber: supplier ikut terisi dari partner dokumen,
+  // daftar barang dibatasi ke baris dokumen itu.
+  const pickSourceDoc = (id: string) => {
+    setSourceDocId(id);
+    const doc = (incomingDocs?.data ?? []).find((d) => String(d.id) === id);
+    if (doc?.partner) setSupplier((prev) => prev || (doc.partner ?? ""));
+    setLines([newLine()]);
   };
 
   const buildNote = (): string | null => {
@@ -232,6 +309,7 @@ export function ReturPembelianForm() {
     status,
     document_date: date || today(),
     warehouse_id: Number(warehouseId),
+    source_document_id: sourceDocId ? Number(sourceDocId) : null,
     partner: supplier || null,
     reference_no: reference.trim() || null,
     pic: pic.trim() || null,
@@ -242,6 +320,7 @@ export function ReturPembelianForm() {
         item_id: Number(l.itemId),
         qty: Number(l.qty),
         from_bin_id: Number(l.binId),
+        source_line_id: sourceDocId ? (lineSource(l)?.id ?? null) : null,
       })),
   });
 
@@ -251,9 +330,23 @@ export function ReturPembelianForm() {
       toast.error("Pilih gudang terlebih dahulu.");
       return;
     }
+    if (!sourceDocId) {
+      toast.error("Pilih dokumen Barang Masuk sumber terlebih dahulu.");
+      return;
+    }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
       toast.error("Lengkapi minimal satu baris barang (barang, lokasi bin, dan qty).");
+      return;
+    }
+
+    const overSourceLine = lines.find((l) => {
+      if (!l.itemId || !l.binId || !l.qty) return false;
+      const src = lineSource(l);
+      return src != null && Number(l.qty) > (src.qty ?? 0);
+    });
+    if (overSourceLine) {
+      toast.error("Ada baris dengan qty melebihi jumlah barang pada dokumen sumber.");
       return;
     }
 
@@ -336,6 +429,25 @@ export function ReturPembelianForm() {
             )}
           </div>
           <div className="space-y-1.5">
+            <Label>Dari Barang Masuk</Label>
+            <FormCombobox
+              value={sourceDocId}
+              onValueChange={pickSourceDoc}
+              options={sourceDocOptions}
+              placeholder={warehouseId ? "Pilih dokumen sumber..." : "Pilih gudang dulu"}
+              searchPlaceholder="Cari nomor / supplier / referensi..."
+              loading={incomingLoading}
+              side="bottom"
+              avoidCollisions={false}
+            />
+            {!warehouseId && (
+              <p className="text-xs text-muted-foreground">Pilih gudang untuk memuat dokumen.</p>
+            )}
+            {docError("source_document_id") && (
+              <p className="text-xs text-destructive">{docError("source_document_id")}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
             <Label>Supplier</Label>
             <FormCombobox
               value={supplier}
@@ -415,6 +527,8 @@ export function ReturPembelianForm() {
               {lines.map((l, i) => {
                 const available = lineAvailable(l);
                 const overStock = available !== undefined && (Number(l.qty) || 0) > available;
+                const src = lineSource(l);
+                const overSource = src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -459,7 +573,7 @@ export function ReturPembelianForm() {
                         min={1}
                         value={l.qty}
                         onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                        className={`h-9 w-24 rounded-lg ${overStock ? "border-destructive" : ""}`}
+                        className={`h-9 w-24 rounded-lg ${overStock || overSource ? "border-destructive" : ""}`}
                       />
                       {lineError(i, "qty") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "qty")}</p>
@@ -467,6 +581,16 @@ export function ReturPembelianForm() {
                       {overStock && (
                         <p className="mt-1 text-xs text-destructive">
                           Melebihi tersedia ({formatNumber(available)})
+                        </p>
+                      )}
+                      {overSource && (
+                        <p className="mt-1 text-xs text-destructive">
+                          Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.qty ?? 0)})
+                        </p>
+                      )}
+                      {src && !overSource && sourceDocId && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Maks {formatNumber(src.qty ?? 0)} dari {sourceDetail?.data.no}
                         </p>
                       )}
                     </td>
@@ -496,6 +620,8 @@ export function ReturPembelianForm() {
           {lines.map((l, i) => {
             const available = lineAvailable(l);
             const overStock = available !== undefined && (Number(l.qty) || 0) > available;
+            const src = lineSource(l);
+            const overSource = src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
@@ -527,7 +653,7 @@ export function ReturPembelianForm() {
                       min={1}
                       value={l.qty}
                       onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                      className={`h-9 w-24 rounded-lg ${overStock ? "border-destructive" : ""}`}
+                      className={`h-9 w-24 rounded-lg ${overStock || overSource ? "border-destructive" : ""}`}
                     />
                     <span className="ml-auto text-sm text-muted-foreground">
                       Tersedia {available !== undefined ? formatNumber(available) : "—"}
@@ -536,6 +662,16 @@ export function ReturPembelianForm() {
                   {overStock && (
                     <p className="text-xs text-destructive">
                       Qty melebihi stok tersedia di bin ini.
+                    </p>
+                  )}
+                  {overSource && (
+                    <p className="text-xs text-destructive">
+                      Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.qty ?? 0)}).
+                    </p>
+                  )}
+                  {src && !overSource && sourceDocId && (
+                    <p className="text-xs text-muted-foreground">
+                      Maks {formatNumber(src.qty ?? 0)} dari {sourceDetail?.data.no}
                     </p>
                   )}
                   {lineError(i, "from_bin_id") && (

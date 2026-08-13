@@ -38,20 +38,10 @@ import {
   formatNumber,
   goodsReceipts,
   purchaseOrders,
-  purchaseRequests,
   type ProcDoc,
 } from "@/lib/wms-data";
 
 const sections = {
-  "purchase-request": {
-    title: "Purchase Request",
-    description: "Permintaan pembelian dari departemen sebelum diterbitkan PO",
-    docs: purchaseRequests,
-    partnerLabel: "Supplier Usulan",
-    refLabel: "Referensi Anggaran",
-    cta: "Buat Purchase Request",
-    icon: ClipboardList,
-  },
   "purchase-order": {
     title: "Purchase Order",
     description: "Pesanan pembelian resmi ke supplier",

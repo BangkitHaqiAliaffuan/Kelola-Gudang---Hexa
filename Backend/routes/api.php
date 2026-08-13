@@ -7,6 +7,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\MerkController;
+use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
 use App\Http\Controllers\RoleController;
@@ -59,4 +60,16 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::get('stock-documents/{stockDocument}', [StockDocumentController::class, 'show']);
     Route::post('stock-documents/{stockDocument}/post', [StockDocumentController::class, 'post']);
     Route::post('stock-documents/{stockDocument}/cancel', [StockDocumentController::class, 'cancel']);
+});
+
+Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan'])->group(function () {
+    Route::get('proc-docs', [ProcDocController::class, 'index']);
+    Route::post('proc-docs', [ProcDocController::class, 'store']);
+    Route::get('proc-docs/{procDoc}', [ProcDocController::class, 'show'])->whereNumber('procDoc');
+    Route::put('proc-docs/{procDoc}', [ProcDocController::class, 'update'])->whereNumber('procDoc');
+    Route::delete('proc-docs/{procDoc}', [ProcDocController::class, 'destroy'])->whereNumber('procDoc');
+    Route::post('proc-docs/{procDoc}/submit', [ProcDocController::class, 'submit'])->whereNumber('procDoc');
+    Route::post('proc-docs/{procDoc}/approve', [ProcDocController::class, 'approve'])->whereNumber('procDoc');
+    Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');
+    Route::post('proc-docs/{procDoc}/cancel', [ProcDocController::class, 'cancel'])->whereNumber('procDoc');
 });

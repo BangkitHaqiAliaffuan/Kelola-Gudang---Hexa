@@ -173,6 +173,9 @@ export function StockDocumentSheet({
                 <Field label="Jenis Dokumen" value={doc.type} />
                 <Field label="Tanggal" value={formatDate(doc.document_date)} />
                 <Field label="Gudang" value={doc.warehouse ?? "—"} />
+                {doc.source_document_id != null && (
+                  <Field label="Dokumen Sumber" value={doc.source_document ?? "—"} />
+                )}
                 <Field
                   label={
                     doc.destination

@@ -19,6 +19,7 @@ class StockDocumentLine extends Model
         'actual_qty',
         'from_bin_id',
         'to_bin_id',
+        'source_line_id',
         'unit_cost',
         'note',
     ];
@@ -48,6 +49,11 @@ class StockDocumentLine extends Model
     public function toBin(): BelongsTo
     {
         return $this->belongsTo(Bin::class, 'to_bin_id');
+    }
+
+    public function sourceLine(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_line_id');
     }
 
     /**

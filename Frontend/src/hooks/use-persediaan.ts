@@ -36,13 +36,14 @@ export function useStockCard(itemId: number | undefined, method: ValuationMethod
   });
 }
 
-export function useStockDocuments(params: { type?: string } = {}) {
-  const { type } = params;
+export function useStockDocuments(params: { type?: string; status?: string } = {}) {
+  const { type, status } = params;
   return useQuery({
-    queryKey: ["persediaan", "stock-documents", "list", type ?? null],
+    queryKey: ["persediaan", "stock-documents", "list", type ?? null, status ?? null],
     queryFn: () => {
       const sp = new URLSearchParams({ per_page: String(DOCS_PER_PAGE) });
       if (type) sp.set("type", type);
+      if (status) sp.set("status", status);
       return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
     },
     enabled: typeof window !== "undefined",

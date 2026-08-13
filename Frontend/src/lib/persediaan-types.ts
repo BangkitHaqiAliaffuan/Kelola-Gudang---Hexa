@@ -168,6 +168,7 @@ export type StockDocumentLineApi = {
   to_bin_id: number | null;
   to_bin: string | null;
   to_rack: string | null;
+  source_line_id: number | null;
   unit_cost: number;
   note: string | null;
 };
@@ -182,6 +183,8 @@ export type StockDocumentApi = {
   warehouse: string | null;
   destination_warehouse_id: number | null;
   destination: string | null;
+  source_document_id: number | null;
+  source_document: string | null;
   partner: string | null;
   reference_no: string | null;
   pic: string | null;
@@ -207,6 +210,9 @@ export type StockDocumentApi = {
 //   (server memakai moving average di bin asal). `qty` selalu positif.
 // - Retur Pembelian: perilaku = Pengeluaran (arah OUT, `from_bin_id` wajib, qty
 //   dinegasi server, unit_cost di-backfill), nomor `RP/YYYY/#####`, partner = supplier.
+//   Bila `source_document_id` (dokumen Penerimaan sumber) dikirim, setiap baris
+//   wajib memakai `source_line_id` baris Penerimaan tersebut — server memvalidasi
+//   relasi + sisa qty dan meng-backfill harga beli asal dari baris sumber.
 // - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, unit_cost
 //   dari input), nomor `RJ/YYYY/#####`, partner = customer.
 
@@ -219,6 +225,7 @@ export type StockDocumentLinePayload = {
   unit_cost?: number | null;
   to_bin_id?: number | null;
   from_bin_id?: number | null;
+  source_line_id?: number | null;
   note?: string | null;
 };
 
@@ -228,6 +235,7 @@ export type StockDocumentPayload = {
   document_date: string;
   warehouse_id: number;
   destination_warehouse_id?: number | null;
+  source_document_id?: number | null;
   partner: string | null;
   reference_no: string | null;
   pic?: string | null;

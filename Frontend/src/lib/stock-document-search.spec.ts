@@ -12,6 +12,8 @@ const doc: StockDocumentApi = {
   warehouse: "Gudang Jakarta",
   destination_warehouse_id: null,
   destination: null,
+  source_document_id: null,
+  source_document: null,
   partner: "PT Sumber Jaya",
   reference_no: "PO-00123",
   pic: "Rudi Hartono",

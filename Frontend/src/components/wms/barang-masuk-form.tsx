@@ -41,7 +41,21 @@ const newLine = (): FormLine => {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function BarangMasukForm() {
+type BarangMasukFormProps = {
+  backTo?: string;
+  title?: string;
+  description?: string;
+  referenceLabel?: string;
+  requireReference?: boolean;
+};
+
+export function BarangMasukForm({
+  backTo = "/transaksi/masuk",
+  title = "Tambah Barang Masuk",
+  description = "Catat penerimaan barang dari supplier",
+  referenceLabel = "Referensi (PO / SJ)",
+  requireReference = false,
+}: BarangMasukFormProps = {}) {
   const navigate = useNavigate();
   const { user, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
@@ -155,6 +169,10 @@ export function BarangMasukForm() {
       toast.error("Pilih gudang terlebih dahulu.");
       return;
     }
+    if (requireReference && !reference.trim()) {
+      toast.error("Isi No. PO terlebih dahulu.");
+      return;
+    }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
       toast.error("Lengkapi minimal satu baris barang (barang, lokasi bin, qty, dan harga).");
@@ -168,7 +186,7 @@ export function BarangMasukForm() {
           ? `Dokumen ${res.data.no} berhasil diposting`
           : `Draft ${res.data.no} berhasil disimpan`,
       );
-      navigate({ to: "/transaksi/masuk" });
+      navigate({ to: backTo });
     } catch (err) {
       if (isApiError(err)) setApiErrors(err.errors);
       toast.error((err as Error).message);
@@ -181,11 +199,11 @@ export function BarangMasukForm() {
   return (
     <>
       <PageHeader
-        title="Tambah Barang Masuk"
-        description="Catat penerimaan barang dari supplier"
+        title={title}
+        description={description}
         actions={
           <Button asChild variant="outline" className="rounded-xl">
-            <Link to="/transaksi/masuk">
+            <Link to={backTo}>
               <ArrowLeft className="h-4 w-4" /> Kembali
             </Link>
           </Button>
@@ -239,13 +257,16 @@ export function BarangMasukForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Referensi (PO / SJ)</Label>
+            <Label>{referenceLabel}</Label>
             <Input
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="Contoh: PO-2026-001"
               className="rounded-xl"
             />
+            {requireReference && !reference.trim() && (
+              <p className="text-xs text-destructive">No. PO wajib diisi.</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>PIC</Label>

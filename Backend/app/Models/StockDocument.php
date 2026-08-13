@@ -36,6 +36,7 @@ class StockDocument extends Model
         'document_date',
         'warehouse_id',
         'destination_warehouse_id',
+        'source_document_id',
         'partner',
         'reference_no',
         'pic',
@@ -67,6 +68,11 @@ class StockDocument extends Model
     public function destination(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'destination_warehouse_id');
+    }
+
+    public function sourceDocument(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_document_id');
     }
 
     public function creator(): BelongsTo

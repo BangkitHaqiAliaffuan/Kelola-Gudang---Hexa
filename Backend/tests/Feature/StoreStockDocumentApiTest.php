@@ -674,6 +674,268 @@ class StoreStockDocumentApiTest extends TestCase
         $this->assertSame($before, StockDocument::count());
     }
 
+    /** Buat dokumen Penerimaan Selesai dan kembalikan (doc, line pertama). */
+    private function makePostedPenerimaan(int $itemId, int $binId, int $qty, float $cost, string $date = '2026-08-11'): array
+    {
+        $no = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => $date,
+            'warehouse_id' => $this->warehouseIdOf($binId),
+            'lines' => [
+                ['item_id' => $itemId, 'qty' => $qty, 'unit_cost' => $cost, 'to_bin_id' => $binId],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = StockDocument::where('no', $no)->firstOrFail();
+
+        return [$doc, $doc->lines()->firstOrFail()];
+    }
+
+    private function warehouseIdOf(int $binId): int
+    {
+        return Bin::with('rack')->findOrFail($binId)->rack->warehouse_id;
+    }
+
+    public function test_store_retur_pembelian_linked_uses_purchase_cost(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        // Dua Penerimaan dengan harga berbeda → moving average di bin berubah,
+        // tapi retur ter-link harus memakai harga beli asal baris sumber (1500).
+        [$source, $sourceLine] = $this->makePostedPenerimaan($item->id, $bin->id, 10, 1500);
+        $this->makePostedPenerimaan($item->id, $bin->id, 5, 2000);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Sumber Jaya',
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 4, 'from_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.source_document_id', $source->id)
+            ->assertJsonPath('data.source_document', $source->no)
+            ->assertJsonPath('data.lines.0.source_line_id', $sourceLine->id)
+            ->assertJsonPath('data.lines.0.unit_cost', 1500)
+            ->assertJsonPath('data.lines.0.qty', -4);
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'direction' => 'OUT',
+            'unit_cost' => 1500.0,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+            'stock' => 11,
+        ]);
+    }
+
+    public function test_store_retur_pembelian_qty_exceeds_source_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        [$source, $sourceLine] = $this->makePostedPenerimaan($item->id, $bin->id, 5, 1500);
+        $before = StockDocument::count();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Sumber Jaya',
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 6, 'from_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.qty');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_retur_pembelian_qty_accumulated_across_documents_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        [$source, $sourceLine] = $this->makePostedPenerimaan($item->id, $bin->id, 5, 1500);
+
+        // Retur pertama memakai 3 dari 5; draft tetap terhitung sebagai pemakaian.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'from_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ])->assertStatus(201);
+
+        $before = StockDocument::count();
+
+        // Retur kedua ingin memakai 3 lagi → hanya sisa 2 yang tersedia.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-13',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'from_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.qty');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_retur_pembelian_source_must_be_posted_penerimaan(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        // Draft Penerimaan belum diposting → tak boleh jadi sumber.
+        $draftNo = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.no');
+        $draft = StockDocument::where('no', $draftNo)->firstOrFail();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $draft->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id, 'source_line_id' => $draft->lines()->firstOrFail()->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('source_document_id');
+
+        // Dokumen Pengeluaran bukan Penerimaan → tak boleh jadi sumber.
+        $bkNo = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Draft',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.no');
+        $bk = StockDocument::where('no', $bkNo)->firstOrFail();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $bk->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id, 'source_line_id' => $bk->lines()->firstOrFail()->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('source_document_id');
+    }
+
+    public function test_store_retur_pembelian_source_line_mismatch_returns_422(): void
+    {
+        $itemA = $this->makeItem();
+        $itemB = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        [$source, $sourceLine] = $this->makePostedPenerimaan($itemA->id, $bin->id, 5, 1500);
+
+        // Baris sumber milik dokumen lain.
+        [$other, $otherLine] = $this->makePostedPenerimaan($itemB->id, $bin->id, 5, 2000);
+        $this->assertNotSame($source->id, $other->id);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $itemB->id, 'qty' => 1, 'from_bin_id' => $bin->id, 'source_line_id' => $otherLine->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.source_line_id');
+
+        // Barang baris retur berbeda dari barang baris sumber.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $itemB->id, 'qty' => 1, 'from_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.source_line_id');
+    }
+
+    public function test_store_retur_pembelian_source_line_bin_mismatch_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $binA] = $this->makeLocation();
+        [, , $binB] = $this->makeLocation();
+        [$source, $sourceLine] = $this->makePostedPenerimaan($item->id, $binA->id, 5, 1500);
+        $before = StockDocument::count();
+
+        // Barang diterima di bin A, tapi retur memakai bin B → tolak.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Pembelian',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $binB->id, 'source_line_id' => $sourceLine->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.from_bin_id');
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_store_source_document_prohibited_for_non_retur_types(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        [$source] = $this->makePostedPenerimaan($item->id, $bin->id, 5, 1500);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('source_document_id');
+    }
+
     public function test_store_retur_penjualan_draft_creates_document_without_movements(): void
     {
         $item = $this->makeItem();

@@ -29,6 +29,7 @@ class StockDocumentLineResource extends JsonResource
             'to_bin_id' => $this->to_bin_id,
             'to_bin' => $this->whenLoaded('toBin', fn () => $this->toBin?->code),
             'to_rack' => $this->whenLoaded('toBin.rack', fn () => $this->toBin?->rack?->code),
+            'source_line_id' => $this->source_line_id,
             'unit_cost' => $this->unit_cost,
             'note' => $this->note,
         ];

@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ProjectSeeder::class,
             WorkOrderSeeder::class,
             StockDocumentSeeder::class,
+            ProcDocSeeder::class,
             RolePermissionSeeder::class,
         ]);
     }

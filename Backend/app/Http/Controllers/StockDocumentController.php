@@ -83,8 +83,17 @@ class StockDocumentController extends Controller
                 ->keyBy('id')
             : collect();
 
+        // Baris Penerimaan sumber untuk Retur Pembelian yang ter-link — harga beli
+        // asal (unit_cost) dipakai menggantikan moving average pada baris retur.
+        $sourceLines = ($data['type'] === 'Retur Pembelian' && ! empty($data['source_document_id']))
+            ? StockDocumentLine::where('document_id', $data['source_document_id'])
+                ->whereIn('id', collect($data['lines'])->pluck('source_line_id')->filter()->unique()->values())
+                ->get()
+                ->keyBy('id')
+            : collect();
+
         try {
-            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $fromBins) {
+            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $fromBins, $sourceLines) {
                 $prefix = $isTransfer ? 'TF' : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK') : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM'));
 
                 $document = StockDocument::create([
@@ -94,6 +103,7 @@ class StockDocumentController extends Controller
                     'document_date' => $data['document_date'],
                     'warehouse_id' => $data['warehouse_id'],
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
+                    'source_document_id' => $data['type'] === 'Retur Pembelian' ? ($data['source_document_id'] ?? null) : null,
                     'partner' => $data['partner'] ?? null,
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
@@ -102,6 +112,10 @@ class StockDocumentController extends Controller
                 ]);
 
                 foreach ($data['lines'] as $index => $line) {
+                    $sourceCost = $data['type'] === 'Retur Pembelian'
+                        ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_cost
+                        : null;
+
                     StockDocumentLine::create([
                         'document_id' => $document->id,
                         'line_no' => $index + 1,
@@ -112,11 +126,16 @@ class StockDocumentController extends Controller
                         // Gudang & Retur Penjualan tetap positif: Transfer merilis pasangan
                         // OUT+IN di service, Retur Penjualan adalah stok masuk (IN).
                         'qty' => $isOutbound ? -abs($line['qty']) : $line['qty'],
-                        'unit_cost' => ($isOutbound || $isTransfer)
-                            ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
-                            : $line['unit_cost'],
+                        // Retur Pembelian ter-link memakai harga beli asal dari baris
+                        // Penerimaan sumber; retur manual tetap moving average.
+                        'unit_cost' => $sourceCost !== null
+                            ? (float) $sourceCost
+                            : (($isOutbound || $isTransfer)
+                                ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
+                                : $line['unit_cost']),
                         'to_bin_id' => $isOutbound ? null : $line['to_bin_id'],
                         'from_bin_id' => $line['from_bin_id'] ?? null,
+                        'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
                         'note' => $line['note'] ?? null,
                     ]);
                 }
@@ -132,7 +151,7 @@ class StockDocumentController extends Controller
         }
 
         return (new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'creator', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
         ])->loadCount('lines')))->response()->setStatusCode(201);
     }
 
@@ -165,6 +184,7 @@ class StockDocumentController extends Controller
             'warehouse',
             'destination',
             'creator',
+            'sourceDocument',
             'lines.item.unit',
             'lines.fromBin.rack',
             'lines.toBin.rack',
