@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatIDR, formatNumber, warehouses } from "@/lib/wms-data";
 import { useItem } from "@/hooks/use-master";
 import { useStockCard } from "@/hooks/use-persediaan";
+import { useAuth } from "@/hooks/use-auth";
 import type { ItemApi } from "@/lib/master-types";
 
 export const Route = createFileRoute("/master/barang/$id")({
@@ -87,6 +88,8 @@ const hueFor = (id: number) => (id * 137) % 360;
 
 function DetailBarang() {
   const { id } = Route.useParams();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Master Data", "Tulis");
   const { data, isLoading } = useItem(Number(id));
   const [editing, setEditing] = useState<ItemApi | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -139,15 +142,17 @@ function DetailBarang() {
             <Button variant="outline" className="rounded-xl">
               <Printer className="h-4 w-4" /> Cetak Label
             </Button>
-            <Button
-              className="rounded-xl"
-              onClick={() => {
-                setEditing(item);
-                setDialogOpen(true);
-              }}
-            >
-              <Pencil className="h-4 w-4" /> Edit Barang
-            </Button>
+            {canWrite && (
+              <Button
+                className="rounded-xl"
+                onClick={() => {
+                  setEditing(item);
+                  setDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" /> Edit Barang
+              </Button>
+            )}
           </>
         }
       />
@@ -273,10 +278,7 @@ function DetailBarang() {
             </TabsContent>
 
             <TabsContent value="barcode" className="m-0 grid gap-4 p-5 sm:grid-cols-2">
-              <BarcodeBars
-                code={item.internal_barcode ?? item.sku}
-                label="Barcode Internal"
-              />
+              <BarcodeBars code={item.internal_barcode ?? item.sku} label="Barcode Internal" />
               {item.barcode && <BarcodeBars code={item.barcode} label="Barcode Produk" />}
               <QrPreview code={item.sku} label="QR Code SKU" />
             </TabsContent>

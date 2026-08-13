@@ -15,10 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { formatIDR, formatNumber, opnameLines, opnameSessions } from "@/lib/wms-data";
+import { useAuth } from "@/hooks/use-auth";
 
 const sections: Record<string, { title: string; description: string }> = {
   jadwal: { title: "Jadwal Opname", description: "Rencana pelaksanaan dan status penyelesaian" },
-  proses: { title: "Proses Opname", description: "Aktivitas mulai, pencatatan fisik, sampai selesai" },
+  proses: {
+    title: "Proses Opname",
+    description: "Aktivitas mulai, pencatatan fisik, sampai selesai",
+  },
   laporan: { title: "Laporan Opname", description: "Ringkasan dan detail hasil tiap sesi opname" },
 };
 
@@ -40,6 +44,8 @@ export const Route = createFileRoute("/opname/$section")({
 
 function Opname() {
   const { section } = Route.useParams();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Stock Opname", "Tulis");
   const cfg = sections[section] ?? sections["jadwal"]!;
   const running = opnameSessions.filter((o) => o.status === "Berjalan");
   const [scan, setScan] = useState("");
@@ -53,15 +59,23 @@ function Opname() {
         description={cfg.description}
         actions={
           section === "jadwal" ? (
-            <Button className="rounded-xl" onClick={() => toast.success("Jadwal opname dibuat")}>
-              <CalendarDays className="h-4 w-4" /> Buat Jadwal
-            </Button>
+            canWrite && (
+              <Button className="rounded-xl" onClick={() => toast.success("Jadwal opname dibuat")}>
+                <CalendarDays className="h-4 w-4" /> Buat Jadwal
+              </Button>
+            )
           ) : section === "proses" ? (
-            <Button className="rounded-xl" onClick={() => toast.success("Sesi opname dimulai")}>
-              <Play className="h-4 w-4" /> Mulai Opname
-            </Button>
+            canWrite && (
+              <Button className="rounded-xl" onClick={() => toast.success("Sesi opname dimulai")}>
+                <Play className="h-4 w-4" /> Mulai Opname
+              </Button>
+            )
           ) : (
-            <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Laporan diexport")}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => toast.success("Laporan diexport")}
+            >
               <ClipboardCheck className="h-4 w-4" /> Export Laporan
             </Button>
           )
@@ -112,7 +126,15 @@ function Opname() {
                     <td className="px-3 py-2.5">{formatNumber(o.total)} SKU</td>
                     <td className="px-3 py-2.5">{o.pic}</td>
                     <td className="px-3 py-2.5">
-                      <Pill tone={o.status === "Berjalan" ? "warning" : o.status === "Selesai" ? "success" : "info"}>
+                      <Pill
+                        tone={
+                          o.status === "Berjalan"
+                            ? "warning"
+                            : o.status === "Selesai"
+                              ? "success"
+                              : "info"
+                        }
+                      >
                         {o.status}
                       </Pill>
                     </td>
@@ -126,7 +148,15 @@ function Opname() {
               <div key={o.id} className="rounded-xl border border-border p-3">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <p className="truncate text-sm font-semibold">{o.warehouse}</p>
-                  <Pill tone={o.status === "Berjalan" ? "warning" : o.status === "Selesai" ? "success" : "info"}>
+                  <Pill
+                    tone={
+                      o.status === "Berjalan"
+                        ? "warning"
+                        : o.status === "Selesai"
+                          ? "success"
+                          : "info"
+                    }
+                  >
                     {o.status}
                   </Pill>
                 </div>
@@ -149,7 +179,9 @@ function Opname() {
                   type="button"
                   onClick={() => setActive(o.id)}
                   className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                    active === o.id ? "border-primary/40 bg-primary-soft" : "border-border hover:bg-accent/40"
+                    active === o.id
+                      ? "border-primary/40 bg-primary-soft"
+                      : "border-border hover:bg-accent/40"
                   }`}
                 >
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -159,7 +191,15 @@ function Opname() {
                         {o.id} · {o.scheduled} · PIC {o.pic}
                       </p>
                     </div>
-                    <Pill tone={o.status === "Berjalan" ? "warning" : o.status === "Selesai" ? "success" : "info"}>
+                    <Pill
+                      tone={
+                        o.status === "Berjalan"
+                          ? "warning"
+                          : o.status === "Selesai"
+                            ? "success"
+                            : "info"
+                      }
+                    >
                       {o.status}
                     </Pill>
                   </div>
@@ -174,18 +214,27 @@ function Opname() {
             </div>
           </Panel>
 
-          <Panel title={`Pencatatan Fisik — ${active}`} description="Scan barcode lalu masukkan qty fisik">
-            <div className="mb-4 flex gap-2">
-              <Input
-                value={scan}
-                onChange={(e) => setScan(e.target.value)}
-                placeholder="Scan / ketik barcode..."
-                className="max-w-sm rounded-xl font-mono"
-              />
-              <Button variant="outline" className="rounded-xl" onClick={() => toast.info("Scanner aktif")}>
-                <Barcode className="h-4 w-4" /> Scan
-              </Button>
-            </div>
+          <Panel
+            title={`Pencatatan Fisik — ${active}`}
+            description="Scan barcode lalu masukkan qty fisik"
+          >
+            {canWrite && (
+              <div className="mb-4 flex gap-2">
+                <Input
+                  value={scan}
+                  onChange={(e) => setScan(e.target.value)}
+                  placeholder="Scan / ketik barcode..."
+                  className="max-w-sm rounded-xl font-mono"
+                />
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => toast.info("Scanner aktif")}
+                >
+                  <Barcode className="h-4 w-4" /> Scan
+                </Button>
+              </div>
+            )}
             <div className="space-y-3">
               {lines.map((l) => (
                 <div
@@ -206,7 +255,13 @@ function Opname() {
                   </div>
                   <div className="text-xs">
                     <p className="text-muted-foreground">Fisik</p>
-                    <Input defaultValue={l.physical} className="h-8 w-24 rounded-lg" />
+                    {canWrite ? (
+                      <Input defaultValue={l.physical} className="h-8 w-24 rounded-lg" />
+                    ) : (
+                      <b>
+                        {formatNumber(l.physical)} {l.unit}
+                      </b>
+                    )}
                   </div>
                   <div className="text-xs">
                     <p className="text-muted-foreground">Selisih</p>
@@ -217,14 +272,23 @@ function Opname() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Draft opname disimpan")}>
-                Simpan Draft
-              </Button>
-              <Button className="rounded-xl" onClick={() => toast.success("Opname selesai diposting")}>
-                Selesaikan Opname
-              </Button>
-            </div>
+            {canWrite && (
+              <div className="mt-4 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => toast.success("Draft opname disimpan")}
+                >
+                  Simpan Draft
+                </Button>
+                <Button
+                  className="rounded-xl"
+                  onClick={() => toast.success("Opname selesai diposting")}
+                >
+                  Selesaikan Opname
+                </Button>
+              </div>
+            )}
           </Panel>
         </>
       )}
@@ -244,7 +308,9 @@ function Opname() {
                     type="button"
                     onClick={() => setActive(o.id)}
                     className={`rounded-xl border p-4 text-left transition-colors ${
-                      active === o.id ? "border-primary/40 bg-primary-soft" : "border-border hover:bg-accent/40"
+                      active === o.id
+                        ? "border-primary/40 bg-primary-soft"
+                        : "border-border hover:bg-accent/40"
                     }`}
                   >
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -281,16 +347,21 @@ function Opname() {
             </div>
           </Panel>
 
-          <Panel title={`Detail Selisih — ${active}`} description="Perbandingan stok sistem dan fisik">
+          <Panel
+            title={`Detail Selisih — ${active}`}
+            description="Perbandingan stok sistem dan fisik"
+          >
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs text-muted-foreground">
-                    {["Barang", "SKU", "Satuan", "Sistem", "Fisik", "Selisih", "Nilai Selisih"].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left font-semibold">
-                        {h}
-                      </th>
-                    ))}
+                    {["Barang", "SKU", "Satuan", "Sistem", "Fisik", "Selisih", "Nilai Selisih"].map(
+                      (h) => (
+                        <th key={h} className="px-3 py-2.5 text-left font-semibold">
+                          {h}
+                        </th>
+                      ),
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -323,8 +394,8 @@ function Opname() {
                   </div>
                   <p className="truncate font-mono text-xs text-muted-foreground">{l.sku}</p>
                   <p className="mt-1 text-xs">
-                    Sistem <b>{formatNumber(l.system)}</b> · Fisik <b>{formatNumber(l.physical)}</b> ·{" "}
-                    <b>{formatIDR(l.value)}</b>
+                    Sistem <b>{formatNumber(l.system)}</b> · Fisik <b>{formatNumber(l.physical)}</b>{" "}
+                    · <b>{formatIDR(l.value)}</b>
                   </p>
                 </div>
               ))}

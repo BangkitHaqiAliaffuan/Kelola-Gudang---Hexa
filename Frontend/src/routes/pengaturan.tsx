@@ -7,12 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
     meta: [
       { title: "Pengaturan — KelolaGudang" },
-      { name: "description", content: "Atur profil perusahaan, tema pastel, dan preferensi operasional gudang." },
+      {
+        name: "description",
+        content: "Atur profil perusahaan, tema pastel, dan preferensi operasional gudang.",
+      },
       { property: "og:title", content: "Pengaturan — KelolaGudang" },
       { property: "og:description", content: "Personalisasi aplikasi gudang Anda." },
     ],
@@ -22,6 +26,8 @@ export const Route = createFileRoute("/pengaturan")({
 
 function Pengaturan() {
   const { theme, setTheme } = useTheme();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("System", "Tulis");
   return (
     <>
       <PageHeader title="Pengaturan" description="Preferensi aplikasi dan tampilan" />
@@ -49,15 +55,23 @@ function Pengaturan() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Nama Perusahaan</Label>
-            <Input defaultValue="PT Kelola Gudang Nusantara" className="rounded-xl" />
+            <Input
+              defaultValue="PT Kelola Gudang Nusantara"
+              readOnly={!canWrite}
+              className="rounded-xl"
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Kode Perusahaan</Label>
-            <Input defaultValue="KGN-001" className="rounded-xl" />
+            <Input defaultValue="KGN-001" readOnly={!canWrite} className="rounded-xl" />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Alamat</Label>
-            <Input defaultValue="Jl. Industri Raya No. 88, Jakarta Timur" className="rounded-xl" />
+            <Input
+              defaultValue="Jl. Industri Raya No. 88, Jakarta Timur"
+              readOnly={!canWrite}
+              className="rounded-xl"
+            />
           </div>
         </div>
       </Panel>
@@ -70,20 +84,25 @@ function Pengaturan() {
             ["Scan barcode otomatis", "Fokus input langsung ke kolom scan"],
             ["Cetak label setelah simpan", "Otomatis cetak label barang baru"],
           ].map(([title, desc], i) => (
-            <div key={title} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border p-3">
+            <div
+              key={title}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border p-3"
+            >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{title}</p>
                 <p className="truncate text-xs text-muted-foreground">{desc}</p>
               </div>
-              <Switch defaultChecked={i !== 3} />
+              <Switch defaultChecked={i !== 3} disabled={!canWrite} />
             </div>
           ))}
         </div>
-        <div className="mt-4 flex justify-end">
-          <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
-            Simpan Perubahan
-          </Button>
-        </div>
+        {canWrite && (
+          <div className="mt-4 flex justify-end">
+            <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
+              Simpan Perubahan
+            </Button>
+          </div>
+        )}
       </Panel>
     </>
   );

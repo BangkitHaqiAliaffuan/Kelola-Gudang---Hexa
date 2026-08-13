@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
@@ -148,8 +149,11 @@ class StockDocumentService
         $available = (int) ($row?->stock ?? 0) - (int) ($row?->reserved ?? 0);
 
         if ($attributes['qty'] > $available) {
+            $item = Item::find($attributes['item_id']);
+            $label = $item ? trim(($item->sku ?? '').' '.($item->name ?? '')) : "#{$attributes['item_id']}";
+
             throw new \InvalidArgumentException(
-                "Stok tidak mencukupi untuk item {$attributes['item_id']} (butuh {$attributes['qty']}, tersedia {$available})."
+                "Stok tidak mencukupi untuk {$label} (butuh {$attributes['qty']}, tersedia {$available})."
             );
         }
     }

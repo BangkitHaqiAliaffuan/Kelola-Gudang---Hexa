@@ -32,6 +32,7 @@ class StockRowResource extends JsonResource
             'warehouse' => $this->warehouse?->name,
             'rack' => $this->bin?->rack?->code,
             'bin' => $this->bin?->code,
+            'bin_id' => $this->bin_id,
             'stock' => $this->stock,
             'reserved' => $this->reserved,
             'available' => max(0, $this->stock - $this->reserved),

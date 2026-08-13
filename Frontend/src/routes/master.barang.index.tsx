@@ -46,6 +46,7 @@ import {
 } from "@/hooks/use-master";
 import type { ItemApi } from "@/lib/master-types";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/master/barang/")({
   head: () => ({
@@ -75,6 +76,9 @@ const hueFor = (id: number) => (id * 137) % 360;
 
 function MasterBarang() {
   const navigate = useNavigate();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Master Data", "Tulis");
+  const canDelete = hasModuleLevel("Master Data", "Kelola");
   const { data, isLoading } = useItems();
   const { data: cats } = useCategories();
   const { data: subs } = useSubCategories();
@@ -179,16 +183,20 @@ function MasterBarang() {
   };
 
   const columns: Column<ItemApi>[] = [
-    {
-      key: "check",
-      label: "",
-      className: "w-10",
-      render: (r) => (
-        <span onClick={(e) => e.stopPropagation()}>
-          <Checkbox checked={selected.includes(r.id)} onCheckedChange={() => toggle(r.id)} />
-        </span>
-      ),
-    },
+    ...((canWrite || canDelete
+      ? [
+          {
+            key: "check",
+            label: "",
+            className: "w-10",
+            render: (r: ItemApi) => (
+              <span onClick={(e) => e.stopPropagation()}>
+                <Checkbox checked={selected.includes(r.id)} onCheckedChange={() => toggle(r.id)} />
+              </span>
+            ),
+          },
+        ]
+      : []) as Column<ItemApi>[]),
     { key: "sku", label: "SKU", render: (r) => <span className="font-mono text-xs">{r.sku}</span> },
     {
       key: "name",
@@ -228,45 +236,53 @@ function MasterBarang() {
       className: "whitespace-nowrap tabular-nums text-right",
       render: (r) => formatIDR(r.price),
     },
-    {
-      key: "actions",
-      label: "",
-      className: "w-10",
-      sticky: "right",
-      render: (r) => (
-        <span onClick={(e) => e.stopPropagation()} className="flex justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 rounded-lg"
-                aria-label="Aksi barang"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditing(r);
-                  setDialogOpen(true);
-                }}
-              >
-                <Pencil className="h-4 w-4" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => openSingleDelete(r)}
-              >
-                <Trash2 className="h-4 w-4" /> Hapus
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </span>
-      ),
-    },
+    ...((canWrite || canDelete
+      ? [
+          {
+            key: "actions",
+            label: "",
+            className: "w-10",
+            sticky: "right",
+            render: (r: ItemApi) => (
+              <span onClick={(e) => e.stopPropagation()} className="flex justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 rounded-lg"
+                      aria-label="Aksi barang"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-36">
+                    {canWrite && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setEditing(r);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                    )}
+                    {(canWrite || canDelete) && <DropdownMenuSeparator />}
+                    {canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => openSingleDelete(r)}
+                      >
+                        <Trash2 className="h-4 w-4" /> Hapus
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
+            ),
+          },
+        ]
+      : []) as Column<ItemApi>[]),
   ];
 
   return (
@@ -276,13 +292,15 @@ function MasterBarang() {
         description={`${formatNumber(data?.meta?.total ?? rows.length)} SKU terdaftar`}
         actions={
           <>
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => toast.success("Import template diunduh")}
-            >
-              <Upload className="h-4 w-4" /> Import
-            </Button>
+            {canWrite && (
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => toast.success("Import template diunduh")}
+              >
+                <Upload className="h-4 w-4" /> Import
+              </Button>
+            )}
             <Button
               variant="outline"
               className="rounded-xl"
@@ -290,15 +308,17 @@ function MasterBarang() {
             >
               <Download className="h-4 w-4" /> Export
             </Button>
-            <Button
-              className="rounded-xl"
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Tambah Barang
-            </Button>
+            {canWrite && (
+              <Button
+                className="rounded-xl"
+                onClick={() => {
+                  setEditing(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> Tambah Barang
+              </Button>
+            )}
           </>
         }
       />
@@ -370,29 +390,33 @@ function MasterBarang() {
             >
               Cetak Barcode
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => {
-                setStatusValue("Aktif");
-                setStatusDialogOpen(true);
-              }}
-            >
-              Ubah Status
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-lg text-destructive hover:text-destructive"
-              onClick={() => {
-                setDeleteTarget(null);
-                setConfirmText("");
-                setDeleteDialogOpen(true);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Hapus
-            </Button>
+            {canWrite && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-lg"
+                onClick={() => {
+                  setStatusValue("Aktif");
+                  setStatusDialogOpen(true);
+                }}
+              >
+                Ubah Status
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-lg text-destructive hover:text-destructive"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setConfirmText("");
+                  setDeleteDialogOpen(true);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Hapus
+              </Button>
+            )}
             <Button
               size="sm"
               variant="ghost"
@@ -437,31 +461,37 @@ function MasterBarang() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 border-t border-border pt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditing(r);
-                      setDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5" /> Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-lg text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openSingleDelete(r);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Hapus
-                  </Button>
-                </div>
+                {(canWrite || canDelete) && (
+                  <div className="flex items-center gap-2 border-t border-border pt-3">
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing(r);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="rounded-lg text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openSingleDelete(r);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Hapus
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           }}

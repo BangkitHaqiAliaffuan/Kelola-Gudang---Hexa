@@ -22,6 +22,7 @@ export type StockRowApi = {
   warehouse: string | null;
   rack: string | null;
   bin: string | null;
+  bin_id: number;
   stock: number;
   reserved: number;
   available: number;
@@ -194,24 +195,34 @@ export type StockDocumentApi = {
 };
 
 // ---- Pembuatan dokumen (POST /api/persediaan/stock-documents) ----
-// Scope saat ini: Penerimaan. Baris memakai `to_bin_id` sebagai bin tujuan
-// (arah IN memprioritaskan to_bin di service); `from_bin_id` opsional untuk
-// tipe lain di masa depan.
+// Scope: Penerimaan, Pengeluaran & Transfer Gudang.
+// - Penerimaan: baris memakai `to_bin_id` (arah IN memprioritaskan to_bin di
+//   service); `from_bin_id` opsional. `unit_cost` diambil dari input.
+// - Pengeluaran: baris memakai `from_bin_id` (sumber stok, arah OUT); `to_bin_id`
+//   dikosongkan. `unit_cost` dibiarkan kosong — server meng-backfill moving
+//   average di bin asal. `qty` selalu positif; server menegasinya saat simpan.
+// - Transfer Gudang: `warehouse_id` = gudang asal, `destination_warehouse_id` =
+//   tujuan (wajib, beda gudang). Baris memakai `from_bin_id` (bin sumber di gudang
+//   asal) + `to_bin_id` (bin tujuan di gudang tujuan). `unit_cost` dibiarkan kosong
+//   (server memakai moving average di bin asal). `qty` selalu positif.
+
+export type StockDocumentTypeToStore = "Penerimaan" | "Pengeluaran" | "Transfer Gudang";
 
 export type StockDocumentLinePayload = {
   item_id: number;
   qty: number;
-  unit_cost: number;
-  to_bin_id: number;
+  unit_cost?: number | null;
+  to_bin_id?: number | null;
   from_bin_id?: number | null;
   note?: string | null;
 };
 
 export type StockDocumentPayload = {
-  type: "Penerimaan";
+  type: StockDocumentTypeToStore;
   status: "Draft" | "Selesai";
   document_date: string;
   warehouse_id: number;
+  destination_warehouse_id?: number | null;
   partner: string | null;
   reference_no: string | null;
   pic?: string | null;

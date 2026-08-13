@@ -7,6 +7,7 @@ import { TrxDetailSheet } from "./trx-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import {
   customers,
   formatDate,
@@ -52,6 +53,8 @@ export function TransactionPage({
   description: string;
   section: string;
 }) {
+  const { hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Transaksi", "Tulis");
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
@@ -64,7 +67,8 @@ export function TransactionPage({
       transactions.filter(
         (t) =>
           t.type === type &&
-          (!debouncedQ || `${t.no} ${t.partner}`.toLowerCase().includes(debouncedQ.toLowerCase())) &&
+          (!debouncedQ ||
+            `${t.no} ${t.partner}`.toLowerCase().includes(debouncedQ.toLowerCase())) &&
           (wh === ALL || t.warehouse === wh) &&
           (partner === ALL || t.partner === partner) &&
           (status === ALL || t.status === status),
@@ -87,7 +91,11 @@ export function TransactionPage({
       ),
     },
     { key: "date", label: "Tanggal", render: (r) => formatDate(r.date) },
-    { key: "wh", label: variant === "transfer" ? "Gudang Asal" : "Gudang", render: (r) => r.warehouse },
+    {
+      key: "wh",
+      label: variant === "transfer" ? "Gudang Asal" : "Gudang",
+      render: (r) => r.warehouse,
+    },
     {
       key: "partner",
       label: variant === "transfer" ? "Gudang Tujuan" : variant === "masuk" ? "Supplier" : "Tujuan",
@@ -107,7 +115,11 @@ export function TransactionPage({
     { key: "qty", label: "Qty", className: "text-right", render: (r) => formatNumber(r.qty) },
     { key: "val", label: "Nilai", className: "text-right", render: (r) => formatIDR(r.value) },
     { key: "pic", label: "PIC", render: (r) => r.pic },
-    { key: "status", label: "Status", render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill> },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
+    },
   ];
 
   return (
@@ -116,11 +128,13 @@ export function TransactionPage({
         title={title}
         description={description}
         actions={
-          <Button asChild className="rounded-xl">
-            <Link to="/transaksi/entri/$section" params={{ section }}>
-              <Plus className="h-4 w-4" /> Buat {title}
-            </Link>
-          </Button>
+          canCreate && (
+            <Button asChild className="rounded-xl">
+              <Link to="/transaksi/entri/$section" params={{ section }}>
+                <Plus className="h-4 w-4" /> Buat {title}
+              </Link>
+            </Button>
+          )
         }
       />
 
@@ -132,7 +146,9 @@ export function TransactionPage({
                 <div className="flex items-center gap-2">
                   <span
                     className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
-                      i < 3 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      i < 3
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {i + 1}
@@ -152,7 +168,12 @@ export function TransactionPage({
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nomor transaksi..." className="rounded-xl pl-9" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari nomor transaksi..."
+              className="rounded-xl pl-9"
+            />
           </div>
           <FilterSelect
             className="w-full"
@@ -166,7 +187,11 @@ export function TransactionPage({
             value={partner}
             onChange={setPartner}
             placeholder={variant === "masuk" ? "Semua Supplier" : "Semua Tujuan"}
-            options={(variant === "masuk" ? suppliers.slice(0, 25).map((s) => s.name) : customers.map((c) => c.name))}
+            options={
+              variant === "masuk"
+                ? suppliers.slice(0, 25).map((s) => s.name)
+                : customers.map((c) => c.name)
+            }
           />
           <FilterSelect
             className="w-full"
@@ -193,7 +218,9 @@ export function TransactionPage({
               <p className="truncate text-xs text-muted-foreground">
                 {formatDate(r.date)} · {r.warehouse}
               </p>
-              <p className="truncate text-xs">{variant === "transfer" ? r.destination : r.partner}</p>
+              <p className="truncate text-xs">
+                {variant === "transfer" ? r.destination : r.partner}
+              </p>
               <div className="flex justify-between pt-1 text-xs">
                 <span>{formatNumber(r.qty)} unit</span>
                 <b>{formatIDR(r.value)}</b>

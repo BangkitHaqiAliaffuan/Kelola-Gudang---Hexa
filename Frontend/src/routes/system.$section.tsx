@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { themes, useTheme } from "@/components/wms/theme";
 import { cn } from "@/lib/utils";
 import { auditLogs, formatDate, type AuditLog } from "@/lib/wms-data";
+import { useAuth } from "@/hooks/use-auth";
 
 const meta: Record<string, { title: string; description: string }> = {
   "audit-trails": {
@@ -74,8 +75,13 @@ function AuditTrails() {
       auditLogs.filter((l) => {
         const okQ =
           !debouncedQ ||
-          [l.user, l.record, l.module, l.ip].join(" ").toLowerCase().includes(debouncedQ.toLowerCase());
-        return okQ && (action === ALL || l.action === action) && (module === ALL || l.module === module);
+          [l.user, l.record, l.module, l.ip]
+            .join(" ")
+            .toLowerCase()
+            .includes(debouncedQ.toLowerCase());
+        return (
+          okQ && (action === ALL || l.action === action) && (module === ALL || l.module === module)
+        );
       }),
     [debouncedQ, action, module],
   );
@@ -92,10 +98,22 @@ function AuditTrails() {
         </div>
       ),
     },
-    { key: "action", label: "Aksi", render: (r) => <Pill tone={actionTone(r.action)}>{r.action}</Pill> },
+    {
+      key: "action",
+      label: "Aksi",
+      render: (r) => <Pill tone={actionTone(r.action)}>{r.action}</Pill>,
+    },
     { key: "module", label: "Modul", render: (r) => r.module },
-    { key: "record", label: "Record", render: (r) => <span className="font-mono text-xs">{r.record}</span> },
-    { key: "ip", label: "IP Address", render: (r) => <span className="font-mono text-xs">{r.ip}</span> },
+    {
+      key: "record",
+      label: "Record",
+      render: (r) => <span className="font-mono text-xs">{r.record}</span>,
+    },
+    {
+      key: "ip",
+      label: "IP Address",
+      render: (r) => <span className="font-mono text-xs">{r.ip}</span>,
+    },
   ];
 
   return (
@@ -149,15 +167,19 @@ function AuditTrails() {
 
 function GeneralSetting() {
   const { theme, setTheme } = useTheme();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("System", "Tulis");
   return (
     <>
       <Panel
         title="Profil Perusahaan"
         actions={
-          <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
-            <Save className="h-4 w-4" />
-            Simpan
-          </Button>
+          canWrite && (
+            <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
+              <Save className="h-4 w-4" />
+              Simpan
+            </Button>
+          )
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -171,7 +193,7 @@ function GeneralSetting() {
           ].map(([label, val]) => (
             <div key={label} className="space-y-1.5">
               <Label>{label}</Label>
-              <Input defaultValue={val} className="rounded-xl" />
+              <Input defaultValue={val} readOnly={!canWrite} className="rounded-xl" />
             </div>
           ))}
         </div>
@@ -189,7 +211,11 @@ function GeneralSetting() {
           ].map(([label, val]) => (
             <div key={label} className="space-y-1.5">
               <Label>{label}</Label>
-              <Input defaultValue={val} className="rounded-xl font-mono text-xs" />
+              <Input
+                defaultValue={val}
+                readOnly={!canWrite}
+                className="rounded-xl font-mono text-xs"
+              />
             </div>
           ))}
         </div>
@@ -208,7 +234,7 @@ function GeneralSetting() {
               className="flex items-center justify-between rounded-xl border border-border px-3 py-3"
             >
               <Label className="text-sm font-medium">{label as string}</Label>
-              <Switch defaultChecked={def as boolean} />
+              <Switch defaultChecked={def as boolean} disabled={!canWrite} />
             </div>
           ))}
         </div>
@@ -278,7 +304,11 @@ function Developer() {
         title="Referensi API (rencana)"
         description="Kontrak endpoint yang akan dipakai saat backend diaktifkan"
         actions={
-          <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Spesifikasi diunduh")}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => toast.success("Spesifikasi diunduh")}
+          >
             <Download className="h-4 w-4" />
             Unduh OpenAPI
           </Button>
@@ -310,7 +340,7 @@ function Developer() {
 
       <Panel title="Contoh Payload" description="POST /api/transactions">
         <pre className="overflow-x-auto rounded-xl bg-muted p-4 font-mono text-xs leading-relaxed text-foreground">
-{`{
+          {`{
   "type": "Barang Masuk",
   "warehouse": "GD-01",
   "partner": "PT Sinar Jaya Abadi",

@@ -43,6 +43,7 @@ import {
   transactions,
   warehouses,
 } from "@/lib/wms-data";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -64,12 +65,12 @@ export const Route = createFileRoute("/")({
 });
 
 const quickActions = [
-  { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine },
-  { label: "Barang Keluar", to: "/transaksi/keluar", icon: ArrowUpFromLine },
-  { label: "Transfer", to: "/transaksi/transfer", icon: ArrowLeftRight },
-  { label: "Stock Opname", to: "/opname/proses", icon: ClipboardCheck },
+  { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine, module: "Persediaan" },
+  { label: "Barang Keluar", to: "/transaksi/keluar", icon: ArrowUpFromLine, module: "Persediaan" },
+  { label: "Transfer", to: "/transaksi/transfer", icon: ArrowLeftRight, module: "Persediaan" },
+  { label: "Stock Opname", to: "/opname/proses", icon: ClipboardCheck, module: "Stock Opname" },
   { label: "Cetak Barcode", to: "/barcode", icon: QrCode },
-  { label: "Tambah Barang", to: "/master/barang", icon: Package },
+  { label: "Tambah Barang", to: "/master/barang", icon: Package, module: "Master Data" },
 ];
 
 const chartTooltip = {
@@ -92,6 +93,10 @@ function useSkeleton(ms = 600) {
 }
 
 function Dashboard() {
+  const { hasModuleLevel } = useAuth();
+  const visibleQuickActions = quickActions.filter(
+    (a) => !a.module || hasModuleLevel(a.module, "Tulis"),
+  );
   const loading = useSkeleton();
   const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
   const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
@@ -187,7 +192,7 @@ function Dashboard() {
 
       <Panel title="Aksi Cepat" description="Mulai pekerjaan dengan satu klik">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {quickActions.map((a) => (
+          {visibleQuickActions.map((a) => (
             <Link
               key={a.label}
               to={a.to}

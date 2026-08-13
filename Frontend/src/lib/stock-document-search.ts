@@ -8,6 +8,7 @@ export function buildStockDocumentSearchText(doc: StockDocumentApi): string {
     doc.no,
     doc.type,
     doc.warehouse,
+    doc.destination,
     doc.partner,
     doc.reference_no,
     doc.pic,

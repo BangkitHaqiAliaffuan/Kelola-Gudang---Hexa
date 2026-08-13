@@ -62,7 +62,9 @@ export function useCreateStockDocument() {
   return useMutation({
     mutationFn: (payload: StockDocumentPayload) =>
       api.post<{ data: StockDocumentApi }>("/persediaan/stock-documents", payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents"] }),
+    // Posting menggerakkan stok: invalidasi seluruh cache persediaan
+    // (stock-documents, stock, stock-card, stock-minimum, valuation).
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
   });
 }
 

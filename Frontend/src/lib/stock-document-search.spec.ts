@@ -52,6 +52,22 @@ describe("stock document search lintas kolom", () => {
     expect(stockDocumentMatchesText(doc, "  RUDI   HARTONO  ")).toBe(true);
   });
 
+  it("mencocokkan gudang tujuan (field destination)", () => {
+    const transfer = {
+      ...doc,
+      type: "Transfer Gudang",
+      no: "TF/2026/00001",
+      warehouse: "Gudang Jakarta",
+      destination: "Gudang Surabaya",
+      destination_warehouse_id: 3,
+      partner: null,
+    } satisfies StockDocumentApi;
+
+    expect(stockDocumentMatchesText(transfer, "gudang surabaya")).toBe(true);
+    expect(stockDocumentMatchesText(transfer, "gudang jakarta")).toBe(true);
+    expect(buildStockDocumentSearchText(transfer)).toContain("gudang surabaya");
+  });
+
   it("query kosong cocok untuk semua", () => {
     expect(stockDocumentMatchesText(doc, "")).toBe(true);
     expect(stockDocumentMatchesText(doc, "   ")).toBe(true);

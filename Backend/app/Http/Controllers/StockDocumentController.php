@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
+use App\Models\Bin;
+use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Services\StockDocumentService;
@@ -59,21 +61,36 @@ class StockDocumentController extends Controller
     }
 
     /**
-     * Simpan dokumen baru (scope: Penerimaan). Bila `status` = Selesai, dokumen
-     * langsung diposting sehingga stok bergerak; Draft hanya menyimpan dokumen.
+     * Simpan dokumen baru (scope: Penerimaan, Pengeluaran & Transfer Gudang).
+     * Bila `status` = Selesai, dokumen langsung diposting sehingga stok bergerak;
+     * Draft hanya menyimpan dokumen. Transfer Gudang memakai warehouse_id sebagai
+     * gudang asal + destination_warehouse_id sebagai tujuan dan disimpan dengan
+     * qty positif (StockDocumentService mengeluarkan pasangan OUT+IN).
      */
     public function store(StoreStockDocumentRequest $request)
     {
         $data = $request->validated();
 
+        $isOutbound = $data['type'] === 'Pengeluaran';
+        $isTransfer = $data['type'] === 'Transfer Gudang';
+        $fromBins = ($isOutbound || $isTransfer)
+            ? Bin::with('rack')
+                ->whereIn('id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
+                ->get()
+                ->keyBy('id')
+            : collect();
+
         try {
-            $document = DB::transaction(function () use ($data, $request) {
+            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $fromBins) {
+                $prefix = $isTransfer ? 'TF' : ($isOutbound ? 'BK' : 'BM');
+
                 $document = StockDocument::create([
-                    'no' => CodeGenerator::nextYearly(StockDocument::class, 'BM', 'no', 5),
+                    'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
                     'status' => $data['status'],
                     'document_date' => $data['document_date'],
                     'warehouse_id' => $data['warehouse_id'],
+                    'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
                     'partner' => $data['partner'] ?? null,
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
@@ -86,9 +103,15 @@ class StockDocumentController extends Controller
                         'document_id' => $document->id,
                         'line_no' => $index + 1,
                         'item_id' => $line['item_id'],
-                        'qty' => $line['qty'],
-                        'unit_cost' => $line['unit_cost'],
-                        'to_bin_id' => $line['to_bin_id'],
+                        // Konvensi ledger: qty garis bertanda. Pengeluaran disimpan negatif
+                        // sehingga moveDirection() → OUT dan moveQty() (abs) menghasilkan
+                        // movement OUT yang benar di StockDocumentService. Transfer Gudang
+                        // tetap positif: service yang merilis pasangan OUT+IN.
+                        'qty' => $isOutbound ? -abs($line['qty']) : $line['qty'],
+                        'unit_cost' => ($isOutbound || $isTransfer)
+                            ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
+                            : $line['unit_cost'],
+                        'to_bin_id' => $isOutbound ? null : $line['to_bin_id'],
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'note' => $line['note'] ?? null,
                     ]);
@@ -107,6 +130,28 @@ class StockDocumentController extends Controller
         return (new StockDocumentResource($document->load([
             'warehouse', 'destination', 'creator', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
         ])->loadCount('lines')))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Biaya rata-rata (moving average) sebuah item di sebuah bin. Dipakai untuk
+     * mengisi unit_cost baris Pengeluaran sehingga agregat nilai (qty * unit_cost)
+     * dan detail dokumen akurat — posting itu sendiri memakai AVG yang sama via
+     * StockDocumentService::costAt(), jadi dua sumber ini selalu konsisten.
+     */
+    private function averageCost(int $itemId, int $binId, $bins): ?float
+    {
+        $bin = $bins->get($binId);
+
+        if (! $bin?->rack) {
+            return null;
+        }
+
+        $avg = ItemStock::where('item_id', $itemId)
+            ->where('warehouse_id', $bin->rack->warehouse_id)
+            ->where('bin_id', $binId)
+            ->value('unit_cost_avg');
+
+        return $avg !== null ? (float) $avg : null;
     }
 
     public function show(StockDocument $stockDocument): StockDocumentResource

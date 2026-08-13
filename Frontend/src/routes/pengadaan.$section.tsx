@@ -11,11 +11,20 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sheet,
   SheetContent,
@@ -204,16 +213,15 @@ function ProcDetailSheet({
 
 function PengadaanPage() {
   const { section } = Route.useParams();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const cfg = sections[section as SectionKey];
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
   const [active, setActive] = useState<ProcDoc | null>(null);
 
-  const statuses = useMemo(
-    () => Array.from(new Set(cfg.docs.map((d) => d.status))),
-    [cfg.docs],
-  );
+  const statuses = useMemo(() => Array.from(new Set(cfg.docs.map((d) => d.status))), [cfg.docs]);
 
   const rows = useMemo(
     () =>
@@ -277,22 +285,38 @@ function PengadaanPage() {
         description={cfg.description}
         actions={
           <>
-            <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Data diekspor ke Excel")}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => toast.success("Data diekspor ke Excel")}
+            >
               <Download className="h-4 w-4" />
               Export
             </Button>
-            <Button className="rounded-xl" onClick={() => toast.info(`${cfg.cta} — form demo`)}>
-              <Plus className="h-4 w-4" />
-              {cfg.cta}
-            </Button>
+            {canWrite && (
+              <Button className="rounded-xl" onClick={() => toast.info(`${cfg.cta} — form demo`)}>
+                <Plus className="h-4 w-4" />
+                {cfg.cta}
+              </Button>
+            )}
           </>
         }
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={cfg.icon} />
-        <StatCard label="Perlu Tindakan" value={formatNumber(openDocs)} icon={ClipboardList} tone="warning" />
-        <StatCard label="Selesai / Disetujui" value={formatNumber(doneDocs)} icon={PackageCheck} tone="success" />
+        <StatCard
+          label="Perlu Tindakan"
+          value={formatNumber(openDocs)}
+          icon={ClipboardList}
+          tone="warning"
+        />
+        <StatCard
+          label="Selesai / Disetujui"
+          value={formatNumber(doneDocs)}
+          icon={PackageCheck}
+          tone="success"
+        />
         <StatCard label="Nilai Total" value={formatIDR(totalValue)} icon={Wallet} tone="info" />
       </div>
 
