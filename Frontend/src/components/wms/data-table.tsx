@@ -32,6 +32,7 @@ export function DataTable<T extends { id: string | number }>({
   pageSize = 10,
   loading = false,
   onRowClick,
+  initialSort,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -39,9 +40,10 @@ export function DataTable<T extends { id: string | number }>({
   pageSize?: number;
   loading?: boolean;
   onRowClick?: (row: T) => void;
+  initialSort?: SortState;
 }) {
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
   const sorted = useMemo(() => {

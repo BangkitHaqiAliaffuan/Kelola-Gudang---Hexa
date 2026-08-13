@@ -124,21 +124,24 @@ export function StockMinimumSheet({
                           </tr>
                         </thead>
                         <tbody>
-                          {rows.slice(-8).map((r, i) => (
-                            <tr key={i} className="border-b border-border/60 last:border-0">
-                              <td className="px-3 py-1.5 text-xs">{formatDate(r.date)}</td>
-                              <td className="px-3 py-1.5 font-mono text-xs">{r.no}</td>
-                              <td className="px-3 py-1.5 text-right text-emerald-600">
-                                {r.masuk ? formatNumber(r.masuk) : ""}
-                              </td>
-                              <td className="px-3 py-1.5 text-right text-rose-500">
-                                {r.keluar ? formatNumber(r.keluar) : ""}
-                              </td>
-                              <td className="px-3 py-1.5 text-right font-semibold">
-                                {formatNumber(r.saldo)}
-                              </td>
-                            </tr>
-                          ))}
+                          {rows
+                            .slice(-8)
+                            .reverse()
+                            .map((r, i) => (
+                              <tr key={i} className="border-b border-border/60 last:border-0">
+                                <td className="px-3 py-1.5 text-xs">{formatDate(r.date)}</td>
+                                <td className="px-3 py-1.5 font-mono text-xs">{r.no}</td>
+                                <td className="px-3 py-1.5 text-right text-emerald-600">
+                                  {r.masuk ? formatNumber(r.masuk) : ""}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-rose-500">
+                                  {r.keluar ? formatNumber(r.keluar) : ""}
+                                </td>
+                                <td className="px-3 py-1.5 text-right font-semibold">
+                                  {formatNumber(r.saldo)}
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>

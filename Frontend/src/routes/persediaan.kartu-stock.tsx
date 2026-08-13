@@ -345,7 +345,9 @@ function KartuStock() {
                   m === method ? "border-primary/40 bg-primary-soft" : "border-border",
                 )}
               >
-                <p className="text-xs font-semibold text-muted-foreground">{valuationMethodLabels[m]}</p>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {valuationMethodLabels[m]}
+                </p>
                 <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   HPP {formatIDR(cLast?.method_cost ?? 0)} / {unit}
@@ -405,6 +407,7 @@ function KartuStock() {
           pageSize={10}
           loading={itemsLoading || card.isFetching}
           onRowClick={(r) => item && setDetail(toTrx(r, item))}
+          initialSort={{ key: "date", dir: "desc" }}
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">

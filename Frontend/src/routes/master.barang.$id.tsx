@@ -248,7 +248,7 @@ function DetailBarang() {
                 />
               ) : (
                 <Accordion type="single" collapsible className="space-y-2">
-                  {card.map((row, i) => (
+                  {[...card].reverse().map((row, i) => (
                     <AccordionItem
                       key={i}
                       value={`r${i}`}
@@ -297,17 +297,20 @@ function DetailBarang() {
                 />
               ) : (
                 <ol className="relative space-y-4 border-l border-border pl-5">
-                  {card.slice(0, 8).map((row, i) => (
-                    <li key={i} className="relative">
-                      <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
-                      <p className="text-sm font-medium">
-                        {row.type} · {row.no}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(row.date)} — {row.pic} — saldo {formatNumber(row.saldo)}
-                      </p>
-                    </li>
-                  ))}
+                  {card
+                    .slice(-8)
+                    .reverse()
+                    .map((row, i) => (
+                      <li key={i} className="relative">
+                        <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
+                        <p className="text-sm font-medium">
+                          {row.type} · {row.no}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(row.date)} — {row.pic} — saldo {formatNumber(row.saldo)}
+                        </p>
+                      </li>
+                    ))}
                 </ol>
               )}
             </TabsContent>
