@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, FileDown, Plus, Save, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, FileDown, Plus, Save, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
+import { PurchaseRequestSheet } from "./purchase-request-sheet";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -29,6 +30,7 @@ import {
 } from "@/hooks/use-purchase-order";
 import { isApiError } from "@/lib/api";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
+import type { ProcDocApi as PengadaanProcDocApi } from "@/lib/pengadaan-types";
 import type { ProcDocApi, ProcDocPayload } from "@/lib/purchase-order-types";
 
 type FormLine = {
@@ -78,6 +80,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [sourcedFromPr, setSourcedFromPr] = useState(false);
+  const [prSheetOpen, setPrSheetOpen] = useState(false);
 
   const doc = mode === "edit" ? docDetail?.data : undefined;
 
@@ -160,8 +163,8 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
     () =>
       (approvedPrs?.data ?? []).map((p) => ({
         value: String(p.id),
-        label: `${p.no} · ${p.supplier ?? "—"} · ${formatNumber(p.qty_total ?? 0)} qty`,
-        keywords: `${p.no} ${p.supplier ?? ""} ${p.department ?? ""}`,
+        label: `${p.no} · ${p.supplier ?? "—"} · ${p.department ?? ""} · ${formatNumber(p.qty_total ?? 0)} qty`,
+        keywords: `${p.no} ${p.supplier ?? ""} ${p.department ?? ""} ${p.requester ?? ""}`,
       })),
     [approvedPrs],
   );
@@ -346,6 +349,17 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                     <p className="text-xs text-muted-foreground">
                       Opsional — pilih PR untuk mengisi otomatis.
                     </p>
+                  )}
+                  {sourcePrId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => setPrSheetOpen(true)}
+                      disabled={!prDetail?.data}
+                    >
+                      <Eye className="h-4 w-4" /> Lihat Detail PR
+                    </Button>
                   )}
                 </div>
               )}
@@ -617,6 +631,11 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PurchaseRequestSheet
+        doc={prSheetOpen ? ((prDetail?.data ?? null) as unknown as PengadaanProcDocApi) : null}
+        onOpenChange={setPrSheetOpen}
+      />
     </>
   );
 }
