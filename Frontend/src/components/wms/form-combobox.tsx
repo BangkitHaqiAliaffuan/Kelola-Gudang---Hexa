@@ -28,6 +28,7 @@ export type FormComboboxProps = {
   allowEmpty?: boolean;
   side?: "top" | "right" | "bottom" | "left";
   avoidCollisions?: boolean;
+  loading?: boolean;
 } & ButtonProps;
 
 export function FormCombobox({
@@ -40,6 +41,7 @@ export function FormCombobox({
   allowEmpty = false,
   side,
   avoidCollisions,
+  loading = false,
   className,
   ...buttonProps
 }: FormComboboxProps) {
@@ -80,9 +82,9 @@ export function FormCombobox({
         {...(avoidCollisions !== undefined ? { avoidCollisions } : {})}
       >
         <Command>
-          <CommandInput placeholder={searchPlaceholder} className="h-9" />
+          <CommandInput placeholder={searchPlaceholder} className="h-9" disabled={loading} />
           <CommandList>
-            <CommandEmpty>Tidak ditemukan</CommandEmpty>
+            <CommandEmpty>{loading ? "Memuat..." : "Tidak ditemukan"}</CommandEmpty>
             <CommandGroup>
               {allowEmpty && (
                 <CommandItem value={emptyLabel} onSelect={() => pick("")}>

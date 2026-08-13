@@ -50,7 +50,7 @@ export function TransferGudangForm() {
   const { data: warehouses } = useWarehouses();
   const { data: items } = useItems();
   const { data: bins } = useBins();
-  const { data: stockRows } = useStockRows();
+  const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
   const [destinationId, setDestinationId] = useState("");
@@ -133,7 +133,7 @@ export function TransferGudangForm() {
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
-      if (r.available <= 0) continue;
+      if (r.stock <= 0) continue;
       const binKey = String(r.bin_id);
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
@@ -413,6 +413,7 @@ export function TransferGudangForm() {
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="bottom"
                         avoidCollisions={false}
+                        loading={Boolean(l.fromBinId) && stockLoading}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -493,6 +494,7 @@ export function TransferGudangForm() {
                     placeholder="Pilih barang"
                     side="bottom"
                     avoidCollisions={false}
+                    loading={Boolean(l.fromBinId) && stockLoading}
                   />
                   <FormCombobox
                     value={l.toBinId}
