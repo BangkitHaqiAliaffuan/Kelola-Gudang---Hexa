@@ -2,8 +2,21 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { authApi, type AuthSession } from "@/lib/auth-api";
 import { clearAuthToken, getAuthToken, isApiError, setAuthToken } from "@/lib/api";
+import type { AccessLevel } from "@/lib/schemas";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
+const LEVEL_RANK: Record<AccessLevel, number> = { Baca: 1, Tulis: 2, Kelola: 3 };
+
+/** Rank of an access level (Baca=1, Tulis=2, Kelola=3); unknown → 0. */
+export function levelRank(level: string): number {
+  return LEVEL_RANK[level as AccessLevel] ?? 0;
+}
+
+export function moduleLevel(access: AuthSession["access"], module: string): AccessLevel | null {
+  const entry = access.find((a) => a.module === module || a.module === "Semua Modul");
+  return entry ? entry.level : null;
+}
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -13,6 +26,8 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   /** True when the module exists in the session's access map (or while still loading). */
   hasModule: (module: string) => boolean;
+  /** True when the module exists AND its level ranks >= the required level. */
+  hasModuleLevel: (module: string, minLevel: AccessLevel) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,6 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasModule: (module) =>
         status !== "authenticated" ||
         session!.access.some((a) => a.module === module || a.module === "Semua Modul"),
+      hasModuleLevel: (module, minLevel) => {
+        const level = status === "authenticated" ? moduleLevel(session!.access, module) : null;
+        return level !== null && levelRank(level) >= LEVEL_RANK[minLevel];
+      },
     }),
     [status, session],
   );

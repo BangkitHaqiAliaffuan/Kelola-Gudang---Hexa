@@ -11,6 +11,7 @@ import type { z } from "zod";
 import { Download, Eye, Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "./data-table";
 import { PageHeader, Panel } from "./kit";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -78,6 +79,15 @@ export function MasterCrudPage<T extends { id: number }>({
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Master-data write CTAs are gated on the current role's "Master Data" level
+  // (Tulis for add/edit, Kelola for delete) — mirror of role.access server-side.
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Master Data", "Tulis");
+  const canDelete = hasModuleLevel("Master Data", "Kelola");
+  const canEdit = onEdit && canWrite ? onEdit : undefined;
+  const canAdd = onAdd && canWrite ? onAdd : undefined;
+  const canDeleteRow = onDelete && canDelete ? onDelete : undefined;
+
   const filtered = useMemo(() => {
     if (!rows) return undefined;
     const needle = q.trim().toLowerCase();
@@ -86,7 +96,7 @@ export function MasterCrudPage<T extends { id: number }>({
   }, [rows, q, searchText]);
 
   const actionColumn: Column<T> | undefined =
-    onView || onEdit || onDelete
+    onView || canEdit || canDeleteRow
       ? {
           key: "actions",
           label: "",
@@ -116,18 +126,18 @@ export function MasterCrudPage<T extends { id: number }>({
                       <Eye className="h-4 w-4" /> Detail
                     </DropdownMenuItem>
                   )}
-                  {onEdit && (
+                  {canEdit && (
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        onEdit(r);
+                        canEdit(r);
                       }}
                     >
                       <Pencil className="h-4 w-4" /> Edit
                     </DropdownMenuItem>
                   )}
-                  {(onView || onEdit) && onDelete && <DropdownMenuSeparator />}
-                  {onDelete && (
+                  {(onView || canEdit) && canDeleteRow && <DropdownMenuSeparator />}
+                  {canDeleteRow && (
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={(e) => {
@@ -150,7 +160,7 @@ export function MasterCrudPage<T extends { id: number }>({
   const mobileCardWithActions = (row: T): ReactNode => (
     <>
       {mobileCard(row)}
-      {(onView || onEdit || onDelete) && (
+      {(onView || canEdit || canDeleteRow) && (
         <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
           {onView && (
             <Button
@@ -165,20 +175,20 @@ export function MasterCrudPage<T extends { id: number }>({
               <Eye className="h-3.5 w-3.5" /> Detail
             </Button>
           )}
-          {onEdit && (
+          {canEdit && (
             <Button
               size="sm"
               variant="outline"
               className="rounded-lg"
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit(row);
+                canEdit(row);
               }}
             >
               <Pencil className="h-3.5 w-3.5" /> Edit
             </Button>
           )}
-          {onDelete && (
+          {canDeleteRow && (
             <Button
               size="sm"
               variant="ghost"
@@ -197,10 +207,10 @@ export function MasterCrudPage<T extends { id: number }>({
   );
 
   const handleConfirmDelete = async () => {
-    if (!deleteTarget || !onDelete) return;
+    if (!deleteTarget || !canDeleteRow) return;
     setDeleting(true);
     try {
-      await onDelete(deleteTarget);
+      await canDeleteRow(deleteTarget);
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -219,8 +229,8 @@ export function MasterCrudPage<T extends { id: number }>({
                 <Download className="h-4 w-4" /> Export CSV
               </Button>
             )}
-            {onAdd && (
-              <Button className="rounded-xl" onClick={onAdd}>
+            {canAdd && (
+              <Button className="rounded-xl" onClick={canAdd}>
                 <Plus className="h-4 w-4" /> {addLabel}
               </Button>
             )}

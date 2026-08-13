@@ -11,11 +11,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+export type NavChild = { label: string; to: string; module?: string };
+
 export type NavGroup = {
   label: string;
   icon: LucideIcon;
   to?: string;
-  children?: { label: string; to: string }[];
+  /** Backend role.access module that gates this group (defaults to the label). */
+  module?: string;
+  children?: NavChild[];
 };
 
 export const navGroups: NavGroup[] = [
@@ -112,9 +116,9 @@ export const navGroups: NavGroup[] = [
     label: "System",
     icon: ShieldCheck,
     children: [
-      { label: "Audit Trails", to: "/system/audit-trails" },
-      { label: "General Setting", to: "/system/general-setting" },
-      { label: "Developer", to: "/system/developer" },
+      { label: "Audit Trails", to: "/system/audit-trails", module: "Audit Trails" },
+      { label: "General Setting", to: "/system/general-setting", module: "System" },
+      { label: "Developer", to: "/system/developer", module: "System" },
     ],
   },
 ];

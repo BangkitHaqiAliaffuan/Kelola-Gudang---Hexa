@@ -43,21 +43,42 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { items, suppliers, transactions, warehouses, notifications } from "@/lib/wms-data";
 import { toast } from "sonner";
 
-const quickActions = [
-  { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine },
-  { label: "Barang Keluar", to: "/transaksi/keluar", icon: ArrowUpFromLine },
-  { label: "Transfer", to: "/transaksi/transfer", icon: ArrowLeftRight },
-  { label: "Stock Opname", to: "/opname/proses", icon: ClipboardCheck },
+type QuickAction = { label: string; to: string; icon: typeof Package; module?: string };
+
+const quickActions: QuickAction[] = [
+  { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine, module: "Transaksi" },
+  { label: "Barang Keluar", to: "/transaksi/keluar", icon: ArrowUpFromLine, module: "Transaksi" },
+  { label: "Transfer", to: "/transaksi/transfer", icon: ArrowLeftRight, module: "Transaksi" },
+  { label: "Stock Opname", to: "/opname/proses", icon: ClipboardCheck, module: "Stock Opname" },
   { label: "Cetak Barcode", to: "/barcode", icon: QrCode },
-  { label: "Tambah Barang", to: "/master/barang", icon: Package },
+  { label: "Tambah Barang", to: "/master/barang", icon: Package, module: "Master Data" },
 ];
 
-const bottomNav = [
+const bottomNav: QuickAction[] = [
   { label: "Dashboard", to: "/", icon: LayoutDashboard },
-  { label: "Barang", to: "/master/barang", icon: Package },
-  { label: "Stock", to: "/persediaan/stock", icon: Boxes },
-  { label: "Opname", to: "/opname/proses", icon: ClipboardCheck },
+  { label: "Barang", to: "/master/barang", icon: Package, module: "Master Data" },
+  { label: "Stock", to: "/persediaan/stock", icon: Boxes, module: "Persediaan" },
+  { label: "Opname", to: "/opname/proses", icon: ClipboardCheck, module: "Stock Opname" },
 ];
+
+/** Prefix → backend role.access module; most-specific first. Empty = public (no gate). */
+const routeModuleMap: { prefix: string; module: string }[] = [
+  { prefix: "/master", module: "Master Data" },
+  { prefix: "/persediaan", module: "Persediaan" },
+  { prefix: "/transaksi", module: "Transaksi" },
+  { prefix: "/pengadaan", module: "Pengadaan" },
+  { prefix: "/opname", module: "Stock Opname" },
+  { prefix: "/laporan", module: "Laporan" },
+  { prefix: "/system/audit-trails", module: "Audit Trails" },
+  { prefix: "/system", module: "System" },
+];
+
+function moduleForPath(pathname: string): string | null {
+  return (
+    routeModuleMap.find((r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`))
+      ?.module ?? null
+  );
+}
 
 function SidebarNav({
   collapsed,
@@ -168,7 +189,17 @@ function SidebarNav({
   );
 }
 
-function GlobalSearch({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+function GlobalSearch({
+  open,
+  setOpen,
+  visibleQuickActions,
+  canAccess,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  visibleQuickActions: QuickAction[];
+  canAccess: (module: string) => boolean;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -186,7 +217,7 @@ function GlobalSearch({ open, setOpen }: { open: boolean; setOpen: (v: boolean) 
       <CommandList>
         <CommandEmpty>Tidak ada hasil ditemukan.</CommandEmpty>
         <CommandGroup heading="Aksi Cepat">
-          {quickActions.map((a) => (
+          {visibleQuickActions.map((a) => (
             <CommandItem key={a.label} value={a.label} onSelect={() => setOpen(false)} asChild>
               <Link to={a.to}>
                 <a.icon className="h-4 w-4" />
@@ -195,47 +226,55 @@ function GlobalSearch({ open, setOpen }: { open: boolean; setOpen: (v: boolean) 
             </CommandItem>
           ))}
         </CommandGroup>
-        <CommandGroup heading="Barang / SKU / Barcode">
-          {items.slice(0, 24).map((it) => (
-            <CommandItem
-              key={it.id}
-              value={`${it.name} ${it.sku} ${it.barcode}`}
-              onSelect={() => setOpen(false)}
-              asChild
-            >
-              <Link to="/master/barang/$id" params={{ id: it.id }}>
-                <Package className="h-4 w-4" />
-                <span className="truncate">{it.name}</span>
-                <span className="ml-auto text-xs text-muted-foreground">{it.sku}</span>
-              </Link>
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Nomor Transaksi">
-          {transactions.slice(0, 8).map((t) => (
-            <CommandItem key={t.id} value={t.no} onSelect={() => setOpen(false)}>
-              <ArrowLeftRight className="h-4 w-4" />
-              {t.no}
-              <span className="ml-auto text-xs text-muted-foreground">{t.type}</span>
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Gudang">
-          {warehouses.map((w) => (
-            <CommandItem key={w.id} value={w.name} onSelect={() => setOpen(false)}>
-              <Boxes className="h-4 w-4" />
-              {w.name}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-        <CommandGroup heading="Supplier">
-          {suppliers.slice(0, 8).map((s) => (
-            <CommandItem key={s.id} value={s.name} onSelect={() => setOpen(false)}>
-              <Package className="h-4 w-4" />
-              {s.name}
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        {canAccess("Master Data") && (
+          <CommandGroup heading="Barang / SKU / Barcode">
+            {items.slice(0, 24).map((it) => (
+              <CommandItem
+                key={it.id}
+                value={`${it.name} ${it.sku} ${it.barcode}`}
+                onSelect={() => setOpen(false)}
+                asChild
+              >
+                <Link to="/master/barang/$id" params={{ id: it.id }}>
+                  <Package className="h-4 w-4" />
+                  <span className="truncate">{it.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{it.sku}</span>
+                </Link>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {canAccess("Transaksi") && (
+          <CommandGroup heading="Nomor Transaksi">
+            {transactions.slice(0, 8).map((t) => (
+              <CommandItem key={t.id} value={t.no} onSelect={() => setOpen(false)}>
+                <ArrowLeftRight className="h-4 w-4" />
+                {t.no}
+                <span className="ml-auto text-xs text-muted-foreground">{t.type}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {canAccess("Master Data") && (
+          <>
+            <CommandGroup heading="Gudang">
+              {warehouses.map((w) => (
+                <CommandItem key={w.id} value={w.name} onSelect={() => setOpen(false)}>
+                  <Boxes className="h-4 w-4" />
+                  {w.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="Supplier">
+              {suppliers.slice(0, 8).map((s) => (
+                <CommandItem key={s.id} value={s.name} onSelect={() => setOpen(false)}>
+                  <Package className="h-4 w-4" />
+                  {s.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
       </CommandList>
     </CommandDialog>
   );
@@ -344,12 +383,38 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const visibleGroups = useMemo(
     () =>
-      navGroups.filter((g) => {
-        if (g.label === "Dashboard" || g.label === "Barcode") return true;
-        return hasModule(g.label);
-      }),
+      navGroups
+        .map((g) => {
+          const isPublic = g.label === "Dashboard" || g.label === "Barcode";
+          if (!g.children || isPublic) return g;
+          const groupModule = g.module ?? g.label;
+          const children = g.children.filter((c) => hasModule(c.module ?? groupModule));
+          return { ...g, children };
+        })
+        .filter((g) => {
+          if (g.label === "Dashboard" || g.label === "Barcode") return true;
+          const groupModule = g.module ?? g.label;
+          if (!hasModule(groupModule)) return false;
+          // A group only renders when it has at least one visible child (or is a plain link).
+          return !g.children || g.children.length > 0;
+        }),
     [hasModule],
   );
+
+  const visibleQuickActions = useMemo(
+    () => quickActions.filter((a) => !a.module || hasModule(a.module)),
+    [hasModule],
+  );
+
+  const visibleBottomNav = useMemo(
+    () => bottomNav.filter((b) => !b.module || hasModule(b.module)),
+    [hasModule],
+  );
+
+  // Route guard: block direct navigation to a module the role cannot access.
+  const routeModule = moduleForPath(pathname);
+  const routeForbidden =
+    status === "authenticated" && routeModule !== null && !hasModule(routeModule);
 
   // Show the bare login page (no sidebar) as long as /login is the committed
   // route match. Gate on `useMatches`, not `pathname`: during a navigation the
@@ -495,14 +560,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1600px] space-y-5 px-3 pb-28 pt-5 sm:px-5 lg:pb-10">
-          {children}
+          {routeForbidden ? <RouteForbidden /> : children}
         </main>
       </div>
 
       {/* Mobile bottom navigation + FAB */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl lg:hidden">
         <div className="grid grid-cols-5 items-center">
-          {bottomNav.slice(0, 2).map((n) => (
+          {visibleBottomNav.slice(0, 2).map((n) => (
             <BottomLink key={n.to} {...n} active={pathname === n.to} />
           ))}
           <div className="flex justify-center">
@@ -516,7 +581,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Plus className="h-6 w-6" />
             </button>
           </div>
-          {bottomNav.slice(2).map((n) => (
+          {visibleBottomNav.slice(2).map((n) => (
             <BottomLink key={n.to} {...n} active={pathname === n.to} />
           ))}
         </div>
@@ -529,7 +594,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <DrawerTitle>Aksi Cepat</DrawerTitle>
           </DrawerHeader>
           <div className="grid grid-cols-3 gap-3 px-4 pb-8">
-            {quickActions.map((a) => (
+            {visibleQuickActions.map((a) => (
               <Link
                 key={a.label}
                 to={a.to}
@@ -546,7 +611,27 @@ export function AppShell({ children }: { children: ReactNode }) {
         </DrawerContent>
       </Drawer>
 
-      <GlobalSearch open={searchOpen} setOpen={setSearchOpen} />
+      <GlobalSearch
+        open={searchOpen}
+        setOpen={setSearchOpen}
+        visibleQuickActions={visibleQuickActions}
+        canAccess={hasModule}
+      />
+    </div>
+  );
+}
+
+function RouteForbidden() {
+  return (
+    <div className="grid min-h-[60vh] place-items-center px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-7xl font-bold text-foreground">403</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Akses ditolak</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Role Anda tidak memiliki akses ke modul ini. Hubungi administrator bila Anda merasa
+          seharusnya dapat mengakses halaman tersebut.
+        </p>
+      </div>
     </div>
   );
 }
@@ -557,9 +642,9 @@ function BottomLink({
   icon: Icon,
   active,
 }: {
-  to: string;
-  label: string;
-  icon: typeof Package;
+  to: QuickAction["to"];
+  label: QuickAction["label"];
+  icon: QuickAction["icon"];
   active: boolean;
 }) {
   return (

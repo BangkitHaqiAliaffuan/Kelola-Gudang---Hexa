@@ -7,6 +7,7 @@ import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
@@ -23,6 +24,8 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function BarangMasukPage() {
+  const { hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
   const { data: warehouses } = useWarehouses();
   const [q, setQ] = useState("");
@@ -134,11 +137,13 @@ export function BarangMasukPage() {
         title="Barang Masuk"
         description="Penerimaan barang dari supplier"
         actions={
-          <Button asChild className="rounded-xl">
-            <Link to="/transaksi/entri/$section" params={{ section: "masuk" }}>
-              <Plus className="h-4 w-4" /> Buat Barang Masuk
-            </Link>
-          </Button>
+          canCreate && (
+            <Button asChild className="rounded-xl">
+              <Link to="/transaksi/entri/$section" params={{ section: "masuk" }}>
+                <Plus className="h-4 w-4" /> Buat Barang Masuk
+              </Link>
+            </Button>
+          )
         }
       />
 

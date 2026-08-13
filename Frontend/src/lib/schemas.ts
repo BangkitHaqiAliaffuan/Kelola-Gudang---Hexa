@@ -272,8 +272,8 @@ export const ACCESS_MODULES = [
   "Audit Trails",
 ] as const;
 
-// Ilustratif — RBAC nyata (roles + permissions + gate) menyusul saat auth dikerjakan.
-// Pemetaan modul → level akses per role untuk halaman /master/role.
+// Mirrors the seeded RolePermissionSeeder matrix (Backend), kept for SSR/first
+// paint as the fallback when the API access map is empty.
 export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
   Administrator: [
     { module: "Master Data", level: "Kelola" },
@@ -283,6 +283,7 @@ export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
     { module: "Pengadaan", level: "Kelola" },
     { module: "Laporan", level: "Kelola" },
     { module: "System", level: "Kelola" },
+    { module: "Audit Trails", level: "Kelola" },
   ],
   Supervisor: [
     { module: "Master Data", level: "Baca" },
@@ -299,8 +300,13 @@ export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
     { module: "Stock Opname", level: "Tulis" },
   ],
   Auditor: [
-    { module: "Semua Modul", level: "Baca" },
+    { module: "Master Data", level: "Baca" },
+    { module: "Transaksi", level: "Baca" },
+    { module: "Persediaan", level: "Baca" },
+    { module: "Stock Opname", level: "Baca" },
+    { module: "Pengadaan", level: "Baca" },
     { module: "Laporan", level: "Baca" },
+    { module: "System", level: "Baca" },
     { module: "Audit Trails", level: "Baca" },
   ],
 };

@@ -33,7 +33,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function BarangMasukForm() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const create = useCreateStockDocument();
 
   const { data: warehouses } = useWarehouses();
@@ -423,14 +424,14 @@ export function BarangMasukForm() {
           variant="outline"
           className="rounded-xl"
           onClick={() => submit("Draft")}
-          disabled={create.isPending}
+          disabled={create.isPending || !canCreate}
         >
           <Save className="h-4 w-4" /> Simpan Draft
         </Button>
         <Button
           className="rounded-xl"
           onClick={() => submit("Selesai")}
-          disabled={create.isPending}
+          disabled={create.isPending || !canCreate}
         >
           <Save className="h-4 w-4" /> Simpan & Posting
         </Button>
