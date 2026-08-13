@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AlertTriangle, BadgeCheck, ClipboardList, Plus, Search, ShoppingCart } from "lucide-react";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  ClipboardList,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Search,
+  ShoppingCart,
+} from "lucide-react";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { PurchaseRequestSheet } from "./purchase-request-sheet";
@@ -22,6 +31,7 @@ import { useDepartments, useSuppliers, useWarehouses } from "@/hooks/use-master"
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { useProcDoc, useProcDocs } from "@/hooks/use-pengadaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { cn } from "@/lib/utils";
 import { procDocStatuses, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
 import type { StockMinimumApi } from "@/lib/persediaan-types";
 
@@ -179,6 +189,7 @@ export function PurchaseRequestPage() {
   const [wh, setWh] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const { data: detail } = useProcDoc(selectedId ?? undefined);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
@@ -274,94 +285,118 @@ export function PurchaseRequestPage() {
 
   return (
     <>
-      <PageHeader
-        title="Purchase Request"
-        description="Permintaan pembelian barang dari departemen"
-        actions={
-          <>
-            {canViewRestock && (
-              <Button variant="outline" className="rounded-xl" onClick={() => setRestockOpen(true)}>
-                <AlertTriangle className="h-4 w-4" /> Saran Restock
-              </Button>
-            )}
-            {canCreate && (
-              <Button asChild className="rounded-xl">
-                <Link to="/pengadaan/purchase-request/new">
-                  <Plus className="h-4 w-4" /> Buat Purchase Request
-                </Link>
-              </Button>
-            )}
-          </>
-        }
-      />
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Purchase Request"
+          description="Permintaan pembelian barang dari departemen"
+          actions={
+            <>
+              {canViewRestock && (
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setRestockOpen(true)}
+                >
+                  <AlertTriangle className="h-4 w-4" /> Saran Restock
+                </Button>
+              )}
+              {canCreate && (
+                <Button asChild className="rounded-xl">
+                  <Link to="/pengadaan/purchase-request/new">
+                    <Plus className="h-4 w-4" /> Buat Purchase Request
+                  </Link>
+                </Button>
+              )}
+            </>
+          }
+        />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total PR"
-          value={formatNumber(stats.total)}
-          hint="Dokumen permintaan"
-          icon={ClipboardList}
-          tone="brand"
-        />
-        <StatCard
-          label="Menunggu Approval"
-          value={formatNumber(stats.pending)}
-          hint="Perlu ditindaklanjuti"
-          icon={ShoppingCart}
-          tone="warning"
-        />
-        <StatCard
-          label="Disetujui"
-          value={formatNumber(stats.approved)}
-          hint="Siap diterbitkan PO"
-          icon={BadgeCheck}
-          tone="success"
-        />
-        <StatCard
-          label="Nilai Total"
-          value={formatIDR(stats.value)}
-          hint="Estimasi seluruh PR"
-          icon={ShoppingCart}
-          tone="info"
-        />
-      </div>
-
-      <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, departemen, supplier, gudang, referensi, status..."
-              className="rounded-xl pl-9"
-            />
-          </div>
-          <FilterSelect
-            className="w-full"
-            value={status}
-            onChange={setStatus}
-            placeholder="Semua Status"
-            options={[...procDocStatuses]}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Total PR"
+            value={formatNumber(stats.total)}
+            hint="Dokumen permintaan"
+            icon={ClipboardList}
+            tone="brand"
           />
-          <FilterSelect
-            className="w-full"
-            value={dept}
-            onChange={setDept}
-            placeholder="Semua Departemen"
-            options={departments?.data.map((d) => d.name) ?? []}
+          <StatCard
+            label="Menunggu Approval"
+            value={formatNumber(stats.pending)}
+            hint="Perlu ditindaklanjuti"
+            icon={ShoppingCart}
+            tone="warning"
           />
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouses?.data.map((w) => w.name) ?? []}
+          <StatCard
+            label="Disetujui"
+            value={formatNumber(stats.approved)}
+            hint="Siap diterbitkan PO"
+            icon={BadgeCheck}
+            tone="success"
+          />
+          <StatCard
+            label="Nilai Total"
+            value={formatIDR(stats.value)}
+            hint="Estimasi seluruh PR"
+            icon={ShoppingCart}
+            tone="info"
           />
         </div>
-      </Panel>
 
-      <Panel title="Daftar Purchase Request" description={`${formatNumber(rows.length)} dokumen`}>
+        <Panel title="Filter">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, departemen, supplier, gudang, referensi, status..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full"
+              value={status}
+              onChange={setStatus}
+              placeholder="Semua Status"
+              options={[...procDocStatuses]}
+            />
+            <FilterSelect
+              className="w-full"
+              value={dept}
+              onChange={setDept}
+              placeholder="Semua Departemen"
+              options={departments?.data.map((d) => d.name) ?? []}
+            />
+            <FilterSelect
+              className="w-full"
+              value={wh}
+              onChange={setWh}
+              placeholder="Semua Gudang"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+            />
+          </div>
+        </Panel>
+      </div>
+
+      <Panel
+        title="Daftar Purchase Request"
+        description={`${formatNumber(rows.length)} dokumen`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
+          </Button>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}
