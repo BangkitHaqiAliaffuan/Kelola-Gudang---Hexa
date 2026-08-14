@@ -70,11 +70,12 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan']
     Route::delete('proc-docs/{procDoc}', [ProcDocController::class, 'destroy'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/submit', [ProcDocController::class, 'submit'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/cancel', [ProcDocController::class, 'cancel'])->whereNumber('procDoc');
+    Route::post('proc-docs/{procDoc}/reschedule', [ProcDocController::class, 'reschedule'])->whereNumber('procDoc');
 });
 
 // Aksi approval hanya butuh auth:sanctum — otorisasi per-dokumen di controller
-// (approver ditunjuk atau Pengadaan Kelola), agar kepala departemen ber-role
-// non-Pengadaan tetap dapat bertindak.
+// (role Supervisor atau Pengadaan Kelola sebagai override), sehingga approver
+// berbasis role dapat bertindak tanpa terikat modul access.
 Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('proc-docs/{procDoc}/approve', [ProcDocController::class, 'approve'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');

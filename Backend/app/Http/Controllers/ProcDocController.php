@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RescheduleProcDocRequest;
 use App\Http\Requests\StoreProcDocRequest;
 use App\Http\Requests\UpdateProcDocRequest;
 use App\Http\Resources\ProcDocResource;
@@ -26,20 +27,22 @@ class ProcDocController extends Controller
         'activeApprover',
         'approver',
         'creator',
+        'sourceProcDoc',
         'approvals.approver',
         'lines.item.unit',
+        'lines.unit',
     ];
 
     /**
-     * Daftar dokumen pengadaan (scope saat ini: Purchase Request, kind=PR) —
+     * Daftar dokumen pengadaan (Purchase Request / Purchase Order) —
      * searchable by nomor/departemen/supplier/referensi, filterable by status,
-     * departemen, dan gudang tujuan.
+     * departemen, dan gudang tujuan. Set status memvalidasi sesuai kind.
      */
     public function index(Request $request)
     {
         $data = $request->validate([
             'kind' => ['nullable', 'string', Rule::in(ProcDoc::KINDS)],
-            'status' => ['nullable', 'string', Rule::in(ProcDoc::PR_STATUSES)],
+            'status' => ['nullable', 'string', Rule::in(ProcDoc::statusesFor($request->input('kind')))],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'search' => ['nullable', 'string', 'max:255'],
@@ -74,8 +77,9 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Simpan Purchase Request baru (selalu berstatus Draft). Nomor di-generate
-     * otomatis: PR/YYYY/#### (tahun-scoped).
+     * Simpan dokumen pengadaan baru (PR atau PO, selalu berstatus Draft).
+     * Nomor di-generate otomatis per kind: PR/YYYY/#### atau PO/YYYY/####.
+     * PO boleh merujuk PR sumber yang sudah disetujui (source_proc_doc_id).
      */
     public function store(StoreProcDocRequest $request): ProcDocResource
     {
@@ -83,8 +87,8 @@ class ProcDocController extends Controller
 
         $doc = DB::transaction(function () use ($data, $request) {
             $procDoc = ProcDoc::create([
-                'no' => CodeGenerator::nextYearly(ProcDoc::class, 'PR', 'no', 4),
-                'kind' => 'PR',
+                'no' => CodeGenerator::nextYearly(ProcDoc::class, $data['kind'], 'no', 4),
+                'kind' => $data['kind'],
                 'status' => 'Draft',
                 'document_date' => $data['document_date'],
                 'need_date' => $data['need_date'] ?? null,
@@ -92,6 +96,7 @@ class ProcDocController extends Controller
                 'department_id' => $data['department_id'],
                 'supplier_id' => $data['supplier_id'],
                 'warehouse_id' => $data['warehouse_id'],
+                'source_proc_doc_id' => $data['source_proc_doc_id'] ?? null,
                 'reference' => $data['reference'] ?? null,
                 'note' => $data['note'] ?? null,
                 'created_by' => $request->user()?->id,
@@ -129,6 +134,7 @@ class ProcDocController extends Controller
                 'department_id' => $data['department_id'],
                 'supplier_id' => $data['supplier_id'],
                 'warehouse_id' => $data['warehouse_id'],
+                'source_proc_doc_id' => $data['source_proc_doc_id'] ?? $procDoc->source_proc_doc_id,
                 'reference' => $data['reference'] ?? null,
                 'note' => $data['note'] ?? null,
             ]);
@@ -171,8 +177,9 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Setujui dokumen pengadaan yang menunggu approval (approver ditunjuk
-     * atau user Pengadaan Kelola; requester tidak boleh menyetujui sendiri).
+     * Setujui dokumen pengadaan yang menunggu approval (role Supervisor atau
+     * user Pengadaan Kelola sebagai override; requester tidak boleh menyetujui
+     * sendiri).
      */
     public function approve(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
@@ -213,11 +220,16 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Batalkan dokumen pengadaan (Draft atau Menunggu Approval).
+     * Batalkan dokumen pengadaan: Draft, Menunggu Approval, atau Disetujui.
+     * PR Disetujui hanya bisa dibatalkan bila belum diterbitkan menjadi PO.
      */
     public function cancel(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
-        if (! $procDoc->isDraft() && ! $procDoc->isPendingApproval()) {
+        if ($procDoc->isApproved() && $procDoc->sourceProcDocs()->exists()) {
+            return response()->json(['message' => 'Dokumen telah diterbitkan menjadi Purchase Order — tidak dapat dibatalkan.'], 422);
+        }
+
+        if (! $procDoc->isDraft() && ! $procDoc->isPendingApproval() && ! $procDoc->isApproved()) {
             return response()->json(['message' => 'Dokumen pengadaan dengan status ini tidak dapat dibatalkan.'], 422);
         }
 
@@ -233,6 +245,27 @@ class ProcDocController extends Controller
                 ->where('status', 'Menunggu')
                 ->delete();
         }
+
+        return new ProcDocResource($this->loadDetail($procDoc->fresh()));
+    }
+
+    /**
+     * Jadwalkan ulang tanggal kebutuhan (Perpanjang) untuk dokumen yang
+     * berstatus Draft, Menunggu Approval, atau Disetujui — terutama PR yang
+     * sudah melewati need_date. Tanggal baru wajib hari ini atau setelahnya.
+     */
+    public function reschedule(RescheduleProcDocRequest $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
+    {
+        if (! $procDoc->isDraft() && ! $procDoc->isPendingApproval() && ! $procDoc->isApproved()) {
+            return response()->json(['message' => 'Dokumen pengadaan dengan status ini tidak dapat dijadwalkan ulang.'], 422);
+        }
+
+        $data = $request->validated();
+
+        $procDoc->update([
+            'need_date' => $data['need_date'],
+            'note' => $data['note'] ?? $procDoc->note,
+        ]);
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }

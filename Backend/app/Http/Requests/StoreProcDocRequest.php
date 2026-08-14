@@ -15,13 +15,14 @@ class StoreProcDocRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kind' => ['required', Rule::in(['PR'])],
+            'kind' => ['required', Rule::in(['PR', 'PO'])],
             'document_date' => ['required', 'date'],
             'need_date' => ['required', 'date', 'after_or_equal:document_date'],
             'requester_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'supplier_id' => ['required', 'integer', Rule::exists('suppliers', 'id')],
             'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
+            'source_proc_doc_id' => ['nullable', 'integer', Rule::exists('proc_docs', 'id')->where(fn ($q) => $q->where('kind', 'PR')->where('status', 'Disetujui'))],
             'reference' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
             'lines' => ['required', 'array', 'min:1'],
@@ -30,6 +31,15 @@ class StoreProcDocRequest extends FormRequest
             // unit_id opsional; controller meng-backfill dari item bila kosong.
             'lines.*.unit_id' => ['nullable', 'integer', Rule::exists('units', 'id')],
             'lines.*.price' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'kind.in' => 'Jenis dokumen pengadaan tidak valid (hanya PR atau PO).',
+            'source_proc_doc_id.integer' => 'Referensi PR sumber tidak valid.',
+            'source_proc_doc_id.exists' => 'PR sumber tidak ditemukan atau belum disetujui.',
         ];
     }
 }

@@ -14,8 +14,9 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Seed Purchase Requests demo (60 dokumen) memakai data master existing —
- * mencerminkan data dummy lama di Frontend (makeProc("PR",60,"PR")).
+ * Seed dokumen pengadaan demo: 60 Purchase Request (mencerminkan data dummy
+ * lama di Frontend — makeProc("PR",60,"PR")) + ~15 Purchase Order yang
+ * dirujuk ke PR berstatus Disetujui (bila ada).
  *
  * Run standalone pada DB yang sudah ter-seed:
  *   php artisan db:seed --class=ProcDocSeeder
@@ -42,10 +43,6 @@ class ProcDocSeeder extends Seeder
 
     public function run(): void
     {
-        if (ProcDoc::where('kind', 'PR')->exists()) {
-            return;
-        }
-
         $state = 20260731;
         $rnd = static function () use (&$state): float {
             $state = ($state * 1664525 + 1013904223) & 0xFFFFFFFF;
@@ -71,52 +68,92 @@ class ProcDocSeeder extends Seeder
         }
 
         DB::transaction(function () use ($ref, $int, $pick, $users, $departments, $suppliers, $warehouses, $items) {
-            for ($i = 0; $i < 60; $i++) {
-                $date = $ref->subDays($int(0, 200))->setTime($int(7, 17), $int(0, 59), 0);
-                $need = $date->addDays($int(3, 30))->startOfDay();
+            if (! ProcDoc::where('kind', 'PR')->exists()) {
+                for ($i = 0; $i < 60; $i++) {
+                    $date = $ref->subDays($int(0, 200))->setTime($int(7, 17), $int(0, 59), 0);
+                    $need = $date->addDays($int(3, 30))->startOfDay();
 
-                $lines = [];
-                for ($j = 0, $count = $int(1, 5); $j < $count; $j++) {
-                    $item = $pick($items);
-                    $lines[] = [
-                        'item' => $item,
-                        'qty' => $int(5, 250),
-                        'price' => (float) $item->cost,
-                    ];
-                }
+                    $lines = [];
+                    for ($j = 0, $count = $int(1, 5); $j < $count; $j++) {
+                        $item = $pick($items);
+                        $lines[] = [
+                            'item' => $item,
+                            'qty' => $int(5, 250),
+                            'price' => (float) $item->cost,
+                        ];
+                    }
 
-                $requester = $pick($users);
-                $status = $pick(self::PR_STATUSES);
-                $approved = in_array($status, ['Disetujui', 'Ditolak'], true);
+                    $requester = $pick($users);
+                    $status = $pick(self::PR_STATUSES);
+                    $approved = in_array($status, ['Disetujui', 'Ditolak'], true);
 
-                $doc = ProcDoc::create([
-                    'no' => 'PR/2026/'.str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT),
-                    'kind' => 'PR',
-                    'status' => $status,
-                    'document_date' => $date,
-                    'need_date' => $need,
-                    'requester_user_id' => $requester->id,
-                    'department_id' => $pick($departments)->id,
-                    'supplier_id' => $pick($suppliers)->id,
-                    'warehouse_id' => $pick($warehouses)->id,
-                    'reference' => 'BUDGET-'.$int(1000, 9999),
-                    'note' => $pick(self::NOTES),
-                    'submitted_at' => $status === 'Draft' ? null : $date,
-                    'approved_by' => $approved ? $pick($users)->id : null,
-                    'approved_at' => $approved ? $date->addHours(3) : null,
-                    'decision_note' => $status === 'Ditolak' ? 'Barang melebihi anggaran departemen.' : null,
-                    'created_by' => $requester->id,
-                ]);
-
-                foreach ($lines as $index => $line) {
-                    ProcDocLine::create([
-                        'proc_doc_id' => $doc->id,
-                        'line_no' => $index + 1,
-                        'item_id' => $line['item']->id,
-                        'qty' => $line['qty'],
-                        'unit_id' => $line['item']->unit_id,
-                        'price' => $line['price'],
+                    $doc = ProcDoc::create([
+                        'no' => 'PR/2026/'.str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT),
+                        'kind' => 'PR',
+                        'status' => $status,
+                        'document_date' => $date,
+                        'need_date' => $need,
+                        'requester_user_id' => $requester->id,
+                        'department_id' => $pick($departments)->id,
+                        'supplier_id' => $pick($suppliers)->id,
+                        'warehouse_id' => $pick($warehouses)->id,
+                        'reference' => 'BUDGET-'.$int(1000, 9999),
+                        'note' => $pick(self::NOTES),
+                        'submitted_at' => $status === 'Draft' ? null : $date,
+                        'approved_by' => $approved ? $pick($users)->id : null,
+                        'approved_at' => $approved ? $date->addHours(3) : null,
+                        'decision_note' => $status === 'Ditolak' ? 'Barang melebihi anggaran departemen.' : null,
+                        'created_by' => $requester->id,
                     ]);
+
+                    foreach ($lines as $index => $line) {
+                        ProcDocLine::create([
+                            'proc_doc_id' => $doc->id,
+                            'line_no' => $index + 1,
+                            'item_id' => $line['item']->id,
+                            'qty' => $line['qty'],
+                            'unit_id' => $line['item']->unit_id,
+                            'price' => $line['price'],
+                        ]);
+                    }
+                }
+            }
+
+            if (! ProcDoc::where('kind', 'PO')->exists()) {
+                $approvedPRs = ProcDoc::where('kind', 'PR')
+                    ->where('status', 'Disetujui')
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($approvedPRs->take(15) as $index => $pr) {
+                    $poDate = $pr->document_date->addDays($int(1, 5))->setTime($int(7, 17), $int(0, 59), 0);
+
+                    $po = ProcDoc::create([
+                        'no' => 'PO/2026/'.str_pad((string) ($index + 1), 4, '0', STR_PAD_LEFT),
+                        'kind' => 'PO',
+                        'status' => 'Draft',
+                        'document_date' => $poDate,
+                        'need_date' => $pr->need_date,
+                        'requester_user_id' => $pr->requester_user_id,
+                        'department_id' => $pr->department_id,
+                        'supplier_id' => $pr->supplier_id,
+                        'warehouse_id' => $pr->warehouse_id,
+                        'source_proc_doc_id' => $pr->id,
+                        'reference' => $pr->reference,
+                        'note' => $pr->note,
+                        'created_by' => $pr->requester_user_id,
+                    ]);
+
+                    foreach ($pr->lines as $lineIndex => $line) {
+                        ProcDocLine::create([
+                            'proc_doc_id' => $po->id,
+                            'line_no' => $lineIndex + 1,
+                            'item_id' => $line->item_id,
+                            'qty' => $line->qty,
+                            'unit_id' => $line->unit_id,
+                            'price' => $line->price,
+                        ]);
+                    }
                 }
             }
         });

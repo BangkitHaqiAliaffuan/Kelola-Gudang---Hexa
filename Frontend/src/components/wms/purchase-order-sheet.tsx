@@ -32,6 +32,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { isApiError } from "@/lib/api";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { canDecideProcDoc } from "@/lib/pengadaan-types";
 import type { ProcDocApi } from "@/lib/purchase-order-types";
 
 const statusTone = (s: string): Tone =>
@@ -44,6 +45,15 @@ const statusTone = (s: string): Tone =>
         : s === "Sebagian Diterima"
           ? "info"
           : "warning";
+
+const approvalTone = (s: string): Tone =>
+  s === "Disetujui"
+    ? "success"
+    : s === "Ditolak"
+      ? "danger"
+      : s === "Menunggu"
+        ? "warning"
+        : "neutral";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -65,7 +75,7 @@ export function PurchaseOrderSheet({
 }) {
   const [action, setAction] = useState<SheetAction | null>(null);
   const [rejectNote, setRejectNote] = useState("");
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
   const submit = useSubmitProcDocPo();
@@ -83,6 +93,8 @@ export function PurchaseOrderSheet({
 
   const isDraft = doc?.status === "Draft";
   const isPendingApproval = doc?.status === "Menunggu Approval";
+
+  const canDecide = (d: ProcDocApi) => canDecideProcDoc(d, user, canManage);
 
   const labels: Record<SheetAction, { title: string; description: string; confirm: string }> = {
     submit: {
@@ -179,6 +191,9 @@ export function PurchaseOrderSheet({
                 <Field label="Departemen" value={doc.department ?? "—"} />
                 <Field label="Tanggal Dibutuhkan" value={formatDate(doc.need_date ?? "")} />
                 <Field label="Dibuat oleh" value={doc.created_by ?? "—"} />
+                {isPendingApproval && (
+                  <Field label="Approver" value={doc.approver ?? "Belum ditugaskan"} />
+                )}
                 <Field label="Total Qty" value={formatNumber(doc.qty_total ?? 0)} />
                 <Field label="Total Nilai" value={formatIDR(doc.value_total ?? 0)} />
               </div>
@@ -238,6 +253,36 @@ export function PurchaseOrderSheet({
                 </div>
               </div>
 
+              {(doc.approvals?.length ?? 0) > 0 && (
+                <div className="rounded-xl border border-border">
+                  <div className="border-b border-border px-4 py-2.5">
+                    <p className="text-sm font-semibold">Riwayat Approval</p>
+                  </div>
+                  <ol className="divide-y divide-border/70">
+                    {doc.approvals!.map((a) => (
+                      <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">
+                            Level {a.level} · {a.approver ?? "Belum ditugaskan"}
+                          </p>
+                          {a.decision_note && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {a.decision_note}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Pill tone={approvalTone(a.status)}>{a.status}</Pill>
+                          <span className="text-[11px] text-muted-foreground">
+                            {formatDate(a.decided_at ?? "")}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
               {doc.note && (
                 <div className="rounded-xl border border-border px-3 py-2.5">
                   <p className="text-[11px] font-medium text-muted-foreground">Catatan</p>
@@ -254,7 +299,7 @@ export function PurchaseOrderSheet({
             </div>
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-card px-5 py-3">
-              {canApprove(doc) && canWrite && (
+              {canDecide(doc) && (
                 <Button
                   variant="outline"
                   className="rounded-xl text-success"
@@ -264,7 +309,7 @@ export function PurchaseOrderSheet({
                   <CheckCircle2 className="h-4 w-4" /> Setujui
                 </Button>
               )}
-              {canReject(doc) && canWrite && (
+              {canDecide(doc) && (
                 <Button
                   variant="outline"
                   className="rounded-xl text-destructive"
@@ -362,12 +407,4 @@ export function PurchaseOrderSheet({
 
 function canSubmit(doc: ProcDocApi): boolean {
   return doc.status === "Draft";
-}
-
-function canApprove(doc: ProcDocApi): boolean {
-  return doc.status === "Menunggu Approval";
-}
-
-function canReject(doc: ProcDocApi): boolean {
-  return doc.status === "Menunggu Approval";
 }

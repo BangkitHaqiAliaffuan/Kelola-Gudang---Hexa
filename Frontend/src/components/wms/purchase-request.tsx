@@ -187,6 +187,7 @@ export function PurchaseRequestPage() {
   const [status, setStatus] = useState(ALL);
   const [dept, setDept] = useState(ALL);
   const [wh, setWh] = useState(ALL);
+  const [need, setNeed] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -203,11 +204,14 @@ export function PurchaseRequestPage() {
           (!qn || hay.includes(qn)) &&
           (status === ALL || d.status === status) &&
           (dept === ALL || d.department === dept) &&
-          (wh === ALL || d.warehouse === wh)
+          (wh === ALL || d.warehouse === wh) &&
+          (need === ALL || (need === "Terlambat" && (d.is_late ?? false)))
         );
       }),
-    [data, qn, status, dept, wh],
+    [data, qn, status, dept, wh, need],
   );
+
+  const lateCount = rows.filter((r) => r.is_late).length;
 
   const stats = useMemo(() => {
     const all = data?.data ?? [];
@@ -256,9 +260,16 @@ export function PurchaseRequestPage() {
     {
       key: "need_date",
       label: "Kebutuhan",
-      className: "w-[120px] whitespace-nowrap",
+      className: "w-[170px] whitespace-nowrap",
       sortable: true,
-      render: (r) => fmtDate(r.need_date),
+      render: (r) =>
+        r.is_late ? (
+          <span className="font-semibold text-destructive">
+            {fmtDate(r.need_date)} · Telat {r.late_days ?? 0} hari
+          </span>
+        ) : (
+          fmtDate(r.need_date)
+        ),
     },
     {
       key: "qty_total",
@@ -343,7 +354,7 @@ export function PurchaseRequestPage() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -374,13 +385,20 @@ export function PurchaseRequestPage() {
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
             />
+            <FilterSelect
+              className="w-full"
+              value={need}
+              onChange={setNeed}
+              placeholder="Semua Kebutuhan"
+              options={["Terlambat"]}
+            />
           </div>
         </Panel>
       </div>
 
       <Panel
         title="Daftar Purchase Request"
-        description={`${formatNumber(rows.length)} dokumen`}
+        description={`${formatNumber(rows.length)} dokumen${lateCount > 0 ? ` · ${formatNumber(lateCount)} terlambat` : ""}`}
         actions={
           <Button
             variant="outline"
@@ -412,6 +430,11 @@ export function PurchaseRequestPage() {
               <p className="truncate text-xs text-muted-foreground">
                 {fmtDate(r.document_date)} · {r.department ?? "—"} · {r.supplier ?? "—"}
               </p>
+              {r.is_late && (
+                <p className="text-xs font-semibold text-destructive">
+                  Terlambat {r.late_days ?? 0} hari
+                </p>
+              )}
               <div className="flex justify-between pt-1 text-xs">
                 <span>{formatNumber(r.qty_total ?? 0)} unit</span>
                 <b>{formatIDR(r.value_total ?? 0)}</b>

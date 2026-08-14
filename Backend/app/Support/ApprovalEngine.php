@@ -8,46 +8,30 @@ use App\Models\RolePermission;
 use App\Models\User;
 
 /**
- * Approval engine untuk dokumen pengadaan (PR/PO) — single-level:
- * approver Level 1 = Kepala Departemen dari department_id dokumen,
- * dengan fallback ke user Pengadaan Kelola dan penegakan SoD
- * (approver tidak boleh requester). Penolakan bersifat terminal.
+ * Approval engine untuk dokumen pengadaan (PR/PO) — single-level berbasis
+ * role: approver Level 1 = user aktif ber-role Supervisor (bukan requester);
+ * user Pengadaan Kelola dapat memutuskan sebagai override; requester tidak
+ * pernah boleh memutuskan (SoD). Penolakan bersifat terminal.
  */
 class ApprovalEngine
 {
     /**
      * Menentukan approver aktif (Level 1) untuk dokumen yang diajukan.
-     * - Utama: kepala departemen (departments.head_user_id) bila aktif dan bukan requester.
-     * - Fallback: user aktif pertama (by id) yang rolenya punya Pengadaan + Kelola, selain requester.
-     * - Null bila tidak ada yang memenuhi → butuh penugasan manual.
+     * - Utama: user aktif pertama (by id) ber-role Supervisor, selain requester.
+     * - Null bila tidak ada yang memenuhi → dokumen menunggu tanpa penugasan
+     *   (butuh penugasan manual); Supervisor mana pun tetap bisa memutuskan.
      */
     public static function resolveApprover(ProcDoc $procDoc): ?int
     {
-        if (! $procDoc->relationLoaded('department')) {
-            $procDoc->load('department');
-        }
-
         $requesterId = $procDoc->requester_user_id;
-        $headId = $procDoc->department?->head_user_id;
 
-        if ($headId !== null && $headId !== $requesterId) {
-            $head = User::whereKey($headId)->where('is_active', true)->first();
-            if ($head !== null) {
-                return (int) $head->id;
-            }
-        }
-
-        $kelolaRoles = RolePermission::where('module', 'Pengadaan')
-            ->where('level', 'Kelola')
-            ->pluck('role');
-
-        $fallback = User::whereIn('role', $kelolaRoles)
+        $supervisor = User::where('role', 'Supervisor')
             ->where('is_active', true)
             ->when($requesterId !== null, fn ($q) => $q->whereKeyNot($requesterId))
             ->orderBy('id')
             ->first();
 
-        return $fallback?->id;
+        return $supervisor?->id;
     }
 
     /**
@@ -93,8 +77,8 @@ class ApprovalEngine
     }
 
     /**
-     * Apakah user berhak memutuskan dokumen: approver yang ditunjuk, atau
-     * siapa pun dengan Pengadaan Kelola (override) — kecuali requester (SoD).
+     * Apakah user berhak memutuskan dokumen: role Supervisor, atau siapa pun
+     * dengan Pengadaan Kelola (override) — kecuali requester (SoD).
      */
     public static function canDecide(ProcDoc $procDoc, int $userId): bool
     {
@@ -102,13 +86,13 @@ class ApprovalEngine
             return false;
         }
 
-        if ($procDoc->approver_user_id === $userId) {
-            return true;
-        }
-
         $user = User::find($userId);
         if ($user === null) {
             return false;
+        }
+
+        if ($user->role === 'Supervisor') {
+            return true;
         }
 
         return RolePermission::where('role', $user->role)

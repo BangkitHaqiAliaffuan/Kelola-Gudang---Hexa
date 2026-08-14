@@ -27,7 +27,7 @@ const statusTone = (s: string): Tone =>
           : "warning";
 
 export function PurchaseOrderPage() {
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const { data, isLoading } = useProcDocsPo("PO");
   const { data: warehouses } = useWarehouses();
@@ -60,6 +60,9 @@ export function PurchaseOrderPage() {
   );
 
   const totalValue = rows.reduce((a, b) => a + (b.value_total ?? 0), 0);
+  const mineAwaiting = rows.filter(
+    (d) => d.status === "Menunggu Approval" && d.approver_user_id === user?.id,
+  ).length;
   const openDocs = rows.filter(
     (d) => d.status === "Menunggu Approval" || d.status === "Sebagian Diterima",
   ).length;
@@ -177,8 +180,14 @@ export function PurchaseOrderPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={ShoppingCart} />
+        <StatCard
+          label="Menunggu Saya"
+          value={formatNumber(mineAwaiting)}
+          icon={ShoppingCart}
+          tone="brand"
+        />
         <StatCard
           label="Perlu Tindakan"
           value={formatNumber(openDocs)}

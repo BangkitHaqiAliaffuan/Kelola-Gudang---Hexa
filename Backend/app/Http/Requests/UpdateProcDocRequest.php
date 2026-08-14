@@ -21,6 +21,7 @@ class UpdateProcDocRequest extends FormRequest
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'supplier_id' => ['required', 'integer', Rule::exists('suppliers', 'id')],
             'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
+            'source_proc_doc_id' => ['nullable', 'integer', Rule::exists('proc_docs', 'id')->where(fn ($q) => $q->where('kind', 'PR')->where('status', 'Disetujui'))],
             'reference' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
             'lines' => ['required', 'array', 'min:1'],

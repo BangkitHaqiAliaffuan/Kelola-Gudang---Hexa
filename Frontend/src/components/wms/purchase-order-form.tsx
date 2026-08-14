@@ -101,7 +101,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
           key: `L${(lineSeq += 1)}`,
           itemId: String(l.item_id),
           unitId: l.unit_id,
-          unitLabel: l.unit ?? "",
+          unitLabel: l.unit ?? unitOf(String(l.item_id)).unit,
           qty: String(l.qty),
           price: String(l.price),
         })),
@@ -125,7 +125,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
           key: `L${(lineSeq += 1)}`,
           itemId: String(l.item_id),
           unitId: l.unit_id,
-          unitLabel: l.unit ?? "",
+          unitLabel: l.unit ?? unitOf(String(l.item_id)).unit,
           qty: String(l.qty),
           price: String(l.price),
         })),
@@ -496,7 +496,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                           value={l.price}
                           onChange={(e) => patchLine(l.key, { price: e.target.value })}
                           placeholder="0"
-                          className="h-9 w-32 rounded-lg text-right"
+                          className="h-9 w-32 rounded-lg"
                         />
                         {lineError(i, "price") && (
                           <p className="mt-1 text-xs text-destructive">{lineError(i, "price")}</p>
@@ -551,7 +551,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                     value={l.price}
                     onChange={(e) => patchLine(l.key, { price: e.target.value })}
                     placeholder="Harga"
-                    className="mt-2 h-9 rounded-lg text-right"
+                    className="mt-2 h-9 rounded-lg"
                   />
                   <div className="mt-1 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Subtotal</span>

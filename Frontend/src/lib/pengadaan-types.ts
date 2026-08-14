@@ -27,6 +27,16 @@ export type ProcDocLineApi = {
   subtotal: number;
 };
 
+export type ProcDocApprovalApi = {
+  id: number;
+  level: number;
+  status: string;
+  approver_user_id: number | null;
+  approver: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+};
+
 export type ProcDocApi = {
   id: number;
   no: string;
@@ -37,18 +47,25 @@ export type ProcDocApi = {
   need_date: string | null;
   requester_user_id: number | null;
   requester: string | null;
+  approver_user_id: number | null;
+  approver: string | null;
   department_id: number | null;
   department: string | null;
   supplier_id: number | null;
   supplier: string | null;
   warehouse_id: number | null;
   warehouse: string | null;
+  source_proc_doc_id: number | null;
+  source_proc_doc: string | null;
+  is_late?: boolean;
+  late_days?: number;
   reference: string | null;
   note: string | null;
   submitted_at: string | null;
   approved_by: string | null;
   approved_at: string | null;
   decision_note: string | null;
+  approvals?: ProcDocApprovalApi[];
   created_by: string | null;
   line_count?: number;
   qty_total?: number;
@@ -75,3 +92,17 @@ export type ProcDocPayload = {
   note: string | null;
   lines: ProcDocLinePayload[];
 };
+
+/** Mirrors backend ApprovalEngine::canDecide — role Supervisor atau Pengadaan Kelola, requester dikecualikan (SoD). */
+export function canDecideProcDoc(
+  doc: { status: string; requester_user_id: number | null },
+  user: { id: number; role?: string | null } | null,
+  canManage: boolean,
+): boolean {
+  return (
+    doc.status === "Menunggu Approval" &&
+    user != null &&
+    user.id !== doc.requester_user_id &&
+    (user.role === "Supervisor" || canManage)
+  );
+}

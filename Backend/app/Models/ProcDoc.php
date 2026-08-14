@@ -13,8 +13,17 @@ class ProcDoc extends Model
 
     public const KINDS = ['PR', 'PO', 'GR'];
 
-    // PR lifecycle: Draft → Menunggu Approval → Disetujui | Ditolak; cancel dari Draft/Menunggu.
+    // PR lifecycle: Draft → Menunggu Approval → Disetujui | Ditolak; cancel dari Draft/Menunggu/Disetujui (selama belum dirujuk PO).
     public const PR_STATUSES = [
+        'Draft',
+        'Menunggu Approval',
+        'Disetujui',
+        'Ditolak',
+        'Dibatalkan',
+    ];
+
+    // PO lifecycle: Draft → Menunggu Approval → Disetujui | Ditolak; cancel dari Draft/Menunggu/Disetujui.
+    public const PO_STATUSES = [
         'Draft',
         'Menunggu Approval',
         'Disetujui',
@@ -32,6 +41,7 @@ class ProcDoc extends Model
         'department_id',
         'supplier_id',
         'warehouse_id',
+        'source_proc_doc_id',
         'reference',
         'note',
         'submitted_at',
@@ -89,6 +99,16 @@ class ProcDoc extends Model
         return $this->hasMany(ProcDocApproval::class, 'proc_doc_id')->orderBy('level');
     }
 
+    public function sourceProcDoc(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_proc_doc_id');
+    }
+
+    public function sourceProcDocs(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_proc_doc_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -102,5 +122,29 @@ class ProcDoc extends Model
     public function isPendingApproval(): bool
     {
         return $this->status === 'Menunggu Approval';
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === 'Disetujui';
+    }
+
+    public function isLate(): bool
+    {
+        return $this->need_date !== null && $this->need_date->lt(now()->startOfDay());
+    }
+
+    public function lateDays(): int
+    {
+        if ($this->need_date === null) {
+            return 0;
+        }
+
+        return max(0, (int) $this->need_date->diffInDays(now()->startOfDay()));
+    }
+
+    public static function statusesFor(?string $kind): array
+    {
+        return $kind === 'PO' ? self::PO_STATUSES : self::PR_STATUSES;
     }
 }

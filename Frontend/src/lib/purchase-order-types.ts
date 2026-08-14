@@ -30,6 +30,16 @@ export type ProcDocLineApi = {
   subtotal: number;
 };
 
+export type ProcDocApprovalApi = {
+  id: number;
+  level: number;
+  status: string;
+  approver_user_id: number | null;
+  approver: string | null;
+  decision_note: string | null;
+  decided_at: string | null;
+};
+
 export type ProcDocApi = {
   id: number;
   no: string;
@@ -40,6 +50,8 @@ export type ProcDocApi = {
   need_date: string | null;
   requester_user_id: number | null;
   requester: string | null;
+  approver_user_id: number | null;
+  approver: string | null;
   department_id: number | null;
   department: string | null;
   supplier_id: number | null;
@@ -54,6 +66,7 @@ export type ProcDocApi = {
   approved_by: string | null;
   approved_at: string | null;
   decision_note: string | null;
+  approvals?: ProcDocApprovalApi[];
   created_by: string | null;
   line_count: number | null;
   qty_total: number | null;

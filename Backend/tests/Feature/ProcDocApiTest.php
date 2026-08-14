@@ -107,7 +107,7 @@ class ProcDocApiTest extends TestCase
 
         $cases = [
             'missing lines' => ['lines' => []],
-            'kind invalid' => ['kind' => 'PO'],
+            'kind invalid' => ['kind' => 'GR'],
             'supplier required' => ['supplier_id' => null],
             'department required' => ['department_id' => null],
             'warehouse required' => ['warehouse_id' => null],
@@ -186,6 +186,7 @@ class ProcDocApiTest extends TestCase
                 ->has('data.lines', 1)
                 ->where('data.lines.0.sku', $item->sku)
                 ->where('data.lines.0.name', $item->name)
+                ->where('data.lines.0.unit', $item->unit?->name)
                 ->where('data.lines.0.subtotal', 10000)
                 ->where('data.qty_total', 5)
                 ->where('data.value_total', 10000));
@@ -315,8 +316,9 @@ class ProcDocApiTest extends TestCase
 
     public function test_approve_flows_pending_to_approved(): void
     {
-        [$department, $supplier, $warehouse, $head] = $this->makeContextWithHead();
+        [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
 
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
@@ -335,25 +337,25 @@ class ProcDocApiTest extends TestCase
         // Approve langsung pada Draft → 422.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(422);
 
-        // Submit → approver yang ditunjuk = kepala departemen.
+        // Submit → approver yang ditunjuk = user aktif ber-role Supervisor pertama.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
             ->assertOk()
             ->assertJsonPath('data.status', 'Menunggu Approval')
-            ->assertJsonPath('data.approver_user_id', $head->id)
-            ->assertJsonPath('data.approver', $head->name);
+            ->assertJsonPath('data.approver_user_id', $supervisor->id)
+            ->assertJsonPath('data.approver', $supervisor->name);
 
-        // User lain yang bukan approver (tanpa Kelola) → 403.
+        // User lain yang bukan Supervisor (tanpa Kelola) → 403.
         Sanctum::actingAs($this->makeUser('Stranger'), ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
 
-        // Approver yang ditunjuk (kepala departemen) → Disetujui + riwayat.
-        Sanctum::actingAs($head, ['*'], 'sanctum');
+        // Supervisor → Disetujui + riwayat.
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Disetujui')
             ->assertJsonPath('data.approved_at', fn ($v) => $v !== null)
             ->assertJsonPath('data.approvals.0.status', 'Disetujui')
-            ->assertJsonPath('data.approvals.0.approver', $head->name);
+            ->assertJsonPath('data.approvals.0.approver', $supervisor->name);
 
         $doc->refresh();
         $this->assertNotNull($doc->approved_by);
@@ -363,7 +365,7 @@ class ProcDocApiTest extends TestCase
 
     public function test_requester_cannot_approve_own_doc(): void
     {
-        [$department, $supplier, $warehouse] = $this->makeContextWithHead();
+        [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
 
         $no = $this->postJson('/api/pengadaan/proc-docs', [
@@ -385,7 +387,7 @@ class ProcDocApiTest extends TestCase
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
     }
 
-    public function test_approve_falls_back_to_kelola_when_no_dept_head(): void
+    public function test_approver_null_when_no_supervisor_kelola_override(): void
     {
         RolePermission::firstOrCreate(
             ['role' => 'Requester Tulis', 'module' => 'Pengadaan'],
@@ -393,9 +395,7 @@ class ProcDocApiTest extends TestCase
         );
         $requester = $this->makeUser('Requester Tulis');
 
-        $department = Department::factory()->create(['head_user_id' => null]);
-        $supplier = Supplier::factory()->create();
-        $warehouse = Warehouse::factory()->create();
+        [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
 
         Sanctum::actingAs($requester, ['*'], 'sanctum');
@@ -414,31 +414,36 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Tanpa kepala departemen → fallback ke user Pengadaan Kelola (bukan requester).
+        // Tanpa Supervisor aktif (selain requester) → approver null, tak ada penugasan.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $doc->refresh();
-        $this->assertNotNull($doc->approver_user_id);
-        $this->assertNotEquals($requester->id, $doc->approver_user_id);
+        $this->assertNull($doc->approver_user_id);
 
-        $approver = User::find($doc->approver_user_id);
-        $this->assertSame('Procurement Test', $approver->role);
-
-        Sanctum::actingAs($approver, ['*'], 'sanctum');
+        // User Pengadaan Kelola (bukan requester) dapat memutuskan sebagai override.
+        $kelola = $this->makeUser('Kelola Test');
+        RolePermission::firstOrCreate(
+            ['role' => 'Kelola Test', 'module' => 'Pengadaan'],
+            ['level' => 'Kelola'],
+        );
+        Sanctum::actingAs($kelola, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Disetujui');
     }
 
-    public function test_fallback_when_head_is_requester(): void
+    public function test_supervisor_requester_cannot_approve_own_doc(): void
     {
-        $this->actingAsProcurement();
-        $requesterId = Auth::id();
+        RolePermission::firstOrCreate(
+            ['role' => 'Supervisor', 'module' => 'Pengadaan'],
+            ['level' => 'Tulis'],
+        );
+        $supervisor = $this->makeUser('Supervisor');
 
-        $department = Department::factory()->create(['head_user_id' => $requesterId]);
-        $supplier = Supplier::factory()->create();
-        $warehouse = Warehouse::factory()->create();
+        [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
+
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
 
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
@@ -454,17 +459,22 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Kepala departemen == requester → fallback ke user Pengadaan Kelola lain.
+        // Satu-satunya Supervisor == requester → tidak ditugaskan sebagai approver.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $doc->refresh();
-        $this->assertNotNull($doc->approver_user_id);
-        $this->assertNotEquals($requesterId, $doc->approver_user_id);
+        $this->assertNull($doc->approver_user_id);
 
-        $approver = User::find($doc->approver_user_id);
-        $this->assertSame('Procurement Test', $approver->role);
+        // Supervisor (requester) tidak boleh menyetujui sendiri — SoD.
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
 
-        Sanctum::actingAs($approver, ['*'], 'sanctum');
+        // User Pengadaan Kelola lain dapat memutuskan.
+        $kelola = $this->makeUser('Kelola Test');
+        RolePermission::firstOrCreate(
+            ['role' => 'Kelola Test', 'module' => 'Pengadaan'],
+            ['level' => 'Kelola'],
+        );
+        Sanctum::actingAs($kelola, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Disetujui');
@@ -472,8 +482,9 @@ class ProcDocApiTest extends TestCase
 
     public function test_reject_requires_reason(): void
     {
-        [$department, $supplier, $warehouse, $head] = $this->makeContextWithHead();
+        [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
 
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
@@ -490,13 +501,13 @@ class ProcDocApiTest extends TestCase
         $doc = ProcDoc::where('no', $no)->firstOrFail();
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
-        // User non-approver (tanpa Kelola) → 403.
+        // User non-Supervisor (tanpa Kelola) → 403.
         Sanctum::actingAs($this->makeUser('Stranger'), ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reject", ['decision_note' => 'Melebihi anggaran'])
             ->assertStatus(403);
 
-        // Approver: tanpa alasan → 422; dengan alasan → Ditolak.
-        Sanctum::actingAs($head, ['*'], 'sanctum');
+        // Supervisor: tanpa alasan → 422; dengan alasan → Ditolak.
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reject")
             ->assertStatus(422)
             ->assertJsonValidationErrors('decision_note');
@@ -541,7 +552,8 @@ class ProcDocApiTest extends TestCase
             ->assertJsonPath('data.status', 'Dibatalkan');
 
         // Cancel dokumen Disetujui → 422.
-        [$d2, $s2, $w2, $head] = $this->makeContextWithHead();
+        [$d2, $s2, $w2] = $this->makeContext();
+        $supervisor = $this->makeSupervisor();
         $no2 = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
@@ -557,11 +569,229 @@ class ProcDocApiTest extends TestCase
         $approved = ProcDoc::where('no', $no2)->firstOrFail();
         $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/submit")->assertOk();
 
-        Sanctum::actingAs($head, ['*'], 'sanctum');
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/approve")->assertOk();
 
+        // PR Disetujui yang belum dirujuk PO kini dapat dibatalkan.
         $this->actingAsProcurement();
-        $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/cancel")->assertStatus(422);
+        $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/cancel")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Dibatalkan');
+
+        // PR Disetujui yang sudah dirujuk PO → 422.
+        $no3 = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'need_date' => '2026-08-25',
+            'department_id' => $d2->id,
+            'supplier_id' => $s2->id,
+            'warehouse_id' => $w2->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $referenced = ProcDoc::where('no', $no3)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$referenced->id}/submit")->assertOk();
+
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$referenced->id}/approve")->assertOk();
+        $this->actingAsProcurement();
+
+        $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PO',
+            'document_date' => '2026-08-13',
+            'need_date' => '2026-08-30',
+            'department_id' => $d2->id,
+            'supplier_id' => $s2->id,
+            'warehouse_id' => $w2->id,
+            'source_proc_doc_id' => $referenced->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201);
+
+        $this->postJson("/api/pengadaan/proc-docs/{$referenced->id}/cancel")
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Dokumen telah diterbitkan menjadi Purchase Order — tidak dapat dibatalkan.');
+    }
+
+    public function test_store_po_references_approved_pr(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'need_date' => '2026-08-25',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'price' => 1500],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $pr = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/submit")->assertOk();
+
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/approve")->assertOk();
+        $this->actingAsProcurement();
+
+        // PO merujuk PR Disetujui → 201, kind=PO, nomor PO, source ter-link.
+        $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PO',
+            'document_date' => '2026-08-13',
+            'need_date' => '2026-08-30',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'source_proc_doc_id' => $pr->id,
+            'reference' => 'PO-DARI-PR',
+            'note' => 'Tindak lanjut PR',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'price' => 1500],
+            ],
+        ])->assertStatus(201)
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->where('data.kind', 'PO')
+                ->where('data.status', 'Draft')
+                ->where('data.source_proc_doc_id', $pr->id)
+                ->where('data.source_proc_doc', $pr->no)
+                ->where('data.reference', 'PO-DARI-PR')
+                ->where('data.no', fn ($v) => (bool) preg_match('/^PO\/\d{4}\/\d{4}$/', (string) $v)));
+
+        // source PR yang belum disetujui → 422.
+        $noPending = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'need_date' => '2026-08-25',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $draftPr = ProcDoc::where('no', $noPending)->firstOrFail();
+
+        $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PO',
+            'document_date' => '2026-08-13',
+            'need_date' => '2026-08-30',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'source_proc_doc_id' => $draftPr->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('source_proc_doc_id');
+    }
+
+    public function test_po_index_filters_by_kind_and_status(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
+
+        // Satu PR → Disetujui → jadikan PO (Draft).
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'need_date' => '2026-08-25',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $pr = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/submit")->assertOk();
+
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/approve")->assertOk();
+        $this->actingAsProcurement();
+
+        $poNo = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PO',
+            'document_date' => '2026-08-13',
+            'need_date' => '2026-08-30',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'source_proc_doc_id' => $pr->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $poRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PO&per_page=10000')->assertOk()->json('data'));
+        $this->assertTrue($poRows->contains('no', $poNo));
+        $this->assertFalse($poRows->contains('no', $no));
+
+        $prRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PR&per_page=10000')->assertOk()->json('data'));
+        $this->assertTrue($prRows->contains('no', $no));
+        $this->assertFalse($prRows->contains('no', $poNo));
+
+        // Status filter memvalidasi set status sesuai kind.
+        $this->getJson('/api/pengadaan/proc-docs?kind=PR&status=Disetujui&per_page=10000')->assertOk();
+        $this->getJson('/api/pengadaan/proc-docs?kind=PO&status=Draft&per_page=10000')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_reschedule_extends_need_date(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+
+        // PR dengan need_date sudah lewat (kemarin).
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $docDate = now()->subDays(10)->format('Y-m-d');
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => $docDate,
+            'need_date' => $yesterday,
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+
+        // Status Draft: is_late terdeteksi pada detail.
+        $this->getJson("/api/pengadaan/proc-docs/{$doc->id}")
+            ->assertOk()
+            ->assertJsonPath('data.is_late', true)
+            ->assertJsonPath('data.late_days', 1);
+
+        // Perpanjang ke tanggal mendatang → need_date ter-update, is_late false.
+        $future = now()->addDays(14)->format('Y-m-d');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reschedule", [
+            'need_date' => $future,
+            'note' => 'Pengiriman ditunda pemasok',
+        ])->assertOk()
+            ->assertJsonPath('data.need_date', fn ($v) => str_starts_with((string) $v, $future))
+            ->assertJsonPath('data.is_late', false)
+            ->assertJsonPath('data.note', 'Pengiriman ditunda pemasok');
+
+        // Tanggal mundur (sebelum hari ini) → 422.
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reschedule", [
+            'need_date' => $yesterday,
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('need_date');
     }
 
     private function actingAsProcurement(): void
@@ -601,22 +831,14 @@ class ProcDocApiTest extends TestCase
     private function makeContext(): array
     {
         return [
-            Department::factory()->create(),
+            Department::factory()->create(['head_user_id' => null]),
             Supplier::factory()->create(),
             Warehouse::factory()->create(),
         ];
     }
 
-    /** @return array{0: Department, 1: Supplier, 2: Warehouse, 3: User} */
-    private function makeContextWithHead(): array
+    private function makeSupervisor(): User
     {
-        $head = $this->makeUser('Dept Head');
-
-        return [
-            Department::factory()->create(['head_user_id' => $head->id]),
-            Supplier::factory()->create(),
-            Warehouse::factory()->create(),
-            $head,
-        ];
+        return $this->makeUser('Supervisor');
     }
 }

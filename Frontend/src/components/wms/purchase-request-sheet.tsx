@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { CheckCircle2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Pencil,
+  Printer,
+  Send,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
@@ -29,6 +38,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -36,10 +46,11 @@ import {
   useCancelProcDoc,
   useDeleteProcDoc,
   useRejectProcDoc,
+  useRescheduleProcDoc,
   useSubmitProcDoc,
 } from "@/hooks/use-pengadaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
-import type { ProcDocApi, ProcDocStatus } from "@/lib/pengadaan-types";
+import { canDecideProcDoc, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
 
 const fmtDate = (iso: string | null | undefined) => (iso ? formatDate(iso) : "—");
 
@@ -53,6 +64,15 @@ const statusTone = (s: ProcDocStatus): Tone =>
         : s === "Dibatalkan"
           ? "danger"
           : "neutral";
+
+const approvalTone = (s: string): Tone =>
+  s === "Disetujui"
+    ? "success"
+    : s === "Ditolak"
+      ? "danger"
+      : s === "Menunggu"
+        ? "warning"
+        : "neutral";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -134,7 +154,7 @@ export function PurchaseRequestSheet({
   doc: ProcDocApi | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
   const submit = useSubmitProcDoc();
@@ -142,19 +162,24 @@ export function PurchaseRequestSheet({
   const reject = useRejectProcDoc();
   const cancel = useCancelProcDoc();
   const remove = useDeleteProcDoc();
+  const reschedule = useRescheduleProcDoc();
 
   const [confirmAction, setConfirmAction] = useState<
     "submit" | "approve" | "cancel" | "delete" | null
   >(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleNote, setRescheduleNote] = useState("");
 
   const busy =
     submit.isPending ||
     approve.isPending ||
     reject.isPending ||
     cancel.isPending ||
-    remove.isPending;
+    remove.isPending ||
+    reschedule.isPending;
 
   const runAction = (action: "submit" | "approve" | "cancel" | "delete") => {
     if (!doc) return;
@@ -208,6 +233,15 @@ export function PurchaseRequestSheet({
 
   const isDraft = doc.status === "Draft";
   const isPending = doc.status === "Menunggu Approval";
+  const isApproved = doc.status === "Disetujui";
+  const canReschedule = isDraft || isPending || isApproved;
+
+  const openReschedule = () => {
+    setRescheduleDate(doc.need_date?.slice(0, 10) ?? "");
+    setRescheduleNote("");
+    setRescheduleOpen(true);
+  };
+  const canDecide = canDecideProcDoc(doc, user, canManage);
 
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>
@@ -226,6 +260,20 @@ export function PurchaseRequestSheet({
         </SheetHeader>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          {doc.is_late && (
+            <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div>
+                <p className="text-sm font-semibold text-destructive">
+                  Kebutuhan sudah lewat {doc.late_days ?? 0} hari
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Perbarui tanggal kebutuhan atau batalkan dokumen yang tidak lagi diperlukan.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Field label="Departemen" value={doc.department ?? "—"} />
             <Field label="Supplier" value={doc.supplier ?? "—"} />
@@ -235,6 +283,7 @@ export function PurchaseRequestSheet({
             <Field label="Referensi" value={doc.reference ?? "—"} />
             <Field label="Diajukan" value={fmtDate(doc.submitted_at)} />
             <Field label="Dibuat oleh" value={doc.created_by ?? "—"} />
+            {isPending && <Field label="Approver" value={doc.approver ?? "Belum ditugaskan"} />}
             {doc.approved_by && <Field label="Disetujui oleh" value={doc.approved_by ?? "—"} />}
             {doc.approved_at && <Field label="Tanggal Approval" value={fmtDate(doc.approved_at)} />}
           </div>
@@ -304,6 +353,34 @@ export function PurchaseRequestSheet({
             </div>
           </div>
 
+          {(doc.approvals?.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-border">
+              <div className="border-b border-border px-4 py-2.5">
+                <p className="text-sm font-semibold">Riwayat Approval</p>
+              </div>
+              <ol className="divide-y divide-border/70">
+                {doc.approvals!.map((a) => (
+                  <li key={a.id} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        Level {a.level} · {a.approver ?? "Belum ditugaskan"}
+                      </p>
+                      {a.decision_note && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">{a.decision_note}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <Pill tone={approvalTone(a.status)}>{a.status}</Pill>
+                      <span className="text-[11px] text-muted-foreground">
+                        {fmtDate(a.decided_at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
           {doc.note && (
             <div className="rounded-xl border border-border px-4 py-3">
               <p className="text-xs font-semibold text-muted-foreground">Catatan</p>
@@ -338,7 +415,7 @@ export function PurchaseRequestSheet({
               <Send className="h-4 w-4" /> Kirim
             </Button>
           )}
-          {(isDraft || isPending) && canWrite && (
+          {(isDraft || isPending || isApproved) && canWrite && (
             <Button
               variant="outline"
               className="rounded-xl"
@@ -348,7 +425,17 @@ export function PurchaseRequestSheet({
               <XCircle className="h-4 w-4" /> Batalkan
             </Button>
           )}
-          {isPending && canWrite && (
+          {doc.is_late && canReschedule && canWrite && (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={openReschedule}
+              disabled={busy}
+            >
+              <CalendarClock className="h-4 w-4" /> Perpanjang
+            </Button>
+          )}
+          {canDecide && (
             <Button
               variant="outline"
               className="rounded-xl"
@@ -358,7 +445,7 @@ export function PurchaseRequestSheet({
               <CheckCircle2 className="h-4 w-4" /> Setujui
             </Button>
           )}
-          {isPending && canWrite && (
+          {canDecide && (
             <Button
               variant="destructive"
               className="rounded-xl"
@@ -443,6 +530,72 @@ export function PurchaseRequestSheet({
               }}
             >
               Tolak PR
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rescheduleOpen} onOpenChange={(o) => !o && setRescheduleOpen(false)}>
+        <DialogContent className="rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Perpanjang Tanggal Kebutuhan</DialogTitle>
+            <DialogDescription>
+              Dokumen ini sudah melewati tanggal kebutuhan. Pilih tanggal baru (hari ini atau
+              setelahnya) untuk melanjutkan proses.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Tanggal Kebutuhan Baru
+              </label>
+              <Input
+                type="date"
+                value={rescheduleDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Catatan (opsional)
+              </label>
+              <Textarea
+                value={rescheduleNote}
+                onChange={(e) => setRescheduleNote(e.target.value)}
+                placeholder="Contoh: pengiriman ditunda pemasok..."
+                rows={3}
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setRescheduleOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl"
+              disabled={!rescheduleDate || busy}
+              onClick={async () => {
+                if (!doc || !rescheduleDate) return;
+                setRescheduleOpen(false);
+                try {
+                  const res = await reschedule.mutateAsync({
+                    id: doc.id,
+                    payload: { need_date: rescheduleDate, note: rescheduleNote.trim() || null },
+                  });
+                  toast.success(`Tanggal kebutuhan ${res.data.no} diperpanjang`);
+                } catch (err) {
+                  toast.error((err as Error).message);
+                }
+              }}
+            >
+              Simpan Perpanjangan
             </Button>
           </DialogFooter>
         </DialogContent>

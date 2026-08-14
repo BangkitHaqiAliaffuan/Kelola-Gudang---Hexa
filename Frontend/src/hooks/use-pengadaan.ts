@@ -86,3 +86,17 @@ export function useCancelProcDoc() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pengadaan"] }),
   });
 }
+
+export function useRescheduleProcDoc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: { need_date: string; note?: string | null };
+    }) => api.post<{ data: ProcDocApi }>(`/pengadaan/proc-docs/${id}/reschedule`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pengadaan"] }),
+  });
+}
