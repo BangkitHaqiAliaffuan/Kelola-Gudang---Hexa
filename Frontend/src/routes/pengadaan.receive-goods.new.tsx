@@ -49,6 +49,7 @@ function ReceiveGoodsNew() {
       description="Catat penerimaan barang dari supplier berdasarkan PO"
       referenceLabel="No. PO"
       requireReference
+      referenceCombobox
     />
   );
 }

@@ -4,8 +4,8 @@ import type { ProcDocApi, ProcDocPayload } from "@/lib/purchase-order-types";
 
 const DOCS_PER_PAGE = 10000;
 
-export function useProcDocsPo(kind: "PO", params: { status?: string } = {}) {
-  const { status } = params;
+export function useProcDocsPo(kind: "PO", params: { status?: string; enabled?: boolean } = {}) {
+  const { status, enabled = true } = params;
   return useQuery({
     queryKey: ["pengadaan", "proc-docs", "list", kind, status ?? null],
     queryFn: () => {
@@ -13,7 +13,7 @@ export function useProcDocsPo(kind: "PO", params: { status?: string } = {}) {
       if (status) sp.set("status", status);
       return api.get<Paginated<ProcDocApi>>(`/pengadaan/proc-docs?${sp.toString()}`);
     },
-    enabled: typeof window !== "undefined",
+    enabled: enabled && typeof window !== "undefined",
   });
 }
 

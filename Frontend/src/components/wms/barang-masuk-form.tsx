@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
+import { PurchaseOrderSheet } from "./purchase-order-sheet";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -21,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useBins, useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useCreateStockDocument } from "@/hooks/use-persediaan";
+import { useProcDocPo, useProcDocsPo } from "@/hooks/use-purchase-order";
 import { isApiError } from "@/lib/api";
 import { formatIDR } from "@/lib/wms-data";
 import type { StockDocumentPayload } from "@/lib/persediaan-types";
@@ -47,6 +49,7 @@ type BarangMasukFormProps = {
   description?: string;
   referenceLabel?: string;
   requireReference?: boolean;
+  referenceCombobox?: boolean;
 };
 
 export function BarangMasukForm({
@@ -55,6 +58,7 @@ export function BarangMasukForm({
   description = "Catat penerimaan barang dari supplier",
   referenceLabel = "Referensi (PO / SJ)",
   requireReference = false,
+  referenceCombobox = false,
 }: BarangMasukFormProps = {}) {
   const navigate = useNavigate();
   const { user, hasModuleLevel } = useAuth();
@@ -65,6 +69,10 @@ export function BarangMasukForm({
   const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
   const { data: items, isLoading: itemsLoading } = useItems();
   const { data: bins, isLoading: binsLoading } = useBins();
+  const { data: approvedPoes, isLoading: approvedPoesLoading } = useProcDocsPo("PO", {
+    status: "Disetujui",
+    enabled: referenceCombobox,
+  });
 
   const [warehouseId, setWarehouseId] = useState("");
   const [supplier, setSupplier] = useState("");
@@ -75,6 +83,12 @@ export function BarangMasukForm({
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
+  const [selectedPoId, setSelectedPoId] = useState("");
+  const [poSheetOpen, setPoSheetOpen] = useState(false);
+  const prefilledPoRef = useRef<number | null>(null);
+
+  const poIdNum = selectedPoId ? Number(selectedPoId) : undefined;
+  const { data: poDetail } = useProcDocPo(poIdNum);
 
   const binsInWarehouse = useMemo(
     () =>
@@ -93,6 +107,37 @@ export function BarangMasukForm({
     () => (suppliers?.data ?? []).map((s) => ({ value: s.name, label: s.name })),
     [suppliers],
   );
+
+  const poOptions: ComboboxOption[] = useMemo(
+    () =>
+      (approvedPoes?.data ?? []).map((p) => ({
+        value: String(p.id),
+        label: p.no,
+        keywords: `${p.no} ${p.supplier ?? ""} ${p.warehouse ?? ""}`,
+      })),
+    [approvedPoes],
+  );
+
+  // Prefill supplier/gudang/No. PO + baris barang saat PO dipilih.
+  useEffect(() => {
+    const po = poDetail?.data;
+    if (!referenceCombobox || po == null || poIdNum == null || prefilledPoRef.current === poIdNum) {
+      return;
+    }
+    prefilledPoRef.current = poIdNum;
+    setSupplier(po.supplier ?? "");
+    setWarehouseId(po.warehouse_id != null ? String(po.warehouse_id) : "");
+    setReference(po.no);
+    setLines(
+      (po.lines ?? []).map((l) => ({
+        key: `P${(lineSeq += 1)}`,
+        itemId: String(l.item_id),
+        binId: "",
+        qty: String(l.qty),
+        cost: String(l.price),
+      })),
+    );
+  }, [referenceCombobox, poIdNum, poDetail?.data]);
 
   const itemOptions: ComboboxOption[] = useMemo(
     () =>
@@ -260,13 +305,48 @@ export function BarangMasukForm({
           </div>
           <div className="space-y-1.5">
             <Label>{referenceLabel}</Label>
-            <Input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder="Contoh: PO-2026-001"
-              className="rounded-xl"
-            />
-            {requireReference && !reference.trim() && (
+            {referenceCombobox ? (
+              <>
+                <FormCombobox
+                  value={selectedPoId}
+                  onValueChange={(v) => {
+                    setSelectedPoId(v);
+                    if (!v) setReference("");
+                  }}
+                  options={poOptions}
+                  placeholder="Pilih Purchase Order..."
+                  searchPlaceholder="Cari no. PO / supplier..."
+                  allowEmpty
+                  side="bottom"
+                  avoidCollisions={false}
+                  loading={approvedPoesLoading}
+                />
+                <div className="flex items-center gap-2">
+                  {selectedPoId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => setPoSheetOpen(true)}
+                      disabled={!poDetail?.data}
+                    >
+                      <Eye className="h-4 w-4" /> Lihat Detail PO
+                    </Button>
+                  )}
+                  {requireReference && !reference.trim() && (
+                    <p className="text-xs text-destructive">No. PO wajib diisi.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="Contoh: PO-2026-001"
+                className="rounded-xl"
+              />
+            )}
+            {!referenceCombobox && requireReference && !reference.trim() && (
               <p className="text-xs text-destructive">No. PO wajib diisi.</p>
             )}
           </div>
@@ -501,6 +581,13 @@ export function BarangMasukForm({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {referenceCombobox && (
+        <PurchaseOrderSheet
+          doc={poSheetOpen ? (poDetail?.data ?? null) : null}
+          onOpenChange={(o) => !o && setPoSheetOpen(false)}
+        />
+      )}
     </>
   );
 }
