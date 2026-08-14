@@ -330,7 +330,7 @@ export function SubCategoryFormDialog({
 }) {
   const create = useCreateSubCategory();
   const update = useUpdateSubCategory();
-  const { data: cats } = useCategories();
+  const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: subCats } = useSubCategories();
   const previewCode = nextCode(
     (subCats?.data ?? []).map((s) => s.code),
@@ -398,16 +398,27 @@ export function SubCategoryFormDialog({
                     onValueChange={(v) => field.onChange(Number(v))}
                   >
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
+                      <SelectTrigger
+                        className="rounded-xl"
+                        icon={
+                          catsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
+                        }
+                      >
                         <SelectValue placeholder="Pilih kategori" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72 rounded-xl">
-                      {cats?.data.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name}
+                      {catsLoading ? (
+                        <SelectItem value="__loading" disabled>
+                          Memuat...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        cats?.data.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -880,7 +891,7 @@ export function RackFormDialog({
 }) {
   const create = useCreateRack();
   const update = useUpdateRack();
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
 
   return (
     <CrudFormDialog<RackInput>
@@ -952,16 +963,29 @@ export function RackFormDialog({
                       onValueChange={(v) => field.onChange(Number(v))}
                     >
                       <FormControl>
-                        <SelectTrigger className="rounded-xl">
+                        <SelectTrigger
+                          className="rounded-xl"
+                          icon={
+                            warehousesLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : undefined
+                          }
+                        >
                           <SelectValue placeholder="Pilih gudang" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="max-h-72 rounded-xl">
-                        {warehouses?.data.map((w) => (
-                          <SelectItem key={w.id} value={String(w.id)}>
-                            {w.name}
+                        {warehousesLoading ? (
+                          <SelectItem value="__loading" disabled>
+                            Memuat...
                           </SelectItem>
-                        ))}
+                        ) : (
+                          warehouses?.data.map((w) => (
+                            <SelectItem key={w.id} value={String(w.id)}>
+                              {w.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1059,7 +1083,7 @@ export function BinFormDialog({
 }) {
   const create = useCreateBin();
   const update = useUpdateBin();
-  const { data: racks } = useRacks();
+  const { data: racks, isLoading: racksLoading } = useRacks();
 
   return (
     <CrudFormDialog<BinInput>
@@ -1136,6 +1160,7 @@ export function BinFormDialog({
                           onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                           options={rackOptions}
                           placeholder="Pilih rak"
+                          loading={racksLoading}
                         />
                       </FormControl>
                       <FormMessage />
@@ -2417,14 +2442,14 @@ export function ItemFormDialog({
 }) {
   const create = useCreateItem();
   const update = useUpdateItem();
-  const { data: cats } = useCategories();
-  const { data: subCats } = useSubCategories();
-  const { data: merks } = useMerks();
-  const { data: units } = useUnits();
-  const { data: warehouses } = useWarehouses();
-  const { data: rackRows } = useRacks();
-  const { data: binRows } = useBins();
-  const { data: suppliers } = useSuppliers();
+  const { data: cats, isLoading: catsLoading } = useCategories();
+  const { data: subCats, isLoading: subCatsLoading } = useSubCategories();
+  const { data: merks, isLoading: merksLoading } = useMerks();
+  const { data: units, isLoading: unitsLoading } = useUnits();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: rackRows, isLoading: rackRowsLoading } = useRacks();
+  const { data: binRows, isLoading: binRowsLoading } = useBins();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
   const { data: items } = useItems();
   const previewInternal = nextCode(
     (items?.data ?? []).map((i) => i.internal_barcode).filter((c): c is string => c != null),
@@ -2637,6 +2662,7 @@ export function ItemFormDialog({
                             onValueChange={(v) => field.onChange(Number(v))}
                             options={catOptions}
                             placeholder="Pilih kategori"
+                            loading={catsLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2666,6 +2692,7 @@ export function ItemFormDialog({
                             options={subOptions}
                             placeholder="Pilih sub kategori"
                             allowEmpty
+                            loading={subCatsLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2694,6 +2721,7 @@ export function ItemFormDialog({
                             options={merkOptions}
                             placeholder="Pilih merk"
                             allowEmpty
+                            loading={merksLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2723,6 +2751,7 @@ export function ItemFormDialog({
                             options={supplierOptions}
                             placeholder="Pilih supplier"
                             allowEmpty
+                            loading={suppliersLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2745,17 +2774,30 @@ export function ItemFormDialog({
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                       >
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
+                          <SelectTrigger
+                            className="rounded-xl"
+                            icon={
+                              unitsLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : undefined
+                            }
+                          >
                             <SelectValue placeholder="Pilih satuan" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-72 rounded-xl">
                           <SelectItem value="">Tidak ada</SelectItem>
-                          {units?.data.map((u) => (
-                            <SelectItem key={u.id} value={String(u.id)}>
-                              {u.name}
+                          {unitsLoading ? (
+                            <SelectItem value="__loading" disabled>
+                              Memuat...
                             </SelectItem>
-                          ))}
+                          ) : (
+                            units?.data.map((u) => (
+                              <SelectItem key={u.id} value={String(u.id)}>
+                                {u.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -2780,17 +2822,30 @@ export function ItemFormDialog({
                         }}
                       >
                         <FormControl>
-                          <SelectTrigger className="rounded-xl">
+                          <SelectTrigger
+                            className="rounded-xl"
+                            icon={
+                              warehousesLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : undefined
+                            }
+                          >
                             <SelectValue placeholder="Pilih gudang" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-72 rounded-xl">
                           <SelectItem value="">Tidak ada</SelectItem>
-                          {warehouses?.data.map((w) => (
-                            <SelectItem key={w.id} value={String(w.id)}>
-                              {w.name}
+                          {warehousesLoading ? (
+                            <SelectItem value="__loading" disabled>
+                              Memuat...
                             </SelectItem>
-                          ))}
+                          ) : (
+                            warehouses?.data.map((w) => (
+                              <SelectItem key={w.id} value={String(w.id)}>
+                                {w.name}
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -2824,6 +2879,7 @@ export function ItemFormDialog({
                             options={rackOptions}
                             placeholder="Pilih rak"
                             allowEmpty
+                            loading={rackRowsLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2853,6 +2909,7 @@ export function ItemFormDialog({
                             options={binOptions}
                             placeholder="Pilih bin"
                             allowEmpty
+                            loading={binRowsLoading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -3035,7 +3092,7 @@ export function DepartmentFormDialog({
   const create = useCreateDepartment();
   const update = useUpdateDepartment();
   const { data: departments } = useDepartments();
-  const { data: users } = useUsers();
+  const { data: users, isLoading: usersLoading } = useUsers();
   const previewCode = nextCode(
     (departments?.data ?? []).map((d) => d.code),
     "DEP",
@@ -3135,16 +3192,27 @@ export function DepartmentFormDialog({
                     onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                   >
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
+                      <SelectTrigger
+                        className="rounded-xl"
+                        icon={
+                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
+                        }
+                      >
                         <SelectValue placeholder="Pilih kepala" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72 rounded-xl">
-                      {users?.data.map((u) => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          {u.name}
+                      {usersLoading ? (
+                        <SelectItem value="__loading" disabled>
+                          Memuat...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        users?.data.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -3186,7 +3254,7 @@ export function ProjectFormDialog({
   const create = useCreateProject();
   const update = useUpdateProject();
   const { data: projects } = useProjects();
-  const { data: users } = useUsers();
+  const { data: users, isLoading: usersLoading } = useUsers();
   const previewCode = nextCode(
     (projects?.data ?? []).map((p) => p.code),
     "PRJ",
@@ -3302,16 +3370,27 @@ export function ProjectFormDialog({
                     onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                   >
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
+                      <SelectTrigger
+                        className="rounded-xl"
+                        icon={
+                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
+                        }
+                      >
                         <SelectValue placeholder="Pilih PIC" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72 rounded-xl">
-                      {users?.data.map((u) => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          {u.name}
+                      {usersLoading ? (
+                        <SelectItem value="__loading" disabled>
+                          Memuat...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        users?.data.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -3426,10 +3505,10 @@ export function WorkOrderFormDialog({
   const create = useCreateWorkOrder();
   const update = useUpdateWorkOrder();
   const { data: workOrders } = useWorkOrders();
-  const { data: projects } = useProjects();
-  const { data: items } = useItems();
-  const { data: units } = useUnits();
-  const { data: users } = useUsers();
+  const { data: projects, isLoading: projectsLoading } = useProjects();
+  const { data: items, isLoading: itemsLoading } = useItems();
+  const { data: units, isLoading: unitsLoading } = useUnits();
+  const { data: users, isLoading: usersLoading } = useUsers();
   const previewNo = nextYearlyCode(
     (workOrders?.data ?? []).map((w) => w.no),
     "WO",
@@ -3543,6 +3622,7 @@ export function WorkOrderFormDialog({
                         onValueChange={(v) => field.onChange(Number(v))}
                         options={projectOptions}
                         placeholder="Pilih proyek"
+                        loading={projectsLoading}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3568,6 +3648,7 @@ export function WorkOrderFormDialog({
                         onValueChange={(v) => field.onChange(Number(v))}
                         options={itemOptions}
                         placeholder="Pilih barang"
+                        loading={itemsLoading}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3589,16 +3670,27 @@ export function WorkOrderFormDialog({
                       onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                     >
                       <FormControl>
-                        <SelectTrigger className="rounded-xl">
+                        <SelectTrigger
+                          className="rounded-xl"
+                          icon={
+                            unitsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
+                          }
+                        >
                           <SelectValue placeholder="Pilih satuan" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="max-h-72 rounded-xl">
-                        {units?.data.map((u) => (
-                          <SelectItem key={u.id} value={String(u.id)}>
-                            {u.name}
+                        {unitsLoading ? (
+                          <SelectItem value="__loading" disabled>
+                            Memuat...
                           </SelectItem>
-                        ))}
+                        ) : (
+                          units?.data.map((u) => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -3682,16 +3774,27 @@ export function WorkOrderFormDialog({
                     onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                   >
                     <FormControl>
-                      <SelectTrigger className="rounded-xl">
+                      <SelectTrigger
+                        className="rounded-xl"
+                        icon={
+                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
+                        }
+                      >
                         <SelectValue placeholder="Pilih PIC" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72 rounded-xl">
-                      {users?.data.map((u) => (
-                        <SelectItem key={u.id} value={String(u.id)}>
-                          {u.name}
+                      {usersLoading ? (
+                        <SelectItem value="__loading" disabled>
+                          Memuat...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        users?.data.map((u) => (
+                          <SelectItem key={u.id} value={String(u.id)}>
+                            {u.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -3975,7 +4078,7 @@ export function RoleEditDialog({
       const level = draft[module];
       return level ? [{ module, level }] : [];
     });
-    if (canApprove) access.push({ module: "Approval Pengadaan", level: "Baca" });
+    if (canApprove) access.push({ module: "Approval Pengadaan", level: "Kelola" });
 
     try {
       await update.mutateAsync({ role: role.name, access });

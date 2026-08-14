@@ -301,8 +301,8 @@ export function PurchaseOrderSheet({
             <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-card px-5 py-3">
               {canDecide(doc) && (
                 <Button
-                  variant="outline"
-                  className="rounded-xl text-success"
+                  variant="default"
+                  className="rounded-xl"
                   onClick={() => setAction("approve")}
                   disabled={busy}
                 >

@@ -259,6 +259,7 @@ function KartuStock() {
           }))}
           placeholder="Pilih barang…"
           searchPlaceholder="Cari nama atau SKU…"
+          loading={itemsLoading}
           className="max-w-md"
         />
       </Panel>
@@ -378,6 +379,7 @@ function KartuStock() {
             onChange={setJenis}
             placeholder="Semua Jenis"
             options={jenisOptions}
+            loading={card.isLoading}
           />
           <FilterSelect
             className="w-full"
@@ -385,6 +387,7 @@ function KartuStock() {
             onChange={setPic}
             placeholder="Semua PIC"
             options={picOptions}
+            loading={card.isLoading}
           />
           <Input
             type="date"

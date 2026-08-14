@@ -27,7 +27,7 @@ export function BarangMasukPage() {
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
@@ -164,6 +164,7 @@ export function BarangMasukPage() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -171,6 +172,7 @@ export function BarangMasukPage() {
             onChange={setPartner}
             placeholder="Semua Supplier"
             options={suppliers}
+            loading={isLoading}
           />
           <FilterSelect
             className="w-full"

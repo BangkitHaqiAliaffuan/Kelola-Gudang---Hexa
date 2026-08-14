@@ -43,7 +43,7 @@ function ReturListPage({
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type });
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
@@ -180,6 +180,7 @@ function ReturListPage({
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -187,6 +188,7 @@ function ReturListPage({
             onChange={setPartner}
             placeholder={`Semua ${partnerLabel}`}
             options={partners}
+            loading={isLoading}
           />
           <FilterSelect
             className="w-full"

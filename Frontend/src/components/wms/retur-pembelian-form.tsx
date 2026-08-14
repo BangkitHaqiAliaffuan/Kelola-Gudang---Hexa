@@ -53,8 +53,8 @@ export function ReturPembelianForm() {
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const create = useCreateStockDocument();
 
-  const { data: warehouses } = useWarehouses();
-  const { data: suppliers } = useSuppliers();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
   const { data: items } = useItems();
   const { data: bins } = useBins();
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
@@ -423,6 +423,7 @@ export function ReturPembelianForm() {
               searchPlaceholder="Cari gudang..."
               side="bottom"
               avoidCollisions={false}
+              loading={warehousesLoading}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -458,6 +459,7 @@ export function ReturPembelianForm() {
               allowEmpty
               side="bottom"
               avoidCollisions={false}
+              loading={suppliersLoading}
             />
           </div>
           <div className="space-y-1.5">

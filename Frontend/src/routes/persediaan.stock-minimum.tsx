@@ -85,8 +85,8 @@ function StockMinimum() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
-  const { data: warehouses } = useWarehouses();
-  const { data: cats } = useCategories();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: cats, isLoading: catsLoading } = useCategories();
 
   const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
@@ -344,6 +344,7 @@ function StockMinimum() {
               onChange={setWh}
               placeholder="Semua Gudang"
               options={warehouseNames}
+              loading={warehousesLoading}
             />
             <FilterSelect
               className="w-full"
@@ -351,6 +352,7 @@ function StockMinimum() {
               onChange={setCat}
               placeholder="Semua Kategori"
               options={categoryNames}
+              loading={catsLoading}
             />
             <FilterSelect
               className="w-full"

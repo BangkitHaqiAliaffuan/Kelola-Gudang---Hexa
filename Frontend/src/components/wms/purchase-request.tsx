@@ -192,8 +192,8 @@ export function PurchaseRequestPage() {
     [user, canApprove, canManage],
   );
   const { data, isLoading } = useProcDocs();
-  const { data: departments } = useDepartments();
-  const { data: warehouses } = useWarehouses();
+  const { data: departments, isLoading: departmentsLoading } = useDepartments();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
@@ -386,6 +386,7 @@ export function PurchaseRequestPage() {
               onChange={setDept}
               placeholder="Semua Departemen"
               options={departments?.data.map((d) => d.name) ?? []}
+              loading={departmentsLoading}
             />
             <FilterSelect
               className="w-full"
@@ -393,6 +394,7 @@ export function PurchaseRequestPage() {
               onChange={setWh}
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
             />
           </div>
           <div className="mt-3 flex justify-end">

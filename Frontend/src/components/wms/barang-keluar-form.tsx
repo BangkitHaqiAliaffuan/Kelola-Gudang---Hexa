@@ -53,12 +53,12 @@ export function BarangKeluarForm() {
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const create = useCreateStockDocument();
 
-  const { data: warehouses } = useWarehouses();
-  const { data: customers } = useCustomers();
-  const { data: departments } = useDepartments();
-  const { data: projects } = useProjects();
-  const { data: items } = useItems();
-  const { data: bins } = useBins();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: customers, isLoading: customersLoading } = useCustomers();
+  const { data: departments, isLoading: departmentsLoading } = useDepartments();
+  const { data: projects, isLoading: projectsLoading } = useProjects();
+  const { data: items, isLoading: itemsLoading } = useItems();
+  const { data: bins, isLoading: binsLoading } = useBins();
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
@@ -326,6 +326,7 @@ export function BarangKeluarForm() {
               searchPlaceholder="Cari gudang..."
               side="bottom"
               avoidCollisions={false}
+              loading={warehousesLoading}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -342,6 +343,7 @@ export function BarangKeluarForm() {
               allowEmpty
               side="bottom"
               avoidCollisions={false}
+              loading={customersLoading || departmentsLoading || projectsLoading}
             />
           </div>
           <div className="space-y-1.5">
@@ -409,6 +411,7 @@ export function BarangKeluarForm() {
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
+                        loading={itemsLoading || stockLoading}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -423,7 +426,7 @@ export function BarangKeluarForm() {
                         searchPlaceholder="Cari bin / rak..."
                         side="top"
                         avoidCollisions={false}
-                        loading={stockLoading}
+                        loading={binsLoading || stockLoading}
                       />
                       {l.itemId && !hasStockInWarehouse(l) && (
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -489,6 +492,7 @@ export function BarangKeluarForm() {
                     placeholder="Pilih barang / scan barcode"
                     side="top"
                     avoidCollisions={false}
+                    loading={itemsLoading || stockLoading}
                   />
                   <FormCombobox
                     value={l.binId}
@@ -497,7 +501,7 @@ export function BarangKeluarForm() {
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
-                    loading={stockLoading}
+                    loading={binsLoading || stockLoading}
                   />
                   {l.itemId && !hasStockInWarehouse(l) && (
                     <p className="text-xs text-muted-foreground">

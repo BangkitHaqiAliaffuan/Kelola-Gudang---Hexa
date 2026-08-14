@@ -80,9 +80,9 @@ function MasterBarang() {
   const canWrite = hasModuleLevel("Master Data", "Tulis");
   const canDelete = hasModuleLevel("Master Data", "Kelola");
   const { data, isLoading } = useItems();
-  const { data: cats } = useCategories();
-  const { data: subs } = useSubCategories();
-  const { data: merks } = useMerks();
+  const { data: cats, isLoading: catsLoading } = useCategories();
+  const { data: subs, isLoading: subsLoading } = useSubCategories();
+  const { data: merks, isLoading: merksLoading } = useMerks();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [cat, setCat] = useState(ALL);
@@ -346,6 +346,7 @@ function MasterBarang() {
             }}
             placeholder="Semua Kategori"
             options={categoryNames}
+            loading={catsLoading}
           />
           <FilterSelect
             className="w-full"
@@ -353,6 +354,7 @@ function MasterBarang() {
             onChange={setSubCat}
             placeholder="Semua Sub Kategori"
             options={subCategoryNames}
+            loading={subsLoading}
           />
           <FilterSelect
             className="w-full"
@@ -360,6 +362,7 @@ function MasterBarang() {
             onChange={setBrand}
             placeholder="Semua Merk"
             options={merkNames}
+            loading={merksLoading}
           />
           <FilterSelect
             className="w-full"

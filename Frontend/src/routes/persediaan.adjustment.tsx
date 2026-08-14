@@ -41,7 +41,7 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 
 function StockAdjustment() {
   const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
@@ -152,6 +152,7 @@ function StockAdjustment() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted-foreground">

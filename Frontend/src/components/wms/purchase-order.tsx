@@ -30,8 +30,8 @@ export function PurchaseOrderPage() {
   const { hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const { data, isLoading } = useProcDocsPo("PO");
-  const { data: warehouses } = useWarehouses();
-  const { data: suppliers } = useSuppliers();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -225,6 +225,7 @@ export function PurchaseOrderPage() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -232,6 +233,7 @@ export function PurchaseOrderPage() {
             onChange={setSupplier}
             placeholder="Semua Supplier"
             options={suppliers?.data.map((s) => s.name) ?? []}
+            loading={suppliersLoading}
           />
           <FilterSelect
             className="w-full"

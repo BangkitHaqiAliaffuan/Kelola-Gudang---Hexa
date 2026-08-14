@@ -1,4 +1,4 @@
-import { Warehouse, Inbox, type LucideIcon } from "lucide-react";
+import { Loader2, Warehouse, Inbox, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,28 +18,41 @@ export function FilterSelect({
   placeholder,
   options,
   className,
+  loading = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   options: Array<string | { value: string; label: string }>;
   className?: string;
+  loading?: boolean;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className={cn("w-48 shrink-0 rounded-xl", className)}>
+      <SelectTrigger
+        className={cn("w-48 shrink-0 rounded-xl", className)}
+        icon={loading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="max-h-72 rounded-xl">
-        <SelectItem value={ALL}>{placeholder}</SelectItem>
-        {options.map((o) => {
-          const entry = typeof o === "string" ? { value: o, label: o } : o;
-          return (
-            <SelectItem key={entry.value} value={entry.value}>
-              {entry.label}
-            </SelectItem>
-          );
-        })}
+        {loading ? (
+          <SelectItem disabled value="__loading__">
+            Memuat...
+          </SelectItem>
+        ) : (
+          <>
+            <SelectItem value={ALL}>{placeholder}</SelectItem>
+            {options.map((o) => {
+              const entry = typeof o === "string" ? { value: o, label: o } : o;
+              return (
+                <SelectItem key={entry.value} value={entry.value}>
+                  {entry.label}
+                </SelectItem>
+              );
+            })}
+          </>
+        )}
       </SelectContent>
     </Select>
   );
@@ -148,9 +161,7 @@ export function PageHeader({
         <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
           {title}
         </h1>
-        {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-        )}
+        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -177,12 +188,8 @@ export function Panel({
       {(title || actions) && (
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3.5 sm:px-5">
           <div className="min-w-0">
-            {title && (
-              <h2 className="truncate text-sm font-semibold text-foreground">{title}</h2>
-            )}
-            {description && (
-              <p className="truncate text-xs text-muted-foreground">{description}</p>
-            )}
+            {title && <h2 className="truncate text-sm font-semibold text-foreground">{title}</h2>}
+            {description && <p className="truncate text-xs text-muted-foreground">{description}</p>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
@@ -217,7 +224,11 @@ export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: nu
   return (
     <div className="space-y-2.5">
       {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}>
+        <div
+          key={r}
+          className="grid gap-3"
+          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))` }}
+        >
           {Array.from({ length: cols }).map((_, c) => (
             <Skeleton key={c} className="h-8 rounded-lg" />
           ))}

@@ -47,9 +47,9 @@ export function TransferGudangForm() {
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const create = useCreateStockDocument();
 
-  const { data: warehouses } = useWarehouses();
-  const { data: items } = useItems();
-  const { data: bins } = useBins();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: items, isLoading: itemsLoading } = useItems();
+  const { data: bins, isLoading: binsLoading } = useBins();
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
@@ -312,6 +312,7 @@ export function TransferGudangForm() {
               searchPlaceholder="Cari gudang..."
               side="bottom"
               avoidCollisions={false}
+              loading={warehousesLoading}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -327,6 +328,7 @@ export function TransferGudangForm() {
               searchPlaceholder="Cari gudang..."
               side="bottom"
               avoidCollisions={false}
+              loading={warehousesLoading}
             />
             {docError("destination_warehouse_id") && (
               <p className="text-xs text-destructive">{docError("destination_warehouse_id")}</p>
@@ -397,6 +399,7 @@ export function TransferGudangForm() {
                         searchPlaceholder="Cari bin / rak..."
                         side="top"
                         avoidCollisions={false}
+                        loading={binsLoading}
                       />
                       {lineError(i, "from_bin_id") && (
                         <p className="mt-1 text-xs text-destructive">
@@ -413,7 +416,7 @@ export function TransferGudangForm() {
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
-                        loading={Boolean(l.fromBinId) && stockLoading}
+                        loading={itemsLoading || (Boolean(l.fromBinId) && stockLoading)}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -448,6 +451,7 @@ export function TransferGudangForm() {
                         searchPlaceholder="Cari bin / rak..."
                         side="top"
                         avoidCollisions={false}
+                        loading={binsLoading}
                       />
                       {lineError(i, "to_bin_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "to_bin_id")}</p>
@@ -486,6 +490,7 @@ export function TransferGudangForm() {
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
+                    loading={binsLoading}
                   />
                   <FormCombobox
                     value={l.itemId}
@@ -494,7 +499,7 @@ export function TransferGudangForm() {
                     placeholder="Pilih barang"
                     side="top"
                     avoidCollisions={false}
-                    loading={Boolean(l.fromBinId) && stockLoading}
+                    loading={itemsLoading || (Boolean(l.fromBinId) && stockLoading)}
                   />
                   <FormCombobox
                     value={l.toBinId}
@@ -503,6 +508,7 @@ export function TransferGudangForm() {
                     placeholder={destinationId ? "Pilih Bin Tujuan" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
+                    loading={binsLoading}
                   />
                   <div className="flex items-center gap-2">
                     <Input

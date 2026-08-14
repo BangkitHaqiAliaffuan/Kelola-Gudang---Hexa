@@ -54,7 +54,7 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 
 function MutasiStock() {
   const { data, isLoading } = useStockDocuments();
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [type, setType] = useState(ALL);
@@ -170,6 +170,7 @@ function MutasiStock() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
         </div>
       </Panel>

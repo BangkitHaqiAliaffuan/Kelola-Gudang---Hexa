@@ -61,10 +61,10 @@ export function BarangMasukForm({
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const create = useCreateStockDocument();
 
-  const { data: warehouses } = useWarehouses();
-  const { data: suppliers } = useSuppliers();
-  const { data: items } = useItems();
-  const { data: bins } = useBins();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
+  const { data: items, isLoading: itemsLoading } = useItems();
+  const { data: bins, isLoading: binsLoading } = useBins();
 
   const [warehouseId, setWarehouseId] = useState("");
   const [supplier, setSupplier] = useState("");
@@ -240,6 +240,7 @@ export function BarangMasukForm({
               options={warehouseOptions}
               placeholder="Pilih Gudang"
               searchPlaceholder="Cari gudang..."
+              loading={warehousesLoading}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -254,6 +255,7 @@ export function BarangMasukForm({
               placeholder="Pilih Supplier"
               searchPlaceholder="Cari supplier..."
               allowEmpty
+              loading={suppliersLoading}
             />
           </div>
           <div className="space-y-1.5">
@@ -322,6 +324,7 @@ export function BarangMasukForm({
                         options={itemOptions}
                         placeholder="Pilih barang / scan barcode"
                         searchPlaceholder="Cari nama, SKU, barcode..."
+                        loading={itemsLoading}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -334,6 +337,7 @@ export function BarangMasukForm({
                         options={binOptions}
                         placeholder={warehouseId ? "Pilih Bin" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
+                        loading={binsLoading}
                       />
                       {lineError(i, "to_bin_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "to_bin_id")}</p>
@@ -399,12 +403,14 @@ export function BarangMasukForm({
                     onValueChange={(v) => pickItem(l.key, v)}
                     options={itemOptions}
                     placeholder="Pilih barang"
+                    loading={itemsLoading}
                   />
                   <FormCombobox
                     value={l.binId}
                     onValueChange={(v) => patchLine(l.key, { binId: v })}
                     options={binOptions}
                     placeholder={warehouseId ? "Pilih Bin" : "Pilih Gudang dulu"}
+                    loading={binsLoading}
                   />
                   <div className="flex items-center gap-2">
                     <Input

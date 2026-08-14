@@ -390,7 +390,7 @@ export function PurchaseRequestSheet({
           )}
           {canDecide && (
             <Button
-              variant="outline"
+              variant="default"
               className="rounded-xl"
               onClick={() => setConfirmAction("approve")}
               disabled={busy}

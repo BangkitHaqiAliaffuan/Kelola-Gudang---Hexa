@@ -699,6 +699,7 @@ export function SupplierPage() {
               onChange={setCityFilter}
               placeholder="Semua Kota"
               options={uniqueOptions(rows, (r) => r.city)}
+              loading={isLoading}
             />
             <FilterSelect
               value={termsFilter}
@@ -827,6 +828,7 @@ export function CustomerPage() {
               onChange={setCityFilter}
               placeholder="Semua Kota"
               options={uniqueOptions(rows, (r) => r.city)}
+              loading={isLoading}
             />
             <FilterSelect
               value={segmentFilter}
@@ -1326,6 +1328,7 @@ export function WorkOrderPage() {
               onChange={setProjectFilter}
               placeholder="Semua Proyek"
               options={uniqueOptions(rows, (r) => r.project)}
+              loading={isLoading}
             />
           </>
         }
@@ -1518,41 +1521,41 @@ export function RolePage() {
     <>
       <MasterCrudPage<RoleCatalog>
         title="Role"
-      description="Hak akses pengguna"
-      searchPlaceholder="Cari role..."
-      searchText={(r) => r.name}
-      columns={columns}
-      rows={filtered}
-      isLoading={isLoading}
-      onEdit={(r) => setEditingRole(r)}
-      filters={
-        <FilterSelect
-          value={levelFilter}
-          onChange={setLevelFilter}
-          placeholder="Semua Hak Akses"
-          options={["Baca", "Tulis", "Kelola"]}
-        />
-      }
-      onExport={exportCsv}
-      mobileCard={(r) => {
-        const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
-        return (
-          <div>
-            <p className="truncate text-sm font-semibold">{r.name}</p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              {formatNumber(r.user_count)} user ({formatNumber(r.active_user_count)} aktif)
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {access.slice(0, 3).map((a) => (
-                <Pill key={a.module} tone={levelTone(a.level)}>
-                  {a.module}
-                </Pill>
-              ))}
-              {access.length > 3 && <Pill tone="neutral">+{access.length - 3} modul</Pill>}
+        description="Hak akses pengguna"
+        searchPlaceholder="Cari role..."
+        searchText={(r) => r.name}
+        columns={columns}
+        rows={filtered}
+        isLoading={isLoading}
+        onEdit={(r) => setEditingRole(r)}
+        filters={
+          <FilterSelect
+            value={levelFilter}
+            onChange={setLevelFilter}
+            placeholder="Semua Hak Akses"
+            options={["Baca", "Tulis", "Kelola"]}
+          />
+        }
+        onExport={exportCsv}
+        mobileCard={(r) => {
+          const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
+          return (
+            <div>
+              <p className="truncate text-sm font-semibold">{r.name}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {formatNumber(r.user_count)} user ({formatNumber(r.active_user_count)} aktif)
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {access.slice(0, 3).map((a) => (
+                  <Pill key={a.module} tone={levelTone(a.level)}>
+                    {a.module}
+                  </Pill>
+                ))}
+                {access.length > 3 && <Pill tone="neutral">+{access.length - 3} modul</Pill>}
+              </div>
             </div>
-          </div>
-        );
-      }}
+          );
+        }}
       />
       <RoleEditDialog role={editingRole} onOpenChange={(o) => !o && setEditingRole(null)} />
     </>

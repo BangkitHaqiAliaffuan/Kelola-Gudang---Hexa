@@ -27,7 +27,7 @@ export function TransferGudangPage() {
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Transfer Gudang" });
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [fromWh, setFromWh] = useState(ALL);
@@ -156,6 +156,7 @@ export function TransferGudangPage() {
             onChange={setFromWh}
             placeholder="Semua Gudang Asal"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -163,6 +164,7 @@ export function TransferGudangPage() {
             onChange={setToWh}
             placeholder="Semua Gudang Tujuan"
             options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"

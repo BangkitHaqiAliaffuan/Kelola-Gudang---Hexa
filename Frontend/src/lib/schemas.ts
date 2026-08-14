@@ -292,7 +292,7 @@ export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
     { module: "Persediaan", level: "Tulis" },
     { module: "Stock Opname", level: "Baca" },
     { module: "Pengadaan", level: "Tulis" },
-    { module: "Approval Pengadaan", level: "Baca" },
+    { module: "Approval Pengadaan", level: "Kelola" },
     { module: "Laporan", level: "Baca" },
   ],
   "Operator Gudang": [

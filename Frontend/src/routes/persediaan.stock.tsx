@@ -36,8 +36,8 @@ const statusTone: Record<StockRowApi["status"], Tone> = {
 
 function StockSaatIni() {
   const { data, isLoading } = useStockRows();
-  const { data: warehouses } = useWarehouses();
-  const { data: cats } = useCategories();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: items } = useItems();
 
   const [q, setQ] = useState("");
@@ -206,6 +206,7 @@ function StockSaatIni() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouseNames}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -213,6 +214,7 @@ function StockSaatIni() {
             onChange={setCat}
             placeholder="Semua Kategori"
             options={categoryNames}
+            loading={catsLoading}
           />
         </div>
       </Panel>

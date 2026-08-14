@@ -64,11 +64,11 @@ export function PurchaseRequestForm({
   const update = useUpdateProcDoc();
   const submit = useSubmitProcDoc();
 
-  const { data: departments } = useDepartments();
-  const { data: suppliers } = useSuppliers();
-  const { data: warehouses } = useWarehouses();
-  const { data: users } = useUsers();
-  const { data: items } = useItems();
+  const { data: departments, isLoading: departmentsLoading } = useDepartments();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: users, isLoading: usersLoading } = useUsers();
+  const { data: items, isLoading: itemsLoading } = useItems();
 
   const isEdit = doc != null;
 
@@ -292,6 +292,7 @@ export function PurchaseRequestForm({
               searchPlaceholder="Cari departemen..."
               side="bottom"
               avoidCollisions={false}
+              loading={departmentsLoading}
             />
             {docError("department_id") && (
               <p className="text-xs text-destructive">{docError("department_id")}</p>
@@ -307,6 +308,7 @@ export function PurchaseRequestForm({
               searchPlaceholder="Cari nama / NIK..."
               side="bottom"
               avoidCollisions={false}
+              loading={usersLoading}
             />
           </div>
           <div className="space-y-1.5">
@@ -319,6 +321,7 @@ export function PurchaseRequestForm({
               searchPlaceholder="Cari supplier..."
               side="bottom"
               avoidCollisions={false}
+              loading={suppliersLoading}
             />
             {docError("supplier_id") && (
               <p className="text-xs text-destructive">{docError("supplier_id")}</p>
@@ -334,6 +337,7 @@ export function PurchaseRequestForm({
               searchPlaceholder="Cari gudang..."
               side="bottom"
               avoidCollisions={false}
+              loading={warehousesLoading}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -400,6 +404,7 @@ export function PurchaseRequestForm({
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
+                        loading={itemsLoading}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -470,6 +475,7 @@ export function PurchaseRequestForm({
                     placeholder="Pilih barang / scan barcode"
                     side="top"
                     avoidCollisions={false}
+                    loading={itemsLoading}
                   />
                   <div className="flex items-center gap-2">
                     <Input

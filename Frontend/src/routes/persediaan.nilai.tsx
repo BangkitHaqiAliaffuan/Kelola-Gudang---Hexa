@@ -55,8 +55,8 @@ function NilaiPersediaan() {
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
 
-  const { data: warehouses } = useWarehouses();
-  const { data: cats } = useCategories();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: cats, isLoading: catsLoading } = useCategories();
 
   const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
@@ -157,6 +157,7 @@ function NilaiPersediaan() {
             onChange={setWh}
             placeholder="Semua Gudang"
             options={warehouseNames}
+            loading={warehousesLoading}
           />
           <FilterSelect
             className="w-full"
@@ -164,6 +165,7 @@ function NilaiPersediaan() {
             onChange={setCat}
             placeholder="Semua Kategori"
             options={categoryNames}
+            loading={catsLoading}
           />
         </div>
       </Panel>

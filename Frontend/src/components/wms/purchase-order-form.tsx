@@ -59,11 +59,11 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
   const update = useUpdateProcDocPo();
   const submit = useSubmitProcDocPo();
 
-  const { data: warehouses } = useWarehouses();
-  const { data: suppliers } = useSuppliers();
-  const { data: departments } = useDepartments();
-  const { data: items } = useItems();
-  const { data: approvedPrs } = useApprovedProcDocsPr();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
+  const { data: departments, isLoading: departmentsLoading } = useDepartments();
+  const { data: items, isLoading: itemsLoading } = useItems();
+  const { data: approvedPrs, isLoading: approvedPrsLoading } = useApprovedProcDocsPr();
 
   const { data: docDetail } = useProcDocPo(mode === "edit" ? id : undefined);
   const [sourcePrId, setSourcePrId] = useState("");
@@ -326,6 +326,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                     allowEmpty
                     side="bottom"
                     avoidCollisions={false}
+                    loading={approvedPrsLoading}
                   />
                   {!sourcePrId && (
                     <p className="text-xs text-muted-foreground">
@@ -356,6 +357,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                   searchPlaceholder="Cari supplier..."
                   side="bottom"
                   avoidCollisions={false}
+                  loading={suppliersLoading}
                 />
                 {docError("supplier_id") && (
                   <p className="text-xs text-destructive">{docError("supplier_id")}</p>
@@ -371,6 +373,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                   searchPlaceholder="Cari gudang..."
                   side="bottom"
                   avoidCollisions={false}
+                  loading={warehousesLoading}
                 />
                 {docError("warehouse_id") && (
                   <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -386,6 +389,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                   searchPlaceholder="Cari departemen..."
                   side="bottom"
                   avoidCollisions={false}
+                  loading={departmentsLoading}
                 />
                 {docError("department_id") && (
                   <p className="text-xs text-destructive">{docError("department_id")}</p>
@@ -450,6 +454,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                           searchPlaceholder="Cari nama, SKU, barcode..."
                           side="top"
                           avoidCollisions={false}
+                          loading={itemsLoading}
                         />
                         {lineError(i, "item_id") && (
                           <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -515,6 +520,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                     placeholder="Pilih barang / scan barcode"
                     side="top"
                     avoidCollisions={false}
+                    loading={itemsLoading}
                   />
                   <div className="mt-2 flex items-center gap-2">
                     <Input
