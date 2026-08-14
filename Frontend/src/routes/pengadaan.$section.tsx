@@ -35,6 +35,7 @@ import {
 import {
   formatDate,
   formatIDR,
+  formatIDRCompact,
   formatNumber,
   goodsReceipts,
   purchaseOrders,
@@ -307,7 +308,13 @@ function PengadaanPage() {
           icon={PackageCheck}
           tone="success"
         />
-        <StatCard label="Nilai Total" value={formatIDR(totalValue)} icon={Wallet} tone="info" />
+        <StatCard
+          label="Nilai Total"
+          value={formatIDRCompact(totalValue)}
+          valueTitle={formatIDR(totalValue)}
+          icon={Wallet}
+          tone="info"
+        />
       </div>
 
       <Panel title="Daftar Dokumen" description="Klik nomor dokumen untuk melihat detail">

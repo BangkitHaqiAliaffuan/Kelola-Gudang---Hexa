@@ -11,7 +11,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useProcDocPo, useProcDocsPo } from "@/hooks/use-purchase-order";
-import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { poStatuses, type ProcDocApi } from "@/lib/purchase-order-types";
 
@@ -202,7 +202,8 @@ export function PurchaseOrderPage() {
         />
         <StatCard
           label="Nilai Total"
-          value={formatIDR(totalValue)}
+          value={formatIDRCompact(totalValue)}
+          valueTitle={formatIDR(totalValue)}
           icon={ShoppingCart}
           tone="info"
         />

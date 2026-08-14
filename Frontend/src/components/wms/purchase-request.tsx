@@ -31,7 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useDepartments, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { useProcDoc, useProcDocs } from "@/hooks/use-pengadaan";
-import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
 import {
   canDecideProcDoc,
@@ -355,7 +355,8 @@ export function PurchaseRequestPage() {
           />
           <StatCard
             label="Nilai Total"
-            value={formatIDR(stats.value)}
+            value={formatIDRCompact(stats.value)}
+            valueTitle={formatIDR(stats.value)}
             hint="Estimasi seluruh PR"
             icon={ShoppingCart}
             tone="info"

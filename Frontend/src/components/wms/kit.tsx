@@ -116,19 +116,24 @@ export function StatCard({
   hint,
   icon: Icon,
   tone = "brand",
+  valueTitle,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: LucideIcon;
   tone?: Tone;
+  valueTitle?: string;
 }) {
   return (
     <div className="card-soft card-hover p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-          <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          <p
+            title={valueTitle}
+            className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl"
+          >
             {value}
           </p>
           {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}

@@ -10,7 +10,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
-import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 
@@ -162,7 +162,13 @@ export function ReceiveGoodsPage() {
           icon={CheckCircle2}
           tone="success"
         />
-        <StatCard label="Nilai Total" value={formatIDR(totalValue)} icon={Wallet} tone="info" />
+        <StatCard
+          label="Nilai Total"
+          value={formatIDRCompact(totalValue)}
+          valueTitle={formatIDR(totalValue)}
+          icon={Wallet}
+          tone="info"
+        />
       </div>
 
       <Panel title="Filter">
