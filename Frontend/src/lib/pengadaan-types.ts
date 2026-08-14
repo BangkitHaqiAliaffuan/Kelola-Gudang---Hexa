@@ -89,9 +89,9 @@ export type ProcDocPayload = {
   lines: ProcDocLinePayload[];
 };
 
-/** Mirrors backend ApprovalEngine::canDecide — role ber-modul 'Approval Pengadaan' (via canApprove) atau Pengadaan Kelola, requester dikecualikan (SoD). */
+/** Mirrors backend ApprovalEngine::canDecide — approver yang ditugaskan (kepala departemen utk PR), role ber-modul 'Approval Pengadaan' (via canApprove), atau Pengadaan Kelola (via canManage); requester dikecualikan (SoD). */
 export function canDecideProcDoc(
-  doc: { status: string; requester_user_id: number | null },
+  doc: { status: string; requester_user_id: number | null; approver_user_id: number | null },
   user: { id: number; role?: string | null } | null,
   canApprove: boolean,
   canManage: boolean,
@@ -100,6 +100,6 @@ export function canDecideProcDoc(
     doc.status === "Menunggu Approval" &&
     user != null &&
     user.id !== doc.requester_user_id &&
-    (canApprove || canManage)
+    (doc.approver_user_id === user.id || canApprove || canManage)
   );
 }

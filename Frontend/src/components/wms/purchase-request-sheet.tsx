@@ -30,6 +30,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import {
   useApproveProcDoc,
@@ -452,10 +453,12 @@ export function PurchaseRequestSheet({
           <DialogHeader>
             <DialogTitle>Tolak Purchase Request</DialogTitle>
             <DialogDescription>
-              Alasan penolakan wajib diisi dan akan tercatat pada dokumen.
+              Catatan tambahan (opsional) akan tercatat pada dokumen.
             </DialogDescription>
           </DialogHeader>
+          <Label htmlFor="pr-reject-note">Catatan Tambahan (Opsional)</Label>
           <Textarea
+            id="pr-reject-note"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="Contoh: anggaran belum tersedia, spesifikasi tidak jelas..."
@@ -469,7 +472,7 @@ export function PurchaseRequestSheet({
             <Button
               variant="destructive"
               className="rounded-xl"
-              disabled={!rejectReason.trim() || busy}
+              disabled={busy}
               onClick={async () => {
                 if (!doc) return;
                 const reason = rejectReason.trim();

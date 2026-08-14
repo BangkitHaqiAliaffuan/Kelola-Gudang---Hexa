@@ -248,9 +248,13 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
         const res = await update.mutateAsync({ id: doc.id, payload });
         saved = res.data;
       }
-      if (thenSubmit && saved) {
+      // PO yang menyalin PR disetujui sudah otomatis Disetujui saat dibuat —
+      // tidak perlu dikirim/diajukan lagi.
+      if (thenSubmit && saved && saved.status !== "Disetujui") {
         await submit.mutateAsync(saved.id);
         toast.success(`${saved.no} disimpan dan diajukan untuk approval`);
+      } else if (saved?.status === "Disetujui") {
+        toast.success(`${saved.no} dibuat dan langsung disetujui dari PR`);
       } else {
         toast.success(`Draft ${saved?.no ?? ""} berhasil disimpan`);
       }

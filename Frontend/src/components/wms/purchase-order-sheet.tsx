@@ -22,6 +22,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   useApproveProcDocPo,
   useCancelProcDocPo,
@@ -110,7 +111,7 @@ export function PurchaseOrderSheet({
     },
     reject: {
       title: "Tolak Purchase Order?",
-      description: "Alasan penolakan wajib diisi dan akan tercatat pada dokumen.",
+      description: "Catatan tambahan (opsional) akan tercatat pada dokumen.",
       confirm: "Ya, Tolak",
     },
     cancel: {
@@ -138,10 +139,6 @@ export function PurchaseOrderSheet({
           toast.success(`${doc.no} disetujui`);
           break;
         case "reject":
-          if (!rejectNote.trim()) {
-            toast.error("Alasan penolakan wajib diisi.");
-            return;
-          }
           await reject.mutateAsync({ id: doc.id, decision_note: rejectNote.trim() });
           toast.success(`${doc.no} ditolak`);
           break;
@@ -165,6 +162,7 @@ export function PurchaseOrderSheet({
 
   const lines = doc?.lines ?? [];
   const totalValue = lines.reduce((sum, l) => sum + l.subtotal, 0);
+  const totalQty = lines.reduce((sum, l) => sum + l.qty, 0);
 
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>
@@ -194,7 +192,6 @@ export function PurchaseOrderSheet({
                 {isPendingApproval && (
                   <Field label="Approver" value={doc.approver ?? "Belum ditugaskan"} />
                 )}
-                <Field label="Total Qty" value={formatNumber(doc.qty_total ?? 0)} />
                 <Field label="Total Nilai" value={formatIDR(doc.value_total ?? 0)} />
               </div>
 
@@ -246,8 +243,10 @@ export function PurchaseOrderSheet({
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
-                  <span className="font-medium">Jumlah Baris</span>
+                  <span className="font-medium">Jumlah Item</span>
                   <span className="text-right font-semibold">{lines.length}</span>
+                  <span className="font-medium">Total Barang</span>
+                  <span className="text-right font-semibold">{formatNumber(totalQty)}</span>
                   <span className="font-medium">Total Nilai</span>
                   <span className="text-right text-base font-bold">{formatIDR(totalValue)}</span>
                 </div>
@@ -375,13 +374,17 @@ export function PurchaseOrderSheet({
                 <AlertDialogDescription>{labels[action].description}</AlertDialogDescription>
               </AlertDialogHeader>
               {action === "reject" && (
-                <Textarea
-                  value={rejectNote}
-                  onChange={(e) => setRejectNote(e.target.value)}
-                  placeholder="Alasan penolakan..."
-                  className="rounded-xl"
-                  rows={3}
-                />
+                <>
+                  <Label htmlFor="po-reject-note">Catatan Tambahan (Opsional)</Label>
+                  <Textarea
+                    id="po-reject-note"
+                    value={rejectNote}
+                    onChange={(e) => setRejectNote(e.target.value)}
+                    placeholder="Catatan tambahan (opsional)..."
+                    className="rounded-xl"
+                    rows={3}
+                  />
+                </>
               )}
               <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-xl" onClick={() => setAction(null)}>

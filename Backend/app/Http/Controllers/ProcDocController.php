@@ -94,9 +94,11 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Simpan dokumen pengadaan baru (PR atau PO, selalu berstatus Draft).
+     * Simpan dokumen pengadaan baru (PR atau PO, berstatus Draft).
      * Nomor di-generate otomatis per kind: PR/YYYY/#### atau PO/YYYY/####.
-     * PO boleh merujuk PR sumber yang sudah disetujui (source_proc_doc_id).
+     * PO boleh merujuk PR sumber yang sudah disetujui (source_proc_doc_id);
+     * bila isi PO identik persis dengan PR sumber, PO langsung berstatus
+     * Disetujui (tanpa approval kedua) dan dicatat sebagai approval otomatis.
      */
     public function store(StoreProcDocRequest $request): ProcDocResource
     {
@@ -120,10 +122,80 @@ class ProcDocController extends Controller
 
             $this->saveLines($procDoc, $data['lines']);
 
+            if ($this->poMatchesSource($procDoc)) {
+                $this->autoApprovePoFromPr($procDoc, (int) $request->user()?->id);
+            }
+
             return $procDoc;
         });
 
         return new ProcDocResource($this->loadDetail($doc));
+    }
+
+    /**
+     * PO dianggap "tidak berubah" dari PR sumber bila supplier & gudang sama
+     * dan setiap baris identik persis (item + qty + harga). Urutan baris tidak
+     * diperhitungkan — dibandingkan sebagai set yang dinormalisasi.
+     */
+    private function poMatchesSource(ProcDoc $procDoc): bool
+    {
+        if ($procDoc->kind !== 'PO' || $procDoc->source_proc_doc_id === null) {
+            return false;
+        }
+
+        $source = $procDoc->sourceProcDoc()->with('lines')->first();
+        if ($source === null) {
+            return false;
+        }
+
+        if ($procDoc->supplier_id !== $source->supplier_id
+            || $procDoc->warehouse_id !== $source->warehouse_id) {
+            return false;
+        }
+
+        $poLines = $procDoc->lines()->get()->map(
+            fn ($line) => [(int) $line->item_id, (int) $line->qty, round((float) $line->price, 4)]
+        );
+        $sourceLines = $source->lines->map(
+            fn ($line) => [(int) $line->item_id, (int) $line->qty, round((float) $line->price, 4)]
+        );
+
+        if ($poLines->count() !== $sourceLines->count()) {
+            return false;
+        }
+
+        $sortLines = fn ($lines) => $lines->sortBy(
+            fn ($l) => sprintf('%d-%d-%s', $l[0], $l[1], number_format($l[2], 4, '.', ''))
+        )->values();
+
+        return $sortLines($poLines)->toArray() === $sortLines($sourceLines)->toArray();
+    }
+
+    /**
+     * Finalisasi PO yang menyalin PR Disetujui: status langsung Disetujui,
+     * approver = pembuat PO, riwayat approval "Disetujui otomatis dari PR".
+     */
+    private function autoApprovePoFromPr(ProcDoc $procDoc, int $userId): void
+    {
+        $source = $procDoc->sourceProcDoc()->first();
+
+        ProcDocApproval::create([
+            'proc_doc_id' => $procDoc->id,
+            'level' => 1,
+            'status' => 'Disetujui',
+            'approver_user_id' => $userId,
+            'decision_note' => 'Disetujui otomatis dari PR '.($source?->no ?? ''),
+            'decided_at' => now(),
+        ]);
+
+        $procDoc->update([
+            'status' => 'Disetujui',
+            'submitted_at' => now(),
+            'approver_user_id' => null,
+            'approved_by' => $userId,
+            'approved_at' => now(),
+            'decision_note' => 'Disetujui otomatis dari PR '.($source?->no ?? ''),
+        ]);
     }
 
     public function show(ProcDoc $procDoc): ProcDocResource|JsonResponse
@@ -229,12 +301,12 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Tolak dokumen pengadaan yang menunggu approval — alasan penolakan wajib.
+     * Tolak dokumen pengadaan yang menunggu approval — catatan penolakan opsional.
      */
     public function reject(Request $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
         $data = $request->validate([
-            'decision_note' => ['required', 'string', 'max:1000'],
+            'decision_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
         if (! $procDoc->isPendingApproval()) {
@@ -245,7 +317,7 @@ class ProcDocController extends Controller
             return response()->json(['message' => 'Anda tidak berwenang menolak dokumen ini.'], 403);
         }
 
-        ApprovalEngine::decide($procDoc, (int) $request->user()?->id, 'Ditolak', $data['decision_note']);
+        ApprovalEngine::decide($procDoc, (int) $request->user()?->id, 'Ditolak', $data['decision_note'] ?? null);
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
