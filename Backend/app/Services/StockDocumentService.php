@@ -28,6 +28,11 @@ class StockDocumentService
             throw new \InvalidArgumentException('Dokumen yang dibatalkan tidak dapat diposting.');
         }
 
+        if ($document->type === 'Stock Opname') {
+            $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
+            $this->assertOpnameReadyForPost($document);
+        }
+
         DB::transaction(function () use ($document) {
             $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
 
@@ -68,6 +73,72 @@ class StockDocumentService
         });
 
         return $document->fresh();
+    }
+
+    /**
+     * Validasi opname sebelum posting (single chokepoint untuk store-with-Selesai
+     * dan /post):
+     * 1. Semua barang wajib sudah dihitung fisik.
+     * 2. Setiap baris yang variance-nya bukan nol wajib punya alasan selisih
+     *    (reason_code) — prasyarat untuk root-cause & defensibilitas audit.
+     * 3. Barang yang bergerak (stock_movements) setelah momen freeze (frozen_at)
+     *    dianggap variance tidak valid — wajib dihitung ulang (pola DBA "throw out").
+     */
+    private function assertOpnameReadyForPost(StockDocument $document): void
+    {
+        $lines = $document->lines;
+
+        $uncounted = $lines->filter(fn ($line) => $line->actual_qty === null)->count();
+
+        if ($uncounted > 0) {
+            throw new \InvalidArgumentException(
+                "Semua barang wajib dihitung sebelum opname diselesaikan ({$uncounted} belum dicek)."
+            );
+        }
+
+        $varianceLines = $lines->filter(fn ($line) => $line->actual_qty !== null && $line->variance() !== 0);
+        $missingReason = $varianceLines->filter(fn ($line) => empty($line->reason_code));
+
+        if ($missingReason->isNotEmpty()) {
+            $labels = $this->labelsFor($missingReason);
+            throw new \InvalidArgumentException(
+                "Alasan selisih wajib diisi sebelum opname diselesaikan: {$labels}."
+            );
+        }
+
+        $frozenAt = $document->frozen_at ?? $document->created_at;
+        $moved = $lines->filter(function ($line) use ($document, $frozenAt) {
+            return StockMovement::where('item_id', $line->item_id)
+                ->where('bin_id', $line->from_bin_id)
+                ->where('occurred_at', '>', $frozenAt)
+                ->where(function ($query) use ($document) {
+                    $query->whereNull('stock_document_id')
+                        ->orWhere('stock_document_id', '!=', $document->id);
+                })
+                ->exists();
+        });
+
+        if ($moved->isNotEmpty()) {
+            $labels = $this->labelsFor($moved);
+            throw new \InvalidArgumentException(
+                "Barang bergerak selama opname dan wajib dihitung ulang: {$labels}."
+            );
+        }
+    }
+
+    private function labelsFor($lines): string
+    {
+        $labels = $lines->take(5)
+            ->map(fn ($line) => trim(($line->item?->sku ?? '').' '.($line->item?->name ?? '')))
+            ->filter()
+            ->values()
+            ->implode(', ');
+
+        if ($labels === '') {
+            $labels = $lines->take(5)->map(fn ($line) => "#{$line->item_id}")->implode(', ');
+        }
+
+        return $labels.($lines->count() > 5 ? ', …' : '');
     }
 
     /**

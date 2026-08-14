@@ -22,6 +22,7 @@ class StoreStockDocumentRequest extends FormRequest
             'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan', 'Stock Opname'])],
             'status' => ['required', Rule::in(['Draft', 'Selesai'])],
             'document_date' => ['required', 'date'],
+            'blind_count' => ['nullable', 'boolean'],
             'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
             // Transfer Gudang: warehouse_id = gudang asal, destination_warehouse_id = gudang tujuan.
             'destination_warehouse_id' => [
@@ -78,6 +79,8 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::requiredIf(fn () => in_array($this->input('type'), ['Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Stock Opname'], true)),
             ],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
+            // Alasan selisih (root cause) — dipakai Stock Opname yang langsung disimpan Selesai.
+            'lines.*.reason_code' => ['nullable', Rule::in(array_keys(StockDocumentLine::REASON_CODES))],
             'lines.*.source_line_id' => [
                 'nullable',
                 'integer',

@@ -32,6 +32,9 @@ class StockDocumentLineResource extends JsonResource
             'source_line_id' => $this->source_line_id,
             'unit_cost' => $this->unit_cost,
             'note' => $this->note,
+            'reason_code' => $this->reason_code,
+            'counted_by' => $this->whenLoaded('countedBy', fn () => $this->countedBy?->name),
+            'counted_at' => $this->counted_at?->toIso8601String(),
         ];
     }
 }

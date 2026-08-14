@@ -33,7 +33,9 @@ class StockDocument extends Model
         'no',
         'type',
         'status',
+        'blind_count',
         'document_date',
+        'frozen_at',
         'warehouse_id',
         'destination_warehouse_id',
         'source_document_id',
@@ -47,7 +49,9 @@ class StockDocument extends Model
 
     protected $casts = [
         'document_date' => 'datetime',
+        'frozen_at' => 'datetime',
         'posted_at' => 'datetime',
+        'blind_count' => 'boolean',
     ];
 
     public function lines(): HasMany

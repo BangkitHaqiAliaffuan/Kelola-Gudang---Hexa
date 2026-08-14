@@ -1,6 +1,9 @@
 # Runtime/tunnel artifacts created by dev.sh
 .dev/
 
+# opencode internal workspace (plans/sessions may contain sensitive notes)
+.opencode/
+
 # Editor / OS noise
 .idea/
 .vscode/

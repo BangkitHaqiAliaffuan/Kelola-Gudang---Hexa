@@ -10,6 +10,22 @@ class StockDocumentLine extends Model
 {
     use HasFactory;
 
+    /**
+     * Alasan selisih opname (root cause). Label id-ID dipakai frontend.
+     */
+    public const REASON_CODES = [
+        'receiving_error' => 'Kesalahan penerimaan',
+        'picking_error' => 'Kesalahan pengambilan',
+        'damage' => 'Rusak',
+        'theft_shrinkage' => 'Hilang / susut',
+        'vendor_short_ship' => 'Kekurangan dari supplier',
+        'uom_mismatch' => 'Salah satuan',
+        'transfer_unposted' => 'Transfer belum diproses',
+        'location_error' => 'Salah lokasi / rak',
+        'data_entry' => 'Kesalahan input',
+        'other' => 'Lainnya',
+    ];
+
     protected $fillable = [
         'document_id',
         'line_no',
@@ -22,6 +38,9 @@ class StockDocumentLine extends Model
         'source_line_id',
         'unit_cost',
         'note',
+        'reason_code',
+        'counted_by_user_id',
+        'counted_at',
     ];
 
     protected $casts = [
@@ -29,6 +48,7 @@ class StockDocumentLine extends Model
         'system_qty' => 'integer',
         'actual_qty' => 'integer',
         'unit_cost' => 'float',
+        'counted_at' => 'datetime',
     ];
 
     public function document(): BelongsTo
@@ -54,6 +74,11 @@ class StockDocumentLine extends Model
     public function sourceLine(): BelongsTo
     {
         return $this->belongsTo(self::class, 'source_line_id');
+    }
+
+    public function countedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'counted_by_user_id');
     }
 
     /**

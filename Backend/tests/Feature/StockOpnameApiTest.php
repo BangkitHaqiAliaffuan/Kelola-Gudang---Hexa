@@ -6,6 +6,7 @@ use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\Rack;
+use App\Models\RolePermission;
 use App\Models\StockDocument;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -154,7 +155,7 @@ class StockOpnameApiTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
-                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 7],
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 7, 'reason_code' => 'picking_error'],
             ],
         ]);
 
@@ -189,7 +190,7 @@ class StockOpnameApiTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
-                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 12],
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 12, 'reason_code' => 'receiving_error'],
             ],
         ]);
 
@@ -244,7 +245,7 @@ class StockOpnameApiTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
-                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 5],
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 5, 'reason_code' => 'other'],
             ],
         ]);
 
@@ -319,7 +320,7 @@ class StockOpnameApiTest extends TestCase
 
         $this->putJson("/api/persediaan/stock-documents/{$docId}", [
             'lines' => [
-                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 6],
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 6, 'reason_code' => 'theft_shrinkage'],
             ],
         ])->assertOk();
 
@@ -450,6 +451,169 @@ class StockOpnameApiTest extends TestCase
                 ['item_id' => $item->id, 'from_bin_id' => $bin->id],
             ],
         ])->assertStatus(403);
+    }
+
+    public function test_store_opname_defaults_blind_count_and_sets_frozen_at(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $res->assertJsonPath('data.blind_count', true)
+            ->assertJsonPath('data.frozen_at', fn ($v) => $v !== null);
+
+        $this->assertDatabaseHas('stock_documents', [
+            'id' => $res->json('data.id'),
+            'blind_count' => true,
+        ]);
+        $this->assertNotNull(StockDocument::find($res->json('data.id'))->frozen_at);
+    }
+
+    public function test_store_opname_accepts_blind_count_false(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'blind_count' => false,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)
+            ->assertJsonPath('data.blind_count', false);
+    }
+
+    public function test_post_opname_without_reason_code_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 7],
+            ],
+        ])->assertOk();
+
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/post")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Alasan selisih wajib'));
+    }
+
+    public function test_post_opname_with_moved_item_after_freeze_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        // Movement terjadi SETELAH freeze (occurred_at di masa depan) — variance
+        // snapshot menjadi tidak valid.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2099-01-01',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Pasca Freeze',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1000, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 10],
+            ],
+        ])->assertOk();
+
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/post")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'wajib dihitung ulang'));
+    }
+
+    public function test_update_preserves_line_audit_and_saves_reason_code(): void
+    {
+        // Audit trail butuh user ter-persist (id real) agar counted_by terisi.
+        $admin = $this->makeUser('Auditor');
+        RolePermission::firstOrCreate(
+            ['role' => 'Auditor', 'module' => 'Persediaan'],
+            ['level' => 'Kelola'],
+        );
+        Sanctum::actingAs($admin, ['*'], 'sanctum');
+
+        $itemA = $this->makeItem();
+        $itemB = $this->makeItem();
+        [$wh, $rack, $binA] = $this->makeLocation();
+        $binB = Bin::factory()->create(['rack_id' => $rack->id]);
+        $this->seedInbound($itemA, $wh, $binA, 10);
+        $this->seedInbound($itemB, $wh, $binB, 5);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $itemA->id, 'from_bin_id' => $binA->id],
+                ['item_id' => $itemB->id, 'from_bin_id' => $binB->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        $detail = $this->getJson("/api/persediaan/stock-documents/{$docId}")->assertOk()->json('data');
+        $lineAId = $detail['lines'][0]['id'];
+
+        $res = $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $itemA->id, 'from_bin_id' => $binA->id, 'actual_qty' => 8, 'reason_code' => 'picking_error'],
+                ['item_id' => $itemB->id, 'from_bin_id' => $binB->id, 'actual_qty' => 5],
+            ],
+        ])->assertOk();
+
+        $res = $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $itemA->id, 'from_bin_id' => $binA->id, 'actual_qty' => 8, 'reason_code' => 'picking_error'],
+                ['item_id' => $itemB->id, 'from_bin_id' => $binB->id, 'actual_qty' => 5],
+            ],
+        ])->assertOk();
+
+        // Id baris dipertahankan (update in-place, bukan delete+reinsert).
+        $this->assertSame($lineAId, (int) $res->json('data.lines.0.id'));
+        $res->assertJsonPath('data.lines.0.reason_code', 'picking_error')
+            ->assertJsonPath('data.lines.0.counted_by', fn ($v) => is_string($v) && $v !== '')
+            ->assertJsonPath('data.lines.0.counted_at', fn ($v) => $v !== null)
+            ->assertJsonPath('data.lines.1.counted_at', fn ($v) => $v !== null);
     }
 
     private function makeUser(string $role): User

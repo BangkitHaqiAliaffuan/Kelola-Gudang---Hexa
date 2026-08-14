@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Bin;
 use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -21,6 +22,7 @@ class UpdateStockDocumentRequest extends FormRequest
             'document_date' => ['nullable', 'date'],
             'pic' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
+            'blind_count' => ['nullable', 'boolean'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')],
             'lines.*.from_bin_id' => ['required', 'integer', Rule::exists('bins', 'id')],
@@ -30,6 +32,8 @@ class UpdateStockDocumentRequest extends FormRequest
             'lines.*.actual_qty' => ['nullable', 'integer', 'min:0'],
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
+            // Alasan selisih (root cause) diisi saat review sebelum posting.
+            'lines.*.reason_code' => ['nullable', Rule::in(array_keys(StockDocumentLine::REASON_CODES))],
         ];
     }
 

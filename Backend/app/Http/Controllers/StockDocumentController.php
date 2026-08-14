@@ -116,7 +116,11 @@ class StockDocumentController extends Controller
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
                     'status' => $data['status'],
+                    'blind_count' => $data['blind_count'] ?? true,
                     'document_date' => $data['document_date'],
+                    // Stock Opname: momen "freeze" book balance — barang yang bergerak
+                    // setelahnya dianggap variance tidak valid (wajib recount).
+                    'frozen_at' => $isOpname ? now() : null,
                     'warehouse_id' => $data['warehouse_id'],
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
                     'source_document_id' => $data['type'] === 'Retur Pembelian' ? ($data['source_document_id'] ?? null) : null,
@@ -124,7 +128,7 @@ class StockDocumentController extends Controller
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
                     'note' => $data['note'] ?? null,
-                    'created_by' => $request->user()?->id,
+                    'created_by' => $request->user('sanctum')?->id,
                 ]);
 
                 foreach ($data['lines'] as $index => $line) {
@@ -159,6 +163,7 @@ class StockDocumentController extends Controller
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
                         'note' => $line['note'] ?? null,
+                        'reason_code' => $line['reason_code'] ?? null,
                     ]);
                 }
 
@@ -173,7 +178,7 @@ class StockDocumentController extends Controller
         }
 
         return (new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines')))->response()->setStatusCode(201);
     }
 
@@ -210,6 +215,7 @@ class StockDocumentController extends Controller
             'lines.item.unit',
             'lines.fromBin.rack',
             'lines.toBin.rack',
+            'lines.countedBy',
             'movements',
         ]);
 
@@ -220,10 +226,10 @@ class StockDocumentController extends Controller
     }
 
     /**
-     * Perbarui dokumen Stock Opname yang masih Draft: mengganti seluruh baris
-     * (menghapus + menyisipkan ulang) sekaligus metadata. system_qty baris yang
-     * ada dipertahankan dari snapshot klien agar variance stabil selama
-     * pencatatan; baris baru tanpa snapshot di-backfill dari item_stock.
+     * Perbarui dokumen Stock Opname yang masih Draft. Baris diperbarui secara
+     * in-place (per item+bin) — TIDAK menghapus & menyisipkan ulang — sehingga
+     * audit (counted_by/counted_at) dan note per baris tidak hilang. system_qty
+     * dipertahankan dari snapshot; baris baru di-backfill dari item_stock.
      */
     public function update(UpdateStockDocumentRequest $request, StockDocument $stockDocument)
     {
@@ -241,6 +247,7 @@ class StockDocumentController extends Controller
             'document_date' => $data['document_date'] ?? $stockDocument->document_date,
             'pic' => $data['pic'] ?? $stockDocument->pic,
             'note' => $data['note'] ?? $stockDocument->note,
+            'blind_count' => $data['blind_count'] ?? $stockDocument->blind_count,
         ]);
 
         $stockRows = ItemStock::where('warehouse_id', $stockDocument->warehouse_id)
@@ -248,45 +255,79 @@ class StockDocumentController extends Controller
             ->get()
             ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id);
 
-        $stockDocument->lines()->delete();
+        $existing = $stockDocument->lines()->get()
+            ->keyBy(fn (StockDocumentLine $line) => $line->item_id.'-'.$line->from_bin_id);
+
+        $payloadKeys = [];
 
         foreach ($data['lines'] as $index => $line) {
-            $stockRow = $stockRows->get(($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0));
+            $key = ($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0);
+            $payloadKeys[$key] = true;
 
-            StockDocumentLine::create([
-                'document_id' => $stockDocument->id,
+            $stockRow = $stockRows->get($key);
+            $current = $existing->get($key);
+
+            $attributes = [
                 'line_no' => $index + 1,
-                'item_id' => $line['item_id'],
-                'qty' => null,
-                'system_qty' => $line['system_qty'] ?? (int) ($stockRow?->stock ?? 0),
+                // system_qty dipertahankan dari snapshot dokumen asli; hanya
+                // baris BARU yang di-backfill dari item_stock saat ini.
+                'system_qty' => array_key_exists('system_qty', $line)
+                    ? $line['system_qty']
+                    : ($current ? $current->system_qty : (int) ($stockRow?->stock ?? 0)),
                 'actual_qty' => $line['actual_qty'] ?? null,
                 'unit_cost' => (float) ($line['unit_cost'] ?? $stockRow?->unit_cost_avg ?? 0),
-                'from_bin_id' => $line['from_bin_id'],
-                'to_bin_id' => null,
-                'note' => $line['note'] ?? null,
-            ]);
+                'note' => array_key_exists('note', $line) ? $line['note'] : ($current?->note ?? null),
+            ];
+
+            // Alasan selisih hanya diubah bila dikirim (save draft biasa tidak
+            // menimpa alasan yang sudah diisi saat review).
+            if (array_key_exists('reason_code', $line)) {
+                $attributes['reason_code'] = $line['reason_code'] ?? null;
+            }
+
+            // Jejak audit: siapa & kapan terakhir kali baris dihitung fisik.
+            if (array_key_exists('actual_qty', $line)) {
+                if ($line['actual_qty'] !== null) {
+                    $attributes['counted_by_user_id'] = $request->user('sanctum')?->id;
+                    $attributes['counted_at'] = now();
+                } else {
+                    $attributes['counted_by_user_id'] = null;
+                    $attributes['counted_at'] = null;
+                }
+            }
+
+            if ($current) {
+                $current->update($attributes);
+            } else {
+                StockDocumentLine::create([
+                    'document_id' => $stockDocument->id,
+                    'item_id' => $line['item_id'],
+                    'from_bin_id' => $line['from_bin_id'],
+                    'to_bin_id' => null,
+                    'qty' => null,
+                    ...$attributes,
+                ]);
+            }
         }
 
+        // Hapus baris yang tidak lagi ada di payload (mis. gudang berubah cakupan).
+        $stockDocument->lines()
+            ->whereIn('id', $existing->filter(fn (StockDocumentLine $line) => ! isset($payloadKeys[$line->item_id.'-'.$line->from_bin_id]))->keys())
+            ->delete();
+
         return new StockDocumentResource($stockDocument->load([
-            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines'));
     }
 
     /**
      * Posting dokumen: memicu mutasi ledger (dokumen Draft / Menunggu Approval).
+     * Guard opname (semua terhitung, alasan selisih, barang bergerak setelah
+     * freeze) dieksekusi di StockDocumentService::post — satu titik untuk
+     * store-with-Selesai dan /post.
      */
     public function post(StockDocument $stockDocument)
     {
-        if ($stockDocument->type === 'Stock Opname') {
-            $uncounted = $stockDocument->lines()->whereNull('actual_qty')->count();
-
-            if ($uncounted > 0) {
-                return response()->json([
-                    'message' => "Semua barang wajib dihitung sebelum opname diselesaikan ({$uncounted} belum dicek).",
-                ], 422);
-            }
-        }
-
         try {
             $document = $this->service->post($stockDocument);
         } catch (\InvalidArgumentException $e) {
@@ -294,7 +335,7 @@ class StockDocumentController extends Controller
         }
 
         return new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+            'warehouse', 'destination', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ]));
     }
 
