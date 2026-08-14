@@ -137,7 +137,7 @@ export function StockDocumentSheet({
   isLoading?: boolean;
 }) {
   const lines = doc?.lines ?? [];
-  const isOpname = lines.length > 0 && lines.every(isOpnameLine);
+  const isOpname = doc?.type === "Stock Opname" || (lines.length > 0 && lines.every(isOpnameLine));
   const isAdjustment = doc?.type === "Stock Adjustment";
   const mode: "plain" | "opname" | "adjustment" = isOpname
     ? "opname"

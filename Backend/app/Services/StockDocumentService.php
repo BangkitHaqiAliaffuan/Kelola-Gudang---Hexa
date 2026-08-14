@@ -36,6 +36,12 @@ class StockDocumentService
             foreach ($document->lines as $line) {
                 $line->setRelation('document', $document);
 
+                // Baris Stock Opname yang belum dihitung (actual_qty null) tidak
+                // diposting — guard ini melindungi bila dokumen lolos validasi.
+                if ($document->type === 'Stock Opname' && $line->actual_qty === null) {
+                    continue;
+                }
+
                 if ($line->moveQty() === 0) {
                     continue;
                 }
@@ -160,7 +166,12 @@ class StockDocumentService
             ->where('bin_id', $attributes['bin_id'])
             ->first();
 
-        $available = (int) ($row?->stock ?? 0) - (int) ($row?->reserved ?? 0);
+        // Stock Opname menyesuaikan stok terhadap kenyataan fisik: guard memakai
+        // stok fisik (stock), bukan available, karena reservasi adalah komitmen
+        // virtual yang tidak menambah/mengurangi barang yang benar-benar ada.
+        $available = $attributes['movement_type'] === 'Stock Opname'
+            ? (int) ($row?->stock ?? 0)
+            : (int) ($row?->stock ?? 0) - (int) ($row?->reserved ?? 0);
 
         if ($attributes['qty'] > $available) {
             $item = Item::find($attributes['item_id']);

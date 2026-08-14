@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreStockDocumentRequest;
+use App\Http\Requests\UpdateStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
 use App\Models\Bin;
 use App\Models\ItemStock;
@@ -36,6 +37,7 @@ class StockDocumentController extends Controller
         $query = StockDocument::query()
             ->with(['warehouse', 'destination'])
             ->withCount('lines')
+            ->withCount(['lines as checked_count' => fn ($q) => $q->whereNotNull('actual_qty')])
             ->withSum('lines as qty_total', 'qty')
             ->withSum('lines as value_total', DB::raw('qty * unit_cost'));
 
@@ -76,11 +78,22 @@ class StockDocumentController extends Controller
 
         $isOutbound = in_array($data['type'], ['Pengeluaran', 'Retur Pembelian'], true);
         $isTransfer = $data['type'] === 'Transfer Gudang';
+        $isOpname = $data['type'] === 'Stock Opname';
         $fromBins = ($isOutbound || $isTransfer)
             ? Bin::with('rack')
                 ->whereIn('id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
                 ->get()
                 ->keyBy('id')
+            : collect();
+
+        // Baris Stock Opname di-snapshot server-side dari item_stock: system_qty &
+        // unit_cost (moving average) diambil per (item, bin) sehingga konsisten dengan
+        // Stock Saat Ini / Nilai Persediaan pada saat jadwal dibuat.
+        $stockRows = $isOpname
+            ? ItemStock::where('warehouse_id', $data['warehouse_id'])
+                ->whereIn('bin_id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
+                ->get()
+                ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id)
             : collect();
 
         // Baris Penerimaan sumber untuk Retur Pembelian yang ter-link — harga beli
@@ -93,8 +106,11 @@ class StockDocumentController extends Controller
             : collect();
 
         try {
-            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $fromBins, $sourceLines) {
-                $prefix = $isTransfer ? 'TF' : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK') : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM'));
+            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $isOpname, $fromBins, $sourceLines, $stockRows) {
+                $prefix = $isTransfer ? 'TF'
+                    : ($isOpname ? 'SO'
+                        : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK')
+                            : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM')));
 
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
@@ -116,6 +132,9 @@ class StockDocumentController extends Controller
                         ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_cost
                         : null;
 
+                    $stockKey = $isOpname ? (($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0)) : null;
+                    $stockRow = $isOpname ? $stockRows->get($stockKey) : null;
+
                     StockDocumentLine::create([
                         'document_id' => $document->id,
                         'line_no' => $index + 1,
@@ -124,16 +143,19 @@ class StockDocumentController extends Controller
                         // disimpan negatif sehingga moveDirection() → OUT dan moveQty() (abs)
                         // menghasilkan movement OUT yang benar di StockDocumentService. Transfer
                         // Gudang & Retur Penjualan tetap positif: Transfer merilis pasangan
-                        // OUT+IN di service, Retur Penjualan adalah stok masuk (IN).
-                        'qty' => $isOutbound ? -abs($line['qty']) : $line['qty'],
-                        // Retur Pembelian ter-link memakai harga beli asal dari baris
-                        // Penerimaan sumber; retur manual tetap moving average.
-                        'unit_cost' => $sourceCost !== null
-                            ? (float) $sourceCost
-                            : (($isOutbound || $isTransfer)
-                                ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
-                                : $line['unit_cost']),
-                        'to_bin_id' => $isOutbound ? null : $line['to_bin_id'],
+                        // OUT+IN di service, Retur Penjualan adalah stok masuk (IN). Stock
+                        // Opname tidak membawa qty — memakai system_qty/actual_qty.
+                        'qty' => $isOpname ? null : ($isOutbound ? -abs($line['qty']) : $line['qty']),
+                        'system_qty' => $isOpname ? (int) ($stockRow?->stock ?? 0) : null,
+                        'actual_qty' => $isOpname ? ($line['actual_qty'] ?? null) : null,
+                        'unit_cost' => $isOpname
+                            ? (float) ($stockRow?->unit_cost_avg ?? $line['unit_cost'] ?? 0)
+                            : ($sourceCost !== null
+                                ? (float) $sourceCost
+                                : (($isOutbound || $isTransfer)
+                                    ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
+                                    : $line['unit_cost'])),
+                        'to_bin_id' => ($isOpname || $isOutbound) ? null : $line['to_bin_id'],
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
                         'note' => $line['note'] ?? null,
@@ -198,10 +220,73 @@ class StockDocumentController extends Controller
     }
 
     /**
+     * Perbarui dokumen Stock Opname yang masih Draft: mengganti seluruh baris
+     * (menghapus + menyisipkan ulang) sekaligus metadata. system_qty baris yang
+     * ada dipertahankan dari snapshot klien agar variance stabil selama
+     * pencatatan; baris baru tanpa snapshot di-backfill dari item_stock.
+     */
+    public function update(UpdateStockDocumentRequest $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname yang dapat diperbarui.'], 422);
+        }
+
+        if ($stockDocument->status !== 'Draft') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname berstatus Draft yang dapat diperbarui.'], 422);
+        }
+
+        $data = $request->validated();
+
+        $stockDocument->update([
+            'document_date' => $data['document_date'] ?? $stockDocument->document_date,
+            'pic' => $data['pic'] ?? $stockDocument->pic,
+            'note' => $data['note'] ?? $stockDocument->note,
+        ]);
+
+        $stockRows = ItemStock::where('warehouse_id', $stockDocument->warehouse_id)
+            ->whereIn('bin_id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
+            ->get()
+            ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id);
+
+        $stockDocument->lines()->delete();
+
+        foreach ($data['lines'] as $index => $line) {
+            $stockRow = $stockRows->get(($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0));
+
+            StockDocumentLine::create([
+                'document_id' => $stockDocument->id,
+                'line_no' => $index + 1,
+                'item_id' => $line['item_id'],
+                'qty' => null,
+                'system_qty' => $line['system_qty'] ?? (int) ($stockRow?->stock ?? 0),
+                'actual_qty' => $line['actual_qty'] ?? null,
+                'unit_cost' => (float) ($line['unit_cost'] ?? $stockRow?->unit_cost_avg ?? 0),
+                'from_bin_id' => $line['from_bin_id'],
+                'to_bin_id' => null,
+                'note' => $line['note'] ?? null,
+            ]);
+        }
+
+        return new StockDocumentResource($stockDocument->load([
+            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack',
+        ])->loadCount('lines'));
+    }
+
+    /**
      * Posting dokumen: memicu mutasi ledger (dokumen Draft / Menunggu Approval).
      */
     public function post(StockDocument $stockDocument)
     {
+        if ($stockDocument->type === 'Stock Opname') {
+            $uncounted = $stockDocument->lines()->whereNull('actual_qty')->count();
+
+            if ($uncounted > 0) {
+                return response()->json([
+                    'message' => "Semua barang wajib dihitung sebelum opname diselesaikan ({$uncounted} belum dicek).",
+                ], 422);
+            }
+        }
+
         try {
             $document = $this->service->post($stockDocument);
         } catch (\InvalidArgumentException $e) {

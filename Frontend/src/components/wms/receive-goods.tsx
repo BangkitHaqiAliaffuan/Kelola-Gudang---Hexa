@@ -1,6 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, FileText, PackageCheck, Plus, Search, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  Maximize2,
+  Minimize2,
+  PackageCheck,
+  Plus,
+  Search,
+  Wallet,
+} from "lucide-react";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -10,6 +19,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import { cn } from "@/lib/utils";
 import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
@@ -36,6 +46,7 @@ export function ReceiveGoodsPage() {
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const receipts = useMemo(() => (data?.data ?? []).filter(isPoReceipt), [data]);
@@ -139,76 +150,96 @@ export function ReceiveGoodsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Receive Goods"
-        description="Penerimaan barang berdasarkan Purchase Order"
-        actions={
-          canCreate && (
-            <Button asChild className="rounded-xl">
-              <Link to="/pengadaan/receive-goods/new">
-                <Plus className="h-4 w-4" /> Terima Barang dari PO
-              </Link>
-            </Button>
-          )
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={PackageCheck} />
-        <StatCard label="Draft" value={formatNumber(draftDocs)} icon={FileText} tone="warning" />
-        <StatCard
-          label="Selesai"
-          value={formatNumber(doneDocs)}
-          icon={CheckCircle2}
-          tone="success"
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Receive Goods"
+          description="Penerimaan barang berdasarkan Purchase Order"
+          actions={
+            canCreate && (
+              <Button asChild className="rounded-xl">
+                <Link to="/pengadaan/receive-goods/new">
+                  <Plus className="h-4 w-4" /> Terima Barang dari PO
+                </Link>
+              </Button>
+            )
+          }
         />
-        <StatCard
-          label="Nilai Total"
-          value={formatIDRCompact(totalValue)}
-          valueTitle={formatIDR(totalValue)}
-          icon={Wallet}
-          tone="info"
-        />
-      </div>
 
-      <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, supplier, gudang, PIC, tanggal, No. PO, status..."
-              className="rounded-xl pl-9"
-            />
-          </div>
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-            loading={warehousesLoading}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={PackageCheck} />
+          <StatCard label="Draft" value={formatNumber(draftDocs)} icon={FileText} tone="warning" />
+          <StatCard
+            label="Selesai"
+            value={formatNumber(doneDocs)}
+            icon={CheckCircle2}
+            tone="success"
           />
-          <FilterSelect
-            className="w-full"
-            value={partner}
-            onChange={setPartner}
-            placeholder="Semua Supplier"
-            options={suppliers}
-            loading={isLoading}
-          />
-          <FilterSelect
-            className="w-full"
-            value={status}
-            onChange={setStatus}
-            placeholder="Semua Status"
-            options={[...stockDocumentStatuses]}
+          <StatCard
+            label="Nilai Total"
+            value={formatIDRCompact(totalValue)}
+            valueTitle={formatIDR(totalValue)}
+            icon={Wallet}
+            tone="info"
           />
         </div>
-      </Panel>
 
-      <Panel title="Daftar Penerimaan dari PO" description={`${formatNumber(rows.length)} dokumen`}>
+        <Panel title="Filter">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, supplier, gudang, PIC, tanggal, No. PO, status..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full"
+              value={wh}
+              onChange={setWh}
+              placeholder="Semua Gudang"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
+            />
+            <FilterSelect
+              className="w-full"
+              value={partner}
+              onChange={setPartner}
+              placeholder="Semua Supplier"
+              options={suppliers}
+              loading={isLoading}
+            />
+            <FilterSelect
+              className="w-full"
+              value={status}
+              onChange={setStatus}
+              placeholder="Semua Status"
+              options={[...stockDocumentStatuses]}
+            />
+          </div>
+        </Panel>
+      </div>
+
+      <Panel
+        title="Daftar Penerimaan dari PO"
+        description={`${formatNumber(rows.length)} dokumen`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
+          </Button>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}

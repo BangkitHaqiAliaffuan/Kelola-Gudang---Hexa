@@ -37,13 +37,17 @@ import {
   items,
   lowStock,
   monthly,
-  opnameSessions,
   outStock,
   totalValue,
   transactions,
   warehouses,
 } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
+import { useStockDocuments } from "@/hooks/use-persediaan";
+import type { StockDocumentApi } from "@/lib/persediaan-types";
+
+/** Baris dokumen opname: list API mengagregasi checked_count per dokumen. */
+type OpnameDoc = StockDocumentApi & { checked_count?: number };
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -101,7 +105,10 @@ function Dashboard() {
   const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
   const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
   const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
-  const running = opnameSessions.filter((o) => o.status === "Berjalan");
+  const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
+    type: "Stock Opname",
+  });
+  const running = ((opnameDocs?.data ?? []) as OpnameDoc[]).filter((d) => d.status === "Draft");
 
   const stats = [
     {
@@ -330,19 +337,36 @@ function Dashboard() {
 
         <div className="space-y-4">
           <Panel title="Stock Opname Berjalan">
-            <div className="space-y-4">
-              {running.map((o) => (
-                <div key={o.id}>
-                  <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                    <p className="truncate text-sm font-medium">{o.warehouse}</p>
-                    <span className="text-xs text-muted-foreground">
-                      {o.checked}/{o.total}
-                    </span>
-                  </div>
-                  <Progress value={(o.checked / o.total) * 100} className="h-2" />
-                </div>
-              ))}
-            </div>
+            {opnameLoading ? (
+              <TableSkeleton rows={2} cols={3} />
+            ) : running.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Tidak ada sesi opname yang sedang berjalan.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {running.map((o) => {
+                  const total = o.line_count;
+                  const checked = o.checked_count ?? 0;
+                  return (
+                    <Link
+                      key={o.id}
+                      to="/opname/$section"
+                      params={{ section: "proses" }}
+                      className="block rounded-xl p-2 transition-colors hover:bg-accent/50"
+                    >
+                      <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                        <p className="truncate text-sm font-medium">{o.warehouse}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {checked}/{total}
+                        </span>
+                      </div>
+                      <Progress value={total > 0 ? (checked / total) * 100 : 0} className="h-2" />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </Panel>
 
           <Panel title="Perlu Perhatian" description="Stok di bawah minimum">

@@ -192,6 +192,7 @@ export type StockDocumentApi = {
   posted_at: string | null;
   created_by: string | null;
   line_count: number;
+  checked_count?: number;
   qty_total?: number;
   value_total?: number;
   lines?: StockDocumentLineApi[];
@@ -217,11 +218,18 @@ export type StockDocumentApi = {
 //   dari input), nomor `RJ/YYYY/#####`, partner = customer.
 
 export type StockDocumentTypeToStore =
-  "Penerimaan" | "Pengeluaran" | "Transfer Gudang" | "Retur Pembelian" | "Retur Penjualan";
+  | "Penerimaan"
+  | "Pengeluaran"
+  | "Transfer Gudang"
+  | "Retur Pembelian"
+  | "Retur Penjualan"
+  | "Stock Opname";
 
 export type StockDocumentLinePayload = {
   item_id: number;
-  qty: number;
+  qty?: number | null;
+  system_qty?: number | null;
+  actual_qty?: number | null;
   unit_cost?: number | null;
   to_bin_id?: number | null;
   from_bin_id?: number | null;
@@ -241,4 +249,22 @@ export type StockDocumentPayload = {
   pic?: string | null;
   note: string | null;
   lines: StockDocumentLinePayload[];
+};
+
+// ---- Update dokumen Stock Opname draft (PUT /api/persediaan/stock-documents/{id}) ----
+// Mengganti seluruh baris sesi opname; system_qty baris yang ada dipertahankan
+// dari snapshot dokumen asli (baris baru boleh kosong — di-backfill server).
+
+export type UpdateStockDocumentPayload = {
+  document_date?: string | null;
+  pic?: string | null;
+  note?: string | null;
+  lines: {
+    item_id: number;
+    from_bin_id: number;
+    system_qty?: number | null;
+    actual_qty?: number | null;
+    unit_cost?: number | null;
+    note?: string | null;
+  }[];
 };

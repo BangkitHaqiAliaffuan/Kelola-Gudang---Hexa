@@ -7,6 +7,7 @@ import type {
   StockMinimumApi,
   StockRowApi,
   StockValuationApi,
+  UpdateStockDocumentPayload,
   ValuationMethod,
 } from "@/lib/persediaan-types";
 
@@ -65,6 +66,33 @@ export function useCreateStockDocument() {
       api.post<{ data: StockDocumentApi }>("/persediaan/stock-documents", payload),
     // Posting menggerakkan stok: invalidasi seluruh cache persediaan
     // (stock-documents, stock, stock-card, stock-minimum, valuation).
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
+export function useUpdateStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateStockDocumentPayload }) =>
+      api.put<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
+export function usePostStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/post`, null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
+export function useCancelStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/cancel`, null),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
   });
 }

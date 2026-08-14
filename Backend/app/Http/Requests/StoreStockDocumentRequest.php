@@ -19,7 +19,7 @@ class StoreStockDocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan'])],
+            'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan', 'Stock Opname'])],
             'status' => ['required', Rule::in(['Draft', 'Selesai'])],
             'document_date' => ['required', 'date'],
             'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
@@ -47,23 +47,35 @@ class StoreStockDocumentRequest extends FormRequest
             'lines.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')],
             // qty selalu positif dari klien; controller menegasi baris Pengeluaran &
             // Retur Pembelian saat menyimpan (konvensi ledger: garis bertanda, arah
-            // diturunkan dari tanda qty).
-            'lines.*.qty' => ['required', 'integer', 'min:1'],
+            // diturunkan dari tanda qty). Baris Stock Opname TIDAK membawa qty —
+            // sistem memakai system_qty (snapshot) & actual_qty (hasil hitung fisik).
+            'lines.*.qty' => [
+                Rule::requiredIf(fn () => $this->input('type') !== 'Stock Opname'),
+                Rule::prohibitedIf(fn () => $this->input('type') === 'Stock Opname'),
+                'integer',
+                'min:1',
+            ],
+            // Stock Opname: system_qty di-snapshot server-side dari item_stock saat
+            // dokumen dibuat (nilai kiriman klien diabaikan); actual_qty adalah hasil
+            // hitung fisik yang boleh kosong untuk baris yang belum dicek.
+            'lines.*.system_qty' => ['nullable', 'integer', 'min:0'],
+            'lines.*.actual_qty' => ['nullable', 'integer', 'min:0'],
             // Pengeluaran & Retur Pembelian memakai biaya rata-rata (moving average) di
             // bin asal — di-backfill server saat simpan; unit_cost kiriman hanya dipakai
-            // untuk Penerimaan & Retur Penjualan.
+            // untuk Penerimaan & Retur Penjualan (dan sebagai fallback Stock Opname).
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'lines.*.to_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
                 Rule::requiredIf(fn () => in_array($this->input('type'), ['Penerimaan', 'Transfer Gudang', 'Retur Penjualan'], true)),
+                Rule::prohibitedIf(fn () => $this->input('type') === 'Stock Opname'),
             ],
             'lines.*.from_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
-                Rule::requiredIf(fn () => in_array($this->input('type'), ['Pengeluaran', 'Transfer Gudang', 'Retur Pembelian'], true)),
+                Rule::requiredIf(fn () => in_array($this->input('type'), ['Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Stock Opname'], true)),
             ],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
             'lines.*.source_line_id' => [
@@ -86,6 +98,26 @@ class StoreStockDocumentRequest extends FormRequest
     public function after(): array
     {
         return [
+            function (Validator $validator) {
+                $type = $this->input('type');
+                $status = $this->input('status');
+                $lines = $this->input('lines') ?? [];
+
+                if ($type !== 'Stock Opname' || $status !== 'Selesai' || ! $lines) {
+                    return;
+                }
+
+                $uncounted = collect($lines)
+                    ->filter(fn ($line) => ($line['actual_qty'] ?? null) === null)
+                    ->count();
+
+                if ($uncounted > 0) {
+                    $validator->errors()->add(
+                        'lines',
+                        "Semua barang wajib dihitung sebelum opname diselesaikan ({$uncounted} belum dicek)."
+                    );
+                }
+            },
             function (Validator $validator) {
                 $warehouseId = $this->input('warehouse_id');
                 $destinationId = $this->input('destination_warehouse_id');

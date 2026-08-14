@@ -28,6 +28,57 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
+const { opnameFixture } = vi.hoisted(() => ({
+  opnameFixture: [
+    {
+      id: 1,
+      no: "SO/2026/00001",
+      type: "Stock Opname",
+      status: "Draft",
+      document_date: "2026-07-28T00:00:00+07:00",
+      warehouse: "Gudang Utama",
+      line_count: 10,
+      checked_count: 4,
+    },
+    {
+      id: 2,
+      no: "SO/2026/00002",
+      type: "Stock Opname",
+      status: "Draft",
+      document_date: "2026-07-29T00:00:00+07:00",
+      warehouse: "Gudang Satelit",
+      line_count: 8,
+      checked_count: 2,
+    },
+    {
+      id: 3,
+      no: "SO/2026/00003",
+      type: "Stock Opname",
+      status: "Selesai",
+      document_date: "2026-07-01T00:00:00+07:00",
+      warehouse: "Gudang Utama",
+      line_count: 5,
+      checked_count: 5,
+    },
+  ] as const,
+}));
+
+vi.mock("@/hooks/use-persediaan", () => ({
+  useStockDocuments: () => ({ data: { data: opnameFixture }, isLoading: false }),
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    status: "authenticated",
+    user: null,
+    access: [],
+    login: vi.fn(),
+    logout: vi.fn(),
+    hasModule: () => true,
+    hasModuleLevel: () => true,
+  }),
+}));
+
 import { Route } from "@/routes/index";
 import {
   activities,
@@ -36,7 +87,6 @@ import {
   items,
   lowStock,
   monthly,
-  opnameSessions,
   outStock,
   totalValue,
   transactions,
@@ -74,7 +124,7 @@ describe("Dashboard (index route)", () => {
     const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
     const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
     const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
-    const running = opnameSessions.filter((o) => o.status === "Berjalan");
+    const running = opnameFixture.filter((o) => o.status === "Draft");
 
     const cases: Array<[label: string, value: string, hint?: string]> = [
       ["Total Item", formatNumber(items.reduce((a, b) => a + b.stock, 0)), "seluruh gudang"],
@@ -169,16 +219,16 @@ describe("Dashboard (index route)", () => {
       timeout: 3000,
     });
 
-    const running = opnameSessions.filter((o) => o.status === "Berjalan");
+    const running = opnameFixture.filter((o) => o.status === "Draft");
     expect(running).toHaveLength(2);
 
     for (const s of running) {
       expect(screen.getAllByText(s.warehouse).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(`${s.checked}/${s.total}`)).toBeInTheDocument();
+      expect(screen.getByText(`${s.checked_count}/${s.line_count}`)).toBeInTheDocument();
     }
 
-    for (const o of opnameSessions.filter((x) => x.status !== "Berjalan")) {
-      expect(screen.queryByText(`${o.checked}/${o.total}`)).toBeNull();
+    for (const o of opnameFixture.filter((x) => x.status !== "Draft")) {
+      expect(screen.queryByText(`${o.checked_count}/${o.line_count}`)).toBeNull();
     }
 
     const bars = screen.getAllByRole("progressbar");
@@ -187,7 +237,7 @@ describe("Dashboard (index route)", () => {
     const transform = style.match(/translateX\(-?([\d.]+)%\)/);
     expect(transform).not.toBeNull();
     expect(Number(transform?.[1])).toBeCloseTo(
-      100 - (running[0]!.checked / running[0]!.total) * 100,
+      100 - (running[0]!.checked_count / running[0]!.line_count) * 100,
       2,
     );
   });

@@ -28,6 +28,7 @@ class StockDocumentResource extends JsonResource
             'posted_at' => $this->posted_at?->toIso8601String(),
             'created_by' => $this->whenLoaded('creator', fn () => $this->creator?->name),
             'line_count' => $this->whenCounted('lines'),
+            'checked_count' => $this->when(isset($this->resource->checked_count), (int) $this->resource->checked_count),
             'qty_total' => $this->when(isset($this->resource->qty_total), (int) $this->resource->qty_total),
             'value_total' => $this->when(isset($this->resource->value_total), (float) $this->resource->value_total),
             'lines' => StockDocumentLineResource::collection($this->whenLoaded('lines')),
