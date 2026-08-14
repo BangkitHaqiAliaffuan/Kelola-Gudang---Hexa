@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -3847,6 +3847,8 @@ export function UserFormDialog({
     (users?.data ?? []).map((u) => u.code),
     "USR",
   );
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   return (
     <CrudFormDialog<UserInput>
@@ -3993,13 +3995,23 @@ export function UserFormDialog({
             />
             <div className="space-y-2">
               <Label>Password</Label>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                placeholder={initial ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
-                className="rounded-xl"
-                {...form.register("password")}
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder={initial ? "Kosongkan jika tidak diubah" : "Minimal 8 karakter"}
+                  className="rounded-xl pr-11"
+                  {...form.register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {form.formState.errors.password?.message && (
                 <p className="text-[0.8rem] font-medium text-destructive">
                   {form.formState.errors.password.message}
@@ -4008,13 +4020,31 @@ export function UserFormDialog({
             </div>
             <div className="space-y-2">
               <Label>Konfirmasi Password</Label>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                placeholder={initial ? "Kosongkan jika tidak diubah" : "Ulangi password"}
-                className="rounded-xl"
-                {...form.register("password_confirmation")}
-              />
+              <div className="relative">
+                <Input
+                  type={showPasswordConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder={initial ? "Kosongkan jika tidak diubah" : "Ulangi password"}
+                  className="rounded-xl pr-11"
+                  {...form.register("password_confirmation")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordConfirm((s) => !s)}
+                  aria-label={
+                    showPasswordConfirm
+                      ? "Sembunyikan konfirmasi password"
+                      : "Tampilkan konfirmasi password"
+                  }
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {showPasswordConfirm ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {form.formState.errors.password_confirmation?.message && (
                 <p className="text-[0.8rem] font-medium text-destructive">
                   {form.formState.errors.password_confirmation.message}
