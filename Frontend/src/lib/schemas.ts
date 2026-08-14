@@ -267,6 +267,7 @@ export const ACCESS_MODULES = [
   "Persediaan",
   "Stock Opname",
   "Pengadaan",
+  "Approval Pengadaan",
   "Laporan",
   "System",
   "Audit Trails",
@@ -291,6 +292,7 @@ export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
     { module: "Persediaan", level: "Tulis" },
     { module: "Stock Opname", level: "Baca" },
     { module: "Pengadaan", level: "Tulis" },
+    { module: "Approval Pengadaan", level: "Baca" },
     { module: "Laporan", level: "Baca" },
   ],
   "Operator Gudang": [

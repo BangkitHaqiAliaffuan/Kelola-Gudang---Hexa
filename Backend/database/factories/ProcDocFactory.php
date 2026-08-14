@@ -25,7 +25,6 @@ class ProcDocFactory extends Factory
             'kind' => 'PR',
             'status' => 'Draft',
             'document_date' => $date,
-            'need_date' => (clone $date)->modify('+7 days'),
             'requester_user_id' => User::factory(),
             'department_id' => Department::factory(),
             'supplier_id' => Supplier::factory(),

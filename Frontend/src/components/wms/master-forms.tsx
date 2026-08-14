@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -3949,6 +3950,7 @@ export function RoleEditDialog({
 }) {
   const update = useUpdateRole();
   const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
+  const [canApprove, setCanApprove] = useState(false);
 
   useEffect(() => {
     if (role) {
@@ -3956,6 +3958,7 @@ export function RoleEditDialog({
       for (const module of ACCESS_MODULES) next[module] = null;
       for (const entry of role.access) next[entry.module] = entry.level;
       setDraft(next);
+      setCanApprove(role.access.some((a) => a.module === "Approval Pengadaan"));
     }
   }, [role]);
 
@@ -3966,10 +3969,13 @@ export function RoleEditDialog({
     event.preventDefault();
     if (!role) return;
 
-    const access: RoleAccessEntry[] = ACCESS_MODULES.flatMap((module) => {
+    const access: RoleAccessEntry[] = ACCESS_MODULES.filter(
+      (m) => m !== "Approval Pengadaan",
+    ).flatMap((module) => {
       const level = draft[module];
       return level ? [{ module, level }] : [];
     });
+    if (canApprove) access.push({ module: "Approval Pengadaan", level: "Baca" });
 
     try {
       await update.mutateAsync({ role: role.name, access });
@@ -3993,7 +3999,7 @@ export function RoleEditDialog({
               <span>Modul</span>
               <span className="w-32 text-right">Hak Akses</span>
             </div>
-            {ACCESS_MODULES.map((module) => (
+            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan").map((module) => (
               <div
                 key={module}
                 className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
@@ -4022,6 +4028,21 @@ export function RoleEditDialog({
                 </Select>
               </div>
             ))}
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-can-approve" className="text-sm font-medium">
+                Approval Pengadaan
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Role ini dapat menyetujui/menolak dokumen pengadaan (PR/PO).
+              </p>
+            </div>
+            <Checkbox
+              id="role-can-approve"
+              checked={canApprove}
+              onCheckedChange={(value) => setCanApprove(value === true)}
+            />
           </div>
           <DialogFooter>
             <Button

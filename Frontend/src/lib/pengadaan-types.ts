@@ -44,7 +44,6 @@ export type ProcDocApi = {
   status: ProcDocStatus;
   date: string | null;
   document_date: string | null;
-  need_date: string | null;
   requester_user_id: number | null;
   requester: string | null;
   approver_user_id: number | null;
@@ -57,8 +56,6 @@ export type ProcDocApi = {
   warehouse: string | null;
   source_proc_doc_id: number | null;
   source_proc_doc: string | null;
-  is_late?: boolean;
-  late_days?: number;
   reference: string | null;
   note: string | null;
   submitted_at: string | null;
@@ -83,7 +80,6 @@ export type ProcDocLinePayload = {
 export type ProcDocPayload = {
   kind: "PR";
   document_date: string;
-  need_date: string | null;
   requester_user_id: number | null;
   department_id: number;
   supplier_id: number;
@@ -93,16 +89,17 @@ export type ProcDocPayload = {
   lines: ProcDocLinePayload[];
 };
 
-/** Mirrors backend ApprovalEngine::canDecide — role Supervisor atau Pengadaan Kelola, requester dikecualikan (SoD). */
+/** Mirrors backend ApprovalEngine::canDecide — role ber-modul 'Approval Pengadaan' (via canApprove) atau Pengadaan Kelola, requester dikecualikan (SoD). */
 export function canDecideProcDoc(
   doc: { status: string; requester_user_id: number | null },
   user: { id: number; role?: string | null } | null,
+  canApprove: boolean,
   canManage: boolean,
 ): boolean {
   return (
     doc.status === "Menunggu Approval" &&
     user != null &&
     user.id !== doc.requester_user_id &&
-    (user.role === "Supervisor" || canManage)
+    (canApprove || canManage)
   );
 }

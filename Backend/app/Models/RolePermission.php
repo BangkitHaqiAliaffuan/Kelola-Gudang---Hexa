@@ -12,6 +12,7 @@ class RolePermission extends Model
         'Persediaan',
         'Stock Opname',
         'Pengadaan',
+        'Approval Pengadaan',
         'Laporan',
         'System',
         'Audit Trails',

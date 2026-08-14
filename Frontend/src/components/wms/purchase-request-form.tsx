@@ -35,11 +35,6 @@ const newLine = (): FormLine => {
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
-const inDays = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-};
 
 /** Ambil query `?restock=itemId:qty,itemId:qty` dari dialog Saran Restock. */
 function readRestockParam(): { itemId: string; qty: string }[] {
@@ -78,7 +73,6 @@ export function PurchaseRequestForm({
   const isEdit = doc != null;
 
   const [documentDate, setDocumentDate] = useState(today());
-  const [needDate, setNeedDate] = useState(inDays(7));
   const [departmentId, setDepartmentId] = useState("");
   const [requesterId, setRequesterId] = useState(user?.id ? String(user.id) : "");
   const [supplierId, setSupplierId] = useState("");
@@ -102,7 +96,6 @@ export function PurchaseRequestForm({
   useEffect(() => {
     if (!doc) return;
     setDocumentDate(doc.document_date?.slice(0, 10) ?? today());
-    setNeedDate(doc.need_date?.slice(0, 10) ?? inDays(7));
     setDepartmentId(doc.department_id != null ? String(doc.department_id) : "");
     setRequesterId(doc.requester_user_id != null ? String(doc.requester_user_id) : "");
     setSupplierId(doc.supplier_id != null ? String(doc.supplier_id) : "");
@@ -216,7 +209,6 @@ export function PurchaseRequestForm({
     return {
       kind: "PR",
       document_date: documentDate || today(),
-      need_date: needDate || null,
       requester_user_id: requesterId ? Number(requesterId) : null,
       department_id: Number(departmentId),
       supplier_id: Number(supplierId),
@@ -288,18 +280,6 @@ export function PurchaseRequestForm({
             />
             {docError("document_date") && (
               <p className="text-xs text-destructive">{docError("document_date")}</p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label>Tanggal Dibutuhkan</Label>
-            <Input
-              type="date"
-              value={needDate}
-              onChange={(e) => setNeedDate(e.target.value)}
-              className="rounded-xl"
-            />
-            {docError("need_date") && (
-              <p className="text-xs text-destructive">{docError("need_date")}</p>
             )}
           </div>
           <div className="space-y-1.5">

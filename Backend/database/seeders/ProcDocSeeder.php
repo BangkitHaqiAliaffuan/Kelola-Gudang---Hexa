@@ -71,7 +71,6 @@ class ProcDocSeeder extends Seeder
             if (! ProcDoc::where('kind', 'PR')->exists()) {
                 for ($i = 0; $i < 60; $i++) {
                     $date = $ref->subDays($int(0, 200))->setTime($int(7, 17), $int(0, 59), 0);
-                    $need = $date->addDays($int(3, 30))->startOfDay();
 
                     $lines = [];
                     for ($j = 0, $count = $int(1, 5); $j < $count; $j++) {
@@ -92,7 +91,6 @@ class ProcDocSeeder extends Seeder
                         'kind' => 'PR',
                         'status' => $status,
                         'document_date' => $date,
-                        'need_date' => $need,
                         'requester_user_id' => $requester->id,
                         'department_id' => $pick($departments)->id,
                         'supplier_id' => $pick($suppliers)->id,
@@ -133,7 +131,6 @@ class ProcDocSeeder extends Seeder
                         'kind' => 'PO',
                         'status' => 'Draft',
                         'document_date' => $poDate,
-                        'need_date' => $pr->need_date,
                         'requester_user_id' => $pr->requester_user_id,
                         'department_id' => $pr->department_id,
                         'supplier_id' => $pr->supplier_id,

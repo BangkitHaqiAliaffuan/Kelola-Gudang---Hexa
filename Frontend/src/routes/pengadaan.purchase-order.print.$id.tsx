@@ -58,7 +58,6 @@ function PurchaseOrderPrint() {
           <PrintField label="Gudang Tujuan" value={doc.warehouse ?? "—"} />
           <PrintField label="No. PR" value={doc.reference ?? "—"} />
           <PrintField label="Tanggal" value={formatDate(doc.document_date)} />
-          <PrintField label="Tanggal Dibutuhkan" value={formatDate(doc.need_date ?? "")} />
           <PrintField label="Departemen" value={doc.department ?? "—"} />
           <PrintField label="Requester" value={doc.requester ?? "—"} />
           <PrintField label="Dibuat oleh" value={doc.created_by ?? "—"} />

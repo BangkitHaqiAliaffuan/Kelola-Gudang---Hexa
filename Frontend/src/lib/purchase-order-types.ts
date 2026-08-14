@@ -47,7 +47,6 @@ export type ProcDocApi = {
   status: string;
   date: string | null;
   document_date: string;
-  need_date: string | null;
   requester_user_id: number | null;
   requester: string | null;
   approver_user_id: number | null;
@@ -84,7 +83,6 @@ export type ProcDocLinePayload = {
 export type ProcDocPayload = {
   kind: "PO";
   document_date: string;
-  need_date: string;
   department_id?: number | null;
   supplier_id: number;
   warehouse_id: number;

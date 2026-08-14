@@ -9,29 +9,48 @@ use App\Models\User;
 
 /**
  * Approval engine untuk dokumen pengadaan (PR/PO) — single-level berbasis
- * role: approver Level 1 = user aktif ber-role Supervisor (bukan requester);
- * user Pengadaan Kelola dapat memutuskan sebagai override; requester tidak
- * pernah boleh memutuskan (SoD). Penolakan bersifat terminal.
+ * role: approver Level 1 = user aktif ber-role yang punya modul
+ * 'Approval Pengadaan' (diatur admin via Master → Role); user Pengadaan Kelola
+ * dapat memutuskan sebagai override; requester tidak pernah boleh memutuskan
+ * (SoD). Penolakan bersifat terminal.
  */
 class ApprovalEngine
 {
+    public const APPROVAL_MODULE = 'Approval Pengadaan';
+
+    /**
+     * Apakah role memiliki modul 'Approval Pengadaan' (keberadaan modul dengan
+     * level apa pun = boleh menyetujui).
+     */
+    public static function roleCanApprove(string $role): bool
+    {
+        return RolePermission::where('role', $role)
+            ->where('module', self::APPROVAL_MODULE)
+            ->exists();
+    }
+
     /**
      * Menentukan approver aktif (Level 1) untuk dokumen yang diajukan.
-     * - Utama: user aktif pertama (by id) ber-role Supervisor, selain requester.
+     * - Utama: user aktif pertama (by id) ber-role ber-modul 'Approval
+     *   Pengadaan', selain requester.
      * - Null bila tidak ada yang memenuhi → dokumen menunggu tanpa penugasan
-     *   (butuh penugasan manual); Supervisor mana pun tetap bisa memutuskan.
+     *   (butuh penugasan manual); user berhak memutuskan mana pun tetap bisa
+     *   memutuskan.
      */
     public static function resolveApprover(ProcDoc $procDoc): ?int
     {
         $requesterId = $procDoc->requester_user_id;
 
-        $supervisor = User::where('role', 'Supervisor')
+        $approvalRoles = RolePermission::where('module', self::APPROVAL_MODULE)
+            ->pluck('role');
+
+        $approver = User::whereIn('role', $approvalRoles)
             ->where('is_active', true)
             ->when($requesterId !== null, fn ($q) => $q->whereKeyNot($requesterId))
             ->orderBy('id')
             ->first();
 
-        return $supervisor?->id;
+        return $approver?->id;
     }
 
     /**
@@ -77,8 +96,9 @@ class ApprovalEngine
     }
 
     /**
-     * Apakah user berhak memutuskan dokumen: role Supervisor, atau siapa pun
-     * dengan Pengadaan Kelola (override) — kecuali requester (SoD).
+     * Apakah user berhak memutuskan dokumen: role ber-modul 'Approval
+     * Pengadaan', atau siapa pun dengan Pengadaan Kelola (override) — kecuali
+     * requester (SoD).
      */
     public static function canDecide(ProcDoc $procDoc, int $userId): bool
     {
@@ -91,7 +111,7 @@ class ApprovalEngine
             return false;
         }
 
-        if ($user->role === 'Supervisor') {
+        if (self::roleCanApprove($user->role)) {
             return true;
         }
 

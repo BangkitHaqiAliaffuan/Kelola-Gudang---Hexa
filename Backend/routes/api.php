@@ -70,7 +70,6 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan']
     Route::delete('proc-docs/{procDoc}', [ProcDocController::class, 'destroy'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/submit', [ProcDocController::class, 'submit'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/cancel', [ProcDocController::class, 'cancel'])->whereNumber('procDoc');
-    Route::post('proc-docs/{procDoc}/reschedule', [ProcDocController::class, 'reschedule'])->whereNumber('procDoc');
 });
 
 // Aksi approval hanya butuh auth:sanctum — otorisasi per-dokumen di controller

@@ -54,7 +54,7 @@ class ProcDocApiTest extends TestCase
         $res = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -96,7 +96,7 @@ class ProcDocApiTest extends TestCase
         $base = [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -111,7 +111,6 @@ class ProcDocApiTest extends TestCase
             'supplier required' => ['supplier_id' => null],
             'department required' => ['department_id' => null],
             'warehouse required' => ['warehouse_id' => null],
-            'need_date before document' => ['need_date' => '2026-08-01'],
             'qty zero' => ['lines' => [['item_id' => $item->id, 'qty' => 0, 'price' => 1000]]],
             'qty negative' => ['lines' => [['item_id' => $item->id, 'qty' => -5, 'price' => 1000]]],
             'item missing' => ['lines' => [['item_id' => 99999999, 'qty' => 1, 'price' => 1000]]],
@@ -136,7 +135,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -168,7 +167,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -201,7 +200,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -214,7 +213,7 @@ class ProcDocApiTest extends TestCase
 
         $this->putJson("/api/pengadaan/proc-docs/{$doc->id}", [
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -235,7 +234,7 @@ class ProcDocApiTest extends TestCase
 
         $this->putJson("/api/pengadaan/proc-docs/{$doc->id}", [
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -253,7 +252,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -271,7 +270,7 @@ class ProcDocApiTest extends TestCase
         $no2 = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -294,7 +293,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -323,7 +322,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -337,7 +336,7 @@ class ProcDocApiTest extends TestCase
         // Approve langsung pada Draft → 422.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(422);
 
-        // Submit → approver yang ditunjuk = user aktif ber-role Supervisor pertama.
+        // Submit → approver yang ditunjuk = user aktif ber-role ber-modul 'Approval Pengadaan' pertama.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
             ->assertOk()
             ->assertJsonPath('data.status', 'Menunggu Approval')
@@ -371,7 +370,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -403,7 +402,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -448,7 +447,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -489,7 +488,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -528,7 +527,7 @@ class ProcDocApiTest extends TestCase
             $no = $this->postJson('/api/pengadaan/proc-docs', [
                 'kind' => 'PR',
                 'document_date' => '2026-08-12',
-                'need_date' => '2026-08-25',
+
                 'department_id' => $department->id,
                 'supplier_id' => $supplier->id,
                 'warehouse_id' => $warehouse->id,
@@ -557,7 +556,7 @@ class ProcDocApiTest extends TestCase
         $no2 = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $d2->id,
             'supplier_id' => $s2->id,
             'warehouse_id' => $w2->id,
@@ -582,7 +581,7 @@ class ProcDocApiTest extends TestCase
         $no3 = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $d2->id,
             'supplier_id' => $s2->id,
             'warehouse_id' => $w2->id,
@@ -601,7 +600,7 @@ class ProcDocApiTest extends TestCase
         $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PO',
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $d2->id,
             'supplier_id' => $s2->id,
             'warehouse_id' => $w2->id,
@@ -625,7 +624,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -645,7 +644,7 @@ class ProcDocApiTest extends TestCase
         $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PO',
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -668,7 +667,7 @@ class ProcDocApiTest extends TestCase
         $noPending = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -682,7 +681,7 @@ class ProcDocApiTest extends TestCase
         $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PO',
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -704,7 +703,7 @@ class ProcDocApiTest extends TestCase
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
-            'need_date' => '2026-08-25',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -723,7 +722,7 @@ class ProcDocApiTest extends TestCase
         $poNo = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PO',
             'document_date' => '2026-08-13',
-            'need_date' => '2026-08-30',
+
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -748,19 +747,112 @@ class ProcDocApiTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
-    public function test_reschedule_extends_need_date(): void
+    public function test_index_non_manager_hides_others_drafts(): void
     {
         [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
 
-        // PR dengan need_date sudah lewat (kemarin).
-        $yesterday = now()->subDay()->format('Y-m-d');
-        $docDate = now()->subDays(10)->format('Y-m-d');
+        $supervisor = $this->makeSupervisor();
+        RolePermission::firstOrCreate(
+            ['role' => 'Supervisor', 'module' => 'Pengadaan'],
+            ['level' => 'Tulis'],
+        );
+        $other = $this->makeUser('Operator Gudang');
+
+        $base = [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ];
+
+        // Procurement (Kelola) membuat Draft milik supervisor, Draft milik orang
+        // lain, dan satu dokumen ter-submit milik orang lain.
+        $mineNo = $this->postJson('/api/pengadaan/proc-docs', $base + ['requester_user_id' => $supervisor->id])
+            ->assertStatus(201)->json('data.no');
+        $othersDraftNo = $this->postJson('/api/pengadaan/proc-docs', $base + ['requester_user_id' => $other->id])
+            ->assertStatus(201)->json('data.no');
+        $othersSubmittedNo = $this->postJson('/api/pengadaan/proc-docs', $base + ['requester_user_id' => $other->id])
+            ->assertStatus(201)->json('data.no');
+
+        $othersSubmitted = ProcDoc::where('no', $othersSubmittedNo)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$othersSubmitted->id}/submit")->assertOk();
+
+        // Supervisor (Pengadaan Tulis, non-Kelola): Draft milik sendiri + dokumen
+        // ter-submit siapa pun tampil; Draft milik orang lain disembunyikan.
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+
+        $numbers = array_column($this->getJson('/api/pengadaan/proc-docs?per_page=10000')->assertOk()->json('data'), 'no');
+
+        $this->assertContains($mineNo, $numbers);
+        $this->assertContains($othersSubmittedNo, $numbers);
+        $this->assertNotContains($othersDraftNo, $numbers);
+
+        // Filter status=Draft juga dibatasi ke Draft milik sendiri.
+        $drafts = array_column(
+            $this->getJson('/api/pengadaan/proc-docs?status=Draft&per_page=10000')->assertOk()->json('data'),
+            'no'
+        );
+        $this->assertContains($mineNo, $drafts);
+        $this->assertNotContains($othersDraftNo, $drafts);
+    }
+
+    public function test_show_draft_of_other_forbidden_for_non_manager(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+
+        $other = $this->makeUser('Operator Gudang');
+        $supervisor = $this->makeSupervisor();
+        RolePermission::firstOrCreate(
+            ['role' => 'Supervisor', 'module' => 'Pengadaan'],
+            ['level' => 'Tulis'],
+        );
+
+        $base = [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ];
+
+        $othersNo = $this->postJson('/api/pengadaan/proc-docs', $base + ['requester_user_id' => $other->id])
+            ->assertStatus(201)->json('data.no');
+        $othersDoc = ProcDoc::where('no', $othersNo)->firstOrFail();
+
+        // Supervisor non-Kelola: Draft milik orang lain → 403.
+        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $this->getJson("/api/pengadaan/proc-docs/{$othersDoc->id}")->assertStatus(403);
+
+        // Draft milik sendiri → 200.
+        $mineNo = $this->postJson('/api/pengadaan/proc-docs', $base + ['requester_user_id' => $supervisor->id])
+            ->assertStatus(201)->json('data.no');
+        $mineDoc = ProcDoc::where('no', $mineNo)->firstOrFail();
+        $this->getJson("/api/pengadaan/proc-docs/{$mineDoc->id}")->assertOk();
+
+        // User Pengadaan Kelola → semua Draft bisa diakses.
+        $this->actingAsProcurement();
+        $this->getJson("/api/pengadaan/proc-docs/{$othersDoc->id}")->assertOk();
+    }
+
+    public function test_role_with_approval_module_can_approve(): void
+    {
+        RolePermission::firstOrCreate(
+            ['role' => 'Approver Baru', 'module' => 'Approval Pengadaan'],
+            ['level' => 'Baca'],
+        );
+        $approver = $this->makeUser('Approver Baru');
+
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
 
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
-            'document_date' => $docDate,
-            'need_date' => $yesterday,
+            'document_date' => '2026-08-12',
             'department_id' => $department->id,
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
@@ -771,27 +863,49 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Status Draft: is_late terdeteksi pada detail.
-        $this->getJson("/api/pengadaan/proc-docs/{$doc->id}")
+        // resolveApprover menunjuk role ber-modul 'Approval Pengadaan'.
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
             ->assertOk()
-            ->assertJsonPath('data.is_late', true)
-            ->assertJsonPath('data.late_days', 1);
+            ->assertJsonPath('data.approver_user_id', $approver->id);
 
-        // Perpanjang ke tanggal mendatang → need_date ter-update, is_late false.
-        $future = now()->addDays(14)->format('Y-m-d');
-        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reschedule", [
-            'need_date' => $future,
-            'note' => 'Pengiriman ditunda pemasok',
-        ])->assertOk()
-            ->assertJsonPath('data.need_date', fn ($v) => str_starts_with((string) $v, $future))
-            ->assertJsonPath('data.is_late', false)
-            ->assertJsonPath('data.note', 'Pengiriman ditunda pemasok');
+        Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Disetujui');
+    }
 
-        // Tanggal mundur (sebelum hari ini) → 422.
-        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reschedule", [
-            'need_date' => $yesterday,
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('need_date');
+    public function test_role_with_pengadaan_tulis_without_approval_module_cannot_approve(): void
+    {
+        RolePermission::firstOrCreate(
+            ['role' => 'Tulis Saja', 'module' => 'Pengadaan'],
+            ['level' => 'Tulis'],
+        );
+        $nonApprover = $this->makeUser('Tulis Saja');
+
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'price' => 1000],
+            ],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+
+        // Tanpa role ber-modul 'Approval Pengadaan' → tak ada penugasan approver.
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
+        $doc->refresh();
+        $this->assertNull($doc->approver_user_id);
+
+        // Pengadaan Tulis tanpa modul approval → 403.
+        Sanctum::actingAs($nonApprover, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
     }
 
     private function actingAsProcurement(): void
@@ -839,6 +953,11 @@ class ProcDocApiTest extends TestCase
 
     private function makeSupervisor(): User
     {
+        RolePermission::firstOrCreate(
+            ['role' => 'Supervisor', 'module' => 'Approval Pengadaan'],
+            ['level' => 'Baca'],
+        );
+
         return $this->makeUser('Supervisor');
     }
 }

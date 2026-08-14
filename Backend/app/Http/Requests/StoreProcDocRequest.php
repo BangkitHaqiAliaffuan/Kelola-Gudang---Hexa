@@ -17,7 +17,6 @@ class StoreProcDocRequest extends FormRequest
         return [
             'kind' => ['required', Rule::in(['PR', 'PO'])],
             'document_date' => ['required', 'date'],
-            'need_date' => ['required', 'date', 'after_or_equal:document_date'],
             'requester_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
             'department_id' => ['required', 'integer', Rule::exists('departments', 'id')],
             'supplier_id' => ['required', 'integer', Rule::exists('suppliers', 'id')],

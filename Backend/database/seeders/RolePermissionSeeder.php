@@ -26,6 +26,7 @@ class RolePermissionSeeder extends Seeder
                 ['module' => 'Persediaan', 'level' => 'Tulis'],
                 ['module' => 'Stock Opname', 'level' => 'Baca'],
                 ['module' => 'Pengadaan', 'level' => 'Tulis'],
+                ['module' => 'Approval Pengadaan', 'level' => 'Baca'],
                 ['module' => 'Laporan', 'level' => 'Baca'],
             ],
             'Operator Gudang' => [

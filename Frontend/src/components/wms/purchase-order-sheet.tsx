@@ -75,9 +75,10 @@ export function PurchaseOrderSheet({
 }) {
   const [action, setAction] = useState<SheetAction | null>(null);
   const [rejectNote, setRejectNote] = useState("");
-  const { hasModuleLevel, user } = useAuth();
+  const { hasModule, hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
+  const canApprove = hasModule("Approval Pengadaan");
   const submit = useSubmitProcDocPo();
   const approve = useApproveProcDocPo();
   const reject = useRejectProcDocPo();
@@ -94,7 +95,7 @@ export function PurchaseOrderSheet({
   const isDraft = doc?.status === "Draft";
   const isPendingApproval = doc?.status === "Menunggu Approval";
 
-  const canDecide = (d: ProcDocApi) => canDecideProcDoc(d, user, canManage);
+  const canDecide = (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage);
 
   const labels: Record<SheetAction, { title: string; description: string; confirm: string }> = {
     submit: {
@@ -189,7 +190,6 @@ export function PurchaseOrderSheet({
                 <Field label="Gudang Tujuan" value={doc.warehouse ?? "—"} />
                 <Field label="No. PR" value={doc.reference ?? "—"} />
                 <Field label="Departemen" value={doc.department ?? "—"} />
-                <Field label="Tanggal Dibutuhkan" value={formatDate(doc.need_date ?? "")} />
                 <Field label="Dibuat oleh" value={doc.created_by ?? "—"} />
                 {isPendingApproval && (
                   <Field label="Approver" value={doc.approver ?? "Belum ditugaskan"} />

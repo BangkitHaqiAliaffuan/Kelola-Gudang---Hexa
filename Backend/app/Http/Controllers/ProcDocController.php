@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\RescheduleProcDocRequest;
 use App\Http\Requests\StoreProcDocRequest;
 use App\Http\Requests\UpdateProcDocRequest;
 use App\Http\Resources\ProcDocResource;
@@ -10,6 +9,8 @@ use App\Models\Item;
 use App\Models\ProcDoc;
 use App\Models\ProcDocApproval;
 use App\Models\ProcDocLine;
+use App\Models\RolePermission;
+use App\Models\User;
 use App\Support\ApprovalEngine;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
@@ -69,6 +70,22 @@ class ProcDocController extends Controller
             ->when($data['department_id'] ?? null, fn ($q, $departmentId) => $q->where('department_id', $departmentId))
             ->when($data['warehouse_id'] ?? null, fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId));
 
+        // Draft adalah pekerjaan pribadi pembuatnya: selain user Pengadaan Kelola,
+        // hanya Draft milik sendiri (requester atau pembuat) yang terlihat.
+        $user = $request->user();
+        if ($user && ! $this->isPengadaanKelola($user)) {
+            $query->where(function ($q) use ($user) {
+                $q->where('status', '!=', 'Draft')
+                    ->orWhere(function ($own) use ($user) {
+                        $own->where('status', 'Draft')
+                            ->where(function ($creator) use ($user) {
+                                $creator->where('requester_user_id', $user->id)
+                                    ->orWhere('created_by', $user->id);
+                            });
+                    });
+            });
+        }
+
         $query->orderByDesc('document_date')->orderByDesc('id');
 
         return ProcDocResource::collection(
@@ -91,7 +108,6 @@ class ProcDocController extends Controller
                 'kind' => $data['kind'],
                 'status' => 'Draft',
                 'document_date' => $data['document_date'],
-                'need_date' => $data['need_date'] ?? null,
                 'requester_user_id' => $data['requester_user_id'] ?? $request->user()?->id,
                 'department_id' => $data['department_id'],
                 'supplier_id' => $data['supplier_id'],
@@ -110,8 +126,12 @@ class ProcDocController extends Controller
         return new ProcDocResource($this->loadDetail($doc));
     }
 
-    public function show(ProcDoc $procDoc): ProcDocResource
+    public function show(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
+        if (! $this->canViewDoc(request()->user(), $procDoc)) {
+            return response()->json(['message' => 'Dokumen Draft milik pengguna lain tidak dapat diakses.'], 403);
+        }
+
         return new ProcDocResource($this->loadDetail($procDoc));
     }
 
@@ -120,6 +140,10 @@ class ProcDocController extends Controller
      */
     public function update(UpdateProcDocRequest $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
+        if (! $this->canViewDoc($request->user(), $procDoc)) {
+            return response()->json(['message' => 'Dokumen Draft milik pengguna lain tidak dapat diubah.'], 403);
+        }
+
         if (! $procDoc->isDraft()) {
             return response()->json(['message' => 'Hanya Purchase Request berstatus Draft yang dapat diubah.'], 422);
         }
@@ -129,7 +153,6 @@ class ProcDocController extends Controller
         DB::transaction(function () use ($procDoc, $data, $request) {
             $procDoc->update([
                 'document_date' => $data['document_date'],
-                'need_date' => $data['need_date'] ?? null,
                 'requester_user_id' => $data['requester_user_id'] ?? $request->user()?->id,
                 'department_id' => $data['department_id'],
                 'supplier_id' => $data['supplier_id'],
@@ -151,6 +174,10 @@ class ProcDocController extends Controller
      */
     public function destroy(ProcDoc $procDoc): JsonResponse
     {
+        if (! $this->canViewDoc(request()->user(), $procDoc)) {
+            return response()->json(['message' => 'Dokumen Draft milik pengguna lain tidak dapat dihapus.'], 403);
+        }
+
         if (! $procDoc->isDraft()) {
             return response()->json(['message' => 'Hanya Purchase Request berstatus Draft yang dapat dihapus.'], 422);
         }
@@ -165,6 +192,10 @@ class ProcDocController extends Controller
      */
     public function submit(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
+        if (! $this->canViewDoc(request()->user(), $procDoc)) {
+            return response()->json(['message' => 'Dokumen Draft milik pengguna lain tidak dapat diajukan.'], 403);
+        }
+
         if (! $procDoc->isDraft()) {
             return response()->json(['message' => 'Hanya dokumen pengadaan berstatus Draft yang dapat diajukan.'], 422);
         }
@@ -249,27 +280,6 @@ class ProcDocController extends Controller
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
-    /**
-     * Jadwalkan ulang tanggal kebutuhan (Perpanjang) untuk dokumen yang
-     * berstatus Draft, Menunggu Approval, atau Disetujui — terutama PR yang
-     * sudah melewati need_date. Tanggal baru wajib hari ini atau setelahnya.
-     */
-    public function reschedule(RescheduleProcDocRequest $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
-    {
-        if (! $procDoc->isDraft() && ! $procDoc->isPendingApproval() && ! $procDoc->isApproved()) {
-            return response()->json(['message' => 'Dokumen pengadaan dengan status ini tidak dapat dijadwalkan ulang.'], 422);
-        }
-
-        $data = $request->validated();
-
-        $procDoc->update([
-            'need_date' => $data['need_date'],
-            'note' => $data['note'] ?? $procDoc->note,
-        ]);
-
-        return new ProcDocResource($this->loadDetail($procDoc->fresh()));
-    }
-
     private function saveLines(ProcDoc $procDoc, array $lines): void
     {
         $items = Item::whereIn('id', collect($lines)->pluck('item_id')->filter()->unique()->values())
@@ -298,5 +308,33 @@ class ProcDocController extends Controller
         $procDoc->setAttribute('value_total', (float) $procDoc->lines->sum(fn (ProcDocLine $l) => $l->subtotal()));
 
         return $procDoc;
+    }
+
+    /**
+     * User dengan akses Pengadaan level Kelola melihat semua dokumen
+     * (termasuk Draft milik siapa pun); selain itu hanya Draft milik sendiri.
+     */
+    private function isPengadaanKelola(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return collect(RolePermission::accessForRole($user->role))
+            ->contains(fn (array $permission) => $permission['module'] === 'Pengadaan' && $permission['level'] === 'Kelola');
+    }
+
+    private function canViewDoc(?User $user, ProcDoc $procDoc): bool
+    {
+        if ($this->isPengadaanKelola($user)) {
+            return true;
+        }
+
+        if ($procDoc->status !== 'Draft') {
+            return true;
+        }
+
+        return $user !== null
+            && ($procDoc->requester_user_id === $user->id || $procDoc->created_by === $user->id);
     }
 }

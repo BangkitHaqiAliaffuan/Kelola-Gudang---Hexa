@@ -36,7 +36,6 @@ class ProcDoc extends Model
         'kind',
         'status',
         'document_date',
-        'need_date',
         'requester_user_id',
         'department_id',
         'supplier_id',
@@ -54,7 +53,6 @@ class ProcDoc extends Model
 
     protected $casts = [
         'document_date' => 'datetime',
-        'need_date' => 'date',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
     ];
@@ -127,20 +125,6 @@ class ProcDoc extends Model
     public function isApproved(): bool
     {
         return $this->status === 'Disetujui';
-    }
-
-    public function isLate(): bool
-    {
-        return $this->need_date !== null && $this->need_date->lt(now()->startOfDay());
-    }
-
-    public function lateDays(): int
-    {
-        if ($this->need_date === null) {
-            return 0;
-        }
-
-        return max(0, (int) $this->need_date->diffInDays(now()->startOfDay()));
     }
 
     public static function statusesFor(?string $kind): array

@@ -70,7 +70,6 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
   const { data: prDetail } = useProcDocPo(sourcePrId ? Number(sourcePrId) : undefined);
 
   const [date, setDate] = useState(today());
-  const [needDate, setNeedDate] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -89,7 +88,6 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
   useEffect(() => {
     if (mode === "edit" && doc && !prefilled) {
       setDate((doc.document_date ?? today()).slice(0, 10));
-      setNeedDate((doc.need_date ?? "").slice(0, 10));
       setSupplierId(doc.supplier_id != null ? String(doc.supplier_id) : "");
       setWarehouseId(doc.warehouse_id != null ? String(doc.warehouse_id) : "");
       setDepartmentId(doc.department_id != null ? String(doc.department_id) : "");
@@ -118,7 +116,6 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
       setWarehouseId(pr.warehouse_id != null ? String(pr.warehouse_id) : "");
       setDepartmentId(pr.department_id != null ? String(pr.department_id) : "");
       setReference(pr.no);
-      setNeedDate(pr.need_date ? pr.need_date.slice(0, 10) : needDate);
       setSourcedFromPr(true);
       setLines(
         (pr.lines ?? []).map((l) => ({
@@ -206,7 +203,6 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
   const buildPayload = (): ProcDocPayload => ({
     kind: "PO",
     document_date: date || today(),
-    need_date: needDate || date || today(),
     department_id: departmentId ? Number(departmentId) : null,
     supplier_id: Number(supplierId),
     warehouse_id: Number(warehouseId),
@@ -318,20 +314,6 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                   <p className="text-xs text-destructive">{docError("document_date")}</p>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label>Tanggal Dibutuhkan</Label>
-                <Input
-                  type="date"
-                  value={needDate}
-                  min={date}
-                  onChange={(e) => setNeedDate(e.target.value)}
-                  className="rounded-xl"
-                />
-                {docError("need_date") && (
-                  <p className="text-xs text-destructive">{docError("need_date")}</p>
-                )}
-              </div>
-
               {mode === "new" && (
                 <div className="space-y-1.5">
                   <Label>Buat dari PR Disetujui</Label>

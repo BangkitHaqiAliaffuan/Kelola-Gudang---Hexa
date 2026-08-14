@@ -1,14 +1,5 @@
 import { useState } from "react";
-import {
-  AlertTriangle,
-  CalendarClock,
-  CheckCircle2,
-  Pencil,
-  Printer,
-  Send,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
@@ -38,7 +29,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -46,7 +36,6 @@ import {
   useCancelProcDoc,
   useDeleteProcDoc,
   useRejectProcDoc,
-  useRescheduleProcDoc,
   useSubmitProcDoc,
 } from "@/hooks/use-pengadaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
@@ -127,7 +116,6 @@ function printProcDoc(doc: ProcDocApi) {
   <div class="field"><span>Departemen</span><b>${doc.department ?? "—"}</b></div>
   <div class="field"><span>Supplier</span><b>${doc.supplier ?? "—"}</b></div>
   <div class="field"><span>Gudang</span><b>${doc.warehouse ?? "—"}</b></div>
-  <div class="field"><span>Dibutuhkan</span><b>${fmtDate(doc.need_date)}</b></div>
   <div class="field"><span>Pemohon</span><b>${doc.requester ?? "—"}</b></div>
   <div class="field"><span>Referensi</span><b>${doc.reference ?? "—"}</b></div>
   <div class="field"><span>Disetujui</span><b>${doc.approved_by ?? "—"}</b></div>
@@ -154,32 +142,28 @@ export function PurchaseRequestSheet({
   doc: ProcDocApi | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { hasModuleLevel, user } = useAuth();
+  const { hasModule, hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
+  const canApprove = hasModule("Approval Pengadaan");
   const submit = useSubmitProcDoc();
   const approve = useApproveProcDoc();
   const reject = useRejectProcDoc();
   const cancel = useCancelProcDoc();
   const remove = useDeleteProcDoc();
-  const reschedule = useRescheduleProcDoc();
 
   const [confirmAction, setConfirmAction] = useState<
     "submit" | "approve" | "cancel" | "delete" | null
   >(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [rescheduleOpen, setRescheduleOpen] = useState(false);
-  const [rescheduleDate, setRescheduleDate] = useState("");
-  const [rescheduleNote, setRescheduleNote] = useState("");
 
   const busy =
     submit.isPending ||
     approve.isPending ||
     reject.isPending ||
     cancel.isPending ||
-    remove.isPending ||
-    reschedule.isPending;
+    remove.isPending;
 
   const runAction = (action: "submit" | "approve" | "cancel" | "delete") => {
     if (!doc) return;
@@ -234,14 +218,8 @@ export function PurchaseRequestSheet({
   const isDraft = doc.status === "Draft";
   const isPending = doc.status === "Menunggu Approval";
   const isApproved = doc.status === "Disetujui";
-  const canReschedule = isDraft || isPending || isApproved;
 
-  const openReschedule = () => {
-    setRescheduleDate(doc.need_date?.slice(0, 10) ?? "");
-    setRescheduleNote("");
-    setRescheduleOpen(true);
-  };
-  const canDecide = canDecideProcDoc(doc, user, canManage);
+  const canDecide = canDecideProcDoc(doc, user, canApprove, canManage);
 
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>
@@ -260,25 +238,10 @@ export function PurchaseRequestSheet({
         </SheetHeader>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-          {doc.is_late && (
-            <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-              <div>
-                <p className="text-sm font-semibold text-destructive">
-                  Kebutuhan sudah lewat {doc.late_days ?? 0} hari
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Perbarui tanggal kebutuhan atau batalkan dokumen yang tidak lagi diperlukan.
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="grid gap-2.5 sm:grid-cols-2">
             <Field label="Departemen" value={doc.department ?? "—"} />
             <Field label="Supplier" value={doc.supplier ?? "—"} />
             <Field label="Gudang" value={doc.warehouse ?? "—"} />
-            <Field label="Dibutuhkan" value={fmtDate(doc.need_date)} />
             <Field label="Pemohon" value={doc.requester ?? "—"} />
             <Field label="Referensi" value={doc.reference ?? "—"} />
             <Field label="Diajukan" value={fmtDate(doc.submitted_at)} />
@@ -425,16 +388,6 @@ export function PurchaseRequestSheet({
               <XCircle className="h-4 w-4" /> Batalkan
             </Button>
           )}
-          {doc.is_late && canReschedule && canWrite && (
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={openReschedule}
-              disabled={busy}
-            >
-              <CalendarClock className="h-4 w-4" /> Perpanjang
-            </Button>
-          )}
           {canDecide && (
             <Button
               variant="outline"
@@ -530,72 +483,6 @@ export function PurchaseRequestSheet({
               }}
             >
               Tolak PR
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={rescheduleOpen} onOpenChange={(o) => !o && setRescheduleOpen(false)}>
-        <DialogContent className="rounded-xl">
-          <DialogHeader>
-            <DialogTitle>Perpanjang Tanggal Kebutuhan</DialogTitle>
-            <DialogDescription>
-              Dokumen ini sudah melewati tanggal kebutuhan. Pilih tanggal baru (hari ini atau
-              setelahnya) untuk melanjutkan proses.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Tanggal Kebutuhan Baru
-              </label>
-              <Input
-                type="date"
-                value={rescheduleDate}
-                min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setRescheduleDate(e.target.value)}
-                className="rounded-xl"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Catatan (opsional)
-              </label>
-              <Textarea
-                value={rescheduleNote}
-                onChange={(e) => setRescheduleNote(e.target.value)}
-                placeholder="Contoh: pengiriman ditunda pemasok..."
-                rows={3}
-                className="rounded-xl"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => setRescheduleOpen(false)}
-            >
-              Batal
-            </Button>
-            <Button
-              className="rounded-xl"
-              disabled={!rescheduleDate || busy}
-              onClick={async () => {
-                if (!doc || !rescheduleDate) return;
-                setRescheduleOpen(false);
-                try {
-                  const res = await reschedule.mutateAsync({
-                    id: doc.id,
-                    payload: { need_date: rescheduleDate, note: rescheduleNote.trim() || null },
-                  });
-                  toast.success(`Tanggal kebutuhan ${res.data.no} diperpanjang`);
-                } catch (err) {
-                  toast.error((err as Error).message);
-                }
-              }}
-            >
-              Simpan Perpanjangan
             </Button>
           </DialogFooter>
         </DialogContent>

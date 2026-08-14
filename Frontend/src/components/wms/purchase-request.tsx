@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   ShoppingCart,
+  UserCheck,
 } from "lucide-react";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
@@ -32,7 +33,12 @@ import { useStockMinimum } from "@/hooks/use-persediaan";
 import { useProcDoc, useProcDocs } from "@/hooks/use-pengadaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
-import { procDocStatuses, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
+import {
+  canDecideProcDoc,
+  procDocStatuses,
+  type ProcDocApi,
+  type ProcDocStatus,
+} from "@/lib/pengadaan-types";
 import type { StockMinimumApi } from "@/lib/persediaan-types";
 
 const statusTone = (s: ProcDocStatus): Tone =>
@@ -176,9 +182,15 @@ function RestockDialog({
 }
 
 export function PurchaseRequestPage() {
-  const { hasModuleLevel } = useAuth();
+  const { hasModule, hasModuleLevel, user } = useAuth();
   const canCreate = hasModuleLevel("Pengadaan", "Tulis");
+  const canManage = hasModuleLevel("Pengadaan", "Kelola");
+  const canApprove = hasModule("Approval Pengadaan");
   const canViewRestock = hasModuleLevel("Persediaan", "Baca");
+  const canDecide = useCallback(
+    (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage),
+    [user, canApprove, canManage],
+  );
   const { data, isLoading } = useProcDocs();
   const { data: departments } = useDepartments();
   const { data: warehouses } = useWarehouses();
@@ -187,7 +199,7 @@ export function PurchaseRequestPage() {
   const [status, setStatus] = useState(ALL);
   const [dept, setDept] = useState(ALL);
   const [wh, setWh] = useState(ALL);
-  const [need, setNeed] = useState(ALL);
+  const [myApproval, setMyApproval] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -205,21 +217,20 @@ export function PurchaseRequestPage() {
           (status === ALL || d.status === status) &&
           (dept === ALL || d.department === dept) &&
           (wh === ALL || d.warehouse === wh) &&
-          (need === ALL || (need === "Terlambat" && (d.is_late ?? false)))
+          (!myApproval || canDecide(d))
         );
       }),
-    [data, qn, status, dept, wh, need],
+    [data, qn, status, dept, wh, myApproval, canDecide],
   );
-
-  const lateCount = rows.filter((r) => r.is_late).length;
 
   const stats = useMemo(() => {
     const all = data?.data ?? [];
     const pending = all.filter((d) => d.status === "Menunggu Approval").length;
     const approved = all.filter((d) => d.status === "Disetujui").length;
+    const approvable = all.filter((d) => canDecide(d)).length;
     const value = all.reduce((sum, d) => sum + (d.value_total ?? 0), 0);
-    return { total: all.length, pending, approved, value };
-  }, [data]);
+    return { total: all.length, pending, approved, approvable, value };
+  }, [data, canDecide]);
 
   const columns: Column<ProcDocApi>[] = [
     {
@@ -258,20 +269,6 @@ export function PurchaseRequestPage() {
       render: (r) => r.warehouse ?? "—",
     },
     {
-      key: "need_date",
-      label: "Kebutuhan",
-      className: "w-[170px] whitespace-nowrap",
-      sortable: true,
-      render: (r) =>
-        r.is_late ? (
-          <span className="font-semibold text-destructive">
-            {fmtDate(r.need_date)} · Telat {r.late_days ?? 0} hari
-          </span>
-        ) : (
-          fmtDate(r.need_date)
-        ),
-    },
-    {
       key: "qty_total",
       label: "Qty",
       className: "text-right w-[90px] whitespace-nowrap",
@@ -288,9 +285,14 @@ export function PurchaseRequestPage() {
     {
       key: "status",
       label: "Status",
-      className: "w-[160px] whitespace-nowrap",
+      className: "w-[180px] whitespace-nowrap",
       sortable: true,
-      render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
+      render: (r) => (
+        <div className="flex flex-col items-start gap-1">
+          <Pill tone={statusTone(r.status)}>{r.status}</Pill>
+          {canDecide(r) && <Pill tone="warning">Perlu Persetujuan</Pill>}
+        </div>
+      ),
     },
   ];
 
@@ -322,7 +324,7 @@ export function PurchaseRequestPage() {
           }
         />
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             label="Total PR"
             value={formatNumber(stats.total)}
@@ -336,6 +338,13 @@ export function PurchaseRequestPage() {
             hint="Perlu ditindaklanjuti"
             icon={ShoppingCart}
             tone="warning"
+          />
+          <StatCard
+            label="Perlu Persetujuan Saya"
+            value={formatNumber(stats.approvable)}
+            hint="Dapat Anda setujui/tolak"
+            icon={UserCheck}
+            tone="brand"
           />
           <StatCard
             label="Disetujui"
@@ -354,7 +363,7 @@ export function PurchaseRequestPage() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -385,20 +394,25 @@ export function PurchaseRequestPage() {
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
             />
-            <FilterSelect
-              className="w-full"
-              value={need}
-              onChange={setNeed}
-              placeholder="Semua Kebutuhan"
-              options={["Terlambat"]}
-            />
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant={myApproval ? "default" : "outline"}
+              className="rounded-xl"
+              aria-pressed={myApproval}
+              onClick={() => setMyApproval((v) => !v)}
+            >
+              <UserCheck className="h-4 w-4" />
+              Perlu Persetujuan Saya
+              {stats.approvable > 0 && ` (${formatNumber(stats.approvable)})`}
+            </Button>
           </div>
         </Panel>
       </div>
 
       <Panel
         title="Daftar Purchase Request"
-        description={`${formatNumber(rows.length)} dokumen${lateCount > 0 ? ` · ${formatNumber(lateCount)} terlambat` : ""}`}
+        description={`${formatNumber(rows.length)} dokumen`}
         actions={
           <Button
             variant="outline"
@@ -430,10 +444,10 @@ export function PurchaseRequestPage() {
               <p className="truncate text-xs text-muted-foreground">
                 {fmtDate(r.document_date)} · {r.department ?? "—"} · {r.supplier ?? "—"}
               </p>
-              {r.is_late && (
-                <p className="text-xs font-semibold text-destructive">
-                  Terlambat {r.late_days ?? 0} hari
-                </p>
+              {canDecide(r) && (
+                <Pill tone="warning" className="text-[10px]">
+                  Perlu Persetujuan Anda
+                </Pill>
               )}
               <div className="flex justify-between pt-1 text-xs">
                 <span>{formatNumber(r.qty_total ?? 0)} unit</span>
