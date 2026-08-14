@@ -2,6 +2,7 @@ import { Loader2, Warehouse, Inbox, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -130,12 +131,22 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-          <p
-            title={valueTitle}
-            className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl"
-          >
-            {value}
-          </p>
+          {valueTitle ? (
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                    {value}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent className="whitespace-nowrap">{valueTitle}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {value}
+            </p>
+          )}
           {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
         </div>
         <span
