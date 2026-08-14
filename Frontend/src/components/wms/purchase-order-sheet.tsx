@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle2, Pencil, Printer, Send, Trash2, XCircle, Ban } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -70,9 +70,11 @@ type SheetAction = "submit" | "approve" | "reject" | "cancel" | "delete";
 export function PurchaseOrderSheet({
   doc,
   onOpenChange,
+  isLoading = false,
 }: {
   doc: ProcDocApi | null;
   onOpenChange: (open: boolean) => void;
+  isLoading?: boolean;
 }) {
   const [action, setAction] = useState<SheetAction | null>(null);
   const [rejectNote, setRejectNote] = useState("");
@@ -164,6 +166,26 @@ export function PurchaseOrderSheet({
   const totalValue = lines.reduce((sum, l) => sum + l.subtotal, 0);
   const totalQty = lines.reduce((sum, l) => sum + l.qty, 0);
 
+  if (isLoading && !doc) {
+    return (
+      <Sheet open onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
+        >
+          <SheetHeader className="border-b border-border px-5 py-4 text-left">
+            <SheetTitle className="text-base">Memuat detail...</SheetTitle>
+            <SheetDescription>Data sedang diambil dari server.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 items-center justify-center gap-2 p-10">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Memuat data...</p>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>
       <SheetContent
@@ -244,9 +266,9 @@ export function PurchaseOrderSheet({
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
                   <span className="font-medium">Jumlah Item</span>
-                  <span className="text-right font-semibold">{lines.length}</span>
-                  <span className="font-medium">Total Barang</span>
-                  <span className="text-right font-semibold">{formatNumber(totalQty)}</span>
+                  <span className="text-right font-semibold">
+                    {lines.length} · {formatNumber(totalQty)} unit
+                  </span>
                   <span className="font-medium">Total Nilai</span>
                   <span className="text-right text-base font-bold">{formatIDR(totalValue)}</span>
                 </div>

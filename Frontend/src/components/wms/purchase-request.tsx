@@ -203,7 +203,7 @@ export function PurchaseRequestPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const { data: detail } = useProcDoc(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useProcDoc(selectedId ?? undefined);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -463,6 +463,7 @@ export function PurchaseRequestPage() {
 
       <PurchaseRequestSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
 

@@ -34,7 +34,7 @@ export function TransferGudangPage() {
   const [toWh, setToWh] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -203,6 +203,7 @@ export function TransferGudangPage() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

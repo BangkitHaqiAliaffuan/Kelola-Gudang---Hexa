@@ -36,7 +36,7 @@ export function BarangKeluarPage() {
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const purposes = useMemo(
     () =>
@@ -234,6 +234,7 @@ export function BarangKeluarPage() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

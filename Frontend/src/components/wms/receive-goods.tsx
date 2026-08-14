@@ -36,7 +36,7 @@ export function ReceiveGoodsPage() {
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const receipts = useMemo(() => (data?.data ?? []).filter(isPoReceipt), [data]);
 
@@ -238,6 +238,7 @@ export function ReceiveGoodsPage() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

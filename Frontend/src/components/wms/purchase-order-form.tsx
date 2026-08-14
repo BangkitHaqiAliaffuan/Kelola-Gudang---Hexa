@@ -67,7 +67,9 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
 
   const { data: docDetail } = useProcDocPo(mode === "edit" ? id : undefined);
   const [sourcePrId, setSourcePrId] = useState("");
-  const { data: prDetail } = useProcDocPo(sourcePrId ? Number(sourcePrId) : undefined);
+  const { data: prDetail, isLoading: prDetailLoading } = useProcDocPo(
+    sourcePrId ? Number(sourcePrId) : undefined,
+  );
 
   const [date, setDate] = useState(today());
   const [supplierId, setSupplierId] = useState("");
@@ -626,6 +628,7 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
 
       <PurchaseRequestSheet
         doc={prSheetOpen ? ((prDetail?.data ?? null) as unknown as PengadaanProcDocApi) : null}
+        isLoading={prSheetOpen && prDetailLoading}
         onOpenChange={setPrSheetOpen}
       />
     </>

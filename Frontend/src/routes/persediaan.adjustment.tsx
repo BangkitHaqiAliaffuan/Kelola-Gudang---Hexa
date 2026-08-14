@@ -49,7 +49,7 @@ function StockAdjustment() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const dayOk = (day: string) => {
     if (dateFrom && dateTo) return day >= dateFrom && day <= dateTo;
@@ -204,6 +204,7 @@ function StockAdjustment() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

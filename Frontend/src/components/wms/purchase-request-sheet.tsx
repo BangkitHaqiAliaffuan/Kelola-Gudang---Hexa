@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
@@ -139,9 +139,11 @@ ${doc.decision_note ? `<div class="note"><b>Catatan Keputusan:</b> ${doc.decisio
 export function PurchaseRequestSheet({
   doc,
   onOpenChange,
+  isLoading = false,
 }: {
   doc: ProcDocApi | null;
   onOpenChange: (open: boolean) => void;
+  isLoading?: boolean;
 }) {
   const { hasModule, hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
@@ -213,6 +215,26 @@ export function PurchaseRequestSheet({
           : confirmAction === "delete"
             ? "Dokumen draft akan dihapus permanen beserta seluruh barisnya."
             : "";
+
+  if (isLoading && !doc) {
+    return (
+      <Sheet open onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
+        >
+          <SheetHeader className="border-b border-border px-5 py-4 text-left">
+            <SheetTitle className="text-base">Memuat detail...</SheetTitle>
+            <SheetDescription>Data sedang diambil dari server.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 items-center justify-center gap-2 p-10">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Memuat data...</p>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   if (!doc) return null;
 
@@ -304,14 +326,13 @@ export function PurchaseRequestSheet({
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
-              <span className="font-medium">Jumlah Baris</span>
-              <span className="text-center font-semibold">{(doc.lines ?? []).length}</span>
+            <div className="grid grid-cols-2 gap-2 border-t border-border bg-muted/40 px-4 py-3 text-sm">
+              <span className="font-medium">Jumlah Item</span>
               <span className="text-right font-semibold">
-                {formatNumber(doc.qty_total ?? 0)} unit
+                {(doc.lines ?? []).length} · {formatNumber(doc.qty_total ?? 0)} unit
               </span>
               <span className="font-medium">Total Nilai</span>
-              <span className="col-span-2 text-right text-base font-bold">
+              <span className="text-right text-base font-bold">
                 {formatIDR(doc.value_total ?? 0)}
               </span>
             </div>

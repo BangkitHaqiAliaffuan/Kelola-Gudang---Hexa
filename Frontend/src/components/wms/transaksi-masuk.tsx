@@ -34,7 +34,7 @@ export function BarangMasukPage() {
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const suppliers = useMemo(
     () =>
@@ -212,6 +212,7 @@ export function BarangMasukPage() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

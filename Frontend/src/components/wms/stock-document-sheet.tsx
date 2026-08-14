@@ -1,4 +1,4 @@
-import { Printer } from "lucide-react";
+import { Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -130,9 +130,11 @@ function LineQtyCells({
 export function StockDocumentSheet({
   doc,
   onOpenChange,
+  isLoading = false,
 }: {
   doc: StockDocumentApi | null;
   onOpenChange: (open: boolean) => void;
+  isLoading?: boolean;
 }) {
   const lines = doc?.lines ?? [];
   const isOpname = lines.length > 0 && lines.every(isOpnameLine);
@@ -149,6 +151,26 @@ export function StockDocumentSheet({
   const totalDown = downLines.reduce((s, l) => s + Math.abs(l.qty ?? 0), 0);
   const netValue = lines.reduce((s, l) => s + lineSignedQty(l) * l.unit_cost, 0);
   const unit = lines[0]?.unit ?? "";
+
+  if (isLoading && !doc) {
+    return (
+      <Sheet open onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl lg:max-w-2xl"
+        >
+          <SheetHeader className="border-b border-border px-5 py-4 text-left">
+            <SheetTitle className="text-base">Memuat detail...</SheetTitle>
+            <SheetDescription>Data sedang diambil dari server.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 items-center justify-center gap-2 p-10">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Memuat data...</p>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet open={!!doc} onOpenChange={onOpenChange}>

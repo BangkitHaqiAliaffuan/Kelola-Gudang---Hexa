@@ -88,7 +88,7 @@ export function BarangMasukForm({
   const prefilledPoRef = useRef<number | null>(null);
 
   const poIdNum = selectedPoId ? Number(selectedPoId) : undefined;
-  const { data: poDetail } = useProcDocPo(poIdNum);
+  const { data: poDetail, isLoading: poDetailLoading } = useProcDocPo(poIdNum);
 
   const binsInWarehouse = useMemo(
     () =>
@@ -585,6 +585,7 @@ export function BarangMasukForm({
       {referenceCombobox && (
         <PurchaseOrderSheet
           doc={poSheetOpen ? (poDetail?.data ?? null) : null}
+          isLoading={poSheetOpen && poDetailLoading}
           onOpenChange={(o) => !o && setPoSheetOpen(false)}
         />
       )}

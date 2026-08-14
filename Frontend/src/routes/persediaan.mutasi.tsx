@@ -61,7 +61,7 @@ function MutasiStock() {
   const [status, setStatus] = useState(ALL);
   const [wh, setWh] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useStockDocument(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
 
   const rows = useMemo(
     () =>
@@ -201,6 +201,7 @@ function MutasiStock() {
 
       <StockDocumentSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>

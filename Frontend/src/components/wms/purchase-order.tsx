@@ -39,7 +39,7 @@ export function PurchaseOrderPage() {
   const [wh, setWh] = useState(ALL);
   const [supplier, setSupplier] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: detail } = useProcDocPo(selectedId ?? undefined);
+  const { data: detail, isLoading: detailLoading } = useProcDocPo(selectedId ?? undefined);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -274,6 +274,7 @@ export function PurchaseOrderPage() {
 
       <PurchaseOrderSheet
         doc={detail?.data ?? null}
+        isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
       />
     </>
