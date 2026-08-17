@@ -26,13 +26,21 @@ export function useStockRows() {
   });
 }
 
-export function useStockCard(itemId: number | undefined, method: ValuationMethod) {
+export function useStockCard(
+  itemId: number | undefined,
+  method: ValuationMethod,
+  warehouseId?: number | null,
+) {
   return useQuery({
-    queryKey: ["persediaan", "stock-card", itemId, method],
-    queryFn: () =>
-      api.get<{ data: StockCardApi }>(
-        `/persediaan/stock-card?item_id=${itemId}&method=${encodeURIComponent(method)}`,
-      ),
+    queryKey: ["persediaan", "stock-card", itemId, method, warehouseId ?? null],
+    queryFn: () => {
+      const sp = new URLSearchParams({
+        item_id: String(itemId),
+        method: encodeURIComponent(method),
+      });
+      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
+      return api.get<{ data: StockCardApi }>(`/persediaan/stock-card?${sp.toString()}`);
+    },
     enabled: itemId != null && typeof window !== "undefined",
   });
 }

@@ -170,7 +170,8 @@ class StockController extends Controller
         $from = $data['from'] ?? null;
         $to = $data['to'] ?? null;
 
-        $movements = StockMovement::where('item_id', $item->id)
+        $movements = StockMovement::with(['warehouse', 'stockDocument.destination'])
+            ->where('item_id', $item->id)
             ->when($data['warehouse_id'] ?? null, fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
             ->orderBy('occurred_at')
             ->orderBy('id')
@@ -237,6 +238,10 @@ class StockController extends Controller
                 'no' => $movement->reference_no,
                 'type' => $movement->movement_type,
                 'direction' => $movement->direction,
+                'warehouse' => $movement->warehouse?->name,
+                'destination' => $movement->movement_type === 'Transfer Gudang'
+                    ? $movement->stockDocument?->destination?->name
+                    : null,
                 'masuk' => $movement->direction === 'IN' ? $movement->qty : 0,
                 'keluar' => $movement->direction === 'OUT' ? $movement->qty : 0,
                 'saldo' => $saldo,

@@ -10,7 +10,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
+import {
+  ALL,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "@/components/wms/kit";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { useDebouncedValue } from "@/hooks/use-debounce";
-import { useItems } from "@/hooks/use-master";
+import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard } from "@/hooks/use-persediaan";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
 import { valuationMethodLabels } from "@/lib/persediaan-types";
@@ -39,17 +47,32 @@ export const Route = createFileRoute("/persediaan/kartu-stock")({
   component: KartuStock,
 });
 
+const typeTone = (t: string): Tone =>
+  t === "Penerimaan"
+    ? "success"
+    : t === "Pengeluaran" || t === "Stock Adjustment"
+      ? "warning"
+      : "info";
+
+type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null };
+
 function KartuStock() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
+  const [wh, setWh] = useState(ALL);
   const [detail, setDetail] = useState<Trx | null>(null);
   const activeId = id ?? options[0]?.id;
+  const whId = useMemo(
+    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
+    [warehouses, wh],
+  );
 
-  const cardFifo = useStockCard(activeId, "FIFO");
-  const cardAvg = useStockCard(activeId, "Average");
-  const cardMax = useStockCard(activeId, "Maximum Cost");
+  const cardFifo = useStockCard(activeId, "FIFO", whId);
+  const cardAvg = useStockCard(activeId, "Average", whId);
+  const cardMax = useStockCard(activeId, "Maximum Cost", whId);
   const card = method === "FIFO" ? cardFifo : method === "Average" ? cardAvg : cardMax;
   const methodCards: Record<ValuationMethod, typeof card> = {
     FIFO: cardFifo,
@@ -59,7 +82,7 @@ function KartuStock() {
 
   const item = card.data?.data.item;
   const cardData = card.data?.data;
-  const rows = useMemo(() => cardData?.rows ?? [], [cardData]);
+  const rows = useMemo(() => (cardData?.rows as CardRow[] | undefined) ?? [], [cardData]);
   const unit = item?.unit ?? "pcs";
   const saldoAwal = cardData?.saldo_awal ?? 0;
   const lastRow = rows[rows.length - 1];
@@ -109,7 +132,7 @@ function KartuStock() {
     [rows],
   );
 
-  const toTrx = (r: StockCardRowApi, it: NonNullable<typeof item>): Trx => {
+  const toTrx = (r: CardRow, it: NonNullable<typeof item>): Trx => {
     const qty = r.masuk || r.keluar;
     const type: Trx["type"] =
       r.type === "Penerimaan"
@@ -122,7 +145,7 @@ function KartuStock() {
       no: r.no,
       type,
       date: r.date,
-      warehouse: it.warehouse ?? "—",
+      warehouse: r.warehouse ?? it.warehouse ?? "—",
       partner: r.partner,
       reference: r.reference,
       qty,
@@ -161,7 +184,17 @@ function KartuStock() {
       label: "Jenis",
       className: "min-w-[140px] whitespace-nowrap",
       sortable: true,
-      render: (r) => <Pill tone={r.masuk ? "success" : "warning"}>{r.type}</Pill>,
+      render: (r) => <Pill tone={typeTone(r.type)}>{r.type}</Pill>,
+    },
+    {
+      key: "warehouse",
+      label: "Gudang",
+      className: "min-w-[160px] whitespace-nowrap",
+      sortable: true,
+      render: (r) =>
+        r.warehouse && r.destination && r.destination !== r.warehouse
+          ? `${r.warehouse} → ${r.destination}`
+          : (r.warehouse ?? "—"),
     },
     {
       key: "unit",
@@ -389,6 +422,14 @@ function KartuStock() {
             options={picOptions}
             loading={card.isLoading}
           />
+          <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
+          />
           <Input
             type="date"
             value={dateFrom}
@@ -418,13 +459,19 @@ function KartuStock() {
                   <p className="truncate text-sm font-medium">{r.no}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(r.date)}</p>
                 </div>
-                <Pill tone={r.masuk ? "success" : "warning"}>
+                <Pill tone={typeTone(r.type)}>
                   {r.masuk ? `+${formatNumber(r.masuk)}` : `-${formatNumber(r.keluar)}`}{" "}
                   {r.unit ?? ""}
                 </Pill>
               </div>
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
                 <p>Jenis: {r.type}</p>
+                <p>
+                  Gudang:{" "}
+                  {r.warehouse && r.destination && r.destination !== r.warehouse
+                    ? `${r.warehouse} → ${r.destination}`
+                    : (r.warehouse ?? "—")}
+                </p>
                 <p>
                   Saldo: {formatNumber(r.saldo)} {r.unit ?? ""}
                 </p>
