@@ -13,6 +13,7 @@ import {
   ArrowLeftRight,
   QrCode,
   CheckCheck,
+  Lock,
 } from "lucide-react";
 import {
   Area,
@@ -133,8 +134,22 @@ function Dashboard() {
       tone: "neutral" as const,
     },
     {
+      label: "Stok Tereservasi",
+      value: formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
+      hint: "terikat permintaan",
+      icon: Lock,
+      tone: "info" as const,
+    },
+    {
       label: "Barang Masuk Hari Ini",
       value: formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)),
+      hint: `${masukToday.length} transaksi`,
+      icon: ArrowDownToLine,
+      tone: "success" as const,
+    },
+    {
+      label: "Nilai Barang Masuk Hari Ini",
+      value: formatIDRCompact(masukToday.reduce((a, b) => a + b.value, 0)),
       hint: `${masukToday.length} transaksi`,
       icon: ArrowDownToLine,
       tone: "success" as const,

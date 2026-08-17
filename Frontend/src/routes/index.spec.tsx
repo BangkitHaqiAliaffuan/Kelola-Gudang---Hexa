@@ -117,9 +117,9 @@ describe("Dashboard (index route)", () => {
     expect(screen.getByText("Semua sistem normal")).toBeInTheDocument();
   });
 
-  it("merender 10 StatCard dengan nilai turunan wms-data", () => {
+  it("merender 12 StatCard dengan nilai turunan wms-data", () => {
     const { container } = render(<DashboardView />);
-    expect(container.querySelectorAll("p.text-xl")).toHaveLength(10);
+    expect(container.querySelectorAll("p.text-xl")).toHaveLength(12);
 
     const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
     const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
@@ -131,8 +131,18 @@ describe("Dashboard (index route)", () => {
       ["Total SKU", formatNumber(items.length), "barang aktif terdaftar"],
       ["Total Gudang", String(warehouses.length), "lokasi penyimpanan"],
       [
+        "Stok Tereservasi",
+        formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
+        "terikat permintaan",
+      ],
+      [
         "Barang Masuk Hari Ini",
         formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)),
+        `${masukToday.length} transaksi`,
+      ],
+      [
+        "Nilai Barang Masuk Hari Ini",
+        formatIDRCompact(masukToday.reduce((a, b) => a + b.value, 0)),
         `${masukToday.length} transaksi`,
       ],
       [
