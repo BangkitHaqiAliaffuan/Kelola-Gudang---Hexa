@@ -211,10 +211,20 @@ export function ReturPembelianForm() {
     );
   };
 
+  // Baris sumber dari dokumen Penerimaan terpilih yang masih bisa diretur:
+  // stok tersedia di bin penerimaannya masih > 0 (bin asal = to_bin/from_bin
+  // baris sumber, konsisten dengan validasi server).
+  const returnableSourceLines = useMemo(
+    () =>
+      sourceLines.filter((s) => (availableByKey.get(`${s.item_id}:${sourceLineBin(s)}`) ?? 0) > 0),
+    [sourceLines, availableByKey],
+  );
+
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    // Dengan dokumen sumber, barang dibatasi pada baris Penerimaan sumber.
+    // Dengan dokumen sumber, barang dibatasi pada baris Penerimaan sumber yang
+    // masih bisa diretur (stok di bin penerimaan > 0).
     if (sourceDocId) {
-      const ids = new Set(sourceLines.map((s) => s.item_id));
+      const ids = new Set(returnableSourceLines.map((s) => s.item_id));
       return itemOptions.filter((o) => ids.has(Number(o.value)));
     }
     if (!l.binId) return itemOptions;
@@ -452,6 +462,12 @@ export function ReturPembelianForm() {
             />
             {!warehouseId && (
               <p className="text-xs text-muted-foreground">Pilih gudang untuk memuat dokumen.</p>
+            )}
+            {sourceDocId && sourceDetail?.data && returnableSourceLines.length === 0 && (
+              <p className="text-xs text-destructive">
+                Dokumen ini tidak memiliki barang yang bisa diretur (stok di bin penerimaan sudah
+                habis/dipindah).
+              </p>
             )}
             {docError("source_document_id") && (
               <p className="text-xs text-destructive">{docError("source_document_id")}</p>
