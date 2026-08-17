@@ -28,7 +28,7 @@ import {
 } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/wms-data";
-import type { StockDocumentPayload } from "@/lib/persediaan-types";
+import type { StockDocumentLineApi, StockDocumentPayload } from "@/lib/persediaan-types";
 
 const returReasons = ["Cacat", "Kelebihan Kirim", "Salah Barang", "Kadaluarsa", "Lainnya"];
 
@@ -96,21 +96,21 @@ export function ReturPembelianForm() {
     [suppliers],
   );
 
-  // Dokumen Barang Masuk (Penerimaan Selesai) di gudang terpilih — difilter juga
-  // oleh supplier bila sudah dipilih. Barang retur harus berasal dari salah satu
-  // baris dokumen ini (validasi server: cap qty per baris + harga beli asal).
+  // Dokumen Barang Masuk (Penerimaan Selesai) di gudang terpilih — selalu
+  // menampilkan seluruh dokumen agar user bisa berganti sumber kapan saja
+  // (supplier terisi otomatis dari dokumen terpilih, tidak memfilter daftar).
+  // Barang retur harus berasal dari salah satu baris dokumen ini (validasi
+  // server: cap qty per baris + harga beli asal).
   const sourceDocOptions: ComboboxOption[] = useMemo(() => {
     const docs = (incomingDocs?.data ?? []).filter(
-      (d) =>
-        (!warehouseId || d.warehouse_id === Number(warehouseId)) &&
-        (!supplier || d.partner === supplier),
+      (d) => !warehouseId || d.warehouse_id === Number(warehouseId),
     );
     return docs.map((d) => ({
       value: String(d.id),
       label: `${d.no} · ${formatDate(d.document_date)}${d.partner ? ` · ${d.partner}` : ""}`,
       keywords: `${d.no} ${d.partner ?? ""} ${d.reference_no ?? ""}`,
     }));
-  }, [incomingDocs, warehouseId, supplier]);
+  }, [incomingDocs, warehouseId]);
 
   // Baris barang dari dokumen sumber terpilih (qty positif = yang diterima).
   const sourceLines = useMemo(
@@ -195,15 +195,18 @@ export function ReturPembelianForm() {
   const lineAvailable = (l: FormLine): number | undefined =>
     l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
 
+  // Bin asal retur dari baris Penerimaan sumber: BM buatan form sungguhan
+  // menyimpan bin di `to_bin_id`, BM lama (seed) hanya di `from_bin_id`.
+  const sourceLineBin = (s: StockDocumentLineApi): number | null => s.to_bin_id ?? s.from_bin_id;
+
   // Baris sumber untuk sebuah barang (dari dokumen Penerimaan terpilih). Bin asal
-  // retur wajib bin tujuan baris sumber; qty maksimum = qty diterima baris sumber.
+  // retur wajib bin penerimaan baris sumber; qty maksimum = qty diterima baris
+  // sumber.
   const lineSource = (l: FormLine) => {
     if (!sourceLines.length || !l.itemId) return undefined;
     return (
       sourceLines.find(
-        (s) =>
-          s.item_id === Number(l.itemId) &&
-          (s.to_bin_id == null || s.to_bin_id === Number(l.binId)),
+        (s) => s.item_id === Number(l.itemId) && sourceLineBin(s) === Number(l.binId),
       ) ?? sourceLines.find((s) => s.item_id === Number(l.itemId))
     );
   };
@@ -222,13 +225,16 @@ export function ReturPembelianForm() {
 
   // Dropdown bin scoped: hanya bin berisi stok di gudang ini; saat barang sudah
   // dipilih, hanya bin yang memegang barang tersebut (berisi stok). Dengan dokumen
-  // sumber, bin hanya yang dipakai baris sumber (bin tujuan Penerimaan).
+  // sumber, bin hanya bin penerimaan (to_bin/from_bin) dari baris dokumen itu
+  // (asal retur).
   const lineBinOptions = (l: FormLine): ComboboxOption[] => {
     if (!warehouseId) return [];
     if (sourceDocId) {
-      const src = lineSource(l);
-      if (!l.itemId || !src || src.to_bin_id == null) return [];
-      return binOptions.filter((o) => Number(o.value) === src.to_bin_id);
+      if (!l.itemId) return [];
+      const ids = new Set(
+        sourceLines.filter((s) => s.item_id === Number(l.itemId)).map((s) => sourceLineBin(s)),
+      );
+      return binOptions.filter((o) => ids.has(Number(o.value)));
     }
     if (l.itemId) {
       const candidates = binCandidatesByItem.get(l.itemId) ?? [];
@@ -255,12 +261,14 @@ export function ReturPembelianForm() {
 
   const pickItem = (key: string, itemId: string) => {
     patchLine(key, (line) => {
-      // Dengan dokumen sumber: bin dikunci ke bin tujuan baris Penerimaan sumber.
+      // Dengan dokumen sumber: bin dikunci ke bin penerimaan baris Penerimaan
+      // sumber (fallback ke from_bin_id untuk BM lama yang tidak mengisi to_bin).
       if (sourceDocId) {
         const src = lineSource({ ...line, itemId });
+        const binId = src?.to_bin_id ?? src?.from_bin_id;
         return {
           itemId,
-          binId: src?.to_bin_id != null ? String(src.to_bin_id) : "",
+          binId: binId != null ? String(binId) : "",
         };
       }
       const item = items?.data.find((x) => String(x.id) === itemId);
@@ -287,12 +295,13 @@ export function ReturPembelianForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  // Pilih dokumen Penerimaan sumber: supplier ikut terisi dari partner dokumen,
-  // daftar barang dibatasi ke baris dokumen itu.
+  // Pilih dokumen Penerimaan sumber: supplier ikut terisi dari partner dokumen
+  // (tersinkron penuh saat pindah ke dokumen lain), daftar barang dibatasi ke
+  // baris dokumen itu.
   const pickSourceDoc = (id: string) => {
     setSourceDocId(id);
     const doc = (incomingDocs?.data ?? []).find((d) => String(d.id) === id);
-    if (doc?.partner) setSupplier((prev) => prev || (doc.partner ?? ""));
+    setSupplier(doc?.partner ?? "");
     setLines([newLine()]);
   };
 
