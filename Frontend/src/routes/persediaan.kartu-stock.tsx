@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Boxes, Printer, Search, Wallet } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Boxes,
+  Maximize2,
+  Minimize2,
+  Printer,
+  Search,
+  Wallet,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -63,6 +72,7 @@ function KartuStock() {
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [wh, setWh] = useState(ALL);
+  const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const activeId = id ?? options[0]?.id;
   const whId = useMemo(
@@ -252,149 +262,166 @@ function KartuStock() {
 
   return (
     <>
-      <PageHeader
-        title="Kartu Stock"
-        description="Riwayat pergerakan stok per barang"
-        actions={
-          <>
-            <div className="flex rounded-xl border border-border bg-card p-1">
-              {valuationMethods.map((m) => (
-                <button
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Kartu Stock"
+          description="Riwayat pergerakan stok per barang"
+          actions={
+            <>
+              <div className="flex rounded-xl border border-border bg-card p-1">
+                {valuationMethods.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMethod(m)}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                      method === m
+                        ? "bg-primary text-primary-foreground shadow-soft"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {valuationMethodLabels[m]}
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" className="rounded-xl">
+                <Printer className="h-4 w-4" /> Cetak
+              </Button>
+            </>
+          }
+        />
+
+        <Panel title="Pilih Barang">
+          <FormCombobox
+            value={activeId != null ? String(activeId) : ""}
+            onValueChange={(v) => setId(Number(v))}
+            options={options.map((o) => ({
+              value: String(o.id),
+              label: `${o.name} — ${o.sku}`,
+              keywords: `${o.name} ${o.sku} ${o.internal_barcode ?? ""}`.trim(),
+            }))}
+            placeholder="Pilih barang…"
+            searchPlaceholder="Cari nama atau SKU…"
+            loading={itemsLoading}
+            className="max-w-md"
+          />
+        </Panel>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            label="Saldo Awal"
+            value={`${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
+            icon={Boxes}
+            tone="info"
+          />
+          <StatCard
+            label="Total Masuk"
+            value={`${formatNumber(totalMasuk)} ${unit}`}
+            icon={ArrowDownLeft}
+            tone="success"
+          />
+          <StatCard
+            label="Total Keluar"
+            value={`${formatNumber(totalKeluar)} ${unit}`}
+            icon={ArrowUpRight}
+            tone="warning"
+          />
+          <StatCard
+            label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
+            value={formatIDR(lastRow?.nilai ?? 0)}
+            hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
+            icon={Wallet}
+          />
+        </div>
+
+        <Panel
+          title="Pergerakan Saldo Stok"
+          description={`Satuan ${unit} · nilai memakai metode ${valuationMethodLabels[method]}`}
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={chart}>
+              <defs>
+                <linearGradient id="ksArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis fontSize={12} tickLine={false} axisLine={false} width={50} />
+              <Tooltip
+                formatter={(v: number, n) =>
+                  n === "nilai" ? formatIDR(v) : `${formatNumber(v)} ${unit}`
+                }
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  background: "var(--card)",
+                  fontSize: 12,
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="saldo"
+                name="Saldo"
+                stroke="var(--primary)"
+                fill="url(#ksArea)"
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Panel>
+
+        <Panel
+          title="Nilai Stok per Metode"
+          description="Perbandingan FIFO, Average, dan Estimasi Maksimum"
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {valuationMethods.map((m) => {
+              const c = methodCards[m];
+              const cRows = c.data?.data.rows ?? [];
+              const cLast = cRows[cRows.length - 1];
+              return (
+                <div
                   key={m}
-                  type="button"
-                  onClick={() => setMethod(m)}
                   className={cn(
-                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
-                    method === m
-                      ? "bg-primary text-primary-foreground shadow-soft"
-                      : "text-muted-foreground hover:text-foreground",
+                    "rounded-xl border p-4",
+                    m === method ? "border-primary/40 bg-primary-soft" : "border-border",
                   )}
                 >
-                  {valuationMethodLabels[m]}
-                </button>
-              ))}
-            </div>
-            <Button variant="outline" className="rounded-xl">
-              <Printer className="h-4 w-4" /> Cetak
-            </Button>
-          </>
-        }
-      />
-
-      <Panel title="Pilih Barang">
-        <FormCombobox
-          value={activeId != null ? String(activeId) : ""}
-          onValueChange={(v) => setId(Number(v))}
-          options={options.map((o) => ({
-            value: String(o.id),
-            label: `${o.name} — ${o.sku}`,
-            keywords: `${o.name} ${o.sku} ${o.internal_barcode ?? ""}`.trim(),
-          }))}
-          placeholder="Pilih barang…"
-          searchPlaceholder="Cari nama atau SKU…"
-          loading={itemsLoading}
-          className="max-w-md"
-        />
-      </Panel>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Saldo Awal"
-          value={`${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
-          icon={Boxes}
-          tone="info"
-        />
-        <StatCard
-          label="Total Masuk"
-          value={`${formatNumber(totalMasuk)} ${unit}`}
-          icon={ArrowDownLeft}
-          tone="success"
-        />
-        <StatCard
-          label="Total Keluar"
-          value={`${formatNumber(totalKeluar)} ${unit}`}
-          icon={ArrowUpRight}
-          tone="warning"
-        />
-        <StatCard
-          label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
-          value={formatIDR(lastRow?.nilai ?? 0)}
-          hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
-          icon={Wallet}
-        />
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {valuationMethodLabels[m]}
+                  </p>
+                  <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    HPP {formatIDR(cLast?.method_cost ?? 0)} / {unit}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
       </div>
-
-      <Panel
-        title="Pergerakan Saldo Stok"
-        description={`Satuan ${unit} · nilai memakai metode ${valuationMethodLabels[method]}`}
-      >
-        <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={chart}>
-            <defs>
-              <linearGradient id="ksArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="date" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis fontSize={12} tickLine={false} axisLine={false} width={50} />
-            <Tooltip
-              formatter={(v: number, n) =>
-                n === "nilai" ? formatIDR(v) : `${formatNumber(v)} ${unit}`
-              }
-              contentStyle={{
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                background: "var(--card)",
-                fontSize: 12,
-              }}
-            />
-            <Area
-              type="monotone"
-              dataKey="saldo"
-              name="Saldo"
-              stroke="var(--primary)"
-              fill="url(#ksArea)"
-              strokeWidth={2}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </Panel>
-
-      <Panel
-        title="Nilai Stok per Metode"
-        description="Perbandingan FIFO, Average, dan Estimasi Maksimum"
-      >
-        <div className="grid gap-3 sm:grid-cols-3">
-          {valuationMethods.map((m) => {
-            const c = methodCards[m];
-            const cRows = c.data?.data.rows ?? [];
-            const cLast = cRows[cRows.length - 1];
-            return (
-              <div
-                key={m}
-                className={cn(
-                  "rounded-xl border p-4",
-                  m === method ? "border-primary/40 bg-primary-soft" : "border-border",
-                )}
-              >
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {valuationMethodLabels[m]}
-                </p>
-                <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  HPP {formatIDR(cLast?.method_cost ?? 0)} / {unit}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </Panel>
 
       <Panel
         title={item?.name ?? "Memuat…"}
         description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit}`}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
+          </Button>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
       >
         <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div className="relative xl:col-span-2">
