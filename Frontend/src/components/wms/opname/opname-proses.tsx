@@ -3,6 +3,7 @@ import {
   Barcode,
   CheckCheck,
   ClipboardCheck,
+  Eye,
   ListChecks,
   Play,
   TriangleAlert,
@@ -16,13 +17,13 @@ import {
   opnameProgress,
   useOpnameAnalytics,
 } from "@/components/wms/opname/opname-utils";
+import { OpnameReviewDialog } from "@/components/wms/opname/opname-review-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/use-auth";
 import {
   useCancelStockDocument,
-  usePostStockDocument,
   useStockDocument,
   useStockDocuments,
   useUpdateStockDocument,
@@ -41,10 +42,11 @@ export function OpnameProsesPage() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [scan, setScan] = useState("");
   const [records, setRecords] = useState<Record<number, string>>({});
+  const [revealed, setRevealed] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const update = useUpdateStockDocument();
-  const post = usePostStockDocument();
   const cancel = useCancelStockDocument();
 
   const active = useMemo(
@@ -64,6 +66,7 @@ export function OpnameProsesPage() {
 
   useEffect(() => {
     if (activeId == null) return;
+    setRevealed(false);
     setRecords(
       Object.fromEntries(
         lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
@@ -142,10 +145,7 @@ export function OpnameProsesPage() {
       );
       return;
     }
-    post.mutate(active.id, {
-      onSuccess: () => toast.success("Opname selesai diposting"),
-      onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal menyelesaikan opname"),
-    });
+    setReviewOpen(true);
   };
 
   const cancelSession = () => {
@@ -157,7 +157,8 @@ export function OpnameProsesPage() {
   };
 
   const isDraft = active?.status === "Draft";
-  const mutationsBusy = update.isPending || post.isPending || cancel.isPending;
+  const blind = isDraft && active?.blind_count === true && !revealed;
+  const mutationsBusy = update.isPending || cancel.isPending;
 
   return (
     <>
@@ -254,12 +255,22 @@ export function OpnameProsesPage() {
         title={active ? `Pencatatan Fisik — ${active.no}` : "Pencatatan Fisik"}
         {...(active
           ? {
-              description: `${active.warehouse ?? "—"} · ${formatDate(active.document_date)} · PIC ${active.pic ?? "—"} · ${uncounted} belum dicek`,
+              description: `${active.warehouse ?? "—"} · ${formatDate(active.document_date)} · PIC ${active.pic ?? "—"} · ${uncounted} belum dicek${blind ? " · blind count aktif" : ""}`,
             }
           : {})}
         actions={
           active && isDraft && canWrite ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {blind && (
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  disabled={mutationsBusy}
+                  onClick={() => setRevealed(true)}
+                >
+                  <Eye className="h-4 w-4" /> Tampilkan Sistem
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="rounded-xl"
@@ -328,7 +339,11 @@ export function OpnameProsesPage() {
                   return (
                     <div
                       key={l.id}
-                      className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+                      className={`grid gap-3 rounded-xl border border-border p-3 ${
+                        blind
+                          ? "sm:grid-cols-[minmax(0,1fr)_auto]"
+                          : "sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
+                      }`}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{l.name ?? "—"}</p>
@@ -337,12 +352,14 @@ export function OpnameProsesPage() {
                           {l.from_bin ?? "—"}
                         </p>
                       </div>
-                      <div className="text-xs">
-                        <p className="text-muted-foreground">Sistem</p>
-                        <b>
-                          {formatNumber(l.system_qty ?? 0)} {l.unit ?? ""}
-                        </b>
-                      </div>
+                      {!blind && (
+                        <div className="text-xs">
+                          <p className="text-muted-foreground">Sistem</p>
+                          <b>
+                            {formatNumber(l.system_qty ?? 0)} {l.unit ?? ""}
+                          </b>
+                        </div>
+                      )}
                       <div className="text-xs">
                         <p className="text-muted-foreground">Fisik</p>
                         {canWrite && isDraft ? (
@@ -361,22 +378,24 @@ export function OpnameProsesPage() {
                           </b>
                         )}
                       </div>
-                      <div className="text-xs">
-                        <p className="text-muted-foreground">Selisih</p>
-                        <Pill
-                          tone={
-                            variance == null
-                              ? "neutral"
-                              : variance === 0
-                                ? "success"
-                                : variance > 0
-                                  ? "info"
-                                  : "danger"
-                          }
-                        >
-                          {variance == null ? "—" : `${variance} ${l.unit ?? ""}`}
-                        </Pill>
-                      </div>
+                      {!blind && (
+                        <div className="text-xs">
+                          <p className="text-muted-foreground">Selisih</p>
+                          <Pill
+                            tone={
+                              variance == null
+                                ? "neutral"
+                                : variance === 0
+                                  ? "success"
+                                  : variance > 0
+                                    ? "info"
+                                    : "danger"
+                            }
+                          >
+                            {variance == null ? "—" : `${variance} ${l.unit ?? ""}`}
+                          </Pill>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -391,6 +410,16 @@ export function OpnameProsesPage() {
           </>
         )}
       </Panel>
+
+      {active && (
+        <OpnameReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          session={active}
+          lines={lines}
+          records={records}
+        />
+      )}
     </>
   );
 }

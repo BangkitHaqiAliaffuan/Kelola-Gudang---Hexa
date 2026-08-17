@@ -2,6 +2,8 @@ import { useQueries } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { StockDocumentApi, StockDocumentLineApi } from "@/lib/persediaan-types";
 
+export { opnameReasonCodes, opnameReasonLabel } from "@/lib/persediaan-types";
+
 // Label UI alur opname: Draft tanpa hitung fisik = "Dijadwalkan"; Draft yang
 // sudah mulai dicatat = "Berjalan"; status backend lainnya ditampilkan apa adanya.
 export function opnameLabel(session: Pick<StockDocumentApi, "status" | "checked_count">): string {

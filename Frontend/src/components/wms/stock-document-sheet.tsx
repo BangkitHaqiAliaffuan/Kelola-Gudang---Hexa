@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { opnameReasonLabel } from "@/lib/persediaan-types";
 import type {
   StockDocumentApi,
   StockDocumentLineApi,
@@ -229,6 +230,7 @@ export function StockDocumentSheet({
                               "Sistem",
                               "Fisik",
                               "Selisih",
+                              "Alasan / Pemeriksa",
                               "Lokasi",
                               "Harga",
                               "Subtotal",
@@ -254,6 +256,12 @@ export function StockDocumentSheet({
                             {l.sku ?? "—"}
                           </td>
                           <LineQtyCells line={l} mode={mode} />
+                          {mode === "opname" && (
+                            <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                              {opnameReasonLabel(l.reason_code)}
+                              {l.counted_by ? ` · ${l.counted_by}` : ""}
+                            </td>
+                          )}
                           <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
                             {lineLocation(l)}
                           </td>
@@ -286,6 +294,11 @@ export function StockDocumentSheet({
                       <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                         {lineLocation(l)}
                       </p>
+                      {mode === "opname" && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Alasan: {opnameReasonLabel(l.reason_code)} · Dicek: {l.counted_by ?? "—"}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

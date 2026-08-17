@@ -171,7 +171,28 @@ export type StockDocumentLineApi = {
   source_line_id: number | null;
   unit_cost: number;
   note: string | null;
+  reason_code: string | null;
+  counted_by: string | null;
+  counted_at: string | null;
 };
+
+// Alasan selisih Stock Opname (root cause) — mirror StockDocumentLine::REASON_CODES.
+export const opnameReasonCodes: Record<string, string> = {
+  receiving_error: "Kesalahan penerimaan",
+  picking_error: "Kesalahan pengambilan",
+  damage: "Rusak",
+  theft_shrinkage: "Hilang / susut",
+  vendor_short_ship: "Kekurangan dari supplier",
+  uom_mismatch: "Salah satuan",
+  transfer_unposted: "Transfer belum diproses",
+  location_error: "Salah lokasi / rak",
+  data_entry: "Kesalahan input",
+  other: "Lainnya",
+};
+
+export function opnameReasonLabel(code: string | null | undefined): string {
+  return code ? (opnameReasonCodes[code] ?? code) : "—";
+}
 
 export type StockDocumentApi = {
   id: number;
@@ -191,6 +212,8 @@ export type StockDocumentApi = {
   note: string | null;
   posted_at: string | null;
   created_by: string | null;
+  blind_count: boolean;
+  frozen_at: string | null;
   line_count: number;
   checked_count?: number;
   qty_total?: number;
@@ -235,6 +258,7 @@ export type StockDocumentLinePayload = {
   from_bin_id?: number | null;
   source_line_id?: number | null;
   note?: string | null;
+  reason_code?: string | null;
 };
 
 export type StockDocumentPayload = {
@@ -248,6 +272,7 @@ export type StockDocumentPayload = {
   reference_no: string | null;
   pic?: string | null;
   note: string | null;
+  blind_count?: boolean;
   lines: StockDocumentLinePayload[];
 };
 
@@ -266,5 +291,6 @@ export type UpdateStockDocumentPayload = {
     actual_qty?: number | null;
     unit_cost?: number | null;
     note?: string | null;
+    reason_code?: string | null;
   }[];
 };

@@ -6,6 +6,7 @@ import {
   opnameLabel,
   opnameLabelTone,
   opnameLineValue,
+  opnameReasonLabel,
   opnameSessionSummary,
   useOpnameAnalytics,
 } from "@/components/wms/opname/opname-utils";
@@ -80,6 +81,8 @@ export function OpnameLaporanPage() {
           actual: l.actual_qty ?? "",
           variance: l.variance ?? "",
           value: formatIDR(opnameLineValue(l)),
+          reason: opnameReasonLabel(l.reason_code),
+          counted_by: l.counted_by ?? "",
         });
       }
     }
@@ -100,6 +103,8 @@ export function OpnameLaporanPage() {
         { key: "actual", label: "Fisik" },
         { key: "variance", label: "Selisih" },
         { key: "value", label: "Nilai Selisih" },
+        { key: "reason", label: "Alasan Selisih" },
+        { key: "counted_by", label: "Dicek Oleh" },
       ]),
     );
     toast.success("Laporan opname diexport");
@@ -313,6 +318,8 @@ export function OpnameLaporanPage() {
                       "Fisik",
                       "Selisih",
                       "Nilai Selisih",
+                      "Alasan",
+                      "Dicek Oleh",
                     ].map((h) => (
                       <th key={h} className="px-3 py-2.5 text-left font-semibold">
                         {h}
@@ -348,6 +355,8 @@ export function OpnameLaporanPage() {
                         <td className="px-3 py-2.5 text-right font-semibold">
                           {l.actual_qty != null ? formatIDR(opnameLineValue(l)) : "—"}
                         </td>
+                        <td className="px-3 py-2.5 text-xs">{opnameReasonLabel(l.reason_code)}</td>
+                        <td className="px-3 py-2.5 text-xs">{l.counted_by ?? "—"}</td>
                       </tr>
                     );
                   })}
@@ -378,6 +387,10 @@ export function OpnameLaporanPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       Nilai selisih:{" "}
                       <b className="text-foreground">{formatIDR(opnameLineValue(l))}</b>
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Alasan: <b className="text-foreground">{opnameReasonLabel(l.reason_code)}</b>{" "}
+                      · Dicek: <b className="text-foreground">{l.counted_by ?? "—"}</b>
                     </p>
                   </div>
                 );

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +38,7 @@ export function OpnameCreateDialog({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [pic, setPic] = useState(user?.name ?? "");
   const [note, setNote] = useState("");
+  const [blindCount, setBlindCount] = useState(true);
 
   const whId = warehouseId ? Number(warehouseId) : null;
 
@@ -61,6 +63,7 @@ export function OpnameCreateDialog({
         reference_no: null,
         pic: pic.trim() || null,
         note: note.trim() || null,
+        blind_count: blindCount,
         lines: warehouseRows.map((r) => ({
           item_id: r.item_id,
           from_bin_id: r.bin_id,
@@ -90,7 +93,8 @@ export function OpnameCreateDialog({
           <DialogTitle>Buat Jadwal Opname</DialogTitle>
           <DialogDescription>
             Jadwal opname mencakup seluruh stok per rak/bin di gudang yang dipilih. Stok sistem
-            di-snapshot saat jadwal dibuat.
+            di-snapshot saat jadwal dibuat dan pergerakan stok setelahnya akan terdeteksi saat
+            penyelesaian.
           </DialogDescription>
         </DialogHeader>
 
@@ -145,6 +149,21 @@ export function OpnameCreateDialog({
               />
             </div>
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border p-3">
+            <Checkbox
+              checked={blindCount}
+              onCheckedChange={(v) => setBlindCount(v !== false)}
+              className="mt-0.5"
+            />
+            <span className="text-sm">
+              <span className="font-medium">Blind count</span>
+              <span className="block text-xs text-muted-foreground">
+                Sembunyikan jumlah sistem & selisih saat pencatatan fisik — petugas menghitung tanpa
+                tahu angka sistem. Kolom sistem muncul kembali saat menyelesaikan opname.
+              </span>
+            </span>
+          </label>
 
           <div className="rounded-xl border border-border">
             <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">

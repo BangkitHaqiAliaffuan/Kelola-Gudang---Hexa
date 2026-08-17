@@ -20,6 +20,8 @@ const doc: StockDocumentApi = {
   note: "Barang datang via kurir",
   posted_at: "2026-08-12T10:00:00Z",
   created_by: "Rudi Hartono",
+  blind_count: true,
+  frozen_at: null,
   line_count: 2,
   qty_total: 13,
   value_total: 19500,
