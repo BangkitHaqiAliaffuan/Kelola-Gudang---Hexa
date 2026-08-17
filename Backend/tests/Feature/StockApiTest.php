@@ -85,6 +85,7 @@ class StockApiTest extends TestCase
         foreach ($data['rows'] as $row) {
             $this->assertGreaterThanOrEqual(0, $row['saldo']);
             $this->assertSame($row['masuk'] > 0 || $row['keluar'] > 0, true);
+            $this->assertNotNull($row['document_id']);
             if ($prevDate !== null) {
                 $this->assertGreaterThanOrEqual($prevDate, $row['date']);
             }

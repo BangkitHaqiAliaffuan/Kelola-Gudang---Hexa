@@ -29,6 +29,7 @@ import {
   type Tone,
 } from "@/components/wms/kit";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
+import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -36,10 +37,17 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
-import { useStockCard } from "@/hooks/use-persediaan";
+import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
 import { valuationMethodLabels } from "@/lib/persediaan-types";
-import { formatDate, formatIDR, formatNumber, valuationMethods, type Trx } from "@/lib/wms-data";
+import {
+  formatDate,
+  formatIDR,
+  formatIDRCompact,
+  formatNumber,
+  valuationMethods,
+  type Trx,
+} from "@/lib/wms-data";
 
 export const Route = createFileRoute("/persediaan/kartu-stock")({
   head: () => ({
@@ -74,6 +82,8 @@ function KartuStock() {
   const [wh, setWh] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
   const activeId = id ?? options[0]?.id;
   const whId = useMemo(
     () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
@@ -166,6 +176,14 @@ function KartuStock() {
     };
   };
 
+  const openDetail = (r: CardRow) => {
+    if (r.document_id != null) {
+      setSelectedId(r.document_id);
+    } else if (item) {
+      setDetail(toTrx(r, item));
+    }
+  };
+
   const columns: Column<(typeof tableRows)[number]>[] = [
     {
       key: "date",
@@ -182,7 +200,7 @@ function KartuStock() {
       render: (r) => (
         <button
           type="button"
-          onClick={() => item && setDetail(toTrx(r, item))}
+          onClick={() => openDetail(r)}
           className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline"
         >
           {r.no}
@@ -329,7 +347,8 @@ function KartuStock() {
           />
           <StatCard
             label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
-            value={formatIDR(lastRow?.nilai ?? 0)}
+            value={formatIDRCompact(lastRow?.nilai ?? 0)}
+            valueTitle={formatIDR(lastRow?.nilai ?? 0)}
             hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
             icon={Wallet}
           />
@@ -477,7 +496,7 @@ function KartuStock() {
           rows={filteredRows}
           pageSize={10}
           loading={itemsLoading || card.isFetching}
-          onRowClick={(r) => item && setDetail(toTrx(r, item))}
+          onRowClick={(r) => openDetail(r)}
           initialSort={{ key: "date", dir: "desc" }}
           mobileCard={(r) => (
             <div className="space-y-2">
@@ -512,7 +531,7 @@ function KartuStock() {
                 variant="outline"
                 size="sm"
                 className="mt-1 rounded-lg"
-                onClick={() => item && setDetail(toTrx(r, item))}
+                onClick={() => openDetail(r)}
               >
                 Lihat Detail
               </Button>
@@ -522,6 +541,11 @@ function KartuStock() {
       </Panel>
 
       <TrxDetailSheet trx={detail} onOpenChange={(o) => !o && setDetail(null)} editable={false} />
+      <StockDocumentSheet
+        doc={docDetail?.data ?? null}
+        isLoading={docLoading}
+        onOpenChange={(o) => !o && setSelectedId(null)}
+      />
     </>
   );
 }

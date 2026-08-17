@@ -236,6 +236,7 @@ class StockController extends Controller
             $rows[] = [
                 'date' => $movement->occurred_at->toIso8601String(),
                 'no' => $movement->reference_no,
+                'document_id' => $movement->stock_document_id,
                 'type' => $movement->movement_type,
                 'direction' => $movement->direction,
                 'warehouse' => $movement->warehouse?->name,

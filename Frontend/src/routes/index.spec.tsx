@@ -28,7 +28,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-const { opnameFixture } = vi.hoisted(() => ({
+const { opnameFixture, recentDocsFixture } = vi.hoisted(() => ({
   opnameFixture: [
     {
       id: 1,
@@ -61,10 +61,51 @@ const { opnameFixture } = vi.hoisted(() => ({
       checked_count: 5,
     },
   ] as const,
+  recentDocsFixture: [
+    {
+      id: 11,
+      no: "BM/2026/00010",
+      type: "Penerimaan",
+      status: "Selesai",
+      document_date: "2026-07-31T08:00:00+07:00",
+      warehouse: "Gudang Utama",
+      pic: "Rudi Hartono",
+      created_by: "Rudi Hartono",
+      line_count: 2,
+      qty_total: 12,
+    },
+    {
+      id: 12,
+      no: "BK/2026/00011",
+      type: "Pengeluaran",
+      status: "Selesai",
+      document_date: "2026-07-30T09:00:00+07:00",
+      warehouse: "Gudang Satelit",
+      pic: "Siti Aminah",
+      created_by: "Siti Aminah",
+      line_count: 1,
+      qty_total: 5,
+    },
+    {
+      id: 13,
+      no: "TF/2026/00012",
+      type: "Transfer Gudang",
+      status: "Draft",
+      document_date: "2026-07-29T10:00:00+07:00",
+      warehouse: "Gudang Utama",
+      pic: "Bayu Pratama",
+      created_by: "Bayu Pratama",
+      line_count: 1,
+      qty_total: 8,
+    },
+  ] as const,
 }));
 
 vi.mock("@/hooks/use-persediaan", () => ({
-  useStockDocuments: () => ({ data: { data: opnameFixture }, isLoading: false }),
+  useStockDocuments: (params?: { type?: string; status?: string }) =>
+    params?.type === "Stock Opname"
+      ? { data: { data: opnameFixture }, isLoading: false }
+      : { data: { data: recentDocsFixture }, isLoading: false },
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -81,7 +122,6 @@ vi.mock("@/hooks/use-auth", () => ({
 
 import { Route } from "@/routes/index";
 import {
-  activities,
   formatIDRCompact,
   formatNumber,
   items,
@@ -199,23 +239,25 @@ describe("Dashboard (index route)", () => {
     expect(screen.getAllByText("Nilai Persediaan").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("merender 14 aktivitas terkini dengan format tanggal id-ID", async () => {
+  it("merender aktivitas terkini dari API (kecuali Draft)", async () => {
     const { container } = render(<DashboardView />);
 
     await waitFor(() => expect(container.querySelector("ol")).toBeInTheDocument(), {
       timeout: 3000,
     });
 
-    expect(container.querySelectorAll("ol li")).toHaveLength(activities.length);
-    expect(activities).toHaveLength(14);
+    const recent = recentDocsFixture.filter((d) => d.status !== "Draft");
+    expect(container.querySelectorAll("ol li")).toHaveLength(recent.length);
 
-    const first = activities[0]!;
+    const first = recent[0]!;
     expect(screen.getByText(`${first.type} · ${first.no}`)).toBeInTheDocument();
     expect(
-      screen.getByText(`${first.warehouse} — ${formatNumber(first.qty)} unit oleh ${first.pic}`),
+      screen.getByText(
+        `${first.warehouse} — ${formatNumber(first.qty_total)} unit oleh ${first.pic}`,
+      ),
     ).toBeInTheDocument();
 
-    const expectedDate = new Date(first.date).toLocaleDateString("id-ID", {
+    const expectedDate = new Date(first.document_date).toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",
     });

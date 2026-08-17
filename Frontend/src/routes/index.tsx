@@ -28,10 +28,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader, Panel, Pill, StatCard, TableSkeleton } from "@/components/wms/kit";
+import { PageHeader, Panel, Pill, StatCard, TableSkeleton, type Tone } from "@/components/wms/kit";
 import { Progress } from "@/components/ui/progress";
 import {
-  activities,
   formatIDR,
   formatIDRCompact,
   formatNumber,
@@ -88,6 +87,15 @@ const chartTooltip = {
   },
 };
 
+const activityTone: Record<string, Tone> = {
+  Penerimaan: "success",
+  Pengeluaran: "warning",
+  "Transfer Gudang": "info",
+  "Retur Pembelian": "warning",
+  "Retur Penjualan": "success",
+  "Stock Opname": "info",
+};
+
 function useSkeleton(ms = 600) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -110,6 +118,19 @@ function Dashboard() {
     type: "Stock Opname",
   });
   const running = ((opnameDocs?.data ?? []) as OpnameDoc[]).filter((d) => d.status === "Draft");
+  const { data: recentDocs, isLoading: recentLoading } = useStockDocuments();
+  const recentActivities = ((recentDocs?.data ?? []) as StockDocumentApi[])
+    .filter((d) => d.status !== "Draft")
+    .map((d) => ({
+      id: d.id,
+      type: d.type,
+      no: d.no,
+      warehouse: d.warehouse ?? "—",
+      qty: d.qty_total ?? d.line_count,
+      pic: d.pic ?? d.created_by ?? "—",
+      date: d.document_date,
+    }))
+    .slice(0, 14);
 
   const stats = [
     {
@@ -312,12 +333,14 @@ function Dashboard() {
       </Panel>
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Panel title="Aktivitas Terkini" description="Pergerakan barang di seluruh gudang">
-          {loading ? (
+        <Panel title="Aktivitas Terkini" description="Dokumen mutasi terbaru">
+          {recentLoading ? (
             <TableSkeleton rows={6} cols={3} />
+          ) : recentActivities.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada aktivitas.</p>
           ) : (
             <ol className="relative space-y-4 border-l border-border pl-5">
-              {activities.map((a) => (
+              {recentActivities.map((a) => (
                 <li key={a.id} className="relative animate-fade-in">
                   <span className="absolute -left-[26px] top-1 grid h-3 w-3 place-items-center rounded-full border-2 border-background bg-primary" />
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
@@ -329,15 +352,7 @@ function Dashboard() {
                         {a.warehouse} — {formatNumber(a.qty)} unit oleh {a.pic}
                       </p>
                     </div>
-                    <Pill
-                      tone={
-                        a.type === "Barang Masuk"
-                          ? "success"
-                          : a.type === "Barang Keluar"
-                            ? "warning"
-                            : "info"
-                      }
-                    >
+                    <Pill tone={activityTone[a.type] ?? "info"}>
                       {new Date(a.date).toLocaleDateString("id-ID", {
                         day: "2-digit",
                         month: "short",

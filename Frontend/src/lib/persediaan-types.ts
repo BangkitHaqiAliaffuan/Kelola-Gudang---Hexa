@@ -61,6 +61,7 @@ export type StockMinimumApi = {
 export type StockCardRowApi = {
   date: string;
   no: string;
+  document_id: number | null;
   type: string;
   direction: "IN" | "OUT";
   masuk: number;
