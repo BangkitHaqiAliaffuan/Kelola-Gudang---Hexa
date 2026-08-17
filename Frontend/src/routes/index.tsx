@@ -191,7 +191,7 @@ function Dashboard() {
         actions={<Pill tone="success">Semua sistem normal</Pill>}
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}

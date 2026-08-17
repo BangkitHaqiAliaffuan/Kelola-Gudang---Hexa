@@ -135,7 +135,7 @@ export function StatCard({
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  <p className="mt-1.5 whitespace-nowrap text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                     {value}
                   </p>
                 </TooltipTrigger>
@@ -143,11 +143,11 @@ export function StatCard({
               </Tooltip>
             </TooltipProvider>
           ) : (
-            <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            <p className="mt-1.5 whitespace-nowrap text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {value}
             </p>
           )}
-          {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
+          {hint && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>}
         </div>
         <span
           className={cn(
