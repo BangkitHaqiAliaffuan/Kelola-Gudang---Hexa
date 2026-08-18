@@ -35,19 +35,32 @@ import {
   formatIDRCompact,
   formatNumber,
   items,
-  lowStock,
   monthly,
-  outStock,
   totalValue,
   transactions,
   warehouses,
 } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
-import { useStockDocuments } from "@/hooks/use-persediaan";
-import type { StockDocumentApi } from "@/lib/persediaan-types";
+import { useStockDocuments, useStockMinimum } from "@/hooks/use-persediaan";
+import type { StockDocumentApi, StockMinimumApi, StockMinimumStatus } from "@/lib/persediaan-types";
 
 /** Baris dokumen opname: list API mengagregasi checked_count per dokumen. */
 type OpnameDoc = StockDocumentApi & { checked_count?: number };
+
+/** Urutan severitas untuk panel "Perlu Perhatian" (paling kritis dulu). */
+const SEVERITY_ORDER: Record<StockMinimumStatus, number> = {
+  Habis: 0,
+  Kritis: 1,
+  Menipis: 2,
+  Normal: 3,
+};
+
+const MIN_TONE: Record<StockMinimumStatus, Tone> = {
+  Habis: "danger",
+  Kritis: "danger",
+  Menipis: "warning",
+  Normal: "success",
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -111,8 +124,6 @@ function Dashboard() {
     (a) => !a.module || hasModuleLevel(a.module, "Tulis"),
   );
   const loading = useSkeleton();
-  const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
-  const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
   const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
   const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
     type: "Stock Opname",
@@ -126,11 +137,32 @@ function Dashboard() {
       type: d.type,
       no: d.no,
       warehouse: d.warehouse ?? "—",
-      qty: d.qty_total ?? d.line_count,
+      qty: Math.abs(d.qty_total ?? 0) || d.line_count,
       pic: d.pic ?? d.created_by ?? "—",
       date: d.document_date,
     }))
     .slice(0, 14);
+
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+  const todayDocs = ((recentDocs?.data ?? []) as StockDocumentApi[]).filter(
+    (d) => d.status !== "Draft" && d.document_date?.slice(0, 10) === todayIso,
+  );
+  const masukToday = todayDocs.filter((d) => d.type === "Penerimaan");
+  const keluarToday = todayDocs.filter((d) => d.type === "Pengeluaran");
+  const masukQty = masukToday.reduce((a, d) => a + (d.qty_total ?? 0), 0);
+  const masukValue = masukToday.reduce((a, d) => a + (d.value_total ?? 0), 0);
+  const keluarQty = keluarToday.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
+
+  const { data: minData, isLoading: minLoading } = useStockMinimum();
+  const minRows = ((minData?.data ?? []) as StockMinimumApi[]).filter((r) => r.status !== "Normal");
+  const stockMenipis = minRows.length;
+  const stockHabis = minRows.filter((r) => r.status === "Habis").length;
+  const attention = [...minRows]
+    .sort((a, b) => SEVERITY_ORDER[a.status] - SEVERITY_ORDER[b.status])
+    .slice(0, 6);
 
   const stats = [
     {
@@ -163,35 +195,35 @@ function Dashboard() {
     },
     {
       label: "Barang Masuk Hari Ini",
-      value: formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)),
-      hint: `${masukToday.length} transaksi`,
+      value: formatNumber(masukQty),
+      hint: `${masukToday.length} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
       label: "Nilai Barang Masuk Hari Ini",
-      value: formatIDRCompact(masukToday.reduce((a, b) => a + b.value, 0)),
-      hint: `${masukToday.length} transaksi`,
+      value: formatIDRCompact(masukValue),
+      hint: `${masukToday.length} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
       label: "Barang Keluar Hari Ini",
-      value: formatNumber(keluarToday.reduce((a, b) => a + b.qty, 0)),
-      hint: `${keluarToday.length} transaksi`,
+      value: formatNumber(keluarQty),
+      hint: `${keluarToday.length} dokumen`,
       icon: ArrowUpFromLine,
       tone: "warning" as const,
     },
     {
       label: "Stock Menipis",
-      value: formatNumber(lowStock.length),
+      value: formatNumber(stockMenipis),
       hint: "di bawah minimum",
       icon: TriangleAlert,
       tone: "warning" as const,
     },
     {
       label: "Stock Habis",
-      value: formatNumber(outStock.length),
+      value: formatNumber(stockHabis),
       hint: "perlu restock segera",
       icon: PackageX,
       tone: "danger" as const,
@@ -400,24 +432,30 @@ function Dashboard() {
           </Panel>
 
           <Panel title="Perlu Perhatian" description="Stok di bawah minimum">
-            <div className="space-y-2.5">
-              {lowStock.slice(0, 6).map((it) => (
-                <Link
-                  key={it.id}
-                  to="/master/barang/$id"
-                  params={{ id: it.id }}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent/50"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{it.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{it.sku}</p>
-                  </div>
-                  <Pill tone="warning">
-                    {it.stock}/{it.min} {it.unit}
-                  </Pill>
-                </Link>
-              ))}
-            </div>
+            {minLoading ? (
+              <TableSkeleton rows={4} />
+            ) : attention.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Tidak ada stok yang perlu perhatian.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {attention.map((it) => (
+                  <Link
+                    key={it.id}
+                    to="/master/barang/$id"
+                    params={{ id: String(it.id) }}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-border px-3 py-2 transition-colors hover:bg-accent/50"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{it.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{it.sku}</p>
+                    </div>
+                    <Pill tone={MIN_TONE[it.status]}>
+                      {it.total_stock}/{it.min} {it.unit}
+                    </Pill>
+                  </Link>
+                ))}
+              </div>
+            )}
           </Panel>
         </div>
       </div>

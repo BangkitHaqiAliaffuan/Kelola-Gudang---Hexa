@@ -33,6 +33,11 @@ class StockDocumentService
             $this->assertOpnameReadyForPost($document);
         }
 
+        if ($document->type === 'Stock Adjustment') {
+            $document->loadMissing(['lines.item']);
+            $this->assertAdjustmentReadyForPost($document);
+        }
+
         DB::transaction(function () use ($document) {
             $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
 
@@ -139,6 +144,23 @@ class StockDocumentService
         }
 
         return $labels.($lines->count() > 5 ? ', …' : '');
+    }
+
+    /**
+     * Validasi Stock Adjustment sebelum posting (single chokepoint untuk
+     * store-with-Selesai dan /post): setiap baris wajib punya reason_code
+     * (root cause) — koreksi stok tanpa alasan tidak boleh diposting.
+     */
+    private function assertAdjustmentReadyForPost(StockDocument $document): void
+    {
+        $missingReason = $document->lines->filter(fn ($line) => empty($line->reason_code));
+
+        if ($missingReason->isNotEmpty()) {
+            $labels = $this->labelsFor($missingReason);
+            throw new \InvalidArgumentException(
+                "Alasan selisih wajib diisi sebelum penyesuaian diposting: {$labels}."
+            );
+        }
     }
 
     /**

@@ -2896,8 +2896,8 @@ export function ItemFormDialog({
                       .filter((b) => b.rack_id === selectedRack)
                       .map((b) => ({
                         value: String(b.id),
-                        label: `${b.code} — ${b.name}`,
-                        keywords: b.name,
+                        label: `${b.full_address ?? b.code} — ${b.name}`,
+                        keywords: `${b.code} ${b.rack_name ?? ""}`,
                       }));
                     return (
                       <FormItem>

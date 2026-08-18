@@ -19,7 +19,7 @@ class StoreStockDocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan', 'Stock Opname'])],
+            'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan', 'Stock Opname', 'Stock Adjustment'])],
             'status' => ['required', Rule::in(['Draft', 'Selesai'])],
             'document_date' => ['required', 'date'],
             'blind_count' => ['nullable', 'boolean'],
@@ -50,11 +50,14 @@ class StoreStockDocumentRequest extends FormRequest
             // Retur Pembelian saat menyimpan (konvensi ledger: garis bertanda, arah
             // diturunkan dari tanda qty). Baris Stock Opname TIDAK membawa qty —
             // sistem memakai system_qty (snapshot) & actual_qty (hasil hitung fisik).
+            // Stock Adjustment memakai qty BERTANDA (delta koreksi): positif = tambah
+            // stok (IN, bin tujuan), negatif = kurangi stok (OUT, bin asal) — `min:1`
+            // tidak berlaku karena penyesuaian boleh bernilai negatif.
             'lines.*.qty' => [
                 Rule::requiredIf(fn () => $this->input('type') !== 'Stock Opname'),
                 Rule::prohibitedIf(fn () => $this->input('type') === 'Stock Opname'),
                 'integer',
-                'min:1',
+                Rule::when(fn () => $this->input('type') !== 'Stock Adjustment', 'min:1'),
             ],
             // Stock Opname: system_qty di-snapshot server-side dari item_stock saat
             // dokumen dibuat (nilai kiriman klien diabaikan); actual_qty adalah hasil
@@ -101,6 +104,51 @@ class StoreStockDocumentRequest extends FormRequest
     public function after(): array
     {
         return [
+            function (Validator $validator) {
+                $type = $this->input('type');
+                $status = $this->input('status');
+                $lines = $this->input('lines') ?? [];
+
+                if ($type !== 'Stock Adjustment' || ! $lines) {
+                    return;
+                }
+
+                // Penyesuaian = delta bertanda: qty tidak boleh nol, dan arah
+                // menentukan bin yang wajib (IN → bin tujuan, OUT → bin asal).
+                // Saat dokumen langsung diposting (Selesai), setiap baris wajib
+                // memakai reason_code (root cause) — alasan wajib ikut dicatat
+                // sejak Draft di form, guard posting menutup bypass /post.
+                foreach ($lines as $index => $line) {
+                    $qty = (int) ($line['qty'] ?? 0);
+
+                    if ($qty === 0) {
+                        $validator->errors()->add(
+                            "lines.{$index}.qty",
+                            'Qty penyesuaian tidak boleh nol.'
+                        );
+
+                        continue;
+                    }
+
+                    $binField = $qty > 0 ? 'to_bin_id' : 'from_bin_id';
+
+                    if (empty($line[$binField])) {
+                        $validator->errors()->add(
+                            "lines.{$index}.{$binField}",
+                            $qty > 0
+                                ? 'Bin tujuan wajib diisi untuk penambahan stok.'
+                                : 'Bin asal wajib diisi untuk pengurangan stok.'
+                        );
+                    }
+
+                    if ($status === 'Selesai' && empty($line['reason_code'])) {
+                        $validator->errors()->add(
+                            "lines.{$index}.reason_code",
+                            'Alasan selisih wajib diisi sebelum posting.'
+                        );
+                    }
+                }
+            },
             function (Validator $validator) {
                 $type = $this->input('type');
                 $status = $this->input('status');

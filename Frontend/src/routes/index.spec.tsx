@@ -28,84 +28,155 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-const { opnameFixture, recentDocsFixture } = vi.hoisted(() => ({
-  opnameFixture: [
-    {
-      id: 1,
-      no: "SO/2026/00001",
-      type: "Stock Opname",
-      status: "Draft",
-      document_date: "2026-07-28T00:00:00+07:00",
-      warehouse: "Gudang Utama",
-      line_count: 10,
-      checked_count: 4,
-    },
-    {
-      id: 2,
-      no: "SO/2026/00002",
-      type: "Stock Opname",
-      status: "Draft",
-      document_date: "2026-07-29T00:00:00+07:00",
-      warehouse: "Gudang Satelit",
-      line_count: 8,
-      checked_count: 2,
-    },
-    {
-      id: 3,
-      no: "SO/2026/00003",
-      type: "Stock Opname",
-      status: "Selesai",
-      document_date: "2026-07-01T00:00:00+07:00",
-      warehouse: "Gudang Utama",
-      line_count: 5,
-      checked_count: 5,
-    },
-  ] as const,
-  recentDocsFixture: [
-    {
-      id: 11,
-      no: "BM/2026/00010",
-      type: "Penerimaan",
-      status: "Selesai",
-      document_date: "2026-07-31T08:00:00+07:00",
-      warehouse: "Gudang Utama",
-      pic: "Rudi Hartono",
-      created_by: "Rudi Hartono",
-      line_count: 2,
-      qty_total: 12,
-    },
-    {
-      id: 12,
-      no: "BK/2026/00011",
-      type: "Pengeluaran",
-      status: "Selesai",
-      document_date: "2026-07-30T09:00:00+07:00",
-      warehouse: "Gudang Satelit",
-      pic: "Siti Aminah",
-      created_by: "Siti Aminah",
-      line_count: 1,
-      qty_total: 5,
-    },
-    {
-      id: 13,
-      no: "TF/2026/00012",
-      type: "Transfer Gudang",
-      status: "Draft",
-      document_date: "2026-07-29T10:00:00+07:00",
-      warehouse: "Gudang Utama",
-      pic: "Bayu Pratama",
-      created_by: "Bayu Pratama",
-      line_count: 1,
-      qty_total: 8,
-    },
-  ] as const,
-}));
+const { opnameFixture, recentDocsFixture, stockMinFixture, todayIso } = vi.hoisted(() => {
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+  return {
+    todayIso,
+    stockMinFixture: [
+      {
+        id: 101,
+        sku: "BRG-101",
+        name: "Kabel UTP 5m",
+        unit: "rol",
+        min: 10,
+        total_stock: 0,
+        status: "Habis",
+      },
+      {
+        id: 102,
+        sku: "BRG-102",
+        name: "Konektor RJ45",
+        unit: "pcs",
+        min: 20,
+        total_stock: 4,
+        status: "Kritis",
+      },
+      {
+        id: 103,
+        sku: "BRG-103",
+        name: "Kabel HDMI 2m",
+        unit: "pcs",
+        min: 10,
+        total_stock: 8,
+        status: "Menipis",
+      },
+      {
+        id: 104,
+        sku: "BRG-104",
+        name: "Switch 8 Port",
+        unit: "unit",
+        min: 5,
+        total_stock: 30,
+        status: "Normal",
+      },
+    ] as const,
+    opnameFixture: [
+      {
+        id: 1,
+        no: "SO/2026/00001",
+        type: "Stock Opname",
+        status: "Draft",
+        document_date: "2026-07-28T00:00:00+07:00",
+        warehouse: "Gudang Utama",
+        line_count: 10,
+        checked_count: 4,
+      },
+      {
+        id: 2,
+        no: "SO/2026/00002",
+        type: "Stock Opname",
+        status: "Draft",
+        document_date: "2026-07-29T00:00:00+07:00",
+        warehouse: "Gudang Satelit",
+        line_count: 8,
+        checked_count: 2,
+      },
+      {
+        id: 3,
+        no: "SO/2026/00003",
+        type: "Stock Opname",
+        status: "Selesai",
+        document_date: "2026-07-01T00:00:00+07:00",
+        warehouse: "Gudang Utama",
+        line_count: 5,
+        checked_count: 5,
+      },
+    ] as const,
+    recentDocsFixture: [
+      {
+        id: 11,
+        no: "BM/2026/00010",
+        type: "Penerimaan",
+        status: "Selesai",
+        document_date: "2026-07-31T08:00:00+07:00",
+        warehouse: "Gudang Utama",
+        pic: "Rudi Hartono",
+        created_by: "Rudi Hartono",
+        line_count: 2,
+        qty_total: 12,
+      },
+      {
+        id: 12,
+        no: "BK/2026/00011",
+        type: "Pengeluaran",
+        status: "Selesai",
+        document_date: "2026-07-30T09:00:00+07:00",
+        warehouse: "Gudang Satelit",
+        pic: "Siti Aminah",
+        created_by: "Siti Aminah",
+        line_count: 1,
+        qty_total: 5,
+      },
+      {
+        id: 13,
+        no: "TF/2026/00012",
+        type: "Transfer Gudang",
+        status: "Draft",
+        document_date: "2026-07-29T10:00:00+07:00",
+        warehouse: "Gudang Utama",
+        pic: "Bayu Pratama",
+        created_by: "Bayu Pratama",
+        line_count: 1,
+        qty_total: 8,
+      },
+      {
+        id: 14,
+        no: "BM/2026/00013",
+        type: "Penerimaan",
+        status: "Selesai",
+        document_date: `${todayIso}T08:00:00+07:00`,
+        warehouse: "Gudang Utama",
+        pic: "Rudi Hartono",
+        created_by: "Rudi Hartono",
+        line_count: 3,
+        qty_total: 30,
+        value_total: 150000,
+      },
+      {
+        id: 15,
+        no: "BK/2026/00014",
+        type: "Pengeluaran",
+        status: "Selesai",
+        document_date: `${todayIso}T09:00:00+07:00`,
+        warehouse: "Gudang Satelit",
+        pic: "Siti Aminah",
+        created_by: "Siti Aminah",
+        line_count: 2,
+        qty_total: -8,
+      },
+    ] as const,
+  };
+});
 
 vi.mock("@/hooks/use-persediaan", () => ({
   useStockDocuments: (params?: { type?: string; status?: string }) =>
     params?.type === "Stock Opname"
       ? { data: { data: opnameFixture }, isLoading: false }
       : { data: { data: recentDocsFixture }, isLoading: false },
+  useStockMinimum: () => ({ data: { data: stockMinFixture }, isLoading: false }),
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -125,9 +196,7 @@ import {
   formatIDRCompact,
   formatNumber,
   items,
-  lowStock,
   monthly,
-  outStock,
   totalValue,
   transactions,
   warehouses,
@@ -161,10 +230,26 @@ describe("Dashboard (index route)", () => {
     const { container } = render(<DashboardView />);
     expect(container.querySelectorAll("p.text-xl")).toHaveLength(12);
 
-    const masukToday = transactions.filter((t) => t.type === "Barang Masuk").slice(0, 24);
-    const keluarToday = transactions.filter((t) => t.type === "Barang Keluar").slice(0, 18);
+    type TodayDoc = {
+      status: string;
+      type: string;
+      document_date: string;
+      qty_total?: number;
+      value_total?: number;
+    };
+    const todayDocs = (recentDocsFixture as readonly TodayDoc[]).filter(
+      (d) => d.status !== "Draft" && d.document_date?.slice(0, 10) === todayIso,
+    );
+    const masukToday = todayDocs.filter((d) => d.type === "Penerimaan");
+    const keluarToday = todayDocs.filter((d) => d.type === "Pengeluaran");
+    const masukQty = masukToday.reduce((a, d) => a + (d.qty_total ?? 0), 0);
+    const masukValue = masukToday.reduce((a, d) => a + (d.value_total ?? 0), 0);
+    const keluarQty = keluarToday.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
     const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
     const running = opnameFixture.filter((o) => o.status === "Draft");
+    const nonNormal = stockMinFixture.filter((r) => r.status !== "Normal");
+    const stockMenipis = nonNormal.length;
+    const stockHabis = stockMinFixture.filter((r) => r.status === "Habis").length;
 
     const cases: Array<[label: string, value: string, hint?: string]> = [
       ["Total Item", formatNumber(items.reduce((a, b) => a + b.stock, 0)), "seluruh gudang"],
@@ -175,23 +260,11 @@ describe("Dashboard (index route)", () => {
         formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
         "terikat permintaan",
       ],
-      [
-        "Barang Masuk Hari Ini",
-        formatNumber(masukToday.reduce((a, b) => a + b.qty, 0)),
-        `${masukToday.length} transaksi`,
-      ],
-      [
-        "Nilai Barang Masuk Hari Ini",
-        formatIDRCompact(masukToday.reduce((a, b) => a + b.value, 0)),
-        `${masukToday.length} transaksi`,
-      ],
-      [
-        "Barang Keluar Hari Ini",
-        formatNumber(keluarToday.reduce((a, b) => a + b.qty, 0)),
-        `${keluarToday.length} transaksi`,
-      ],
-      ["Stock Menipis", formatNumber(lowStock.length), "di bawah minimum"],
-      ["Stock Habis", formatNumber(outStock.length), "perlu restock segera"],
+      ["Barang Masuk Hari Ini", formatNumber(masukQty), `${masukToday.length} dokumen`],
+      ["Nilai Barang Masuk Hari Ini", formatIDRCompact(masukValue), `${masukToday.length} dokumen`],
+      ["Barang Keluar Hari Ini", formatNumber(keluarQty), `${keluarToday.length} dokumen`],
+      ["Stock Menipis", formatNumber(stockMenipis), "di bawah minimum"],
+      ["Stock Habis", formatNumber(stockHabis), "perlu restock segera"],
       ["Nilai Persediaan", formatIDRCompact(totalValue), "metode FIFO"],
       ["Pending Approval", String(pending), "menunggu supervisor"],
       ["Stock Opname Berjalan", String(running.length), "sesi aktif"],
@@ -305,15 +378,20 @@ describe("Dashboard (index route)", () => {
       { timeout: 3000 },
     );
 
-    const links = container.querySelectorAll('a[data-to="/master/barang/$id"]');
-    expect(links.length).toBe(Math.min(6, lowStock.length));
+    const severity: Record<string, number> = { Habis: 0, Kritis: 1, Menipis: 2, Normal: 3 };
+    const attention = [...stockMinFixture]
+      .filter((r) => r.status !== "Normal")
+      .sort((a, b) => (severity[a.status] ?? 0) - (severity[b.status] ?? 0));
 
-    const first = lowStock[0]!;
+    const links = container.querySelectorAll('a[data-to="/master/barang/$id"]');
+    expect(links.length).toBe(Math.min(6, attention.length));
+
+    const first = attention[0]!;
     const firstLink = links[0] as HTMLElement;
     const params = JSON.parse(firstLink.getAttribute("data-params") ?? "{}") as { id?: string };
-    expect(params.id).toBe(first.id);
+    expect(params.id).toBe(String(first.id));
 
     expect(screen.getAllByText(first.name).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(`${first.stock}/${first.min} ${first.unit}`)).toBeInTheDocument();
+    expect(screen.getByText(`${first.total_stock}/${first.min} ${first.unit}`)).toBeInTheDocument();
   });
 });

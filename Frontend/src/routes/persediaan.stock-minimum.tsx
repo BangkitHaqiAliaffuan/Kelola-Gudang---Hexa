@@ -28,7 +28,7 @@ import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
-import { formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { StockMinimumApi, StockMinimumStatus } from "@/lib/persediaan-types";
 
 export const Route = createFileRoute("/persediaan/stock-minimum")({
@@ -306,7 +306,8 @@ function StockMinimum() {
           />
           <StatCard
             label="Nilai Kebutuhan"
-            value={formatIDR(stats.nilai)}
+            value={formatIDRCompact(stats.nilai)}
+            valueTitle={formatIDR(stats.nilai)}
             hint="total usulan restock"
             icon={PackageX}
             tone="brand"

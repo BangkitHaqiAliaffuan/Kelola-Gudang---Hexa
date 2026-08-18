@@ -1059,6 +1059,252 @@ class StoreStockDocumentApiTest extends TestCase
         $this->assertSame($before, StockDocument::count());
     }
 
+    public function test_store_adjustment_draft_creates_document_without_movements(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'note' => 'Penyesuaian stok (lebih)',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'to_bin_id' => $bin->id, 'reason_code' => 'location_error'],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->where('data.status', 'Draft')
+                ->where('data.type', 'Stock Adjustment')
+                ->where('data.line_count', 1)
+                ->where('data.no', fn ($v) => (bool) preg_match('/^ADJ\/\d{4}\/\d{5}$/', (string) $v))
+                ->has('data.lines', 1)
+                ->where('data.lines.0.to_bin_id', $bin->id)
+                ->where('data.lines.0.from_bin_id', null)
+                ->where('data.lines.0.item_id', $item->id)
+                ->where('data.lines.0.qty', 5)
+                ->where('data.lines.0.reason_code', 'location_error'));
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $this->assertNull($doc->posted_at);
+        $this->assertSame(0, $doc->movements()->count());
+    }
+
+    public function test_store_adjustment_posted_in_increases_stock_with_moving_average(): void
+    {
+        $item = $this->makeItem();
+        [$wh, $rack, $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id, 'reason_code' => 'location_error'],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.posted_at', fn ($v) => $v !== null)
+            ->assertJsonPath('data.lines.0.qty', 3)
+            ->assertJsonPath('data.lines.0.to_bin_id', $bin->id)
+            ->assertJsonPath('data.lines.0.unit_cost', 1500);
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'direction' => 'IN',
+            'qty' => 3,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $rack->id,
+            'bin_id' => $bin->id,
+            'unit_cost' => 1500.0,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+            'stock' => 13,
+        ]);
+    }
+
+    public function test_store_adjustment_posted_out_decreases_stock(): void
+    {
+        $item = $this->makeItem();
+        [$wh, $rack, $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => -4, 'from_bin_id' => $bin->id, 'reason_code' => 'damage'],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.lines.0.qty', -4)
+            ->assertJsonPath('data.lines.0.from_bin_id', $bin->id)
+            ->assertJsonPath('data.lines.0.to_bin_id', null)
+            ->assertJsonPath('data.lines.0.unit_cost', 1500);
+
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'direction' => 'OUT',
+            'qty' => 4,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $rack->id,
+            'bin_id' => $bin->id,
+            'unit_cost' => 1500.0,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+            'stock' => 6,
+        ]);
+    }
+
+    public function test_store_adjustment_zero_qty_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 0, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.qty');
+    }
+
+    public function test_store_adjustment_out_requires_from_bin(): void
+    {
+        $item = $this->makeItem();
+        [$wh] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => -3],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.from_bin_id');
+    }
+
+    public function test_store_adjustment_in_requires_to_bin(): void
+    {
+        $item = $this->makeItem();
+        [$wh] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.to_bin_id');
+    }
+
+    public function test_store_adjustment_posted_requires_reason_code(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.reason_code');
+    }
+
+    public function test_store_adjustment_out_insufficient_stock_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $before = StockDocument::count();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => -100, 'from_bin_id' => $bin->id, 'reason_code' => 'damage'],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Stok tidak mencukupi'));
+
+        $this->assertSame($before, StockDocument::count());
+    }
+
+    public function test_post_adjustment_draft_without_reason_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+
+        $created = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Adjustment',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $this->postJson("/api/persediaan/stock-documents/{$created->json('data.id')}/post")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Alasan selisih wajib diisi'));
+    }
+
     private function makeItem(): Item
     {
         $unique = random_int(10000, 99999);

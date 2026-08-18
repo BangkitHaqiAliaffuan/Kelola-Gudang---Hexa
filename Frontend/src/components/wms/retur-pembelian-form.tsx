@@ -70,6 +70,10 @@ export function ReturPembelianForm() {
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
+  // Set saat submit dimulai: menahan rendering peringatan over-stock selama
+  // jendela refetch pasca-posting (invalidateQueries) sebelum navigate selesai,
+  // agar "Melebihi tersedia" tidak berkedip terhadap stok yang sudah berkurang.
+  const [submitted, setSubmitted] = useState(false);
 
   // Dokumen Penerimaan (Barang Masuk) Selesai yang bisa jadi sumber retur.
   const { data: incomingDocs, isLoading: incomingLoading } = useStockDocuments({
@@ -379,6 +383,7 @@ export function ReturPembelianForm() {
       return;
     }
 
+    setSubmitted(true);
     try {
       const res = await create.mutateAsync(payload);
       toast.success(
@@ -388,6 +393,7 @@ export function ReturPembelianForm() {
       );
       navigate({ to: "/transaksi/retur-pembelian" });
     } catch (err) {
+      setSubmitted(false);
       if (isApiError(err)) setApiErrors(err.errors);
       toast.error((err as Error).message);
     }
@@ -553,9 +559,9 @@ export function ReturPembelianForm() {
             <tbody>
               {lines.map((l, i) => {
                 const available = lineAvailable(l);
-                const overStock = available !== undefined && (Number(l.qty) || 0) > available;
+                const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
                 const src = lineSource(l);
-                const overSource = src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
+                const overSource = !submitted && src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -646,9 +652,9 @@ export function ReturPembelianForm() {
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
             const available = lineAvailable(l);
-            const overStock = available !== undefined && (Number(l.qty) || 0) > available;
+            const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
             const src = lineSource(l);
-            const overSource = src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
+            const overSource = !submitted && src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">

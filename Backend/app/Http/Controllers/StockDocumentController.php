@@ -64,13 +64,16 @@ class StockDocumentController extends Controller
 
     /**
      * Simpan dokumen baru (scope: Penerimaan, Pengeluaran, Transfer Gudang,
-     * Retur Pembelian & Retur Penjualan).
+     * Retur Pembelian, Retur Penjualan & Stock Adjustment).
      * Bila `status` = Selesai, dokumen langsung diposting sehingga stok bergerak;
      * Draft hanya menyimpan dokumen. Transfer Gudang memakai warehouse_id sebagai
      * gudang asal + destination_warehouse_id sebagai tujuan dan disimpan dengan
      * qty positif (StockDocumentService mengeluarkan pasangan OUT+IN). Retur
      * Pembelian diperlakukan seperti pengeluaran (qty dinegasi, stok keluar ke
      * supplier); Retur Penjualan seperti penerimaan (stok masuk dari customer).
+     * Stock Adjustment membawa delta bertanda (positif = tambah stok ke bin
+     * tujuan, negatif = kurangi stok dari bin asal) dan disimpan apa adanya;
+     * unit_cost di-backfill moving average (koreksi valuasi-netral).
      */
     public function store(StoreStockDocumentRequest $request)
     {
@@ -79,9 +82,15 @@ class StockDocumentController extends Controller
         $isOutbound = in_array($data['type'], ['Pengeluaran', 'Retur Pembelian'], true);
         $isTransfer = $data['type'] === 'Transfer Gudang';
         $isOpname = $data['type'] === 'Stock Opname';
-        $fromBins = ($isOutbound || $isTransfer)
+        $isAdjustment = $data['type'] === 'Stock Adjustment';
+        // Stock Adjustment memakai bin dari arah qty (to_bin untuk IN, from_bin
+        // untuk OUT) untuk backfill unit_cost — load kedua sisi agar lookup lengkap.
+        $fromBins = ($isOutbound || $isTransfer || $isAdjustment)
             ? Bin::with('rack')
-                ->whereIn('id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
+                ->whereIn('id', collect($data['lines'])->flatMap(fn ($l) => array_filter([
+                    $l['from_bin_id'] ?? null,
+                    $isAdjustment ? ($l['to_bin_id'] ?? null) : null,
+                ]))->unique()->values())
                 ->get()
                 ->keyBy('id')
             : collect();
@@ -106,11 +115,12 @@ class StockDocumentController extends Controller
             : collect();
 
         try {
-            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $isOpname, $fromBins, $sourceLines, $stockRows) {
+            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $isOpname, $isAdjustment, $fromBins, $sourceLines, $stockRows) {
                 $prefix = $isTransfer ? 'TF'
                     : ($isOpname ? 'SO'
-                        : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK')
-                            : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM')));
+                        : ($isAdjustment ? 'ADJ'
+                            : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK')
+                                : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM'))));
 
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
@@ -139,6 +149,13 @@ class StockDocumentController extends Controller
                     $stockKey = $isOpname ? (($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0)) : null;
                     $stockRow = $isOpname ? $stockRows->get($stockKey) : null;
 
+                    // Stock Adjustment adalah koreksi (bukan pembelian): unit_cost
+                    // di-backfill moving average di bin baris (OUT=from, IN=to) agar
+                    // koreksi valuasi-netral — tidak menciptakan nilai palsu.
+                    $adjustBinId = $isAdjustment
+                        ? ((int) $line['qty'] < 0 ? ($line['from_bin_id'] ?? null) : ($line['to_bin_id'] ?? null))
+                        : null;
+
                     StockDocumentLine::create([
                         'document_id' => $document->id,
                         'line_no' => $index + 1,
@@ -148,18 +165,21 @@ class StockDocumentController extends Controller
                         // menghasilkan movement OUT yang benar di StockDocumentService. Transfer
                         // Gudang & Retur Penjualan tetap positif: Transfer merilis pasangan
                         // OUT+IN di service, Retur Penjualan adalah stok masuk (IN). Stock
-                        // Opname tidak membawa qty — memakai system_qty/actual_qty.
-                        'qty' => $isOpname ? null : ($isOutbound ? -abs($line['qty']) : $line['qty']),
+                        // Opname tidak membawa qty — memakai system_qty/actual_qty. Stock
+                        // Adjustment membawa delta BERTANDA (positif = IN, negatif = OUT).
+                        'qty' => $isOpname ? null : ($isAdjustment ? (int) $line['qty'] : ($isOutbound ? -abs($line['qty']) : $line['qty'])),
                         'system_qty' => $isOpname ? (int) ($stockRow?->stock ?? 0) : null,
                         'actual_qty' => $isOpname ? ($line['actual_qty'] ?? null) : null,
                         'unit_cost' => $isOpname
                             ? (float) ($stockRow?->unit_cost_avg ?? $line['unit_cost'] ?? 0)
                             : ($sourceCost !== null
                                 ? (float) $sourceCost
-                                : (($isOutbound || $isTransfer)
-                                    ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
-                                    : $line['unit_cost'])),
-                        'to_bin_id' => ($isOpname || $isOutbound) ? null : $line['to_bin_id'],
+                                : ($isAdjustment
+                                    ? ($adjustBinId ? ($this->averageCost($line['item_id'], $adjustBinId, $fromBins) ?? 0.0) : 0.0)
+                                    : (($isOutbound || $isTransfer)
+                                        ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
+                                        : $line['unit_cost']))),
+                        'to_bin_id' => ($isOpname || $isOutbound) ? null : ($line['to_bin_id'] ?? null),
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
                         'note' => $line['note'] ?? null,
