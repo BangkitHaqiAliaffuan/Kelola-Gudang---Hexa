@@ -63,6 +63,46 @@ class StockDocumentController extends Controller
     }
 
     /**
+     * Ringkasan mutasi untuk dashboard — agregat per jenis (Penerimaan/Pengeluaran)
+     * atas seluruh dokumen non-Draft, dihitung di SQL agar tidak men-serialisasi
+     * ribuan baris dokumen. qty keluar bertanda negatif (konsisten dengan
+     * `qty_total` pada index); frontend memakai nilai absolutnya.
+     */
+    public function summary()
+    {
+        $rows = DB::table('stock_documents')
+            ->join('stock_document_lines', 'stock_document_lines.document_id', '=', 'stock_documents.id')
+            ->whereIn('stock_documents.type', ['Penerimaan', 'Pengeluaran'])
+            ->where('stock_documents.status', '!=', 'Draft')
+            ->groupBy('stock_documents.type')
+            ->selectRaw(
+                'stock_documents.type,
+                 COUNT(DISTINCT stock_documents.id) as doc_count,
+                 SUM(stock_document_lines.qty) as qty,
+                 SUM(stock_document_lines.qty * stock_document_lines.unit_cost) as value'
+            )
+            ->get()
+            ->keyBy('type');
+
+        $masuk = $rows->get('Penerimaan');
+        $keluar = $rows->get('Pengeluaran');
+
+        return response()->json([
+            'data' => [
+                'masuk' => [
+                    'count' => (int) ($masuk->doc_count ?? 0),
+                    'qty' => (int) ($masuk->qty ?? 0),
+                    'value' => (float) ($masuk->value ?? 0),
+                ],
+                'keluar' => [
+                    'count' => (int) ($keluar->doc_count ?? 0),
+                    'qty' => (int) ($keluar->qty ?? 0),
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * Simpan dokumen baru (scope: Penerimaan, Pengeluaran, Transfer Gudang,
      * Retur Pembelian, Retur Penjualan & Stock Adjustment).
      * Bila `status` = Selesai, dokumen langsung diposting sehingga stok bergerak;

@@ -57,6 +57,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::get('valuation', [StockController::class, 'valuation']);
     Route::get('stock-documents', [StockDocumentController::class, 'index']);
     Route::post('stock-documents', [StockDocumentController::class, 'store']);
+    Route::get('stock-documents/summary', [StockDocumentController::class, 'summary']);
     Route::get('stock-documents/{stockDocument}', [StockDocumentController::class, 'show']);
     Route::put('stock-documents/{stockDocument}', [StockDocumentController::class, 'update']);
     Route::post('stock-documents/{stockDocument}/post', [StockDocumentController::class, 'post']);

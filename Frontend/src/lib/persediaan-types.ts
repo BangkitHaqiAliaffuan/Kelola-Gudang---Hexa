@@ -222,6 +222,11 @@ export type StockDocumentApi = {
   lines?: StockDocumentLineApi[];
 };
 
+export type StockDocumentSummaryApi = {
+  masuk: { count: number; qty: number; value: number };
+  keluar: { count: number; qty: number };
+};
+
 // ---- Pembuatan dokumen (POST /api/persediaan/stock-documents) ----
 // Scope: Penerimaan, Pengeluaran, Transfer Gudang, Retur Pembelian & Retur Penjualan.
 // - Penerimaan: baris memakai `to_bin_id` (arah IN memprioritaskan to_bin di

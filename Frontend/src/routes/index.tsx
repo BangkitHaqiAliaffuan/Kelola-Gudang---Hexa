@@ -41,7 +41,11 @@ import {
   warehouses,
 } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
-import { useStockDocuments, useStockMinimum } from "@/hooks/use-persediaan";
+import {
+  useStockDocumentSummary,
+  useStockDocuments,
+  useStockMinimum,
+} from "@/hooks/use-persediaan";
 import type { StockDocumentApi, StockMinimumApi, StockMinimumStatus } from "@/lib/persediaan-types";
 
 /** Baris dokumen opname: list API mengagregasi checked_count per dokumen. */
@@ -127,9 +131,10 @@ function Dashboard() {
   const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
   const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
     type: "Stock Opname",
+    status: "Draft",
   });
   const running = ((opnameDocs?.data ?? []) as OpnameDoc[]).filter((d) => d.status === "Draft");
-  const { data: recentDocs, isLoading: recentLoading } = useStockDocuments();
+  const { data: recentDocs, isLoading: recentLoading } = useStockDocuments({ perPage: 50 });
   const recentActivities = ((recentDocs?.data ?? []) as StockDocumentApi[])
     .filter((d) => d.status !== "Draft")
     .map((d) => ({
@@ -143,14 +148,13 @@ function Dashboard() {
     }))
     .slice(0, 14);
 
-  const nonDraftDocs = ((recentDocs?.data ?? []) as StockDocumentApi[]).filter(
-    (d) => d.status !== "Draft",
-  );
-  const masukDocs = nonDraftDocs.filter((d) => d.type === "Penerimaan");
-  const keluarDocs = nonDraftDocs.filter((d) => d.type === "Pengeluaran");
-  const masukQty = masukDocs.reduce((a, d) => a + (d.qty_total ?? 0), 0);
-  const masukValue = masukDocs.reduce((a, d) => a + (d.value_total ?? 0), 0);
-  const keluarQty = keluarDocs.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
+  const { data: summaryData, isLoading: summaryLoading } = useStockDocumentSummary();
+  const summary = summaryData?.data;
+  const masukQty = summary?.masuk.qty ?? 0;
+  const masukValue = summary?.masuk.value ?? 0;
+  const keluarQty = Math.abs(summary?.keluar.qty ?? 0);
+  const masukCount = summary?.masuk.count ?? 0;
+  const keluarCount = summary?.keluar.count ?? 0;
 
   const { data: minData, isLoading: minLoading } = useStockMinimum();
   const minRows = ((minData?.data ?? []) as StockMinimumApi[]).filter((r) => r.status !== "Normal");
@@ -191,22 +195,22 @@ function Dashboard() {
     },
     {
       label: "Total Barang Masuk",
-      value: formatNumber(masukQty),
-      hint: `${masukDocs.length} dokumen`,
+      value: summaryLoading ? "…" : formatNumber(masukQty),
+      hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
       label: "Nilai Barang Masuk",
-      value: formatIDRCompact(masukValue),
-      hint: `${masukDocs.length} dokumen`,
+      value: summaryLoading ? "…" : formatIDRCompact(masukValue),
+      hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
       label: "Total Barang Keluar",
-      value: formatNumber(keluarQty),
-      hint: `${keluarDocs.length} dokumen`,
+      value: summaryLoading ? "…" : formatNumber(keluarQty),
+      hint: `${keluarCount} dokumen`,
       icon: ArrowUpFromLine,
       tone: "warning" as const,
     },

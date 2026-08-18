@@ -4,6 +4,7 @@ import type {
   StockCardApi,
   StockDocumentApi,
   StockDocumentPayload,
+  StockDocumentSummaryApi,
   StockMinimumApi,
   StockRowApi,
   StockValuationApi,
@@ -45,16 +46,34 @@ export function useStockCard(
   });
 }
 
-export function useStockDocuments(params: { type?: string; status?: string } = {}) {
-  const { type, status } = params;
+export function useStockDocuments(
+  params: { type?: string; status?: string; perPage?: number } = {},
+) {
+  const { type, status, perPage } = params;
   return useQuery({
-    queryKey: ["persediaan", "stock-documents", "list", type ?? null, status ?? null],
+    queryKey: [
+      "persediaan",
+      "stock-documents",
+      "list",
+      type ?? null,
+      status ?? null,
+      perPage ?? null,
+    ],
     queryFn: () => {
-      const sp = new URLSearchParams({ per_page: String(DOCS_PER_PAGE) });
+      const sp = new URLSearchParams({ per_page: String(perPage ?? DOCS_PER_PAGE) });
       if (type) sp.set("type", type);
       if (status) sp.set("status", status);
       return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
     },
+    enabled: typeof window !== "undefined",
+  });
+}
+
+export function useStockDocumentSummary() {
+  return useQuery({
+    queryKey: ["persediaan", "stock-documents", "summary"],
+    queryFn: () =>
+      api.get<{ data: StockDocumentSummaryApi }>("/persediaan/stock-documents/summary"),
     enabled: typeof window !== "undefined",
   });
 }
