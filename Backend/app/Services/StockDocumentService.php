@@ -7,6 +7,7 @@ use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
+use App\Support\CodeGenerator;
 use Illuminate\Support\Facades\DB;
 
 class StockDocumentService
@@ -31,6 +32,8 @@ class StockDocumentService
         if ($document->type === 'Stock Opname') {
             $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
             $this->assertOpnameReadyForPost($document);
+
+            return $this->postOpname($document);
         }
 
         if ($document->type === 'Stock Adjustment') {
@@ -72,6 +75,63 @@ class StockDocumentService
 
             foreach (array_keys($itemsTouched) as $itemId) {
                 $this->ledger->rebuildForItem($itemId);
+            }
+
+            $document->update(['status' => 'Selesai', 'posted_at' => now()]);
+        });
+
+        return $document->fresh();
+    }
+
+    /**
+     * Stock Opname = penghitungan fisik: dokumen opname tidak memindahkan stok
+     * langsung. Saat diselesaikan, sistem membuat dokumen Stock Adjustment yang
+     * berisi baris selisih (variance ≠ 0) dan langsung memostingnya, sehingga
+     * koreksi stok ter-audit lewat dokumen ADJ yang ter-link ke opname via
+     * source_document_id. Opname tanpa selisih tidak menghasilkan ADJ.
+     */
+    private function postOpname(StockDocument $document): StockDocument
+    {
+        DB::transaction(function () use ($document) {
+            $varianceLines = $document->lines
+                ->filter(fn (StockDocumentLine $line) => $line->actual_qty !== null)
+                ->filter(fn (StockDocumentLine $line) => ((int) $line->actual_qty) - ((int) $line->system_qty) !== 0)
+                ->values();
+
+            if ($varianceLines->isNotEmpty()) {
+                $adjustment = StockDocument::create([
+                    'no' => CodeGenerator::nextYearly(StockDocument::class, 'ADJ', 'no', 5),
+                    'type' => 'Stock Adjustment',
+                    'status' => 'Selesai',
+                    'document_date' => $document->document_date,
+                    'warehouse_id' => $document->warehouse_id,
+                    'source_document_id' => $document->id,
+                    'pic' => $document->pic,
+                    'note' => 'Koreksi otomatis dari opname '.$document->no,
+                    'created_by' => $document->created_by,
+                ]);
+
+                $varianceLines->each(function (StockDocumentLine $line, int $index) use ($adjustment) {
+                    $variance = ((int) $line->actual_qty) - ((int) $line->system_qty);
+
+                    StockDocumentLine::create([
+                        'document_id' => $adjustment->id,
+                        'line_no' => $index + 1,
+                        'item_id' => $line->item_id,
+                        // Delta bertanda: positif = stok masuk (IN), negatif = keluar (OUT).
+                        'qty' => $variance,
+                        'from_bin_id' => $line->from_bin_id,
+                        'to_bin_id' => $variance > 0 ? $line->from_bin_id : null,
+                        'unit_cost' => (float) $line->unit_cost,
+                        'reason_code' => $line->reason_code,
+                        'note' => $line->note,
+                    ]);
+                });
+
+                // Posting ADJ menjalankan guard stok (assertNoNegativeStock) dan
+                // memindahkan stok via ledger; reason_code tiap baris diwarisi dari
+                // opname sehingga lolos assertAdjustmentReadyForPost.
+                $this->post($adjustment);
             }
 
             $document->update(['status' => 'Selesai', 'posted_at' => now()]);
@@ -262,7 +322,15 @@ class StockDocumentService
         // Stock Opname menyesuaikan stok terhadap kenyataan fisik: guard memakai
         // stok fisik (stock), bukan available, karena reservasi adalah komitmen
         // virtual yang tidak menambah/mengurangi barang yang benar-benar ada.
-        $available = $attributes['movement_type'] === 'Stock Opname'
+        // Koreksi dari opname (Stock Adjustment ter-link ke opname via
+        // source_document_id) mempertahankan semantik yang sama.
+        $physical = $attributes['movement_type'] === 'Stock Opname';
+        if (! $physical && $attributes['movement_type'] === 'Stock Adjustment') {
+            $source = StockDocument::find($attributes['stock_document_id'])?->sourceDocument;
+            $physical = $source?->type === 'Stock Opname';
+        }
+
+        $available = $physical
             ? (int) ($row?->stock ?? 0)
             : (int) ($row?->stock ?? 0) - (int) ($row?->reserved ?? 0);
 

@@ -101,7 +101,7 @@ export function OpnameReviewDialog({
         onSuccess: () =>
           post.mutate(session.id, {
             onSuccess: () => {
-              toast.success("Opname selesai diposting");
+              toast.success("Opname selesai — koreksi ADJ dibuat otomatis");
               onOpenChange(false);
             },
             onError: (err) =>

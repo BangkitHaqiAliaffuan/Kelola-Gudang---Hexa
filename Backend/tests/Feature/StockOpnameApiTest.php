@@ -163,6 +163,15 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', -3);
 
+        // Opname hanya mencatat hasil hitung; koreksi stok dibuat sebagai dokumen
+        // Stock Adjustment otomatis (source_document_id -> opname).
+        $opname = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $this->assertSame(0, $opname->movements()->count());
+
+        $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
+        $this->assertSame('Stock Adjustment', $adjustment->type);
+        $this->assertTrue($adjustment->isPosted());
+
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
             ->where('bin_id', $bin->id)
@@ -171,7 +180,7 @@ class StockOpnameApiTest extends TestCase
         $this->assertSame(7, (int) $row->stock);
 
         $this->assertDatabaseHas('stock_movements', [
-            'stock_document_id' => $res->json('data.id'),
+            'stock_document_id' => $adjustment->id,
             'direction' => 'OUT',
             'qty' => 3,
             'bin_id' => $bin->id,
@@ -198,6 +207,13 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', 2);
 
+        $opname = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $this->assertSame(0, $opname->movements()->count());
+
+        $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
+        $this->assertSame('Stock Adjustment', $adjustment->type);
+        $this->assertTrue($adjustment->isPosted());
+
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
             ->where('bin_id', $bin->id)
@@ -206,7 +222,7 @@ class StockOpnameApiTest extends TestCase
         $this->assertSame(12, (int) $row->stock);
 
         $this->assertDatabaseHas('stock_movements', [
-            'stock_document_id' => $res->json('data.id'),
+            'stock_document_id' => $adjustment->id,
             'direction' => 'IN',
             'qty' => 2,
             'bin_id' => $bin->id,
@@ -232,6 +248,8 @@ class StockOpnameApiTest extends TestCase
         $res->assertStatus(201)->assertJsonPath('data.status', 'Selesai');
 
         $this->assertDatabaseMissing('stock_movements', ['stock_document_id' => $res->json('data.id')]);
+        // Tanpa selisih, tidak ada dokumen Stock Adjustment yang dibuat.
+        $this->assertDatabaseMissing('stock_documents', ['source_document_id' => $res->json('data.id')]);
     }
 
     public function test_store_opname_posted_zero_system_bin_counts_physical(): void
@@ -253,6 +271,12 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.system_qty', 0)
             ->assertJsonPath('data.lines.0.variance', 5);
+
+        // Selisih 5 disalurkan lewat Stock Adjustment otomatis.
+        $this->assertDatabaseHas('stock_documents', [
+            'source_document_id' => $res->json('data.id'),
+            'type' => 'Stock Adjustment',
+        ]);
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
@@ -328,6 +352,13 @@ class StockOpnameApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', -4);
+
+        // Selisih -4 disalurkan lewat Stock Adjustment otomatis.
+        $this->assertDatabaseHas('stock_documents', [
+            'source_document_id' => $docId,
+            'type' => 'Stock Adjustment',
+        ]);
+        $this->assertSame(0, StockDocument::findOrFail($docId)->movements()->count());
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
