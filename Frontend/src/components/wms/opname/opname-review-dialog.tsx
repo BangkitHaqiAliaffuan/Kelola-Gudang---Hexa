@@ -39,12 +39,14 @@ export function OpnameReviewDialog({
   session,
   lines,
   records,
+  onCompleted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: StockDocumentApi;
   lines: StockDocumentLineApi[];
   records: Record<number, string>;
+  onCompleted?: () => void;
 }) {
   const update = useUpdateStockDocument();
   const post = usePostStockDocument();
@@ -103,6 +105,7 @@ export function OpnameReviewDialog({
             onSuccess: () => {
               toast.success("Opname selesai — koreksi ADJ dibuat otomatis");
               onOpenChange(false);
+              onCompleted?.();
             },
             onError: (err) =>
               toast.error(isApiError(err) ? err.message : "Gagal menyelesaikan opname"),
