@@ -143,18 +143,14 @@ function Dashboard() {
     }))
     .slice(0, 14);
 
-  const now = new Date();
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate(),
-  ).padStart(2, "0")}`;
-  const todayDocs = ((recentDocs?.data ?? []) as StockDocumentApi[]).filter(
-    (d) => d.status !== "Draft" && d.document_date?.slice(0, 10) === todayIso,
+  const nonDraftDocs = ((recentDocs?.data ?? []) as StockDocumentApi[]).filter(
+    (d) => d.status !== "Draft",
   );
-  const masukToday = todayDocs.filter((d) => d.type === "Penerimaan");
-  const keluarToday = todayDocs.filter((d) => d.type === "Pengeluaran");
-  const masukQty = masukToday.reduce((a, d) => a + (d.qty_total ?? 0), 0);
-  const masukValue = masukToday.reduce((a, d) => a + (d.value_total ?? 0), 0);
-  const keluarQty = keluarToday.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
+  const masukDocs = nonDraftDocs.filter((d) => d.type === "Penerimaan");
+  const keluarDocs = nonDraftDocs.filter((d) => d.type === "Pengeluaran");
+  const masukQty = masukDocs.reduce((a, d) => a + (d.qty_total ?? 0), 0);
+  const masukValue = masukDocs.reduce((a, d) => a + (d.value_total ?? 0), 0);
+  const keluarQty = keluarDocs.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
 
   const { data: minData, isLoading: minLoading } = useStockMinimum();
   const minRows = ((minData?.data ?? []) as StockMinimumApi[]).filter((r) => r.status !== "Normal");
@@ -194,23 +190,23 @@ function Dashboard() {
       tone: "info" as const,
     },
     {
-      label: "Barang Masuk Hari Ini",
+      label: "Total Barang Masuk",
       value: formatNumber(masukQty),
-      hint: `${masukToday.length} dokumen`,
+      hint: `${masukDocs.length} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
-      label: "Nilai Barang Masuk Hari Ini",
+      label: "Nilai Barang Masuk",
       value: formatIDRCompact(masukValue),
-      hint: `${masukToday.length} dokumen`,
+      hint: `${masukDocs.length} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
     },
     {
-      label: "Barang Keluar Hari Ini",
+      label: "Total Barang Keluar",
       value: formatNumber(keluarQty),
-      hint: `${keluarToday.length} dokumen`,
+      hint: `${keluarDocs.length} dokumen`,
       icon: ArrowUpFromLine,
       tone: "warning" as const,
     },

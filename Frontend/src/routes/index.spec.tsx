@@ -237,14 +237,12 @@ describe("Dashboard (index route)", () => {
       qty_total?: number;
       value_total?: number;
     };
-    const todayDocs = (recentDocsFixture as readonly TodayDoc[]).filter(
-      (d) => d.status !== "Draft" && d.document_date?.slice(0, 10) === todayIso,
-    );
-    const masukToday = todayDocs.filter((d) => d.type === "Penerimaan");
-    const keluarToday = todayDocs.filter((d) => d.type === "Pengeluaran");
-    const masukQty = masukToday.reduce((a, d) => a + (d.qty_total ?? 0), 0);
-    const masukValue = masukToday.reduce((a, d) => a + (d.value_total ?? 0), 0);
-    const keluarQty = keluarToday.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
+    const docs = recentDocsFixture as readonly TodayDoc[];
+    const masukDocs = docs.filter((d) => d.status !== "Draft" && d.type === "Penerimaan");
+    const keluarDocs = docs.filter((d) => d.status !== "Draft" && d.type === "Pengeluaran");
+    const masukQty = masukDocs.reduce((a, d) => a + (d.qty_total ?? 0), 0);
+    const masukValue = masukDocs.reduce((a, d) => a + (d.value_total ?? 0), 0);
+    const keluarQty = keluarDocs.reduce((a, d) => a + Math.abs(d.qty_total ?? 0), 0);
     const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
     const running = opnameFixture.filter((o) => o.status === "Draft");
     const nonNormal = stockMinFixture.filter((r) => r.status !== "Normal");
@@ -260,9 +258,9 @@ describe("Dashboard (index route)", () => {
         formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
         "terikat permintaan",
       ],
-      ["Barang Masuk Hari Ini", formatNumber(masukQty), `${masukToday.length} dokumen`],
-      ["Nilai Barang Masuk Hari Ini", formatIDRCompact(masukValue), `${masukToday.length} dokumen`],
-      ["Barang Keluar Hari Ini", formatNumber(keluarQty), `${keluarToday.length} dokumen`],
+      ["Total Barang Masuk", formatNumber(masukQty), `${masukDocs.length} dokumen`],
+      ["Nilai Barang Masuk", formatIDRCompact(masukValue), `${masukDocs.length} dokumen`],
+      ["Total Barang Keluar", formatNumber(keluarQty), `${keluarDocs.length} dokumen`],
       ["Stock Menipis", formatNumber(stockMenipis), "di bawah minimum"],
       ["Stock Habis", formatNumber(stockHabis), "perlu restock segera"],
       ["Nilai Persediaan", formatIDRCompact(totalValue), "metode FIFO"],
