@@ -186,6 +186,7 @@ export function PurchaseRequestPage() {
   const canCreate = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
   const canApprove = hasModule("Approval Pengadaan");
+  const canApproveAny = canApprove || canManage;
   const canViewRestock = hasModuleLevel("Persediaan", "Baca");
   const canDecide = useCallback(
     (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage),
@@ -339,13 +340,15 @@ export function PurchaseRequestPage() {
             icon={ShoppingCart}
             tone="warning"
           />
-          <StatCard
-            label="Perlu Persetujuan Saya"
-            value={formatNumber(stats.approvable)}
-            hint="Dapat Anda setujui/tolak"
-            icon={UserCheck}
-            tone="brand"
-          />
+          {canApproveAny && (
+            <StatCard
+              label="Perlu Persetujuan Saya"
+              value={formatNumber(stats.approvable)}
+              hint="Dapat Anda setujui/tolak"
+              icon={UserCheck}
+              tone="brand"
+            />
+          )}
           <StatCard
             label="Disetujui"
             value={formatNumber(stats.approved)}
@@ -399,16 +402,18 @@ export function PurchaseRequestPage() {
             />
           </div>
           <div className="mt-3 flex justify-end">
-            <Button
-              variant={myApproval ? "default" : "outline"}
-              className="rounded-xl"
-              aria-pressed={myApproval}
-              onClick={() => setMyApproval((v) => !v)}
-            >
-              <UserCheck className="h-4 w-4" />
-              Perlu Persetujuan Saya
-              {stats.approvable > 0 && ` (${formatNumber(stats.approvable)})`}
-            </Button>
+            {canApproveAny && (
+              <Button
+                variant={myApproval ? "default" : "outline"}
+                className="rounded-xl"
+                aria-pressed={myApproval}
+                onClick={() => setMyApproval((v) => !v)}
+              >
+                <UserCheck className="h-4 w-4" />
+                Perlu Persetujuan Saya
+                {stats.approvable > 0 && ` (${formatNumber(stats.approvable)})`}
+              </Button>
+            )}
           </div>
         </Panel>
       </div>

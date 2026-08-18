@@ -27,8 +27,11 @@ const statusTone = (s: string): Tone =>
           : "warning";
 
 export function PurchaseOrderPage() {
-  const { hasModuleLevel, user } = useAuth();
+  const { hasModule, hasModuleLevel, user } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
+  const canApprove = hasModule("Approval Pengadaan");
+  const canManage = hasModuleLevel("Pengadaan", "Kelola");
+  const canApproveAny = canApprove || canManage;
   const { data, isLoading } = useProcDocsPo("PO");
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
@@ -182,12 +185,14 @@ export function PurchaseOrderPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={ShoppingCart} />
-        <StatCard
-          label="Menunggu Saya"
-          value={formatNumber(mineAwaiting)}
-          icon={ShoppingCart}
-          tone="brand"
-        />
+        {canApproveAny && (
+          <StatCard
+            label="Menunggu Saya"
+            value={formatNumber(mineAwaiting)}
+            icon={ShoppingCart}
+            tone="brand"
+          />
+        )}
         <StatCard
           label="Perlu Tindakan"
           value={formatNumber(openDocs)}
