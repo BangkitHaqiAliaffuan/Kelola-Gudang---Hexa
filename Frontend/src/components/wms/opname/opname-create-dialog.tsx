@@ -112,6 +112,8 @@ export function OpnameCreateDialog({
                 searchPlaceholder="Cari gudang..."
                 loading={warehousesLoading}
                 className="w-full justify-between rounded-xl"
+                side="bottom"
+                avoidCollisions={false}
               />
             </div>
             <div className="space-y-1.5">
@@ -137,6 +139,8 @@ export function OpnameCreateDialog({
                 searchPlaceholder="Cari nama..."
                 loading={usersLoading}
                 className="w-full justify-between rounded-xl"
+                side="bottom"
+                avoidCollisions={false}
               />
             </div>
             <div className="space-y-1.5">

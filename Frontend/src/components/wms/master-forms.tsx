@@ -171,6 +171,24 @@ function nextCode(codes: string[], prefix: string): string {
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
+function nextSku(codes: string[]): string {
+  let bestSeries = 10000;
+  let bestSeq = 0;
+  for (const c of codes) {
+    const m = /^SKU-(\d+)-(\d{3})$/.exec(c);
+    if (!m) continue;
+    const series = Number(m[1]);
+    const seq = Number(m[2]);
+    if (series > bestSeries || (series === bestSeries && seq > bestSeq)) {
+      bestSeries = series;
+      bestSeq = seq;
+    }
+  }
+  if (bestSeries === 10000 && bestSeq === 0) return "SKU-10001-001";
+  if (bestSeq >= 999) return `SKU-${bestSeries + 1}-001`;
+  return `SKU-${bestSeries}-${String(bestSeq + 1).padStart(3, "0")}`;
+}
+
 function nextYearlyCode(codes: string[], prefix: string, year = new Date().getFullYear()): string {
   const head = `${prefix}/${year}/`;
   let max = 0;
@@ -390,40 +408,28 @@ export function SubCategoryFormDialog({
             <FormField
               control={form.control}
               name="category_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Induk Kategori</FormLabel>
-                  <Select
-                    value={String(field.value)}
-                    onValueChange={(v) => field.onChange(Number(v))}
-                  >
+              render={({ field }) => {
+                const catOptions: ComboboxOption[] = (cats?.data ?? []).map((c) => ({
+                  value: String(c.id),
+                  label: c.name,
+                  keywords: c.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>Induk Kategori</FormLabel>
                     <FormControl>
-                      <SelectTrigger
-                        className="rounded-xl"
-                        icon={
-                          catsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
-                        }
-                      >
-                        <SelectValue placeholder="Pilih kategori" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value)}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                        options={catOptions}
+                        placeholder="Pilih kategori"
+                        loading={catsLoading}
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {catsLoading ? (
-                        <SelectItem value="__loading" disabled>
-                          Memuat...
-                        </SelectItem>
-                      ) : (
-                        cats?.data.map((c) => (
-                          <SelectItem key={c.id} value={String(c.id)}>
-                            {c.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}
@@ -955,42 +961,28 @@ export function RackFormDialog({
               <FormField
                 control={form.control}
                 name="warehouse_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Gudang</FormLabel>
-                    <Select
-                      value={String(field.value)}
-                      onValueChange={(v) => field.onChange(Number(v))}
-                    >
+                render={({ field }) => {
+                  const warehouseOptions: ComboboxOption[] = (warehouses?.data ?? []).map((w) => ({
+                    value: String(w.id),
+                    label: w.name,
+                    keywords: w.code,
+                  }));
+                  return (
+                    <FormItem>
+                      <FormLabel>Gudang</FormLabel>
                       <FormControl>
-                        <SelectTrigger
-                          className="rounded-xl"
-                          icon={
-                            warehousesLoading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : undefined
-                          }
-                        >
-                          <SelectValue placeholder="Pilih gudang" />
-                        </SelectTrigger>
+                        <FormCombobox
+                          value={String(field.value)}
+                          onValueChange={(v) => field.onChange(Number(v))}
+                          options={warehouseOptions}
+                          placeholder="Pilih gudang"
+                          loading={warehousesLoading}
+                        />
                       </FormControl>
-                      <SelectContent className="max-h-72 rounded-xl">
-                        {warehousesLoading ? (
-                          <SelectItem value="__loading" disabled>
-                            Memuat...
-                          </SelectItem>
-                        ) : (
-                          warehouses?.data.map((w) => (
-                            <SelectItem key={w.id} value={String(w.id)}>
-                              {w.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -2455,6 +2447,7 @@ export function ItemFormDialog({
     (items?.data ?? []).map((i) => i.internal_barcode).filter((c): c is string => c != null),
     "IB",
   );
+  const previewSku = nextSku((items?.data ?? []).map((i) => i.sku));
 
   const defaultValues = useMemo<ItemInput>(
     () =>
@@ -2482,7 +2475,7 @@ export function ItemFormDialog({
             status: initial.status,
           }
         : {
-            sku: "",
+            sku: previewSku,
             barcode: "",
             internal_barcode: "",
             name: "",
@@ -2503,7 +2496,7 @@ export function ItemFormDialog({
             dimension: "",
             status: "Aktif",
           },
-    [initial],
+    [initial, previewSku],
   );
 
   const toPayload = (v: ItemInput): ItemPayload => {
@@ -2587,6 +2580,11 @@ export function ItemFormDialog({
                         <Input placeholder="SKU-10001-001" className="rounded-xl" {...field} />
                       </FormControl>
                       <FormMessage />
+                      {!initial && (
+                        <p className="text-xs text-muted-foreground">
+                          Diisi otomatis dengan SKU berikutnya — bisa diubah.
+                        </p>
+                      )}
                     </FormItem>
                   )}
                 />
@@ -2764,93 +2762,68 @@ export function ItemFormDialog({
                 <FormField
                   control={form.control}
                   name="unit_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Satuan <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                      >
+                  render={({ field }) => {
+                    const unitOptions: ComboboxOption[] = (units?.data ?? []).map((u) => ({
+                      value: String(u.id),
+                      label: u.name,
+                      keywords: u.code,
+                    }));
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Satuan{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger
-                            className="rounded-xl"
-                            icon={
-                              unitsLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : undefined
-                            }
-                          >
-                            <SelectValue placeholder="Pilih satuan" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                            options={unitOptions}
+                            placeholder="Pilih satuan"
+                            allowEmpty
+                            loading={unitsLoading}
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          <SelectItem value="">Tidak ada</SelectItem>
-                          {unitsLoading ? (
-                            <SelectItem value="__loading" disabled>
-                              Memuat...
-                            </SelectItem>
-                          ) : (
-                            units?.data.map((u) => (
-                              <SelectItem key={u.id} value={String(u.id)}>
-                                {u.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
                   name="default_warehouse_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Gudang Default{" "}
-                        <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => {
-                          field.onChange(v === "" ? "" : Number(v));
-                          form.setValue("default_rack_id", "");
-                          form.setValue("default_bin_id", "");
-                        }}
-                      >
+                  render={({ field }) => {
+                    const warehouseOptions: ComboboxOption[] = (warehouses?.data ?? []).map(
+                      (w) => ({
+                        value: String(w.id),
+                        label: w.name,
+                        keywords: w.code,
+                      }),
+                    );
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Gudang Default{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
                         <FormControl>
-                          <SelectTrigger
-                            className="rounded-xl"
-                            icon={
-                              warehousesLoading ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : undefined
-                            }
-                          >
-                            <SelectValue placeholder="Pilih gudang" />
-                          </SelectTrigger>
+                          <FormCombobox
+                            value={field.value ? String(field.value) : ""}
+                            onValueChange={(v) => {
+                              field.onChange(v === "" ? "" : Number(v));
+                              form.setValue("default_rack_id", "");
+                              form.setValue("default_bin_id", "");
+                            }}
+                            options={warehouseOptions}
+                            placeholder="Pilih gudang"
+                            allowEmpty
+                            loading={warehousesLoading}
+                          />
                         </FormControl>
-                        <SelectContent className="max-h-72 rounded-xl">
-                          <SelectItem value="">Tidak ada</SelectItem>
-                          {warehousesLoading ? (
-                            <SelectItem value="__loading" disabled>
-                              Memuat...
-                            </SelectItem>
-                          ) : (
-                            warehouses?.data.map((w) => (
-                              <SelectItem key={w.id} value={String(w.id)}>
-                                {w.name}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -3182,42 +3155,31 @@ export function DepartmentFormDialog({
             <FormField
               control={form.control}
               name="head_user_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Kepala <span className="font-normal text-muted-foreground">(opsional)</span>
-                  </FormLabel>
-                  <Select
-                    value={String(field.value ?? "")}
-                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                  >
+              render={({ field }) => {
+                const userOptions: ComboboxOption[] = (users?.data ?? []).map((u) => ({
+                  value: String(u.id),
+                  label: u.name,
+                  keywords: u.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      Kepala <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger
-                        className="rounded-xl"
-                        icon={
-                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
-                        }
-                      >
-                        <SelectValue placeholder="Pilih kepala" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value ?? "")}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={userOptions}
+                        placeholder="Pilih kepala"
+                        allowEmpty
+                        loading={usersLoading}
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {usersLoading ? (
-                        <SelectItem value="__loading" disabled>
-                          Memuat...
-                        </SelectItem>
-                      ) : (
-                        users?.data.map((u) => (
-                          <SelectItem key={u.id} value={String(u.id)}>
-                            {u.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}
@@ -3360,42 +3322,31 @@ export function ProjectFormDialog({
             <FormField
               control={form.control}
               name="pic_user_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    PIC <span className="font-normal text-muted-foreground">(opsional)</span>
-                  </FormLabel>
-                  <Select
-                    value={String(field.value ?? "")}
-                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                  >
+              render={({ field }) => {
+                const userOptions: ComboboxOption[] = (users?.data ?? []).map((u) => ({
+                  value: String(u.id),
+                  label: u.name,
+                  keywords: u.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger
-                        className="rounded-xl"
-                        icon={
-                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
-                        }
-                      >
-                        <SelectValue placeholder="Pilih PIC" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value ?? "")}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={userOptions}
+                        placeholder="Pilih PIC"
+                        allowEmpty
+                        loading={usersLoading}
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {usersLoading ? (
-                        <SelectItem value="__loading" disabled>
-                          Memuat...
-                        </SelectItem>
-                      ) : (
-                        users?.data.map((u) => (
-                          <SelectItem key={u.id} value={String(u.id)}>
-                            {u.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -3660,42 +3611,31 @@ export function WorkOrderFormDialog({
               <FormField
                 control={form.control}
                 name="unit_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Satuan <span className="font-normal text-muted-foreground">(opsional)</span>
-                    </FormLabel>
-                    <Select
-                      value={String(field.value ?? "")}
-                      onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                    >
+                render={({ field }) => {
+                  const unitOptions: ComboboxOption[] = (units?.data ?? []).map((u) => ({
+                    value: String(u.id),
+                    label: u.name,
+                    keywords: u.code,
+                  }));
+                  return (
+                    <FormItem>
+                      <FormLabel>
+                        Satuan <span className="font-normal text-muted-foreground">(opsional)</span>
+                      </FormLabel>
                       <FormControl>
-                        <SelectTrigger
-                          className="rounded-xl"
-                          icon={
-                            unitsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
-                          }
-                        >
-                          <SelectValue placeholder="Pilih satuan" />
-                        </SelectTrigger>
+                        <FormCombobox
+                          value={String(field.value ?? "")}
+                          onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                          options={unitOptions}
+                          placeholder="Pilih satuan"
+                          allowEmpty
+                          loading={unitsLoading}
+                        />
                       </FormControl>
-                      <SelectContent className="max-h-72 rounded-xl">
-                        {unitsLoading ? (
-                          <SelectItem value="__loading" disabled>
-                            Memuat...
-                          </SelectItem>
-                        ) : (
-                          units?.data.map((u) => (
-                            <SelectItem key={u.id} value={String(u.id)}>
-                              {u.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <FormField
                 control={form.control}
@@ -3764,42 +3704,31 @@ export function WorkOrderFormDialog({
             <FormField
               control={form.control}
               name="pic_user_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    PIC <span className="font-normal text-muted-foreground">(opsional)</span>
-                  </FormLabel>
-                  <Select
-                    value={String(field.value ?? "")}
-                    onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
-                  >
+              render={({ field }) => {
+                const userOptions: ComboboxOption[] = (users?.data ?? []).map((u) => ({
+                  value: String(u.id),
+                  label: u.name,
+                  keywords: u.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      PIC <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
                     <FormControl>
-                      <SelectTrigger
-                        className="rounded-xl"
-                        icon={
-                          usersLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined
-                        }
-                      >
-                        <SelectValue placeholder="Pilih PIC" />
-                      </SelectTrigger>
+                      <FormCombobox
+                        value={String(field.value ?? "")}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={userOptions}
+                        placeholder="Pilih PIC"
+                        allowEmpty
+                        loading={usersLoading}
+                      />
                     </FormControl>
-                    <SelectContent className="max-h-72 rounded-xl">
-                      {usersLoading ? (
-                        <SelectItem value="__loading" disabled>
-                          Memuat...
-                        </SelectItem>
-                      ) : (
-                        users?.data.map((u) => (
-                          <SelectItem key={u.id} value={String(u.id)}>
-                            {u.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}

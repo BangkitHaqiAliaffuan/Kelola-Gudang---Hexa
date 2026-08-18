@@ -168,7 +168,7 @@ export function OpnameReviewDialog({
                     >
                       <SelectValue placeholder="Pilih alasan..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent side="top" avoidCollisions={false}>
                       {Object.entries(opnameReasonCodes).map(([code, label]) => (
                         <SelectItem key={code} value={code}>
                           {label}

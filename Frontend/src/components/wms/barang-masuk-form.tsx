@@ -286,6 +286,8 @@ export function BarangMasukForm({
               placeholder="Pilih Gudang"
               searchPlaceholder="Cari gudang..."
               loading={warehousesLoading}
+              side="bottom"
+              avoidCollisions={false}
             />
             {docError("warehouse_id") && (
               <p className="text-xs text-destructive">{docError("warehouse_id")}</p>
@@ -301,6 +303,8 @@ export function BarangMasukForm({
               searchPlaceholder="Cari supplier..."
               allowEmpty
               loading={suppliersLoading}
+              side="bottom"
+              avoidCollisions={false}
             />
           </div>
           <div className="space-y-1.5">
@@ -405,6 +409,8 @@ export function BarangMasukForm({
                         placeholder="Pilih barang / scan barcode"
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         loading={itemsLoading}
+                        side="top"
+                        avoidCollisions={false}
                       />
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
@@ -418,6 +424,8 @@ export function BarangMasukForm({
                         placeholder={warehouseId ? "Pilih Bin" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
                         loading={binsLoading}
+                        side="top"
+                        avoidCollisions={false}
                       />
                       {lineError(i, "to_bin_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "to_bin_id")}</p>
@@ -484,6 +492,8 @@ export function BarangMasukForm({
                     options={itemOptions}
                     placeholder="Pilih barang"
                     loading={itemsLoading}
+                    side="top"
+                    avoidCollisions={false}
                   />
                   <FormCombobox
                     value={l.binId}
@@ -491,6 +501,8 @@ export function BarangMasukForm({
                     options={binOptions}
                     placeholder={warehouseId ? "Pilih Bin" : "Pilih Gudang dulu"}
                     loading={binsLoading}
+                    side="top"
+                    avoidCollisions={false}
                   />
                   <div className="flex items-center gap-2">
                     <Input
