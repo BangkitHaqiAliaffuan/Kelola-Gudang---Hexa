@@ -243,8 +243,13 @@ export type StockDocumentSummaryApi = {
 //   Bila `source_document_id` (dokumen Penerimaan sumber) dikirim, setiap baris
 //   wajib memakai `source_line_id` baris Penerimaan tersebut — server memvalidasi
 //   relasi + sisa qty dan meng-backfill harga beli asal dari baris sumber.
-// - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, unit_cost
-//   dari input), nomor `RJ/YYYY/#####`, partner = customer.
+// - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, qty
+//   positif, server memakai unit_cost baris sumber), nomor `RJ/YYYY/#####`,
+//   partner = customer. Bila `source_document_id` (dokumen Pengeluaran sumber)
+//   dikirim, setiap baris wajib memakai `source_line_id` baris Pengeluaran
+//   tersebut — server memvalidasi relasi + sisa qty (cap abs qty baris BK),
+//   `to_bin_id` harus sama dengan `from_bin_id` baris sumber, dan meng-backfill
+//   harga baris sumber. Tanpa sumber, baris memakai `unit_cost` dari input.
 // - Stock Adjustment: koreksi stok dengan delta BERTANDA — `qty` positif = tambah
 //   stok (IN, `to_bin_id` wajib), `qty` negatif = kurangi stok (OUT, `from_bin_id`
 //   wajib). Nomor `ADJ/YYYY/#####`. `unit_cost` di-backfill server (moving average

@@ -111,6 +111,9 @@ class StockDocumentController extends Controller
      * qty positif (StockDocumentService mengeluarkan pasangan OUT+IN). Retur
      * Pembelian diperlakukan seperti pengeluaran (qty dinegasi, stok keluar ke
      * supplier); Retur Penjualan seperti penerimaan (stok masuk dari customer).
+     * RP/RJ yang mengirim source_document_id ter-link ke baris sumber (Penerimaan
+     * untuk RP, Pengeluaran untuk RJ): unit_cost baris retur di-backfill harga
+     * baris sumber dan source_line_id dicatat.
      * Stock Adjustment membawa delta bertanda (positif = tambah stok ke bin
      * tujuan, negatif = kurangi stok dari bin asal) dan disimpan apa adanya;
      * unit_cost di-backfill moving average (koreksi valuasi-netral).
@@ -145,9 +148,10 @@ class StockDocumentController extends Controller
                 ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id)
             : collect();
 
-        // Baris Penerimaan sumber untuk Retur Pembelian yang ter-link — harga beli
-        // asal (unit_cost) dipakai menggantikan moving average pada baris retur.
-        $sourceLines = ($data['type'] === 'Retur Pembelian' && ! empty($data['source_document_id']))
+        // Baris dokumen sumber untuk Retur Pembelian/Penjualan yang ter-link —
+        // harga asal (unit_cost) baris sumber dipakai menggantikan moving average
+        // pada baris retur (RP: Penerimaan, RJ: Pengeluaran).
+        $sourceLines = (in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true) && ! empty($data['source_document_id']))
             ? StockDocumentLine::where('document_id', $data['source_document_id'])
                 ->whereIn('id', collect($data['lines'])->pluck('source_line_id')->filter()->unique()->values())
                 ->get()
@@ -173,7 +177,7 @@ class StockDocumentController extends Controller
                     'frozen_at' => $isOpname ? now() : null,
                     'warehouse_id' => $data['warehouse_id'],
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
-                    'source_document_id' => $data['type'] === 'Retur Pembelian' ? ($data['source_document_id'] ?? null) : null,
+                    'source_document_id' => in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true) ? ($data['source_document_id'] ?? null) : null,
                     'partner' => $data['partner'] ?? null,
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
@@ -182,7 +186,7 @@ class StockDocumentController extends Controller
                 ]);
 
                 foreach ($data['lines'] as $index => $line) {
-                    $sourceCost = $data['type'] === 'Retur Pembelian'
+                    $sourceCost = in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true)
                         ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_cost
                         : null;
 

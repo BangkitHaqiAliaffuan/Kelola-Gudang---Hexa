@@ -32,13 +32,14 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::requiredIf(fn () => $this->input('type') === 'Transfer Gudang'),
                 'different:warehouse_id',
             ],
-            // Retur Pembelian: dokumen Barang Masuk (Penerimaan) sumber — wajib
-            // ketika source_document_id dikirim; hanya sah untuk tipe Retur Pembelian.
+            // Retur Pembelian / Retur Penjualan: dokumen sumber — wajib ketika
+            // source_document_id dikirim; hanya sah untuk tipe retur ber-sumber.
+            // RP merujuk Penerimaan (Barang Masuk), RJ merujuk Pengeluaran (Barang Keluar).
             'source_document_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('stock_documents', 'id'),
-                Rule::prohibitedIf(fn () => $this->input('type') !== 'Retur Pembelian'),
+                Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Retur Pembelian', 'Retur Penjualan'], true)),
             ],
             'partner' => ['nullable', 'string', 'max:255'],
             'reference_no' => ['nullable', 'string', 'max:255'],
@@ -65,8 +66,10 @@ class StoreStockDocumentRequest extends FormRequest
             'lines.*.system_qty' => ['nullable', 'integer', 'min:0'],
             'lines.*.actual_qty' => ['nullable', 'integer', 'min:0'],
             // Pengeluaran & Retur Pembelian memakai biaya rata-rata (moving average) di
-            // bin asal — di-backfill server saat simpan; unit_cost kiriman hanya dipakai
-            // untuk Penerimaan & Retur Penjualan (dan sebagai fallback Stock Opname).
+            // bin asal — di-backfill server saat simpan. Retur Pembelian/Penjualan yang
+            // ter-link sumber memakai harga baris sumber; unit_cost kiriman hanya
+            // dipakai untuk Penerimaan & Retur Penjualan tanpa sumber (dan sebagai
+            // fallback Stock Opname).
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'lines.*.to_bin_id' => [
                 'nullable',
@@ -88,7 +91,7 @@ class StoreStockDocumentRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::exists('stock_document_lines', 'id'),
-                Rule::requiredIf(fn () => $this->input('type') === 'Retur Pembelian' && ! empty($this->input('source_document_id'))),
+                Rule::requiredIf(fn () => in_array($this->input('type'), ['Retur Pembelian', 'Retur Penjualan'], true) && ! empty($this->input('source_document_id'))),
             ],
         ];
     }
@@ -330,6 +333,128 @@ class StoreStockDocumentRequest extends FormRequest
                     }
 
                     $sourceQty = (int) $sourceLine->qty;
+                    $alreadyReturned = (int) ($returnedByLine->get((int) $sourceLineId) ?? 0);
+                    $requested = (int) ($requestedByLine[(int) $sourceLineId] ?? 0);
+
+                    if ($alreadyReturned + $requested > $sourceQty) {
+                        $remaining = max(0, $sourceQty - $alreadyReturned);
+                        $validator->errors()->add(
+                            "lines.{$index}.qty",
+                            "Qty melebihi sisa barang dari dokumen sumber (sisa {$remaining})."
+                        );
+                    }
+                }
+            },
+            function (Validator $validator) {
+                $type = $this->input('type');
+                $sourceDocumentId = $this->input('source_document_id');
+                $lines = $this->input('lines') ?? [];
+
+                if ($type !== 'Retur Penjualan' || ! $sourceDocumentId || ! $lines) {
+                    return;
+                }
+
+                $source = StockDocument::with('lines')->find((int) $sourceDocumentId);
+
+                if (! $source) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber tidak ditemukan.');
+
+                    return;
+                }
+
+                if ($source->type !== 'Pengeluaran') {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berjenis Pengeluaran (Barang Keluar).');
+
+                    return;
+                }
+
+                if ($source->status !== 'Selesai') {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berstatus Selesai (sudah diposting).');
+
+                    return;
+                }
+
+                if ((int) $source->warehouse_id !== (int) $this->input('warehouse_id')) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber harus berada di gudang yang sama dengan retur.');
+
+                    return;
+                }
+
+                $sourceLines = $source->lines->keyBy('id');
+
+                if ($sourceLines->isEmpty()) {
+                    $validator->errors()->add('source_document_id', 'Dokumen sumber tidak memiliki baris barang.');
+
+                    return;
+                }
+
+                // Total qty yang sudah di-retur (dokumen Retur Penjualan non-Dibatalkan)
+                // per baris sumber, dijumlahkan dengan qty pada request ini agar
+                // pembagian ke beberapa baris ikut terhitung.
+                $returnedByLine = StockDocumentLine::query()
+                    ->whereNotNull('source_line_id')
+                    ->whereIn('source_line_id', $sourceLines->keys())
+                    ->whereHas('document', fn ($q) => $q
+                        ->where('type', 'Retur Penjualan')
+                        ->where('status', '!=', 'Dibatalkan'))
+                    ->get()
+                    ->groupBy('source_line_id')
+                    ->map(fn ($group) => $group->sum(fn ($l) => abs((int) $l->qty)));
+
+                $requestedByLine = [];
+
+                foreach ($lines as $line) {
+                    $sourceLineId = $line['source_line_id'] ?? null;
+
+                    if (! $sourceLineId) {
+                        continue;
+                    }
+
+                    $requestedByLine[(int) $sourceLineId] = (int) ($requestedByLine[(int) $sourceLineId] ?? 0) + abs((int) $line['qty']);
+                }
+
+                foreach ($lines as $index => $line) {
+                    $sourceLineId = $line['source_line_id'] ?? null;
+
+                    if (! $sourceLineId) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris wajib merujuk baris dokumen sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    $sourceLine = $sourceLines->get((int) $sourceLineId);
+
+                    if (! $sourceLine) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris sumber bukan milik dokumen sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    if ((int) $sourceLine->item_id !== (int) $line['item_id']) {
+                        $validator->errors()->add(
+                            "lines.{$index}.source_line_id",
+                            'Baris retur harus memakai barang yang sama dengan baris sumber.'
+                        );
+
+                        continue;
+                    }
+
+                    $sourceBinId = (int) ($sourceLine->from_bin_id ?? 0);
+
+                    if ($sourceBinId && (int) ($line['to_bin_id'] ?? 0) !== $sourceBinId) {
+                        $validator->errors()->add(
+                            "lines.{$index}.to_bin_id",
+                            'Bin tujuan harus sama dengan bin asal baris sumber (Pengeluaran).'
+                        );
+                    }
+
+                    $sourceQty = abs((int) $sourceLine->qty);
                     $alreadyReturned = (int) ($returnedByLine->get((int) $sourceLineId) ?? 0);
                     $requested = (int) ($requestedByLine[(int) $sourceLineId] ?? 0);
 
