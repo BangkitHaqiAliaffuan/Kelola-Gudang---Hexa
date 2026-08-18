@@ -6,8 +6,10 @@ use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\Rack;
+use App\Models\StockDocument;
 use App\Models\StockMovement;
 use App\Models\Warehouse;
+use App\Services\StockLedger;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,11 +22,23 @@ class StockApiTest extends TestCase
     {
         parent::setUp();
         $this->actingAsMasterAdmin();
-        $this->seed();
     }
 
     public function test_index_returns_complete_stock_rows(): void
     {
+        $item = Item::factory()->create([
+            'sku' => 'SKU-INDEX-001',
+            'barcode' => '8990000000001',
+            'internal_barcode' => 'IB-501',
+        ]);
+        $wh = $item->default_warehouse ?? Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+        ItemStock::updateOrInsert(
+            ['item_id' => $item->id, 'warehouse_id' => $wh->id, 'bin_id' => $bin->id],
+            ['stock' => 100, 'reserved' => 0, 'unit_cost_avg' => 1000, 'updated_at' => now()]
+        );
+
         $this->getJson('/api/persediaan/stock?per_page=500')
             ->assertOk()
             ->assertJsonStructure([
@@ -47,6 +61,32 @@ class StockApiTest extends TestCase
 
     public function test_index_filters(): void
     {
+        $itemA = Item::factory()->create([
+            'sku' => 'SKU-INDEX-002',
+            'barcode' => '8990000000002',
+            'internal_barcode' => 'IB-502',
+        ]);
+        $whA = $itemA->default_warehouse ?? Warehouse::factory()->create();
+        $rackA = Rack::factory()->create(['warehouse_id' => $whA->id]);
+        $binA = Bin::factory()->create(['rack_id' => $rackA->id]);
+        ItemStock::updateOrInsert(
+            ['item_id' => $itemA->id, 'warehouse_id' => $whA->id, 'bin_id' => $binA->id],
+            ['stock' => 100, 'reserved' => 0, 'unit_cost_avg' => 1000, 'updated_at' => now()]
+        );
+
+        $itemB = Item::factory()->create([
+            'sku' => 'SKU-INDEX-003',
+            'barcode' => '8990000000003',
+            'internal_barcode' => 'IB-503',
+        ]);
+        $whB = $itemB->default_warehouse ?? Warehouse::factory()->create();
+        $rackB = Rack::factory()->create(['warehouse_id' => $whB->id]);
+        $binB = Bin::factory()->create(['rack_id' => $rackB->id]);
+        ItemStock::updateOrInsert(
+            ['item_id' => $itemB->id, 'warehouse_id' => $whB->id, 'bin_id' => $binB->id],
+            ['stock' => 0, 'reserved' => 0, 'unit_cost_avg' => 1500, 'updated_at' => now()]
+        );
+
         $row = ItemStock::query()->with('item')->first();
 
         $this->getJson('/api/persediaan/stock?search='.urlencode((string) $row->item->sku))
@@ -69,7 +109,7 @@ class StockApiTest extends TestCase
 
     public function test_stock_card_is_balanced(): void
     {
-        $item = Item::query()->whereHas('itemStocks', fn ($q) => $q->where('stock', '>', 0))->firstOrFail();
+        $item = $this->makeCardItem();
 
         $response = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id);
         $response->assertOk();
@@ -95,7 +135,7 @@ class StockApiTest extends TestCase
 
     public function test_stock_card_respects_date_range(): void
     {
-        $item = Item::query()->firstOrFail();
+        $item = $this->makeCardItem();
         $full = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id)->json('data');
         $this->assertGreaterThan(1, count($full['rows']));
 
@@ -112,7 +152,7 @@ class StockApiTest extends TestCase
 
     public function test_stock_card_methods(): void
     {
-        $item = Item::query()->whereHas('itemStocks', fn ($q) => $q->where('stock', '>', 0))->firstOrFail();
+        $item = $this->makeCardItem();
 
         foreach (['FIFO', 'Average', 'Maximum Cost'] as $method) {
             $data = $this->getJson('/api/persediaan/stock-card?item_id='.$item->id.'&method='.urlencode($method))
@@ -268,5 +308,59 @@ class StockApiTest extends TestCase
         $this->getJson('/api/persediaan/stock-card?item_id=999999')
             ->assertStatus(422)
             ->assertJsonValidationErrors('item_id');
+    }
+
+    private function makeCardItem(): Item
+    {
+        $unique = random_int(10000, 99999);
+        $item = Item::factory()->create([
+            'sku' => "SKU-CARD-{$unique}",
+            'barcode' => '899'.str_pad((string) $unique, 10, '0', STR_PAD_LEFT),
+            'internal_barcode' => "IB-CARD-{$unique}",
+        ]);
+        $wh = $item->default_warehouse ?? Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $doc = StockDocument::create([
+            'no' => 'BM/2026/'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => now(),
+            'warehouse_id' => $wh->id,
+            'pic' => 'Test',
+        ]);
+
+        $base = CarbonImmutable::parse('2026-08-01 08:00:00');
+        $movements = [
+            ['IN', 100, 1000, 'Penerimaan', $base],
+            ['OUT', 40, 1500, 'Pengeluaran', $base->addMinutes(10)],
+            ['IN', 60, 2000, 'Penerimaan', $base->addMinutes(20)],
+            ['IN', 40, 2500, 'Penerimaan', $base->addMinutes(30)],
+        ];
+
+        foreach ($movements as [$direction, $qty, $cost, $type, $when]) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'warehouse_id' => $wh->id,
+                'rack_id' => $rack->id,
+                'bin_id' => $bin->id,
+                'direction' => $direction,
+                'qty' => $qty,
+                'movement_type' => $type,
+                'reference_no' => $doc->no,
+                'partner' => 'Test',
+                'unit_cost' => $cost,
+                'pic' => 'Test',
+                'note' => 'Test',
+                'occurred_at' => $when,
+                'stock_document_id' => $doc->id,
+                'line_no' => 1,
+            ]);
+        }
+
+        (new StockLedger)->rebuildForItem($item->id);
+
+        return $item;
     }
 }

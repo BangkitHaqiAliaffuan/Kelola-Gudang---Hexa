@@ -22,11 +22,14 @@ class StockDocumentApiTest extends TestCase
     {
         parent::setUp();
         $this->actingAsMasterAdmin();
-        $this->seed();
     }
 
     public function test_index_returns_documents(): void
     {
+        $this->makeDoc('Penerimaan', 'Selesai');
+        $this->makeDoc('Pengeluaran', 'Draft');
+        $this->makeDoc('Transfer Gudang', 'Menunggu Approval');
+
         $this->getJson('/api/persediaan/stock-documents?per_page=500')
             ->assertOk()
             ->assertJsonStructure([
@@ -44,7 +47,8 @@ class StockDocumentApiTest extends TestCase
 
     public function test_index_filters(): void
     {
-        $doc = StockDocument::query()->firstOrFail();
+        $doc = $this->makeDoc('Penerimaan', 'Selesai');
+        $this->makeDoc('Pengeluaran', 'Draft');
 
         $this->getJson('/api/persediaan/stock-documents?type='.urlencode($doc->type))
             ->assertOk()
@@ -62,7 +66,10 @@ class StockDocumentApiTest extends TestCase
 
     public function test_show_includes_lines(): void
     {
-        $doc = StockDocument::query()->firstOrFail();
+        $doc = $this->makeDocument('Penerimaan', 'Draft', [
+            ['qty' => 5, 'cost' => 1000],
+            ['qty' => 3, 'cost' => 1500],
+        ]);
 
         $this->getJson("/api/persediaan/stock-documents/{$doc->id}")
             ->assertOk()
@@ -74,7 +81,7 @@ class StockDocumentApiTest extends TestCase
                     ],
                 ],
             ])
-            ->assertJsonCount(StockDocumentLine::where('document_id', $doc->id)->count(), 'data.lines');
+            ->assertJsonCount(2, 'data.lines');
     }
 
     public function test_post_penerimaan_creates_movement(): void
@@ -193,10 +200,25 @@ class StockDocumentApiTest extends TestCase
 
     public function test_cancel_posted_document_returns_422(): void
     {
-        $doc = StockDocument::query()->where('status', 'Selesai')->firstOrFail();
+        $doc = $this->makeDocument('Penerimaan', 'Selesai', [['qty' => 5, 'cost' => 900]]);
+        $doc->update(['posted_at' => now()]);
 
         $this->postJson("/api/persediaan/stock-documents/{$doc->id}/cancel")
             ->assertStatus(422);
+    }
+
+    private function makeDoc(string $type, string $status, ?Warehouse $warehouse = null): StockDocument
+    {
+        $warehouse ??= Warehouse::factory()->create();
+
+        return StockDocument::create([
+            'no' => "TEST/{$type}/".str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+            'type' => $type,
+            'status' => $status,
+            'document_date' => now(),
+            'warehouse_id' => $warehouse->id,
+            'pic' => 'Test',
+        ]);
     }
 
     private function makeDocument(string $type, string $status, array $lines): StockDocument

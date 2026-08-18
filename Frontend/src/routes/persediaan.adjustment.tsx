@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
@@ -8,6 +8,7 @@ import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatNumber } from "@/lib/wms-data";
@@ -42,6 +43,8 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 function StockAdjustment() {
   const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
@@ -119,13 +122,22 @@ function StockAdjustment() {
         title="Stock Adjustment"
         description="Dokumen penyesuaian stok yang telah diposting ke ledger"
         actions={
-          <Button
-            variant="outline"
-            className="rounded-xl"
-            onClick={() => toast.success("Export Excel diproses")}
-          >
-            <Download className="h-4 w-4" /> Export
-          </Button>
+          <>
+            {canCreate && (
+              <Button asChild className="rounded-xl">
+                <Link to="/persediaan/adjustment/new">
+                  <Plus className="h-4 w-4" /> Buat Penyesuaian
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => toast.success("Export Excel diproses")}
+            >
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          </>
         }
       />
       <Panel title="Filter">

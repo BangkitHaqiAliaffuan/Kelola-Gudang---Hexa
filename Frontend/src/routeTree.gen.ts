@@ -41,6 +41,7 @@ import { Route as PengadaanPurchaseRequestIndexRouteImport } from './routes/peng
 import { Route as PengadaanPurchaseRequestNewRouteImport } from './routes/pengadaan.purchase-request.new'
 import { Route as PengadaanReceiveGoodsIndexRouteImport } from './routes/pengadaan.receive-goods.index'
 import { Route as PengadaanReceiveGoodsNewRouteImport } from './routes/pengadaan.receive-goods.new'
+import { Route as PersediaanAdjustmentNewRouteImport } from './routes/persediaan.adjustment.new'
 import { Route as TransaksiEntriSectionRouteImport } from './routes/transaksi.entri.$section'
 import { Route as PengadaanPurchaseOrderEditIdRouteImport } from './routes/pengadaan.purchase-order.edit.$id'
 import { Route as PengadaanPurchaseOrderPrintIdRouteImport } from './routes/pengadaan.purchase-order.print.$id'
@@ -214,6 +215,11 @@ const PengadaanReceiveGoodsNewRoute =
     path: '/new',
     getParentRoute: () => PengadaanReceiveGoodsRoute,
   } as any)
+const PersediaanAdjustmentNewRoute = PersediaanAdjustmentNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => PersediaanAdjustmentRoute,
+} as any)
 const TransaksiEntriSectionRoute = TransaksiEntriSectionRouteImport.update({
   id: '/transaksi/entri/$section',
   path: '/transaksi/entri/$section',
@@ -255,7 +261,7 @@ export interface FileRoutesByFullPath {
   '/pengadaan/purchase-order': typeof PengadaanPurchaseOrderRouteWithChildren
   '/pengadaan/purchase-request': typeof PengadaanPurchaseRequestRouteWithChildren
   '/pengadaan/receive-goods': typeof PengadaanReceiveGoodsRouteWithChildren
-  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRouteWithChildren
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
+  '/persediaan/adjustment/new': typeof PersediaanAdjustmentNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang/': typeof MasterBarangIndexRoute
   '/pengadaan/purchase-order/': typeof PengadaanPurchaseOrderIndexRoute
@@ -291,7 +298,7 @@ export interface FileRoutesByTo {
   '/master/$section': typeof MasterSectionRoute
   '/opname/$section': typeof OpnameSectionRoute
   '/pengadaan/$section': typeof PengadaanSectionRoute
-  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRouteWithChildren
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -308,6 +315,7 @@ export interface FileRoutesByTo {
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
+  '/persediaan/adjustment/new': typeof PersediaanAdjustmentNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang': typeof MasterBarangIndexRoute
   '/pengadaan/purchase-order': typeof PengadaanPurchaseOrderIndexRoute
@@ -331,7 +339,7 @@ export interface FileRoutesById {
   '/pengadaan/purchase-order': typeof PengadaanPurchaseOrderRouteWithChildren
   '/pengadaan/purchase-request': typeof PengadaanPurchaseRequestRouteWithChildren
   '/pengadaan/receive-goods': typeof PengadaanReceiveGoodsRouteWithChildren
-  '/persediaan/adjustment': typeof PersediaanAdjustmentRoute
+  '/persediaan/adjustment': typeof PersediaanAdjustmentRouteWithChildren
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
@@ -348,6 +356,7 @@ export interface FileRoutesById {
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
   '/pengadaan/receive-goods/new': typeof PengadaanReceiveGoodsNewRoute
+  '/persediaan/adjustment/new': typeof PersediaanAdjustmentNewRoute
   '/transaksi/entri/$section': typeof TransaksiEntriSectionRouteWithChildren
   '/master/barang/': typeof MasterBarangIndexRoute
   '/pengadaan/purchase-order/': typeof PengadaanPurchaseOrderIndexRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
     | '/pengadaan/receive-goods/new'
+    | '/persediaan/adjustment/new'
     | '/transaksi/entri/$section'
     | '/master/barang/'
     | '/pengadaan/purchase-order/'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
     | '/pengadaan/receive-goods/new'
+    | '/persediaan/adjustment/new'
     | '/transaksi/entri/$section'
     | '/master/barang'
     | '/pengadaan/purchase-order'
@@ -464,6 +475,7 @@ export interface FileRouteTypes {
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
     | '/pengadaan/receive-goods/new'
+    | '/persediaan/adjustment/new'
     | '/transaksi/entri/$section'
     | '/master/barang/'
     | '/pengadaan/purchase-order/'
@@ -487,7 +499,7 @@ export interface RootRouteChildren {
   PengadaanPurchaseOrderRoute: typeof PengadaanPurchaseOrderRouteWithChildren
   PengadaanPurchaseRequestRoute: typeof PengadaanPurchaseRequestRouteWithChildren
   PengadaanReceiveGoodsRoute: typeof PengadaanReceiveGoodsRouteWithChildren
-  PersediaanAdjustmentRoute: typeof PersediaanAdjustmentRoute
+  PersediaanAdjustmentRoute: typeof PersediaanAdjustmentRouteWithChildren
   PersediaanKartuStockRoute: typeof PersediaanKartuStockRoute
   PersediaanMutasiRoute: typeof PersediaanMutasiRoute
   PersediaanNilaiRoute: typeof PersediaanNilaiRoute
@@ -731,6 +743,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PengadaanReceiveGoodsNewRouteImport
       parentRoute: typeof PengadaanReceiveGoodsRoute
     }
+    '/persediaan/adjustment/new': {
+      id: '/persediaan/adjustment/new'
+      path: '/new'
+      fullPath: '/persediaan/adjustment/new'
+      preLoaderRoute: typeof PersediaanAdjustmentNewRouteImport
+      parentRoute: typeof PersediaanAdjustmentRoute
+    }
     '/transaksi/entri/$section': {
       id: '/transaksi/entri/$section'
       path: '/transaksi/entri/$section'
@@ -822,6 +841,17 @@ const PengadaanReceiveGoodsRouteWithChildren =
     PengadaanReceiveGoodsRouteChildren,
   )
 
+interface PersediaanAdjustmentRouteChildren {
+  PersediaanAdjustmentNewRoute: typeof PersediaanAdjustmentNewRoute
+}
+
+const PersediaanAdjustmentRouteChildren: PersediaanAdjustmentRouteChildren = {
+  PersediaanAdjustmentNewRoute: PersediaanAdjustmentNewRoute,
+}
+
+const PersediaanAdjustmentRouteWithChildren =
+  PersediaanAdjustmentRoute._addFileChildren(PersediaanAdjustmentRouteChildren)
+
 interface TransaksiEntriSectionRouteChildren {
   TransaksiEntriSectionIdRoute: typeof TransaksiEntriSectionIdRoute
 }
@@ -847,7 +877,7 @@ const rootRouteChildren: RootRouteChildren = {
   PengadaanPurchaseOrderRoute: PengadaanPurchaseOrderRouteWithChildren,
   PengadaanPurchaseRequestRoute: PengadaanPurchaseRequestRouteWithChildren,
   PengadaanReceiveGoodsRoute: PengadaanReceiveGoodsRouteWithChildren,
-  PersediaanAdjustmentRoute: PersediaanAdjustmentRoute,
+  PersediaanAdjustmentRoute: PersediaanAdjustmentRouteWithChildren,
   PersediaanKartuStockRoute: PersediaanKartuStockRoute,
   PersediaanMutasiRoute: PersediaanMutasiRoute,
   PersediaanNilaiRoute: PersediaanNilaiRoute,

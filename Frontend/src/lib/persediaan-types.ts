@@ -240,6 +240,10 @@ export type StockDocumentApi = {
 //   relasi + sisa qty dan meng-backfill harga beli asal dari baris sumber.
 // - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, unit_cost
 //   dari input), nomor `RJ/YYYY/#####`, partner = customer.
+// - Stock Adjustment: koreksi stok dengan delta BERTANDA — `qty` positif = tambah
+//   stok (IN, `to_bin_id` wajib), `qty` negatif = kurangi stok (OUT, `from_bin_id`
+//   wajib). Nomor `ADJ/YYYY/#####`. `unit_cost` di-backfill server (moving average
+//   di bin, valuasi-netral). `reason_code` (alasan selisih) wajib selalu diisi.
 
 export type StockDocumentTypeToStore =
   | "Penerimaan"
@@ -247,7 +251,8 @@ export type StockDocumentTypeToStore =
   | "Transfer Gudang"
   | "Retur Pembelian"
   | "Retur Penjualan"
-  | "Stock Opname";
+  | "Stock Opname"
+  | "Stock Adjustment";
 
 export type StockDocumentLinePayload = {
   item_id: number;

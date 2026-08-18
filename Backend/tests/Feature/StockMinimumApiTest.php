@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\Rack;
 use App\Models\StockMovement;
+use App\Models\Warehouse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,11 +19,12 @@ class StockMinimumApiTest extends TestCase
     {
         parent::setUp();
         $this->actingAsMasterAdmin();
-        $this->seed();
     }
 
     public function test_stock_minimum_returns_rows_with_expected_shape(): void
     {
+        $this->makeStockItem(10, 100, 30);
+
         $this->getJson('/api/persediaan/stock-minimum?per_page=500')
             ->assertOk()
             ->assertJsonStructure([
@@ -39,6 +43,11 @@ class StockMinimumApiTest extends TestCase
 
     public function test_status_is_derived_from_min_threshold(): void
     {
+        $this->makeStockItem(10, 100, 0);            // Habis
+        $this->makeStockItem(10, 100, 5, 5);         // Kritis (available 0)
+        $this->makeStockItem(10, 100, 8);            // Menipis (available <= min)
+        $this->makeStockItem(10, 100, 30);           // Normal
+
         $rows = $this->getJson('/api/persediaan/stock-minimum?per_page=500')->assertOk()->json('data');
 
         foreach ($rows as $row) {
@@ -60,7 +69,7 @@ class StockMinimumApiTest extends TestCase
 
     public function test_category_filter_scopes_rows(): void
     {
-        $item = Item::whereNotNull('category_id')->firstOrFail();
+        $item = $this->makeStockItem(10, 100, 30);
 
         $this->getJson('/api/persediaan/stock-minimum?category_id='.$item->category_id)
             ->assertOk()
@@ -69,7 +78,7 @@ class StockMinimumApiTest extends TestCase
 
     public function test_search_scopes_rows(): void
     {
-        $item = Item::query()->firstOrFail();
+        $item = $this->makeStockItem(10, 100, 30);
 
         $this->getJson('/api/persediaan/stock-minimum?search='.urlencode((string) $item->sku))
             ->assertOk()
@@ -79,6 +88,11 @@ class StockMinimumApiTest extends TestCase
 
     public function test_suggested_qty_is_never_negative(): void
     {
+        $this->makeStockItem(10, 100, 0);
+        $this->makeStockItem(10, 100, 5, 5);
+        $this->makeStockItem(10, 100, 8);
+        $this->makeStockItem(10, 100, 30);
+
         $response = $this->getJson('/api/persediaan/stock-minimum?per_page=500')
             ->assertOk();
 
@@ -89,6 +103,27 @@ class StockMinimumApiTest extends TestCase
 
     public function test_movement_types_driver_usage_is_consumption_only(): void
     {
+        $item = $this->makeStockItem(10, 100, 20);
+        $wh = $item->default_warehouse ?? Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        StockMovement::create([
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $rack->id,
+            'bin_id' => $bin->id,
+            'direction' => 'OUT',
+            'qty' => 6,
+            'movement_type' => 'Pengeluaran',
+            'reference_no' => 'BK/2026/00001',
+            'partner' => 'Test',
+            'unit_cost' => 1000,
+            'pic' => 'Test',
+            'note' => 'Test',
+            'occurred_at' => now()->subDays(3),
+        ]);
+
         // Only Pengeluaran OUT movements feed avg_daily_usage — transfers and
         // stock adjustments are inventory mechanics, not demand.
         $usageQuery = StockMovement::query()->selectRaw('SUM(qty) AS used')
@@ -104,7 +139,15 @@ class StockMinimumApiTest extends TestCase
 
     public function test_warehouse_filter_scopes_stock_and_usage(): void
     {
-        // Pick two warehouses that each have item_stock rows.
+        $item = $this->makeStockItem(5, 100, 10);
+        $wh2 = Warehouse::factory()->create();
+        $rack2 = Rack::factory()->create(['warehouse_id' => $wh2->id]);
+        $bin2 = Bin::factory()->create(['rack_id' => $rack2->id]);
+        ItemStock::updateOrInsert(
+            ['item_id' => $item->id, 'warehouse_id' => $wh2->id, 'bin_id' => $bin2->id],
+            ['stock' => 5, 'reserved' => 0, 'unit_cost_avg' => 1000, 'updated_at' => now()]
+        );
+
         $warehouseIds = ItemStock::distinct()->pluck('warehouse_id')->take(2);
         if ($warehouseIds->count() < 2) {
             $this->markTestSkipped('Need at least 2 warehouses with item_stock rows.');
@@ -148,5 +191,27 @@ class StockMinimumApiTest extends TestCase
             $allSame,
             'total_stock should differ for at least one item between the two warehouses — filter is not working.'
         );
+    }
+
+    private function makeStockItem(int $min, int $max, int $stock, int $reserved = 0): Item
+    {
+        $unique = random_int(10000, 99999);
+        $item = Item::factory()->create([
+            'sku' => "SKU-MIN-{$unique}",
+            'barcode' => '899'.str_pad((string) $unique, 10, '0', STR_PAD_LEFT),
+            'internal_barcode' => "IB-MIN-{$unique}",
+            'min_stock' => $min,
+            'max_stock' => $max,
+        ]);
+        $wh = $item->default_warehouse ?? Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        ItemStock::updateOrInsert(
+            ['item_id' => $item->id, 'warehouse_id' => $wh->id, 'bin_id' => $bin->id],
+            ['stock' => $stock, 'reserved' => $reserved, 'unit_cost_avg' => 1000, 'updated_at' => now()]
+        );
+
+        return $item;
     }
 }
