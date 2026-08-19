@@ -20,9 +20,11 @@ import type {
   WorkOrder,
 } from "@/lib/master-types";
 
-// Data volume is small (~300 items), so fetch everything and let the UI
-// (DataTable) paginate + filter client-side, matching the existing UX.
-const PER_PAGE = 500;
+// Data volume is small, so fetch everything and let the UI (DataTable)
+// paginate + filter client-side, matching the existing UX. 10000 covers the
+// largest dataset today (bins, ~578 rows) with ample headroom — matches the
+// DOCS_PER_PAGE convention used by use-purchase-order.ts / use-persediaan.ts.
+const PER_PAGE = 10000;
 
 const keys = {
   categories: ["master", "categories"] as const,
