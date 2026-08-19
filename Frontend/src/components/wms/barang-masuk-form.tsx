@@ -50,6 +50,7 @@ type BarangMasukFormProps = {
   referenceLabel?: string;
   requireReference?: boolean;
   referenceCombobox?: boolean;
+  initialPoId?: string | undefined;
 };
 
 export function BarangMasukForm({
@@ -59,6 +60,7 @@ export function BarangMasukForm({
   referenceLabel = "Referensi (PO / SJ)",
   requireReference = false,
   referenceCombobox = false,
+  initialPoId,
 }: BarangMasukFormProps = {}) {
   const navigate = useNavigate();
   const { user, hasModuleLevel } = useAuth();
@@ -83,7 +85,7 @@ export function BarangMasukForm({
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
-  const [selectedPoId, setSelectedPoId] = useState("");
+  const [selectedPoId, setSelectedPoId] = useState(initialPoId ?? "");
   const [poSheetOpen, setPoSheetOpen] = useState(false);
   const prefilledPoRef = useRef<number | null>(null);
 

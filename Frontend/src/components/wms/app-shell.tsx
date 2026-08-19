@@ -357,7 +357,7 @@ function NotificationCenter() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { status, user, hasModule, logout } = useAuth();
+  const { status, user, access, hasModule, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -536,6 +536,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NotificationCenter />
               <ProfileHelpDialog
                 user={user ?? undefined}
+                access={access}
                 onLogout={onLogout}
                 trigger={
                   <button

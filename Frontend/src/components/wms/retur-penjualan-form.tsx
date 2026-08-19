@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useBins, useCustomers, useItems, useWarehouses } from "@/hooks/use-master";
 import {
   useCreateStockDocument,
@@ -27,7 +28,11 @@ import {
 } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/wms-data";
-import type { StockDocumentLineApi, StockDocumentPayload } from "@/lib/persediaan-types";
+import type {
+  StockDocumentApi,
+  StockDocumentLineApi,
+  StockDocumentPayload,
+} from "@/lib/persediaan-types";
 
 const returReasons = ["Cacat", "Kelebihan Kirim", "Salah Barang", "Kadaluarsa", "Lainnya"];
 
@@ -60,6 +65,8 @@ export function ReturPenjualanForm() {
   const [warehouseId, setWarehouseId] = useState("");
   const [customer, setCustomer] = useState("");
   const [sourceDocId, setSourceDocId] = useState("");
+  const [sourceSearch, setSourceSearch] = useState("");
+  const [selectedSourceDoc, setSelectedSourceDoc] = useState<StockDocumentApi | null>(null);
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");
@@ -69,10 +76,17 @@ export function ReturPenjualanForm() {
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
 
-  // Dokumen Pengeluaran (Barang Keluar) Selesai yang bisa jadi sumber retur.
+  // Dokumen Pengeluaran (Barang Keluar) Selesai yang bisa jadi sumber retur —
+  // dimuat async per gudang (per_page kecil + server-side search) agar form
+  // tetap ringan meski dokumen mencapai ribuan. Dipicu setelah gudang dipilih.
+  const debouncedSourceSearch = useDebouncedValue(sourceSearch);
   const { data: outboundDocs, isLoading: outboundLoading } = useStockDocuments({
     type: "Pengeluaran",
     status: "Selesai",
+    warehouseId: warehouseId ? Number(warehouseId) : null,
+    search: debouncedSourceSearch.trim() || null,
+    perPage: 20,
+    enabled: warehouseId !== "",
   });
   const { data: sourceDetail } = useStockDocument(sourceDocId ? Number(sourceDocId) : undefined);
 
@@ -94,21 +108,25 @@ export function ReturPenjualanForm() {
     [customers],
   );
 
-  // Dokumen Barang Keluar (Pengeluaran Selesai) di gudang terpilih — selalu
-  // menampilkan seluruh dokumen agar user bisa berganti sumber kapan saja
-  // (customer terisi otomatis dari dokumen terpilih, tidak memfilter daftar).
-  // Barang retur harus berasal dari salah satu baris dokumen ini (validasi
-  // server: cap qty per baris + harga baris sumber).
+  // Dokumen Barang Keluar (Pengeluaran Selesai) di gudang terpilih — dimuat
+  // async dari server (per_page=20 + search). Dokumen yang sedang dipilih tetap
+  // disertakan agar labelnya tidak hilang saat hasil search/gudang menyaringnya
+  // keluar. Customer terisi otomatis dari dokumen terpilih (tidak memfilter
+  // daftar). Barang retur harus berasal dari salah satu baris dokumen ini
+  // (validasi server: cap qty per baris + harga baris sumber).
   const sourceDocOptions: ComboboxOption[] = useMemo(() => {
-    const docs = (outboundDocs?.data ?? []).filter(
-      (d) => !warehouseId || d.warehouse_id === Number(warehouseId),
-    );
-    return docs.map((d) => ({
+    const docs = outboundDocs?.data ?? [];
+    const seen = new Set(docs.map((d) => d.id));
+    const merged = [
+      ...(selectedSourceDoc && !seen.has(selectedSourceDoc.id) ? [selectedSourceDoc] : []),
+      ...docs,
+    ];
+    return merged.map((d) => ({
       value: String(d.id),
       label: `${d.no} · ${formatDate(d.document_date)}${d.partner ? ` · ${d.partner}` : ""}`,
       keywords: `${d.no} ${d.partner ?? ""} ${d.reference_no ?? ""}`,
     }));
-  }, [outboundDocs, warehouseId]);
+  }, [outboundDocs, selectedSourceDoc]);
 
   // Baris barang dari dokumen sumber terpilih (qty negatif = yang dikeluarkan).
   const sourceLines = useMemo(
@@ -224,6 +242,8 @@ export function ReturPenjualanForm() {
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
     setSourceDocId("");
+    setSelectedSourceDoc(null);
+    setSourceSearch("");
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
@@ -232,7 +252,10 @@ export function ReturPenjualanForm() {
   // baris dokumen itu.
   const pickSourceDoc = (id: string) => {
     setSourceDocId(id);
-    const doc = (outboundDocs?.data ?? []).find((d) => String(d.id) === id);
+    const doc =
+      (outboundDocs?.data ?? []).find((d) => String(d.id) === id) ??
+      (selectedSourceDoc && String(selectedSourceDoc.id) === id ? selectedSourceDoc : null);
+    setSelectedSourceDoc(doc);
     setCustomer(doc?.partner ?? "");
     setLines([newLine()]);
   };
@@ -366,8 +389,9 @@ export function ReturPenjualanForm() {
               value={sourceDocId}
               onValueChange={pickSourceDoc}
               options={sourceDocOptions}
+              onSearchChange={setSourceSearch}
               placeholder={warehouseId ? "Pilih dokumen sumber..." : "Pilih gudang dulu"}
-              searchPlaceholder="Cari nomor / customer / referensi..."
+              searchPlaceholder="Cari nomor / customer..."
               loading={outboundLoading}
               side="bottom"
               avoidCollisions={false}

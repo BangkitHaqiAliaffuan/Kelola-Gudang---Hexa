@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Download, Plus, Search, ShoppingCart } from "lucide-react";
+import { Download, Plus, Search, ShoppingCart, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
@@ -13,6 +13,7 @@ import { useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useProcDocPo, useProcDocsPo } from "@/hooks/use-purchase-order";
 import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { canDecideProcDoc } from "@/lib/pengadaan-types";
 import { poStatuses, type ProcDocApi } from "@/lib/purchase-order-types";
 
 const statusTone = (s: string): Tone =>
@@ -32,6 +33,10 @@ export function PurchaseOrderPage() {
   const canApprove = hasModule("Approval Pengadaan");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
   const canApproveAny = canApprove || canManage;
+  const canDecide = useCallback(
+    (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage),
+    [user, canApprove, canManage],
+  );
   const { data, isLoading } = useProcDocsPo("PO");
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
@@ -41,6 +46,7 @@ export function PurchaseOrderPage() {
   const [status, setStatus] = useState(ALL);
   const [wh, setWh] = useState(ALL);
   const [supplier, setSupplier] = useState(ALL);
+  const [myApproval, setMyApproval] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useProcDocPo(selectedId ?? undefined);
 
@@ -57,15 +63,14 @@ export function PurchaseOrderPage() {
               .includes(qn)) &&
           (status === ALL || d.status === status) &&
           (wh === ALL || d.warehouse === wh) &&
-          (supplier === ALL || d.supplier === supplier),
+          (supplier === ALL || d.supplier === supplier) &&
+          (!myApproval || canDecide(d)),
       ),
-    [data, qn, status, wh, supplier],
+    [data, qn, status, wh, supplier, myApproval, canDecide],
   );
 
   const totalValue = rows.reduce((a, b) => a + (b.value_total ?? 0), 0);
-  const mineAwaiting = rows.filter(
-    (d) => d.status === "Menunggu Approval" && d.approver_user_id === user?.id,
-  ).length;
+  const approvable = (data?.data ?? []).filter((d) => canDecide(d)).length;
   const openDocs = rows.filter(
     (d) => d.status === "Menunggu Approval" || d.status === "Sebagian Diterima",
   ).length;
@@ -188,7 +193,7 @@ export function PurchaseOrderPage() {
         {canApproveAny && (
           <StatCard
             label="Menunggu Saya"
-            value={formatNumber(mineAwaiting)}
+            value={formatNumber(approvable)}
             icon={ShoppingCart}
             tone="brand"
           />
@@ -248,6 +253,20 @@ export function PurchaseOrderPage() {
             placeholder="Semua Status"
             options={[...poStatuses]}
           />
+        </div>
+        <div className="mt-3 flex justify-end">
+          {canApproveAny && (
+            <Button
+              variant={myApproval ? "default" : "outline"}
+              className="rounded-xl"
+              aria-pressed={myApproval}
+              onClick={() => setMyApproval((v) => !v)}
+            >
+              <UserCheck className="h-4 w-4" />
+              Perlu Persetujuan Saya
+              {approvable > 0 && ` (${formatNumber(approvable)})`}
+            </Button>
+          )}
         </div>
       </Panel>
 

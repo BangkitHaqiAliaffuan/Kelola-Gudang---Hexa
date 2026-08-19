@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Ban, CheckCircle2, Loader2, Pencil, Printer, Send, Trash2, XCircle } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Loader2,
+  PackageCheck,
+  Pencil,
+  Printer,
+  Send,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -82,6 +92,7 @@ export function PurchaseOrderSheet({
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
   const canManage = hasModuleLevel("Pengadaan", "Kelola");
   const canApprove = hasModule("Approval Pengadaan");
+  const canReceive = hasModuleLevel("Persediaan", "Tulis");
   const submit = useSubmitProcDocPo();
   const approve = useApproveProcDocPo();
   const reject = useRejectProcDocPo();
@@ -375,6 +386,13 @@ export function PurchaseOrderSheet({
                   disabled={busy}
                 >
                   <Trash2 className="h-4 w-4" /> Hapus
+                </Button>
+              )}
+              {doc.status === "Disetujui" && canReceive && (
+                <Button asChild className="rounded-xl">
+                  <Link to="/pengadaan/receive-goods/new" search={{ po: String(doc.id) }}>
+                    <PackageCheck className="h-4 w-4" /> Terima Barang
+                  </Link>
                 </Button>
               )}
               <Button asChild className="rounded-xl">

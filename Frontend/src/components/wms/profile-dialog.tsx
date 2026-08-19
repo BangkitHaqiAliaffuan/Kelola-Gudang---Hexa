@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Pill } from "./kit";
 import { themes, useTheme } from "./theme";
 import type { AuthUser } from "@/lib/auth-api";
+import { ROLE_ACCESS, type RoleAccessEntry, type UserRole } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -74,10 +75,12 @@ function Row({ icon: Icon, label, value }: { icon: typeof Mail; label: string; v
 export function ProfileHelpDialog({
   trigger,
   user,
+  access,
   onLogout,
 }: {
   trigger: ReactNode;
   user?: AuthUser | undefined;
+  access: RoleAccessEntry[];
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -86,6 +89,7 @@ export function ProfileHelpDialog({
   const name = user?.name ?? "Pengguna";
   const role = user?.role ?? "";
   const email = user?.email ?? "";
+  const accessList = access.length > 0 ? access : (ROLE_ACCESS[role as UserRole] ?? []);
   const initials =
     name
       .split(" ")
@@ -107,9 +111,7 @@ export function ProfileHelpDialog({
             </Avatar>
             <div className="min-w-0">
               <DialogTitle className="truncate text-base">{name}</DialogTitle>
-              <DialogDescription className="truncate text-xs">
-                {role} · Gudang Pusat Jakarta
-              </DialogDescription>
+              <DialogDescription className="truncate text-xs">{role}</DialogDescription>
             </div>
             <Pill tone="success" className="ml-auto hidden sm:inline-flex">
               Aktif
@@ -142,11 +144,15 @@ export function ProfileHelpDialog({
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs font-semibold text-muted-foreground">Hak Akses</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {["Transaksi", "Persediaan", "Opname", "Barcode", "Laporan"].map((p) => (
-                    <Pill key={p} tone="brand">
-                      {p}
-                    </Pill>
-                  ))}
+                  {accessList.length > 0 ? (
+                    accessList.map((a) => (
+                      <Pill key={a.module} tone="brand">
+                        {a.module} · {a.level}
+                      </Pill>
+                    ))
+                  ) : (
+                    <Pill tone="neutral">Tidak ada hak akses</Pill>
+                  )}
                 </div>
               </div>
             </TabsContent>

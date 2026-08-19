@@ -47,9 +47,16 @@ export function useStockCard(
 }
 
 export function useStockDocuments(
-  params: { type?: string; status?: string; perPage?: number } = {},
+  params: {
+    type?: string;
+    status?: string;
+    perPage?: number;
+    warehouseId?: number | null;
+    search?: string | null;
+    enabled?: boolean;
+  } = {},
 ) {
-  const { type, status, perPage } = params;
+  const { type, status, perPage, warehouseId, search, enabled = true } = params;
   return useQuery({
     queryKey: [
       "persediaan",
@@ -57,15 +64,19 @@ export function useStockDocuments(
       "list",
       type ?? null,
       status ?? null,
+      warehouseId ?? null,
+      search ?? null,
       perPage ?? null,
     ],
     queryFn: () => {
       const sp = new URLSearchParams({ per_page: String(perPage ?? DOCS_PER_PAGE) });
       if (type) sp.set("type", type);
       if (status) sp.set("status", status);
+      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
+      if (search) sp.set("search", search);
       return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
     },
-    enabled: typeof window !== "undefined",
+    enabled: typeof window !== "undefined" && enabled,
   });
 }
 

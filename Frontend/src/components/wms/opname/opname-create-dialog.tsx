@@ -88,7 +88,7 @@ export function OpnameCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl max-w-2xl">
         <DialogHeader>
           <DialogTitle>Buat Jadwal Opname</DialogTitle>
           <DialogDescription>
@@ -200,7 +200,7 @@ export function OpnameCreateDialog({
                 />
               </div>
             ) : (
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-56 overflow-y-auto">
                 {warehouseRows.map((r) => (
                   <div
                     key={`${r.item_id}-${r.bin_id}`}

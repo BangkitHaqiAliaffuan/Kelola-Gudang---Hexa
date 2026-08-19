@@ -29,6 +29,8 @@ export type FormComboboxProps = {
   side?: "top" | "right" | "bottom" | "left";
   avoidCollisions?: boolean;
   loading?: boolean;
+  /** Kirim teks yang diketik agar induk bisa memuat opsi async (server-side search). */
+  onSearchChange?: (value: string) => void;
 } & ButtonProps;
 
 export function FormCombobox({
@@ -42,6 +44,7 @@ export function FormCombobox({
   side,
   avoidCollisions,
   loading = false,
+  onSearchChange,
   className,
   ...buttonProps
 }: FormComboboxProps) {
@@ -86,7 +89,12 @@ export function FormCombobox({
         {...(avoidCollisions !== undefined ? { avoidCollisions } : {})}
       >
         <Command>
-          <CommandInput placeholder={searchPlaceholder} className="h-9" disabled={loading} />
+          <CommandInput
+            placeholder={searchPlaceholder}
+            className="h-9"
+            disabled={loading && !onSearchChange}
+            {...(onSearchChange ? { onValueChange: onSearchChange } : {})}
+          />
           <CommandList>
             <CommandEmpty>{loading ? "Memuat..." : "Tidak ditemukan"}</CommandEmpty>
             <CommandGroup>

@@ -424,6 +424,8 @@ export function SubCategoryFormDialog({
                         options={catOptions}
                         placeholder="Pilih kategori"
                         loading={catsLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -977,6 +979,8 @@ export function RackFormDialog({
                           options={warehouseOptions}
                           placeholder="Pilih gudang"
                           loading={warehousesLoading}
+                          side="bottom"
+                          avoidCollisions={false}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1153,6 +1157,8 @@ export function BinFormDialog({
                           options={rackOptions}
                           placeholder="Pilih rak"
                           loading={racksLoading}
+                          side="bottom"
+                          avoidCollisions={false}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1568,7 +1574,7 @@ export function SupplierFormDialog({
                         <SelectValue placeholder="Pilih termin" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="rounded-xl">
+                    <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                       <SelectItem value="">Tidak ada</SelectItem>
                       <SelectItem value="NET 30">NET 30</SelectItem>
                       <SelectItem value="NET 14">NET 14</SelectItem>
@@ -1978,7 +1984,7 @@ export function CustomerFormDialog({
                           <SelectValue placeholder="Pilih segmen" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                         <SelectItem value="">Tidak ada</SelectItem>
                         <SelectItem value="Retail">Retail</SelectItem>
                         <SelectItem value="Distributor">Distributor</SelectItem>
@@ -2276,7 +2282,7 @@ export function VendorFormDialog({
                           <SelectValue placeholder="Pilih layanan" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                         <SelectItem value="">Tidak ada</SelectItem>
                         <SelectItem value="Ekspedisi">Ekspedisi</SelectItem>
                         <SelectItem value="Maintenance">Maintenance</SelectItem>
@@ -2661,6 +2667,8 @@ export function ItemFormDialog({
                             options={catOptions}
                             placeholder="Pilih kategori"
                             loading={catsLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2691,6 +2699,8 @@ export function ItemFormDialog({
                             placeholder="Pilih sub kategori"
                             allowEmpty
                             loading={subCatsLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2720,6 +2730,8 @@ export function ItemFormDialog({
                             placeholder="Pilih merk"
                             allowEmpty
                             loading={merksLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2750,6 +2762,8 @@ export function ItemFormDialog({
                             placeholder="Pilih supplier"
                             allowEmpty
                             loading={suppliersLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2782,6 +2796,8 @@ export function ItemFormDialog({
                             placeholder="Pilih satuan"
                             allowEmpty
                             loading={unitsLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2818,6 +2834,8 @@ export function ItemFormDialog({
                             placeholder="Pilih gudang"
                             allowEmpty
                             loading={warehousesLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2853,6 +2871,8 @@ export function ItemFormDialog({
                             placeholder="Pilih rak"
                             allowEmpty
                             loading={rackRowsLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -2883,6 +2903,8 @@ export function ItemFormDialog({
                             placeholder="Pilih bin"
                             allowEmpty
                             loading={binRowsLoading}
+                            side="bottom"
+                            avoidCollisions={false}
                           />
                         </FormControl>
                         <FormMessage />
@@ -3036,7 +3058,7 @@ export function ItemFormDialog({
                           <SelectValue placeholder="Pilih status" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                         <SelectItem value="Aktif">Aktif</SelectItem>
                         <SelectItem value="Nonaktif">Nonaktif</SelectItem>
                       </SelectContent>
@@ -3174,6 +3196,8 @@ export function DepartmentFormDialog({
                         placeholder="Pilih kepala"
                         allowEmpty
                         loading={usersLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3341,6 +3365,8 @@ export function ProjectFormDialog({
                         placeholder="Pilih PIC"
                         allowEmpty
                         loading={usersLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3404,7 +3430,7 @@ export function ProjectFormDialog({
                         <SelectValue placeholder="Pilih status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="rounded-xl">
+                    <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                       <SelectItem value="Perencanaan">Perencanaan</SelectItem>
                       <SelectItem value="Berjalan">Berjalan</SelectItem>
                       <SelectItem value="Selesai">Selesai</SelectItem>
@@ -3574,6 +3600,8 @@ export function WorkOrderFormDialog({
                         options={projectOptions}
                         placeholder="Pilih proyek"
                         loading={projectsLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3600,6 +3628,8 @@ export function WorkOrderFormDialog({
                         options={itemOptions}
                         placeholder="Pilih barang"
                         loading={itemsLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3630,6 +3660,8 @@ export function WorkOrderFormDialog({
                           placeholder="Pilih satuan"
                           allowEmpty
                           loading={unitsLoading}
+                          side="bottom"
+                          avoidCollisions={false}
                         />
                       </FormControl>
                       <FormMessage />
@@ -3723,6 +3755,8 @@ export function WorkOrderFormDialog({
                         placeholder="Pilih PIC"
                         allowEmpty
                         loading={usersLoading}
+                        side="bottom"
+                        avoidCollisions={false}
                       />
                     </FormControl>
                     <FormMessage />
@@ -3742,7 +3776,7 @@ export function WorkOrderFormDialog({
                         <SelectValue placeholder="Pilih status" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="rounded-xl">
+                    <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                       <SelectItem value="Perencanaan">Perencanaan</SelectItem>
                       <SelectItem value="Berjalan">Berjalan</SelectItem>
                       <SelectItem value="Selesai">Selesai</SelectItem>
@@ -3910,7 +3944,7 @@ export function UserFormDialog({
                         <SelectValue placeholder="Pilih role" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="rounded-xl">
+                    <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
                       {USER_ROLES.map((r) => (
                         <SelectItem key={r} value={r}>
                           {r}
@@ -4079,7 +4113,7 @@ export function RoleEditDialog({
                   <SelectTrigger className="w-32 rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent side="bottom" avoidCollisions={false}>
                     <SelectItem value="NONE">Tidak Ada</SelectItem>
                     {ACCESS_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>

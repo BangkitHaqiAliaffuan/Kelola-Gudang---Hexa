@@ -42,6 +42,11 @@ function ReceiveGoodsNew() {
     );
   }
 
+  const initialPoId =
+    typeof window !== "undefined"
+      ? (new URLSearchParams(window.location.search).get("po") ?? undefined)
+      : undefined;
+
   return (
     <BarangMasukForm
       backTo="/pengadaan/receive-goods"
@@ -50,6 +55,7 @@ function ReceiveGoodsNew() {
       referenceLabel="No. PO"
       requireReference
       referenceCombobox
+      initialPoId={initialPoId}
     />
   );
 }
