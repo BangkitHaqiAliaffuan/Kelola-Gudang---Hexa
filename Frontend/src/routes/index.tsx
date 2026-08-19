@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import {
   Package,
   Barcode,
@@ -30,21 +29,14 @@ import {
 } from "recharts";
 import { PageHeader, Panel, Pill, StatCard, TableSkeleton, type Tone } from "@/components/wms/kit";
 import { Progress } from "@/components/ui/progress";
-import {
-  formatIDR,
-  formatIDRCompact,
-  formatNumber,
-  items,
-  monthly,
-  totalValue,
-  transactions,
-  warehouses,
-} from "@/lib/wms-data";
+import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
+import { useItems, useWarehouses } from "@/hooks/use-master";
 import {
   useStockDocumentSummary,
   useStockDocuments,
   useStockMinimum,
+  useStockValuation,
 } from "@/hooks/use-persediaan";
 import type { StockDocumentApi, StockMinimumApi, StockMinimumStatus } from "@/lib/persediaan-types";
 
@@ -86,13 +78,43 @@ export const Route = createFileRoute("/")({
 });
 
 const quickActions = [
-  { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine, module: "Persediaan" },
-  { label: "Barang Keluar", to: "/transaksi/keluar", icon: ArrowUpFromLine, module: "Persediaan" },
-  { label: "Transfer", to: "/transaksi/transfer", icon: ArrowLeftRight, module: "Persediaan" },
-  { label: "Stock Opname", to: "/opname/proses", icon: ClipboardCheck, module: "Stock Opname" },
-  { label: "Cetak Barcode", to: "/barcode", icon: QrCode },
-  { label: "Tambah Barang", to: "/master/barang", icon: Package, module: "Master Data" },
-];
+  {
+    label: "Barang Masuk",
+    to: "/transaksi/entri/$section",
+    params: { section: "masuk" },
+    icon: ArrowDownToLine,
+    module: "Persediaan",
+  },
+  {
+    label: "Barang Keluar",
+    to: "/transaksi/entri/$section",
+    params: { section: "keluar" },
+    icon: ArrowUpFromLine,
+    module: "Persediaan",
+  },
+  {
+    label: "Transfer",
+    to: "/transaksi/entri/$section",
+    params: { section: "transfer" },
+    icon: ArrowLeftRight,
+    module: "Persediaan",
+  },
+  {
+    label: "Stock Opname",
+    to: "/opname/$section",
+    params: { section: "jadwal" },
+    icon: ClipboardCheck,
+    module: "Stock Opname",
+  },
+  { label: "Cetak Barcode", to: "/barcode", params: undefined, icon: QrCode, module: undefined },
+  {
+    label: "Tambah Barang",
+    to: "/master/barang",
+    params: undefined,
+    icon: Package,
+    module: "Master Data",
+  },
+] as const;
 
 const chartTooltip = {
   contentStyle: {
@@ -113,29 +135,77 @@ const activityTone: Record<string, Tone> = {
   "Stock Opname": "info",
 };
 
-function useSkeleton(ms = 600) {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), ms);
-    return () => clearTimeout(t);
-  }, [ms]);
-  return loading;
+/** Titik bulanan (12 bulan terakhir) dari dokumen mutasi real, nol untuk bulan kosong. */
+type MonthPoint = { month: string; masuk: number; keluar: number; saldo: number; nilai: number };
+
+function buildMonthly(docs: StockDocumentApi[]): MonthPoint[] {
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      label: d.toLocaleDateString("id-ID", { month: "short" }),
+      masuk: 0,
+      keluar: 0,
+      nilai: 0,
+    };
+  });
+  const byKey = new Map(months.map((m) => [m.key, m]));
+  for (const doc of docs) {
+    if (doc.status === "Draft") continue;
+    if (doc.type !== "Penerimaan" && doc.type !== "Pengeluaran") continue;
+    if (!doc.document_date) continue;
+    const d = new Date(doc.document_date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const bucket = byKey.get(key);
+    if (!bucket) continue;
+    const qty = doc.qty_total ?? 0;
+    const value = doc.value_total ?? 0;
+    if (doc.type === "Penerimaan") {
+      bucket.masuk += qty;
+    } else {
+      bucket.keluar += Math.abs(qty);
+    }
+    // qty keluar bernilai negatif → nilai otomatis terkurangi (net masuk-keluar).
+    bucket.nilai += value;
+  }
+  let saldo = 0;
+  let nilai = 0;
+  return months.map((m) => {
+    saldo += m.masuk - m.keluar;
+    nilai += m.nilai;
+    return { month: m.label, masuk: m.masuk, keluar: m.keluar, saldo, nilai };
+  });
 }
 
 function Dashboard() {
-  const { hasModuleLevel } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
   const visibleQuickActions = quickActions.filter(
     (a) => !a.module || hasModuleLevel(a.module, "Tulis"),
   );
-  const loading = useSkeleton();
-  const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
-  const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
-    type: "Stock Opname",
-    status: "Draft",
+
+  // Statistik master & persediaan.
+  const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const { data: warehousesData, isLoading: warehousesLoading } = useWarehouses();
+  const { data: valData, isLoading: valLoading } = useStockValuation();
+  const totalSku = itemsData?.data.length ?? 0;
+  const totalGudang = warehousesData?.data.length ?? 0;
+  const valuationRows = valData?.data ?? [];
+  const totalStock = valuationRows.reduce((a, b) => a + b.stock, 0);
+  const totalReserved = valuationRows.reduce((a, b) => a + b.reserved, 0);
+  const inventoryValue = valuationRows.reduce((a, b) => a + b.nilai_fifo, 0);
+
+  // Persetujuan tertunda.
+  const { data: pendingData, isLoading: pendingLoading } = useStockDocuments({
+    status: "Menunggu Approval",
   });
-  const running = ((opnameDocs?.data ?? []) as OpnameDoc[]).filter((d) => d.status === "Draft");
-  const { data: recentDocs, isLoading: recentLoading } = useStockDocuments({ perPage: 50 });
-  const recentActivities = ((recentDocs?.data ?? []) as StockDocumentApi[])
+  const pending = pendingData?.data.length ?? 0;
+
+  // Semua dokumen mutasi: agregasi chart bulanan + aktivitas terkini.
+  const { data: docsData, isLoading: docsLoading } = useStockDocuments();
+  const allDocs = (docsData?.data ?? []) as StockDocumentApi[];
+  const monthly = buildMonthly(allDocs);
+  const recentActivities = allDocs
     .filter((d) => d.status !== "Draft")
     .map((d) => ({
       id: d.id,
@@ -147,6 +217,12 @@ function Dashboard() {
       date: d.document_date,
     }))
     .slice(0, 14);
+
+  const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
+    type: "Stock Opname",
+    status: "Draft",
+  });
+  const running = ((opnameDocs?.data ?? []) as OpnameDoc[]).filter((d) => d.status === "Draft");
 
   const { data: summaryData, isLoading: summaryLoading } = useStockDocumentSummary();
   const summary = summaryData?.data;
@@ -164,31 +240,38 @@ function Dashboard() {
     .sort((a, b) => SEVERITY_ORDER[a.status] - SEVERITY_ORDER[b.status])
     .slice(0, 6);
 
+  const todayLabel = new Date().toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   const stats = [
     {
       label: "Total Item",
-      value: formatNumber(items.reduce((a, b) => a + b.stock, 0)),
+      value: valLoading ? "…" : formatNumber(totalStock),
       hint: "seluruh gudang",
       icon: Package,
       tone: "brand" as const,
     },
     {
       label: "Total SKU",
-      value: formatNumber(items.length),
+      value: itemsLoading ? "…" : formatNumber(totalSku),
       hint: "barang aktif terdaftar",
       icon: Barcode,
       tone: "info" as const,
     },
     {
       label: "Total Gudang",
-      value: String(warehouses.length),
+      value: warehousesLoading ? "…" : String(totalGudang),
       hint: "lokasi penyimpanan",
       icon: Warehouse,
       tone: "neutral" as const,
     },
     {
       label: "Stok Tereservasi",
-      value: formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
+      value: valLoading ? "…" : formatNumber(totalReserved),
       hint: "terikat permintaan",
       icon: Lock,
       tone: "info" as const,
@@ -203,6 +286,7 @@ function Dashboard() {
     {
       label: "Nilai Barang Masuk",
       value: summaryLoading ? "…" : formatIDRCompact(masukValue),
+      valueTitle: summaryLoading ? undefined : formatIDR(masukValue),
       hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
@@ -230,14 +314,15 @@ function Dashboard() {
     },
     {
       label: "Nilai Persediaan",
-      value: formatIDRCompact(totalValue),
+      value: valLoading ? "…" : formatIDRCompact(inventoryValue),
+      valueTitle: valLoading ? undefined : formatIDR(inventoryValue),
       hint: "metode FIFO",
       icon: Wallet,
       tone: "brand" as const,
     },
     {
       label: "Pending Approval",
-      value: String(pending),
+      value: pendingLoading ? "…" : String(pending),
       hint: "menunggu supervisor",
       icon: CheckCheck,
       tone: "info" as const,
@@ -254,9 +339,15 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title="Selamat datang, Rudi 👋"
-        description="Ringkasan operasional gudang hari ini, Jumat 31 Juli 2026."
-        actions={<Pill tone="success">Semua sistem normal</Pill>}
+        title={user ? `Selamat datang, ${user.name} 👋` : "Selamat datang 👋"}
+        description={`Ringkasan operasional gudang hari ini, ${todayLabel}.`}
+        actions={
+          stockHabis > 0 ? (
+            <Pill tone="danger">{formatNumber(stockHabis)} stok habis</Pill>
+          ) : (
+            <Pill tone="success">Semua sistem normal</Pill>
+          )
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
@@ -271,6 +362,7 @@ function Dashboard() {
             <Link
               key={a.label}
               to={a.to}
+              params={a.params as never}
               className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lift"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
@@ -284,7 +376,7 @@ function Dashboard() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Barang Masuk & Keluar per Bulan" description="12 bulan terakhir">
-          {loading ? (
+          {docsLoading ? (
             <TableSkeleton rows={4} cols={4} />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
@@ -306,7 +398,7 @@ function Dashboard() {
         </Panel>
 
         <Panel title="Pergerakan Stock" description="Saldo akhir stok per bulan">
-          {loading ? (
+          {docsLoading ? (
             <TableSkeleton rows={4} cols={4} />
           ) : (
             <ResponsiveContainer width="100%" height={260}>
@@ -330,7 +422,7 @@ function Dashboard() {
       </div>
 
       <Panel title="Nilai Persediaan" description="Tren nilai stok (Rupiah)">
-        {loading ? (
+        {docsLoading ? (
           <TableSkeleton rows={3} cols={6} />
         ) : (
           <ResponsiveContainer width="100%" height={240}>
@@ -366,7 +458,7 @@ function Dashboard() {
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Panel title="Aktivitas Terkini" description="Dokumen mutasi terbaru">
-          {recentLoading ? (
+          {docsLoading ? (
             <TableSkeleton rows={6} cols={3} />
           ) : recentActivities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada aktivitas.</p>

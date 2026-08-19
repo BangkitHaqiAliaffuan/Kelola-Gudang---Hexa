@@ -1,6 +1,9 @@
 import type { AnchorHTMLAttributes, ComponentType, ReactNode } from "react";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+/** Kontrol state loading untuk query dokumen mutasi (useStockDocuments default). */
+const docsLoading = vi.hoisted(() => ({ value: false }));
 
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
@@ -28,168 +31,239 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-const { opnameFixture, recentDocsFixture, stockMinFixture, summaryFixture, todayIso } = vi.hoisted(
-  () => {
-    const now = new Date();
-    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-      now.getDate(),
-    ).padStart(2, "0")}`;
-    return {
-      todayIso,
-      stockMinFixture: [
-        {
-          id: 101,
-          sku: "BRG-101",
-          name: "Kabel UTP 5m",
-          unit: "rol",
-          min: 10,
-          total_stock: 0,
-          status: "Habis",
-        },
-        {
-          id: 102,
-          sku: "BRG-102",
-          name: "Konektor RJ45",
-          unit: "pcs",
-          min: 20,
-          total_stock: 4,
-          status: "Kritis",
-        },
-        {
-          id: 103,
-          sku: "BRG-103",
-          name: "Kabel HDMI 2m",
-          unit: "pcs",
-          min: 10,
-          total_stock: 8,
-          status: "Menipis",
-        },
-        {
-          id: 104,
-          sku: "BRG-104",
-          name: "Switch 8 Port",
-          unit: "unit",
-          min: 5,
-          total_stock: 30,
-          status: "Normal",
-        },
-      ] as const,
-      opnameFixture: [
-        {
-          id: 1,
-          no: "SO/2026/00001",
-          type: "Stock Opname",
-          status: "Draft",
-          document_date: "2026-07-28T00:00:00+07:00",
-          warehouse: "Gudang Utama",
-          line_count: 10,
-          checked_count: 4,
-        },
-        {
-          id: 2,
-          no: "SO/2026/00002",
-          type: "Stock Opname",
-          status: "Draft",
-          document_date: "2026-07-29T00:00:00+07:00",
-          warehouse: "Gudang Satelit",
-          line_count: 8,
-          checked_count: 2,
-        },
-        {
-          id: 3,
-          no: "SO/2026/00003",
-          type: "Stock Opname",
-          status: "Selesai",
-          document_date: "2026-07-01T00:00:00+07:00",
-          warehouse: "Gudang Utama",
-          line_count: 5,
-          checked_count: 5,
-        },
-      ] as const,
-      recentDocsFixture: [
-        {
-          id: 11,
-          no: "BM/2026/00010",
-          type: "Penerimaan",
-          status: "Selesai",
-          document_date: "2026-07-31T08:00:00+07:00",
-          warehouse: "Gudang Utama",
-          pic: "Rudi Hartono",
-          created_by: "Rudi Hartono",
-          line_count: 2,
-          qty_total: 12,
-        },
-        {
-          id: 12,
-          no: "BK/2026/00011",
-          type: "Pengeluaran",
-          status: "Selesai",
-          document_date: "2026-07-30T09:00:00+07:00",
-          warehouse: "Gudang Satelit",
-          pic: "Siti Aminah",
-          created_by: "Siti Aminah",
-          line_count: 1,
-          qty_total: 5,
-        },
-        {
-          id: 13,
-          no: "TF/2026/00012",
-          type: "Transfer Gudang",
-          status: "Draft",
-          document_date: "2026-07-29T10:00:00+07:00",
-          warehouse: "Gudang Utama",
-          pic: "Bayu Pratama",
-          created_by: "Bayu Pratama",
-          line_count: 1,
-          qty_total: 8,
-        },
-        {
-          id: 14,
-          no: "BM/2026/00013",
-          type: "Penerimaan",
-          status: "Selesai",
-          document_date: `${todayIso}T08:00:00+07:00`,
-          warehouse: "Gudang Utama",
-          pic: "Rudi Hartono",
-          created_by: "Rudi Hartono",
-          line_count: 3,
-          qty_total: 30,
-          value_total: 150000,
-        },
-        {
-          id: 15,
-          no: "BK/2026/00014",
-          type: "Pengeluaran",
-          status: "Selesai",
-          document_date: `${todayIso}T09:00:00+07:00`,
-          warehouse: "Gudang Satelit",
-          pic: "Siti Aminah",
-          created_by: "Siti Aminah",
-          line_count: 2,
-          qty_total: -8,
-        },
-      ] as const,
-      summaryFixture: {
-        masuk: { count: 2, qty: 42, value: 150000 },
-        keluar: { count: 2, qty: -13 },
-      } as const,
-    };
-  },
-);
+const {
+  opnameFixture,
+  recentDocsFixture,
+  stockMinFixture,
+  summaryFixture,
+  todayIso,
+  itemsFixture,
+  warehousesFixture,
+  valuationFixture,
+  pendingFixture,
+} = vi.hoisted(() => {
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
+  return {
+    todayIso,
+    stockMinFixture: [
+      {
+        id: 101,
+        sku: "BRG-101",
+        name: "Kabel UTP 5m",
+        unit: "rol",
+        min: 10,
+        total_stock: 0,
+        status: "Habis",
+      },
+      {
+        id: 102,
+        sku: "BRG-102",
+        name: "Konektor RJ45",
+        unit: "pcs",
+        min: 20,
+        total_stock: 4,
+        status: "Kritis",
+      },
+      {
+        id: 103,
+        sku: "BRG-103",
+        name: "Kabel HDMI 2m",
+        unit: "pcs",
+        min: 10,
+        total_stock: 8,
+        status: "Menipis",
+      },
+      {
+        id: 104,
+        sku: "BRG-104",
+        name: "Switch 8 Port",
+        unit: "unit",
+        min: 5,
+        total_stock: 30,
+        status: "Normal",
+      },
+    ] as const,
+    opnameFixture: [
+      {
+        id: 1,
+        no: "SO/2026/00001",
+        type: "Stock Opname",
+        status: "Draft",
+        document_date: "2026-07-28T00:00:00+07:00",
+        warehouse: "Gudang Utama",
+        line_count: 10,
+        checked_count: 4,
+      },
+      {
+        id: 2,
+        no: "SO/2026/00002",
+        type: "Stock Opname",
+        status: "Draft",
+        document_date: "2026-07-29T00:00:00+07:00",
+        warehouse: "Gudang Satelit",
+        line_count: 8,
+        checked_count: 2,
+      },
+      {
+        id: 3,
+        no: "SO/2026/00003",
+        type: "Stock Opname",
+        status: "Selesai",
+        document_date: "2026-07-01T00:00:00+07:00",
+        warehouse: "Gudang Utama",
+        line_count: 5,
+        checked_count: 5,
+      },
+    ] as const,
+    recentDocsFixture: [
+      {
+        id: 11,
+        no: "BM/2026/00010",
+        type: "Penerimaan",
+        status: "Selesai",
+        document_date: "2026-07-31T08:00:00+07:00",
+        warehouse: "Gudang Utama",
+        pic: "Rudi Hartono",
+        created_by: "Rudi Hartono",
+        line_count: 2,
+        qty_total: 12,
+      },
+      {
+        id: 12,
+        no: "BK/2026/00011",
+        type: "Pengeluaran",
+        status: "Selesai",
+        document_date: "2026-07-30T09:00:00+07:00",
+        warehouse: "Gudang Satelit",
+        pic: "Siti Aminah",
+        created_by: "Siti Aminah",
+        line_count: 1,
+        qty_total: 5,
+      },
+      {
+        id: 13,
+        no: "TF/2026/00012",
+        type: "Transfer Gudang",
+        status: "Draft",
+        document_date: "2026-07-29T10:00:00+07:00",
+        warehouse: "Gudang Utama",
+        pic: "Bayu Pratama",
+        created_by: "Bayu Pratama",
+        line_count: 1,
+        qty_total: 8,
+      },
+      {
+        id: 14,
+        no: "BM/2026/00013",
+        type: "Penerimaan",
+        status: "Selesai",
+        document_date: `${todayIso}T08:00:00+07:00`,
+        warehouse: "Gudang Utama",
+        pic: "Rudi Hartono",
+        created_by: "Rudi Hartono",
+        line_count: 3,
+        qty_total: 30,
+        value_total: 150000,
+      },
+      {
+        id: 15,
+        no: "BK/2026/00014",
+        type: "Pengeluaran",
+        status: "Selesai",
+        document_date: `${todayIso}T09:00:00+07:00`,
+        warehouse: "Gudang Satelit",
+        pic: "Siti Aminah",
+        created_by: "Siti Aminah",
+        line_count: 2,
+        qty_total: -8,
+      },
+    ] as const,
+    summaryFixture: {
+      masuk: { count: 2, qty: 42, value: 150000 },
+      keluar: { count: 2, qty: -13 },
+    } as const,
+    itemsFixture: [
+      { id: 1, sku: "BRG-001", name: "Bearing 6205", stock: 100, reserved: 5 },
+      { id: 2, sku: "BRG-002", name: "Oli Mesin", stock: 50, reserved: 10 },
+      { id: 3, sku: "BRG-003", name: "Filter Udara", stock: 25, reserved: 0 },
+    ] as const,
+    warehousesFixture: [
+      { id: 1, name: "Gudang Utama" },
+      { id: 2, name: "Gudang Satelit" },
+    ] as const,
+    valuationFixture: [
+      {
+        id: 1,
+        item_id: 1,
+        sku: "BRG-001",
+        name: "Bearing 6205",
+        stock: 100,
+        reserved: 5,
+        nilai_fifo: 1000000,
+      },
+      {
+        id: 2,
+        item_id: 2,
+        sku: "BRG-002",
+        name: "Oli Mesin",
+        stock: 50,
+        reserved: 10,
+        nilai_fifo: 750000,
+      },
+      {
+        id: 3,
+        item_id: 3,
+        sku: "BRG-003",
+        name: "Filter Udara",
+        stock: 25,
+        reserved: 0,
+        nilai_fifo: 250000,
+      },
+    ] as const,
+    pendingFixture: [
+      {
+        id: 21,
+        no: "BK/2026/00020",
+        type: "Pengeluaran",
+        status: "Menunggu Approval",
+        document_date: "2026-07-30T09:00:00+07:00",
+      },
+      {
+        id: 22,
+        no: "BM/2026/00021",
+        type: "Penerimaan",
+        status: "Menunggu Approval",
+        document_date: "2026-07-31T09:00:00+07:00",
+      },
+    ] as const,
+  };
+});
 
 vi.mock("@/hooks/use-persediaan", () => ({
-  useStockDocuments: (params?: { type?: string; status?: string; perPage?: number }) =>
+  useStockDocuments: vi.fn((params?: { type?: string; status?: string; perPage?: number }) =>
     params?.type === "Stock Opname"
       ? { data: { data: opnameFixture }, isLoading: false }
-      : { data: { data: recentDocsFixture }, isLoading: false },
+      : params?.status === "Menunggu Approval"
+        ? { data: { data: pendingFixture }, isLoading: false }
+        : { data: { data: recentDocsFixture }, isLoading: docsLoading.value },
+  ),
   useStockDocumentSummary: () => ({ data: { data: summaryFixture }, isLoading: false }),
   useStockMinimum: () => ({ data: { data: stockMinFixture }, isLoading: false }),
+  useStockValuation: () => ({ data: { data: valuationFixture }, isLoading: false }),
+}));
+
+vi.mock("@/hooks/use-master", () => ({
+  useItems: () => ({ data: { data: itemsFixture }, isLoading: false }),
+  useWarehouses: () => ({ data: { data: warehousesFixture }, isLoading: false }),
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
     status: "authenticated",
-    user: null,
+    user: { id: 1, name: "Rudi", email: "rudi.hartono@kelolagudang.id", role: "Administrator" },
     access: [],
     login: vi.fn(),
     logout: vi.fn(),
@@ -199,15 +273,7 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 import { Route } from "@/routes/index";
-import {
-  formatIDRCompact,
-  formatNumber,
-  items,
-  monthly,
-  totalValue,
-  transactions,
-  warehouses,
-} from "@/lib/wms-data";
+import { formatIDRCompact, formatNumber } from "@/lib/wms-data";
 
 const DashboardView = Route.options.component as ComponentType;
 
@@ -221,16 +287,12 @@ function getStatCard(label: string): HTMLElement {
   throw new Error(`StatCard "${label}" tidak ditemukan`);
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("Dashboard (index route)", () => {
   it("merender header sambutan dan status sistem", () => {
     render(<DashboardView />);
     expect(screen.getByText("Selamat datang, Rudi 👋")).toBeInTheDocument();
     expect(screen.getByText(/Ringkasan operasional gudang hari ini/)).toBeInTheDocument();
-    expect(screen.getByText("Semua sistem normal")).toBeInTheDocument();
+    expect(screen.getByText("1 stok habis")).toBeInTheDocument();
   });
 
   it("merender 12 StatCard dengan nilai turunan wms-data", () => {
@@ -240,27 +302,26 @@ describe("Dashboard (index route)", () => {
     const masukQty = summaryFixture.masuk.qty;
     const masukValue = summaryFixture.masuk.value;
     const keluarQty = Math.abs(summaryFixture.keluar.qty);
-    const pending = transactions.filter((t) => t.status === "Menunggu Approval").length;
+    const pending = pendingFixture.length;
     const running = opnameFixture.filter((o) => o.status === "Draft");
     const nonNormal = stockMinFixture.filter((r) => r.status !== "Normal");
     const stockMenipis = nonNormal.length;
     const stockHabis = stockMinFixture.filter((r) => r.status === "Habis").length;
+    const totalStock = valuationFixture.reduce((a, b) => a + b.stock, 0);
+    const totalReserved = valuationFixture.reduce((a, b) => a + b.reserved, 0);
+    const inventoryValue = valuationFixture.reduce((a, b) => a + b.nilai_fifo, 0);
 
     const cases: Array<[label: string, value: string, hint?: string]> = [
-      ["Total Item", formatNumber(items.reduce((a, b) => a + b.stock, 0)), "seluruh gudang"],
-      ["Total SKU", formatNumber(items.length), "barang aktif terdaftar"],
-      ["Total Gudang", String(warehouses.length), "lokasi penyimpanan"],
-      [
-        "Stok Tereservasi",
-        formatNumber(items.reduce((a, b) => a + b.reserved, 0)),
-        "terikat permintaan",
-      ],
+      ["Total Item", formatNumber(totalStock), "seluruh gudang"],
+      ["Total SKU", formatNumber(itemsFixture.length), "barang aktif terdaftar"],
+      ["Total Gudang", String(warehousesFixture.length), "lokasi penyimpanan"],
+      ["Stok Tereservasi", formatNumber(totalReserved), "terikat permintaan"],
       ["Total Barang Masuk", formatNumber(masukQty), `${summaryFixture.masuk.count} dokumen`],
       ["Nilai Barang Masuk", formatIDRCompact(masukValue), `${summaryFixture.masuk.count} dokumen`],
       ["Total Barang Keluar", formatNumber(keluarQty), `${summaryFixture.keluar.count} dokumen`],
       ["Stock Menipis", formatNumber(stockMenipis), "di bawah minimum"],
       ["Stock Habis", formatNumber(stockHabis), "perlu restock segera"],
-      ["Nilai Persediaan", formatIDRCompact(totalValue), "metode FIFO"],
+      ["Nilai Persediaan", formatIDRCompact(inventoryValue), "metode FIFO"],
       ["Pending Approval", String(pending), "menunggu supervisor"],
       ["Stock Opname Berjalan", String(running.length), "sesi aktif"],
     ];
@@ -276,27 +337,21 @@ describe("Dashboard (index route)", () => {
     }
   });
 
-  it("menampilkan skeleton saat loading, lalu chart setelah 600ms", () => {
-    vi.useFakeTimers();
+  it("menampilkan skeleton chart saat dokumen mutasi masih dimuat", () => {
+    docsLoading.value = true;
     const { container } = render(<DashboardView />);
     expect(container.querySelector(".recharts-bar")).toBeNull();
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
-
-    act(() => {
-      vi.advanceTimersByTime(600);
-    });
-
-    expect(container.querySelector(".recharts-bar")).not.toBeNull();
+    docsLoading.value = false;
   });
 
-  it("merender 3 chart bulanan dari data monthly", async () => {
+  it("merender 3 chart bulanan dari agregasi dokumen mutasi", async () => {
     const { container } = render(<DashboardView />);
 
     await waitFor(() => expect(container.querySelector(".recharts-bar")).toBeInTheDocument(), {
       timeout: 3000,
     });
 
-    expect(monthly).toHaveLength(12);
     expect(container.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(24);
     expect(container.querySelector(".recharts-line-curve")).toBeInTheDocument();
     expect(container.querySelector(".recharts-area")).toBeInTheDocument();
