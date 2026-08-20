@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { ClipboardCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
@@ -32,10 +33,6 @@ export function OpnameLaporanPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(2);
-
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const active = sessions.find((s) => s.id === activeId) ?? sessions[0] ?? null;
-  const activeLines = active ? analytics.linesOf(active) : [];
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
   const searchIndex = useMemo(
@@ -236,15 +233,11 @@ export function OpnameLaporanPage() {
               const lineCount = s.line_count;
               const sum = summary.get(s.id) ?? opnameSessionSummary([]);
               return (
-                <button
+                <Link
                   key={s.id}
-                  type="button"
-                  onClick={() => setActiveId(s.id)}
-                  className={`rounded-xl border p-4 text-left transition-colors ${
-                    active?.id === s.id
-                      ? "border-primary/40 bg-primary-soft"
-                      : "border-border hover:bg-accent/40"
-                  }`}
+                  to="/opname/laporan/$docId"
+                  params={{ docId: String(s.id) }}
+                  className="rounded-xl border border-border p-4 text-left transition-colors hover:bg-accent/40"
                 >
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                     <p className="truncate text-sm font-semibold">{s.warehouse ?? "—"}</p>
@@ -274,7 +267,7 @@ export function OpnameLaporanPage() {
                   <p className="mt-2 text-xs text-muted-foreground">
                     Nilai selisih: <b className="text-foreground">{formatIDR(sum.value)}</b>
                   </p>
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -293,110 +286,6 @@ export function OpnameLaporanPage() {
               Tampilkan Lebih Banyak ({formatNumber(filtered.length - shown.length)} tersisa)
             </Button>
           </div>
-        )}
-      </Panel>
-
-      <Panel
-        title={active ? `Detail Selisih — ${active.no}` : "Detail Selisih"}
-        description="Perbandingan stok sistem dan fisik"
-      >
-        {!active ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Belum ada sesi opname.</p>
-        ) : (
-          <>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-muted-foreground">
-                    {[
-                      "Barang",
-                      "SKU",
-                      "Satuan",
-                      "Rak",
-                      "Bin",
-                      "Sistem",
-                      "Fisik",
-                      "Selisih",
-                      "Nilai Selisih",
-                      "Alasan",
-                      "Dicek Oleh",
-                    ].map((h) => (
-                      <th key={h} className="px-3 py-2.5 text-left font-semibold">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeLines.map((l) => {
-                    const variance = l.variance ?? 0;
-                    return (
-                      <tr key={l.id} className="border-b border-border/60 hover:bg-accent/40">
-                        <td className="px-3 py-2.5">{l.name ?? "—"}</td>
-                        <td className="px-3 py-2.5 font-mono text-xs">{l.sku ?? "—"}</td>
-                        <td className="px-3 py-2.5">{l.unit ?? "—"}</td>
-                        <td className="px-3 py-2.5 font-mono text-xs">{l.from_rack ?? "—"}</td>
-                        <td className="px-3 py-2.5 font-mono text-xs">{l.from_bin ?? "—"}</td>
-                        <td className="px-3 py-2.5 text-right">
-                          {formatNumber(l.system_qty ?? 0)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          {l.actual_qty != null ? formatNumber(l.actual_qty) : "—"}
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <Pill
-                            tone={variance === 0 ? "success" : variance > 0 ? "info" : "danger"}
-                          >
-                            {l.actual_qty != null
-                              ? `${variance > 0 ? "+" : ""}${formatNumber(variance)} ${l.unit ?? ""}`
-                              : "—"}
-                          </Pill>
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold">
-                          {l.actual_qty != null ? formatIDR(opnameLineValue(l)) : "—"}
-                        </td>
-                        <td className="px-3 py-2.5 text-xs">{opnameReasonLabel(l.reason_code)}</td>
-                        <td className="px-3 py-2.5 text-xs">{l.counted_by ?? "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="space-y-3 md:hidden">
-              {activeLines.map((l) => {
-                const variance = l.variance ?? 0;
-                return (
-                  <div key={l.id} className="rounded-xl border border-border p-3">
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                      <p className="truncate text-sm font-semibold">{l.name ?? "—"}</p>
-                      <Pill tone={variance === 0 ? "success" : variance > 0 ? "info" : "danger"}>
-                        {l.actual_qty != null
-                          ? `${variance > 0 ? "+" : ""}${formatNumber(variance)} ${l.unit ?? ""}`
-                          : "—"}
-                      </Pill>
-                    </div>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {l.sku ?? "—"}
-                    </p>
-                    <p className="mt-1 text-xs">
-                      Sistem <b>{formatNumber(l.system_qty ?? 0)}</b> · Fisik{" "}
-                      <b>{l.actual_qty != null ? formatNumber(l.actual_qty) : "—"}</b> · Rak{" "}
-                      {l.from_rack ?? "—"} / Bin {l.from_bin ?? "—"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Nilai selisih:{" "}
-                      <b className="text-foreground">{formatIDR(opnameLineValue(l))}</b>
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Alasan: <b className="text-foreground">{opnameReasonLabel(l.reason_code)}</b>{" "}
-                      · Dicek: <b className="text-foreground">{l.counted_by ?? "—"}</b>
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </>
         )}
       </Panel>
     </>

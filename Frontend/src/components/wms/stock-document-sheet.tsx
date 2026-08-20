@@ -1,4 +1,4 @@
-import { Loader2, Printer } from "lucide-react";
+import { Ban, CheckCheck, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Pill, type Tone } from "./kit";
 import { Button } from "@/components/ui/button";
@@ -132,10 +132,16 @@ export function StockDocumentSheet({
   doc,
   onOpenChange,
   isLoading = false,
+  onPost,
+  onCancel,
+  busy = false,
 }: {
   doc: StockDocumentApi | null;
   onOpenChange: (open: boolean) => void;
   isLoading?: boolean;
+  onPost?: () => void;
+  onCancel?: () => void;
+  busy?: boolean;
 }) {
   const lines = doc?.lines ?? [];
   const isOpname = doc?.type === "Stock Opname" || (lines.length > 0 && lines.every(isOpnameLine));
@@ -357,6 +363,35 @@ export function StockDocumentSheet({
               >
                 <Printer className="h-4 w-4" /> Cetak
               </Button>
+              {doc.type === "Stock Adjustment" && doc.status === "Draft" && (
+                <>
+                  {onCancel && (
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={onCancel}
+                      disabled={busy}
+                    >
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Ban className="h-4 w-4" />
+                      )}{" "}
+                      Batalkan
+                    </Button>
+                  )}
+                  {onPost && (
+                    <Button className="rounded-xl" onClick={onPost} disabled={busy}>
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCheck className="h-4 w-4" />
+                      )}{" "}
+                      Posting
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </>
         )}

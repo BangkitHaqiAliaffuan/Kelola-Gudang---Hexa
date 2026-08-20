@@ -35,6 +35,7 @@ import { Route as TransaksiReturPenjualanRouteImport } from './routes/transaksi.
 import { Route as TransaksiTransferRouteImport } from './routes/transaksi.transfer'
 import { Route as MasterBarangIndexRouteImport } from './routes/master.barang.index'
 import { Route as MasterBarangIdRouteImport } from './routes/master.barang.$id'
+import { Route as OpnameLaporanDocIdRouteImport } from './routes/opname.laporan.$docId'
 import { Route as OpnameProsesDocIdRouteImport } from './routes/opname.proses.$docId'
 import { Route as PengadaanPurchaseOrderIndexRouteImport } from './routes/pengadaan.purchase-order.index'
 import { Route as PengadaanPurchaseOrderNewRouteImport } from './routes/pengadaan.purchase-order.new'
@@ -181,6 +182,11 @@ const MasterBarangIdRoute = MasterBarangIdRouteImport.update({
   path: '/master/barang/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpnameLaporanDocIdRoute = OpnameLaporanDocIdRouteImport.update({
+  id: '/opname/laporan/$docId',
+  path: '/opname/laporan/$docId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OpnameProsesDocIdRoute = OpnameProsesDocIdRouteImport.update({
   id: '/opname/proses/$docId',
   path: '/opname/proses/$docId',
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
+  '/opname/laporan/$docId': typeof OpnameLaporanDocIdRoute
   '/opname/proses/$docId': typeof OpnameProsesDocIdRoute
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
@@ -326,6 +333,7 @@ export interface FileRoutesByTo {
   '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
+  '/opname/laporan/$docId': typeof OpnameLaporanDocIdRoute
   '/opname/proses/$docId': typeof OpnameProsesDocIdRoute
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
@@ -369,6 +377,7 @@ export interface FileRoutesById {
   '/transaksi/retur-penjualan': typeof TransaksiReturPenjualanRoute
   '/transaksi/transfer': typeof TransaksiTransferRoute
   '/master/barang/$id': typeof MasterBarangIdRoute
+  '/opname/laporan/$docId': typeof OpnameLaporanDocIdRoute
   '/opname/proses/$docId': typeof OpnameProsesDocIdRoute
   '/pengadaan/purchase-order/new': typeof PengadaanPurchaseOrderNewRoute
   '/pengadaan/purchase-request/new': typeof PengadaanPurchaseRequestNewRoute
@@ -413,6 +422,7 @@ export interface FileRouteTypes {
     | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
+    | '/opname/laporan/$docId'
     | '/opname/proses/$docId'
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
+    | '/opname/laporan/$docId'
     | '/opname/proses/$docId'
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
@@ -493,6 +504,7 @@ export interface FileRouteTypes {
     | '/transaksi/retur-penjualan'
     | '/transaksi/transfer'
     | '/master/barang/$id'
+    | '/opname/laporan/$docId'
     | '/opname/proses/$docId'
     | '/pengadaan/purchase-order/new'
     | '/pengadaan/purchase-request/new'
@@ -536,6 +548,7 @@ export interface RootRouteChildren {
   TransaksiReturPenjualanRoute: typeof TransaksiReturPenjualanRoute
   TransaksiTransferRoute: typeof TransaksiTransferRoute
   MasterBarangIdRoute: typeof MasterBarangIdRoute
+  OpnameLaporanDocIdRoute: typeof OpnameLaporanDocIdRoute
   OpnameProsesDocIdRoute: typeof OpnameProsesDocIdRoute
   TransaksiEntriSectionRoute: typeof TransaksiEntriSectionRouteWithChildren
   MasterBarangIndexRoute: typeof MasterBarangIndexRoute
@@ -723,6 +736,13 @@ declare module '@tanstack/react-router' {
       path: '/master/barang/$id'
       fullPath: '/master/barang/$id'
       preLoaderRoute: typeof MasterBarangIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/opname/laporan/$docId': {
+      id: '/opname/laporan/$docId'
+      path: '/opname/laporan/$docId'
+      fullPath: '/opname/laporan/$docId'
+      preLoaderRoute: typeof OpnameLaporanDocIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/opname/proses/$docId': {
@@ -931,6 +951,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransaksiReturPenjualanRoute: TransaksiReturPenjualanRoute,
   TransaksiTransferRoute: TransaksiTransferRoute,
   MasterBarangIdRoute: MasterBarangIdRoute,
+  OpnameLaporanDocIdRoute: OpnameLaporanDocIdRoute,
   OpnameProsesDocIdRoute: OpnameProsesDocIdRoute,
   TransaksiEntriSectionRoute: TransaksiEntriSectionRouteWithChildren,
   MasterBarangIndexRoute: MasterBarangIndexRoute,

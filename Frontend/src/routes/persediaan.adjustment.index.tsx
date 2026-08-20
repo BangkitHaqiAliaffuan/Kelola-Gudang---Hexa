@@ -1,16 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, Plus, Search } from "lucide-react";
+import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
-import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import {
+  useCancelStockDocument,
+  usePostStockDocument,
+  useStockDocument,
+  useStockDocuments,
+} from "@/hooks/use-persediaan";
+import { isApiError } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/wms-data";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 
@@ -53,6 +69,12 @@ function StockAdjustment() {
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const postDoc = usePostStockDocument();
+  const cancelDoc = useCancelStockDocument();
+  const [confirmPostId, setConfirmPostId] = useState<number | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+  const pendingDrafts = (data?.data ?? []).filter((d) => d.status === "Draft").length;
+  const busy = postDoc.isPending || cancelDoc.isPending;
 
   const dayOk = (day: string) => {
     if (dateFrom && dateTo) return day >= dateFrom && day <= dateTo;
@@ -140,6 +162,15 @@ function StockAdjustment() {
           </>
         }
       />
+      {pendingDrafts > 0 && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <p className="text-sm font-medium text-warning">
+            {pendingDrafts} koreksi ADJ menunggu ditinjau. Buka dokumen untuk memeriksa baris
+            selisih, lalu tekan Posting.
+          </p>
+        </div>
+      )}
       <Panel title="Filter">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="relative">
@@ -218,7 +249,75 @@ function StockAdjustment() {
         doc={detail?.data ?? null}
         isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
+        onPost={() => detail?.data && setConfirmPostId(detail.data.id)}
+        onCancel={() => detail?.data && setConfirmCancelId(detail.data.id)}
+        busy={busy}
       />
+
+      <AlertDialog open={confirmPostId != null} onOpenChange={(o) => !o && setConfirmPostId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Posting koreksi ini?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Memosting akan memindahkan stok sesuai baris selisih ke ledger dan mengubah saldo
+              stok. Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmPostId == null) return;
+                postDoc.mutate(confirmPostId, {
+                  onSuccess: () => {
+                    toast.success("Koreksi berhasil diposting");
+                    setConfirmPostId(null);
+                    setSelectedId(null);
+                  },
+                  onError: (err) =>
+                    toast.error(isApiError(err) ? err.message : "Gagal memosting koreksi"),
+                });
+              }}
+            >
+              Ya, posting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmCancelId != null}
+        onOpenChange={(o) => !o && setConfirmCancelId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan koreksi ini?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen koreksi akan berstatus Dibatalkan dan tidak dapat diposting lagi. Stok tidak
+              berubah.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Kembali</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmCancelId == null) return;
+                cancelDoc.mutate(confirmCancelId, {
+                  onSuccess: () => {
+                    toast.success("Koreksi dibatalkan");
+                    setConfirmCancelId(null);
+                    setSelectedId(null);
+                  },
+                  onError: (err) =>
+                    toast.error(isApiError(err) ? err.message : "Gagal membatalkan koreksi"),
+                });
+              }}
+            >
+              Ya, batalkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

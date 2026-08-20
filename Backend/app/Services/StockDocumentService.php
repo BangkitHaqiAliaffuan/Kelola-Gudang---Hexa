@@ -86,9 +86,10 @@ class StockDocumentService
     /**
      * Stock Opname = penghitungan fisik: dokumen opname tidak memindahkan stok
      * langsung. Saat diselesaikan, sistem membuat dokumen Stock Adjustment yang
-     * berisi baris selisih (variance ≠ 0) dan langsung memostingnya, sehingga
-     * koreksi stok ter-audit lewat dokumen ADJ yang ter-link ke opname via
-     * source_document_id. Opname tanpa selisih tidak menghasilkan ADJ.
+     * berisi baris selisih (variance ≠ 0) dengan status DRAFT (belum diposting),
+     * ter-link ke opname via source_document_id. Posting koreksi dilakukan
+     * terpisah (halaman Penyesuaian) agar ada langkah review sebelum stok
+     * berubah. Opname tanpa selisih tidak menghasilkan ADJ.
      */
     private function postOpname(StockDocument $document): StockDocument
     {
@@ -102,7 +103,7 @@ class StockDocumentService
                 $adjustment = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, 'ADJ', 'no', 5),
                     'type' => 'Stock Adjustment',
-                    'status' => 'Selesai',
+                    'status' => 'Draft',
                     'document_date' => $document->document_date,
                     'warehouse_id' => $document->warehouse_id,
                     'source_document_id' => $document->id,
@@ -128,10 +129,10 @@ class StockDocumentService
                     ]);
                 });
 
-                // Posting ADJ menjalankan guard stok (assertNoNegativeStock) dan
-                // memindahkan stok via ledger; reason_code tiap baris diwarisi dari
-                // opname sehingga lolos assertAdjustmentReadyForPost.
-                $this->post($adjustment);
+                // ADJ dibuat sebagai Draft — koreksi tidak langsung memindahkan
+                // stok; posting dilakukan belakangan dari halaman Penyesuaian
+                // setelah ditinjau. Alasan selisih diwarisi dari opname sehingga
+                // lolos assertAdjustmentReadyForPost saat diposting.
             }
 
             $document->update(['status' => 'Selesai', 'posted_at' => now()]);

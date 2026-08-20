@@ -163,21 +163,30 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', -3);
 
-        // Opname hanya mencatat hasil hitung; koreksi stok dibuat sebagai dokumen
-        // Stock Adjustment otomatis (source_document_id -> opname).
+        // Opname hanya mencatat hasil hitung; koreksi dibuat sebagai Stock
+        // Adjustment DRAFT (source_document_id -> opname) — stok belum berubah
+        // sampai ADJ ditinjau & diposting dari halaman Penyesuaian.
         $opname = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
         $this->assertSame(0, $opname->movements()->count());
 
         $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
         $this->assertSame('Stock Adjustment', $adjustment->type);
-        $this->assertTrue($adjustment->isPosted());
+        $this->assertSame('Draft', $adjustment->status);
+        $this->assertFalse($adjustment->isPosted());
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
             ->where('bin_id', $bin->id)
             ->first();
 
-        $this->assertSame(7, (int) $row->stock);
+        $this->assertSame(10, (int) $row->stock);
+
+        $this->assertDatabaseMissing('stock_movements', ['stock_document_id' => $adjustment->id]);
+
+        // Posting ADJ: guard stok & ledger berjalan, stok bergeser ke hasil fisik.
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Selesai');
 
         $this->assertDatabaseHas('stock_movements', [
             'stock_document_id' => $adjustment->id,
@@ -185,6 +194,13 @@ class StockOpnameApiTest extends TestCase
             'qty' => 3,
             'bin_id' => $bin->id,
         ]);
+
+        $row = ItemStock::where('item_id', $item->id)
+            ->where('warehouse_id', $wh->id)
+            ->where('bin_id', $bin->id)
+            ->first();
+
+        $this->assertSame(7, (int) $row->stock);
     }
 
     public function test_store_opname_posted_applies_positive_variance(): void
@@ -212,14 +228,22 @@ class StockOpnameApiTest extends TestCase
 
         $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
         $this->assertSame('Stock Adjustment', $adjustment->type);
-        $this->assertTrue($adjustment->isPosted());
+        $this->assertSame('Draft', $adjustment->status);
+        $this->assertFalse($adjustment->isPosted());
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
             ->where('bin_id', $bin->id)
             ->first();
 
-        $this->assertSame(12, (int) $row->stock);
+        $this->assertSame(10, (int) $row->stock);
+
+        $this->assertDatabaseMissing('stock_movements', ['stock_document_id' => $adjustment->id]);
+
+        // Posting ADJ: koreksi naik masuk ke ledger, stok menjadi hasil fisik.
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Selesai');
 
         $this->assertDatabaseHas('stock_movements', [
             'stock_document_id' => $adjustment->id,
@@ -227,6 +251,13 @@ class StockOpnameApiTest extends TestCase
             'qty' => 2,
             'bin_id' => $bin->id,
         ]);
+
+        $row = ItemStock::where('item_id', $item->id)
+            ->where('warehouse_id', $wh->id)
+            ->where('bin_id', $bin->id)
+            ->first();
+
+        $this->assertSame(12, (int) $row->stock);
     }
 
     public function test_store_opname_posted_zero_variance_creates_no_movement(): void
@@ -272,11 +303,26 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.lines.0.system_qty', 0)
             ->assertJsonPath('data.lines.0.variance', 5);
 
-        // Selisih 5 disalurkan lewat Stock Adjustment otomatis.
+        // Selisih 5 disalurkan lewat Stock Adjustment DRAFT (belum diposting).
         $this->assertDatabaseHas('stock_documents', [
             'source_document_id' => $res->json('data.id'),
             'type' => 'Stock Adjustment',
+            'status' => 'Draft',
         ]);
+
+        $row = ItemStock::where('item_id', $item->id)
+            ->where('warehouse_id', $wh->id)
+            ->where('bin_id', $bin->id)
+            ->first();
+
+        // Belum ada stok fisik sama sekali — belum ada baris item_stock.
+        $this->assertNull($row);
+
+        // Posting ADJ: stok muncul sesuai hitung fisik.
+        $adjustment = StockDocument::where('source_document_id', $res->json('data.id'))->firstOrFail();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Selesai');
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
@@ -353,12 +399,26 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', -4);
 
-        // Selisih -4 disalurkan lewat Stock Adjustment otomatis.
+        // Selisih -4 disalurkan lewat Stock Adjustment DRAFT (belum diposting).
         $this->assertDatabaseHas('stock_documents', [
             'source_document_id' => $docId,
             'type' => 'Stock Adjustment',
+            'status' => 'Draft',
         ]);
         $this->assertSame(0, StockDocument::findOrFail($docId)->movements()->count());
+
+        $row = ItemStock::where('item_id', $item->id)
+            ->where('warehouse_id', $wh->id)
+            ->where('bin_id', $bin->id)
+            ->first();
+
+        $this->assertSame(10, (int) $row->stock);
+
+        // Posting ADJ: stok turun sesuai hasil fisik.
+        $adjustment = StockDocument::where('source_document_id', $docId)->firstOrFail();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Selesai');
 
         $row = ItemStock::where('item_id', $item->id)
             ->where('warehouse_id', $wh->id)
