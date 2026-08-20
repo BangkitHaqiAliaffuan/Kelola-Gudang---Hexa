@@ -28,7 +28,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
-import { formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { StockRowApi } from "@/lib/persediaan-types";
 
 const statusTone: Record<StockRowApi["status"], Tone> = {
@@ -393,10 +393,24 @@ export function LaporanStock() {
       <Panel title="Nilai per Gudang" description={`${formatNumber(chart.length)} gudang`}>
         {chart.length > 0 ? (
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={chart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="warehouse" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis fontSize={12} tickLine={false} axisLine={false} width={72} />
+            <BarChart data={chart} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+              <XAxis
+                type="number"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => formatIDRCompact(Number(v))}
+              />
+              <YAxis
+                type="category"
+                dataKey="warehouse"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={190}
+                tickFormatter={(name) => (name.length > 24 ? `${name.slice(0, 24)}…` : name)}
+              />
               <Tooltip
                 contentStyle={{
                   borderRadius: 12,
@@ -406,7 +420,7 @@ export function LaporanStock() {
                 }}
                 formatter={(value) => [formatIDR(Number(value)), "Nilai"]}
               />
-              <Bar dataKey="nilai" name="Nilai" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="nilai" name="Nilai" fill="var(--primary)" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
