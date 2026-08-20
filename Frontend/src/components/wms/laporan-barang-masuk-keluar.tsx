@@ -409,14 +409,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chart}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis
-                dataKey="month"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                interval="preserveStartEnd"
-                minTickGap={24}
-              />
+              <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis fontSize={12} tickLine={false} axisLine={false} width={44} />
               <Tooltip
                 contentStyle={{
