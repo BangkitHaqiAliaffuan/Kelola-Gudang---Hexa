@@ -3,10 +3,14 @@
 
 function escapeCell(value: unknown): string {
   const text = value == null ? "" : String(value);
-  if (/[",\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+  // Formula-injection guard (OWASP): hanya sel bertipe string yang diawali
+  // karakter formula diberi prefiks apostrof. Sel numerik (number) dibiarkan
+  // apa adanya agar tetap terbaca sebagai angka di Excel (mis. variance negatif).
+  const cell = typeof value === "string" && /^[=+\-@]/.test(text) ? `'${text}` : text;
+  if (/[",\n]/.test(cell)) {
+    return `"${cell.replace(/"/g, '""')}"`;
   }
-  return text;
+  return cell;
 }
 
 export function toCsv(

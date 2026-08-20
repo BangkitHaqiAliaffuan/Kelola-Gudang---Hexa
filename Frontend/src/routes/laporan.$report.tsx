@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useStockDocuments } from "@/hooks/use-persediaan";
+import { LaporanBarangMasukKeluar } from "@/components/wms/laporan-barang-masuk-keluar";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
   formatDate,
@@ -105,6 +106,9 @@ function Laporan() {
     type: "Stock Opname",
   });
   const opnameRows: OpnameDoc[] = isStockOpname ? ((opnameDocs?.data ?? []) as OpnameDoc[]) : [];
+
+  if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
+  if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
 
   const source: Row[] = isStockOpname
     ? opnameRows.map((d) => ({

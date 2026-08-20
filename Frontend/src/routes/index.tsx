@@ -286,7 +286,7 @@ function Dashboard() {
     {
       label: "Nilai Barang Masuk",
       value: summaryLoading ? "…" : formatIDRCompact(masukValue),
-      valueTitle: summaryLoading ? undefined : formatIDR(masukValue),
+      ...(summaryLoading ? {} : { valueTitle: formatIDR(masukValue) }),
       hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
@@ -315,7 +315,7 @@ function Dashboard() {
     {
       label: "Nilai Persediaan",
       value: valLoading ? "…" : formatIDRCompact(inventoryValue),
-      valueTitle: valLoading ? undefined : formatIDR(inventoryValue),
+      ...(valLoading ? {} : { valueTitle: formatIDR(inventoryValue) }),
       hint: "metode FIFO",
       icon: Wallet,
       tone: "brand" as const,

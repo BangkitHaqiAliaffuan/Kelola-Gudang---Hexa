@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
+import { cn } from "@/lib/utils";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockRowApi } from "@/lib/persediaan-types";
 
@@ -44,6 +45,7 @@ function StockSaatIni() {
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const itemCat = useMemo(
     () => new Map((items?.data ?? []).map((i) => [i.id, i.category])),
@@ -176,49 +178,70 @@ function StockSaatIni() {
 
   return (
     <>
-      <PageHeader
-        title="Stock Saat Ini"
-        description="Posisi stok real-time di seluruh gudang"
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Stock Saat Ini"
+          description="Posisi stok real-time di seluruh gudang"
+          actions={
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => toast.success("Export Excel diproses")}
+            >
+              <Download className="h-4 w-4" /> Export
+            </Button>
+          }
+        />
+        <Panel title="Filter">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari barang atau SKU..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full"
+              value={wh}
+              onChange={setWh}
+              placeholder="Semua Gudang"
+              options={warehouseNames}
+              loading={warehousesLoading}
+            />
+            <FilterSelect
+              className="w-full"
+              value={cat}
+              onChange={setCat}
+              placeholder="Semua Kategori"
+              options={categoryNames}
+              loading={catsLoading}
+            />
+          </div>
+        </Panel>
+      </div>
+
+      <Panel
+        title="Posisi Stock"
+        description={`${formatNumber(rows.length)} baris`}
         actions={
           <Button
             variant="outline"
+            size="sm"
             className="rounded-xl"
-            onClick={() => toast.success("Export Excel diproses")}
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+            onClick={() => setFullscreen((f) => !f)}
           >
-            <Download className="h-4 w-4" /> Export
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {fullscreen ? "Keluar" : "Fullscreen"}
           </Button>
         }
-      />
-      <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari barang atau SKU..."
-              className="rounded-xl pl-9"
-            />
-          </div>
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouseNames}
-            loading={warehousesLoading}
-          />
-          <FilterSelect
-            className="w-full"
-            value={cat}
-            onChange={setCat}
-            placeholder="Semua Kategori"
-            options={categoryNames}
-            loading={catsLoading}
-          />
-        </div>
-      </Panel>
-      <Panel title="Posisi Stock" description={`${formatNumber(rows.length)} baris`}>
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}

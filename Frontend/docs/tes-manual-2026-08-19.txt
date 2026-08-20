@@ -1,0 +1,512 @@
+======================================================================
+TES MANUAL - PERUBAHAN 19 AGUSTUS 2026
+(commit b091077, 7304066, cfe3ca5)
+======================================================================
+
+DOKUMEN UJI MANUAL UNTUK PERUBAHAN FRONTEND YANG DI-COMMIT DAN DI-PUSH
+PADA 19 AGUSTUS 2026. TULISAN INI BERFORMAT TEKS BIASA (BUKAN MARKDOWN)
+AGAR MUDAH DIBACA DI EDITOR TEKS APAPUN.
+
+----------------------------------------------------------------------
+CAKUPAN PENGUJIAN
+----------------------------------------------------------------------
+Perubahan yang diuji (git log --since="2026-08-18 17:00"):
+
+  1. b091077 - Profil role & hak akses sesuai user login, async search
+               dropdown retur & PO, prefill Receive Goods via ?po=,
+               cap tinggi dialog Buat Jadwal Opname, arah dropdown
+               combobox/select form master.
+  2. 7304066 - Arah dropdown combobox membuka ke bawah + auto-suggest
+               SKU pada form create Barang.
+  3. cfe3ca5 - Opname menjadi halaman khusus per sesi (redirect dari
+               Pilih Sesi ke /opname/proses/<id>).
+
+Perubahan 18 Agustus pagi (c088208 sampai 65d563d) SUDAH diuji di
+dokumen Frontend/docs/tes-manual-2026-08-18.md dan TIDAK diulang di
+sini, kecuali langkah regresi yang disebutkan secara eksplisit.
+
+----------------------------------------------------------------------
+PRASYARAT
+----------------------------------------------------------------------
+- Backend + frontend berjalan. Disarankan ./dev.sh dari root repo
+  (dijalankan dari Git Bash / MSYS, bukan PowerShell). Port: API
+  127.0.0.1:8000, UI localhost:8080. Pastikan kedua port bebas
+  sebelum start.
+- Dev DB kelolagudang sudah di-seed. Bila kosong jalankan
+  php artisan db:seed di folder Backend/ (JANGAN jalankan
+  migrate:fresh - memusnahkan seluruh data).
+- Password seluruh akun = nilai DEMO_PASSWORD di Backend/.env
+  (lihat Frontend/docs/akun-login.md).
+- Data mutasi stok (Penerimaan/Pengeluaran Selesai) dan data
+  pengadaan (PR/PO) diambil dari API backend yang sudah di-seed
+  (StockDocumentSeeder + ProcDocSeeder).
+
+----------------------------------------------------------------------
+AKUN UJI
+----------------------------------------------------------------------
+  USR-001  Rudi Hartono     rudi.hartono@kelolagudang.id      Administrator
+  USR-002  Siti Aminah      siti.aminah@kelolagudang.id       Supervisor
+  USR-003  Bayu Pratama     bayu.pratama@kelolagudang.id      Operator Gudang
+  USR-004  Dewi Lestari     dewi.lestari@kelolagudang.id      Auditor
+  USR-005  Agus Salim       agus.salim@kelolagudang.id        Operator Gudang
+  USR-006  Nur Hidayat      nur.hidayat@kelolagudang.id       Supervisor
+
+CATATAN PENTING: Di database live saat ini role USR-003 Bayu Pratama
+sudah diubah menjadi Administrator. JANGAN pakai Bayu sebagai contoh
+akun Operator Gudang. Gunakan USR-005 Agus Salim untuk semua kasus
+yang butuh role Operator Gudang (kasus tanpa hak approval).
+
+----------------------------------------------------------------------
+SKENARIO A - PROFIL & NAVBAR: ROLE + HAK AKSES SESUAI USER LOGIN
+(commit b091077)
+----------------------------------------------------------------------
+Tujuan: dialog Profil dan area nama di navbar menampilkan role dan
+daftar Hak Akses dari data user yang sedang login (bukan nilai
+hardcoded), dan berubah mengikuti user.
+
+Cara membuka profil: klik tombol avatar + nama di pojok kanan atas
+navbar (header). Dialog Profil terbuka langsung pada tab "Profil".
+
+A1. Administrator (Rudi Hartono)
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Lihat tombol di navbar kanan atas: menampilkan inisial avatar,
+     nama "Rudi Hartono", dan di bawahnya role "Administrator".
+  3. Klik tombol tersebut -> dialog Profil terbuka.
+  4. HARAP LIHAT:
+     - Header dialog = NAMA saja ("Rudi Hartono") sebagai judul dan
+       ROLE ("Administrator") sebagai subjudul. Tidak ada teks
+       warehouse seperti "Gudang Pusat Jakarta" di header.
+     - Tab Profil: baris "Role" bernilai Administrator; baris
+       "Perusahaan" bernilai PT Kelola Nusantara.
+     - Bagian "Hak Akses" menampilkan pill berwarna brand dengan
+       format "Modul · Level" sebanyak 8 modul, semuanya level Kelola:
+         Master Data · Kelola
+         Transaksi · Kelola
+         Persediaan · Kelola
+         Stock Opname · Kelola
+         Pengadaan · Kelola
+         Laporan · Kelola
+         System · Kelola
+         Audit Trails · Kelola
+       CATATAN: tidak ada pill "Approval Pengadaan" untuk role ini
+       (hak approval Rudi berasal dari Pengadaan level Kelola).
+  5. Nilai pill tepat sama persis dengan hak akses role Administrator
+     yang tampil di Master -> Roles.
+
+A2. Supervisor (Siti Aminah)
+  1. Login sebagai USR-002 Siti Aminah.
+  2. Buka Profil.
+  3. HARAP LIHAT: header role "Supervisor"; Hak Akses menampilkan
+     7 pill:
+         Master Data · Baca
+         Transaksi · Tulis
+         Persediaan · Tulis
+         Stock Opname · Baca
+         Pengadaan · Tulis
+         Approval Pengadaan · Baca
+         Laporan · Baca
+
+A3. Operator Gudang (Agus Salim)
+  1. Login sebagai USR-005 Agus Salim.
+  2. Buka Profil.
+  3. HARAP LIHAT: header role "Operator Gudang"; Hak Akses menampilkan
+     5 pill:
+         Master Data · Baca
+         Transaksi · Tulis
+         Persediaan · Tulis
+         Stock Opname · Tulis
+         Pengadaan · Baca
+
+A4. Auditor (Dewi Lestari)
+  1. Login sebagai USR-004 Dewi Lestari.
+  2. Buka Profil.
+  3. HARAP LIHAT: header role "Auditor"; Hak Akses menampilkan
+     8 pill, semuanya level Baca (Master Data, Transaksi, Persediaan,
+     Stock Opname, Pengadaan, Laporan, System, Audit Trails).
+
+A5. Perubahan saat berganti user (regresi hardcoded)
+  1. Logout dari salah satu akun, lalu login sebagai akun lain.
+  2. Buka Profil.
+  3. HARAP LIHAT: header role DAN seluruh pill Hak Akses berubah
+     mengikuti role user baru. Tidak pernah ada dua user berbeda
+     dengan pill yang identik jika role-nya berbeda.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO B - DIALOG "BUAT JADWAL OPNAME" MUAT LAYAR (commit b091077)
+----------------------------------------------------------------------
+Tujuan: dialog pembuatan jadwal opname tidak pernah melebihi tinggi
+layar; isi panjang dapat di-scroll di dalam dialog; panel pratinjau
+cakupan memakai area terbatas dengan scroll internal.
+
+B1. Dialog tidak overflow
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Buka Opname -> Jadwal (/opname/jadwal).
+  3. Klik tombol "Buat Jadwal" -> dialog "Buat Jadwal Opname" terbuka.
+  4. HARAP LIHAT: tinggi dialog dibatasi maksimal sekitar 90% tinggi
+     layar. Bila isi (form + pratinjau + footer tombol) lebih tinggi
+     dari batas, seluruh dialog dapat di-scroll ke bawah sehingga
+     panel pratinjau dan tombol aksi tetap terjangkau.
+  5. Ulangi pada ukuran layar kecil (misalnya laptop 1366x768 atau
+     jendela browser yang dipersempit): dialog tetap muat di layar
+     dan bisa di-scroll di dalamnya (tidak terpotong oleh tepi bawah
+     layar).
+
+B2. Panel pratinjau cakupan
+  1. Pada dialog yang sama, pilih sebuah Gudang yang memiliki stok.
+  2. HARAP LIHAT: panel "Pratinjau Cakupan" menampilkan jumlah baris
+     stok (mis. "N baris stok") dan daftar baris (nama barang, SKU,
+     Rak, Bin, stok sistem) memakai area tinggi terbatas dengan
+     scroll internal di dalam panel - daftar tidak membentang penuh
+     menyeret seluruh dialog.
+
+B3. Kondisi sebelum pilih gudang
+  1. Buka dialog baru, jangan pilih gudang.
+  2. HARAP LIHAT: panel pratinjau menampilkan pesan "Pilih gudang
+     dulu" dan tombol "Buat Jadwal" nonaktif.
+
+B4. Alur normal
+  1. Pilih gudang berisi stok -> tombol "Buat Jadwal" aktif.
+  2. Klik "Buat Jadwal" -> toast "Jadwal opname dibuat", dialog
+     tertutup, sesi baru muncul di daftar.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO C - RECEIVE GOODS: TOMBOL "TERIMA BARANG" + PREFILL DARI PO
+(commit b091077)
+----------------------------------------------------------------------
+Tujuan: sheet detail PO menampilkan tombol "Terima Barang" hanya untuk
+PO berstatus Disetujui dan role yang punya akses Persediaan Tulis;
+klik tombol membuka halaman Receive Goods dengan No. PO terpilih dan
+data PO (supplier, gudang, referensi, baris barang) ter-prefill.
+
+C1. Prefill dari PO Disetujui (Administrator)
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Buka Pengadaan -> Purchase Order (/pengadaan/purchase-order).
+  3. Temukan PO berstatus "Disetujui" (bisa pakai filter status atau
+     gulir daftar). Klik barisnya -> sheet detail PO terbuka.
+  4. HARAP LIHAT: tombol "Terima Barang" (dengan ikon package check)
+     muncul di dalam sheet PO.
+  5. Klik "Terima Barang".
+  6. HARAP LIHAT: halaman /pengadaan/receive-goods/new terbuka dan
+     URL memuat parameter ?po=<id> (id = nomor internal PO).
+  7. Pada form "Terima Barang dari PO":
+     - Field "No. PO" (combobox) SUDAH terisi nomor PO yang tadi.
+     - Supplier, Gudang, dan Referensi terisi otomatis dari PO.
+     - Baris barang terisi otomatis dari baris PO: nama barang,
+       qty, dan harga beli (unit cost) sesuai baris PO.
+     - Kolom lokasi/bin pada baris masih KOSONG (tidak ikut
+       ter-prefill).
+  8. Lengkapi bin pada tiap baris, lalu Simpan (Draft) dan/atau
+     Simpan & Posting -> dokumen Penerimaan tersimpan dengan nomor
+     BM/YYYY/##### dan referensi ke PO.
+
+C2. Prefill via URL langsung (opsional)
+  1. Buka langsung URL /pengadaan/receive-goods/new?po=<id> dengan id
+     PO Disetujui lain.
+  2. HARAP LIHAT: No. PO, supplier, gudang, referensi, dan baris
+     ter-prefill sama seperti langkah C1.
+
+C3. PO non-Disetujui TIDAK ada tombol
+  1. Kembali ke daftar PO, buka PO berstatus selain Disetujui
+     (mis. Menunggu Approval, Selesai, atau Dibatalkan).
+  2. HARAP LIHAT: tombol "Terima Barang" TIDAK muncul di sheet.
+
+C4. Role tanpa Persediaan Tulis TIDAK ada tombol + halaman dibatasi
+  1. Login sebagai USR-004 Dewi Lestari (Auditor - Persediaan Baca).
+  2. Buka Pengadaan -> Purchase Order -> buka PO Disetujui.
+  3. HARAP LIHAT: tombol "Terima Barang" TIDAK muncul meski PO
+     berstatus Disetujui.
+  4. Buka langsung /pengadaan/receive-goods/new.
+  5. HARAP LIHAT: halaman "Akses dibatasi" dengan pesan "Anda tidak
+     dapat membuat dokumen Receive Goods." dan tombol "Kembali ke
+     Daftar".
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO D - PO: TOGGLE "PERLU PERSETUJUAN SAYA" + KARTU "MENUNGGU
+SAYA" (commit b091077)
+----------------------------------------------------------------------
+Tujuan: elemen persetujuan di daftar Purchase Order hanya muncul untuk
+role yang berhak memutuskan approval (memiliki modul Approval
+Pengadaan ATAU Pengadaan level Kelola), dan tombol filter hanya
+menampilkan PO yang dapat diputuskan user yang bersangkutan.
+
+Aturan keputusan yang dipakai: dokumen berstatus "Menunggu Approval",
+bukan permintaan milik user sendiri, dan (approver ditunjuk ke user
+tersebut ATAU role user memiliki Approval Pengadaan / Pengadaan
+Kelola).
+
+D1. Administrator (Rudi) melihat elemen approval
+  1. Login sebagai USR-001 Rudi Hartono (hak via Pengadaan Kelola).
+  2. Buka Pengadaan -> Purchase Order.
+  3. HARAP LIHAT:
+     - Kartu stat "Menunggu Saya" MUNCUL (nilai = jumlah PO Menunggu
+       Approval yang dapat diputuskan role ini).
+     - Tombol toggle "Perlu Persetujuan Saya" MUNCUL di kanan bawah
+       panel Filter, dengan badge jumlah "(n)" bila n > 0.
+  4. Klik tombol toggle -> daftar tersaring hanya PO yang dapat
+     diputuskan user ini. Klik lagi -> kembali menampilkan semua.
+
+D2. Kombinasi dengan filter lain
+  1. Aktifkan toggle "Perlu Persetujuan Saya".
+  2. Ubah filter lain (Status, Gudang, Supplier, atau teks cari).
+  3. HARAP LIHAT: hasil tetap memenuhi SEMUA kondisi sekaligus
+     (kondisi AND).
+
+D3. Supervisor (Siti) melihat elemen approval
+  1. Login sebagai USR-002 Siti Aminah (memiliki modul Approval
+     Pengadaan).
+  2. Buka Pengadaan -> Purchase Order.
+  3. HARAP LIHAT: kartu "Menunggu Saya" dan tombol "Perlu Persetujuan
+     Saya" MUNCUL (PO dengan approver ditunjuk ke Siti atau fallback
+     Supervisor dapat diputuskan).
+
+D4. Operator Gudang (Agus) TIDAK melihat elemen approval
+  1. Login sebagai USR-005 Agus Salim (tanpa Approval Pengadaan dan
+     tanpa Pengadaan Kelola).
+  2. Buka Pengadaan -> Purchase Order.
+  3. HARAP LIHAT: kartu stat "Menunggu Saya" dan tombol "Perlu
+     Persetujuan Saya" TIDAK MUNCUL. Kartu lain (Total Dokumen,
+     Perlu Tindakan, Selesai / Disetujui, Nilai Total) tetap tampil.
+
+D5. Auditor (Dewi) TIDAK melihat elemen approval
+  1. Login sebagai USR-004 Dewi Lestari (Pengadaan Baca saja).
+  2. Ulangi langkah D4: kedua elemen approval TIDAK MUNCUL.
+
+CATATAN: USR-003 Bayu Pratama tidak dipakai pada skenario ini karena
+role-nya di database live sudah Administrator.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO E - RETUR PEMBELIAN & RETUR PENJUALAN: SUMBER DOKUMEN DIMUAT
+ASYNC PER GUDANG + PENCARIAN DI SERVER (commit b091077)
+----------------------------------------------------------------------
+Tujuan: combobox dokumen sumber pada form retur hanya memuat dokumen
+Selesai di gudang yang dipilih (maksimal 20, pencarian dilakukan di
+server), dokumen terpilih tetap tampil walau tersaring keluar, dan
+pilihan dokumen ter-reset saat gudang diganti.
+
+E1. Retur Pembelian - perilaku combobox sumber
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Buka Transaksi -> Retur Pembelian -> tombol Buat Retur.
+  3. SEBELUM pilih gudang: combobox "Dokumen sumber" menampilkan
+     placeholder "Pilih gudang dulu" dan daftar kosong.
+  4. Pilih Gudang.
+  5. HARAP LIHAT: combobox menampilkan indikator memuat (spinner /
+     "Memuat..."), lalu menampilkan maksimal 20 dokumen Penerimaan
+     berstatus Selesai DI GUDANG TERPILIH. Label opsi berformat
+     "no dokumen · tanggal · partner".
+  6. Ketik teks pada field cari di dalam combobox (misal sebagian
+     nomor dokumen atau nama supplier) -> hasil berubah setelah jeda
+     singkat (debounce) dan disaring oleh server - bukan sekadar
+     penyaringan lokal dari daftar yang sudah tampil.
+
+E2. Dokumen terpilih tetap tampil
+  1. Pilih satu dokumen sumber.
+  2. Supplier otomatis terisi dari partner dokumen; baris retur hanya
+     boleh memilih barang yang ada di baris dokumen itu.
+  3. Ketik kata pada pencarian yang membuat dokumen terpilih keluar
+     dari hasil.
+  4. HARAP LIHAT: dokumen terpilih TETAP tampil sebagai opsi teratas
+     (labelnya tidak hilang) walau tidak memenuhi hasil pencarian.
+
+E3. Reset saat ganti gudang
+  1. Ganti Gudang ke gudang lain.
+  2. HARAP LIHAT: seleksi dokumen sumber TER-RESET (combobox kosong,
+     placeholder "Pilih gudang dulu" tidak tampil kembali melainkan
+     "Pilih dokumen sumber..."), supplier/baris ikut ter-bersihkan,
+     dan daftar dimuat ulang untuk gudang baru.
+
+E4. Validasi retur tetap berjalan
+  1. Pilih dokumen sumber, pilih barang, set qty retur MELEBIHI sisa
+     yang dapat diretur.
+  2. Simpan / Simpan & Posting -> ditolak (pesan validasi, tidak
+     menjadi Selesai).
+  3. Isi qty valid dan alasan retur -> tersimpan; alasan tercatat di
+     catatan dokumen diawali "Alasan: ...".
+
+E5. Retur Penjualan - pola sama
+  1. Ulangi E1 sampai E4 pada Transaksi -> Retur Penjualan -> Buat
+     Retur.
+  2. HARAP LIHAT: sumbernya adalah dokumen PENGELUARAN (Barang Keluar)
+     berstatus Selesai di gudang terpilih; CUSTOMER terisi otomatis
+     dari partner dokumen; harga dan bin kembali mengikuti baris
+     Pengeluaran sumber; cap sisa qty tetap berlaku.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO F - AUTO-SUGGEST SKU PADA FORM CREATE BARANG (commit 7304066)
+----------------------------------------------------------------------
+Tujuan: saat membuat barang baru, field SKU terisi otomatis dengan
+SKU berikutnya yang belum terpakai, tetap bisa diedit, dan nilai usul
+maju setelah satu barang tersimpan.
+
+F1. Isian otomatis pada create
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Buka Master -> Barang -> tombol Tambah Barang.
+  3. HARAP LIHAT: field SKU (Kode) SUDAH terisi dengan pola
+     "SKU-<seri>-<urutan>" (contoh: SKU-10001-001, atau nilai lanjutan
+     dari data SKU terakhir yang ada). Di bawah field terdapat hint
+     "Diisi otomatis dengan SKU berikutnya - bisa diubah."
+
+F2. Nilai usul bisa diedit
+  1. Ganti nilai SKU dengan nilai lain yang belum terpakai
+     (mis. SKU-99000-001).
+  2. Lengkapi field wajib lainnya, lalu Simpan.
+  3. HARAP LIHAT: barang tersimpan dengan SKU hasil ubahan (tanpa
+     error unique).
+
+F3. Usul berikutnya maju
+  1. Setelah barang tersimpan, buka lagi Tambah Barang.
+  2. HARAP LIHAT: field SKU terisi nilai BERIKUTNYA (menaik dari data
+     SKU terakhir; nilai yang baru saja dipakai TIDAK diulang).
+
+F4. SKU duplikat ditolak
+  1. Pada form create, set SKU sama dengan SKU barang yang sudah ada.
+  2. Simpan -> form/API menolak dengan pesan SKU sudah terpakai
+     (error unique).
+
+F5. Mode edit tidak menampilkan usul otomatis
+  1. Buka/edit barang yang sudah ada.
+  2. HARAP LIHAT: field SKU menampilkan SKU lama barang tersebut, hint
+     "Diisi otomatis..." TIDAK muncul, dan nilai tidak diganti otomatis.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO G - DROPDOWN COMBOBOX/SELECT MEMBUKA KE BAWAH (commit 7304066
+dan b091077)
+----------------------------------------------------------------------
+Tujuan: dropdown pada form master dan dialog-dialog terkait membuka
+ke BAWAH dari trigger sehingga opsi tampil utuh dan tidak terpotong
+oleh tepi dialog.
+
+G1. Form Barang
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Master -> Barang -> Tambah Barang (atau edit barang).
+  3. Buka combobox Kategori, Satuan, Gudang Default, dan dropdown
+     select lainnya satu per satu.
+  4. HARAP LIHAT: setiap dropdown membuka KE BAWAH dari field-nya,
+     opsi tampil utuh dan tidak terpotong/tersembunyi di tepi dialog.
+
+G2. Dialog Buat Jadwal Opname & form Receive Goods
+  1. Buka Opname -> Jadwal -> Buat Jadwal. Buka combobox Gudang dan
+     PIC.
+  2. Buka Pengadaan -> Receive Goods -> Terima Barang dari PO. Buka
+     combobox No. PO, Gudang, Supplier, Barang.
+  3. HARAP LIHAT: semua dropdown membuka ke bawah dan opsi tidak
+     terpotong, termasuk saat dialog berada dekat tepi bawah layar.
+
+G3. Master lainnya
+  1. Cek cepat combobox pada form Supplier, Customer, Vendor, dan
+     Work Order (Master -> menu terkait -> Tambah).
+  2. HARAP LIHAT: arah dropdown konsisten ke bawah.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+SKENARIO H - OPNAME: HALAMAN PENCATATAN KHUSUS PER SESI (commit cfe3ca5)
+----------------------------------------------------------------------
+Tujuan: pemilihan sesi opname membuka halaman penuh khusus
+(/opname/proses/<id>) untuk pencatatan fisik, bukan lagi sheet/
+overlay; halaman menangani blind count, filter scan, simpan draft,
+selesaikan (tinjauan), batalkan, dan kondisi sesi tidak ditemukan /
+sudah selesai.
+
+H1. Navigasi ke halaman per sesi
+  1. Login sebagai USR-001 Rudi Hartono.
+  2. Buka Opname -> Proses (/opname/proses).
+  3. HARAP LIHAT: panel "Pilih Sesi" dengan deskripsi "Pilih sesi
+     untuk membuka halaman pencatatan fisik".
+  4. Klik kartu sebuah sesi -> URL berubah ke /opname/proses/<id> dan
+     halaman pencatatan khusus terbuka (bukan sheet).
+
+H2. Konten halaman
+  1. HARAP LIHAT header "Pencatatan Opname - <no dokumen>" dengan
+     deskripsi "<gudang> · <tanggal> · PIC <nama> · N belum dicek"
+     (dan tambahan " · blind count aktif" bila sesi dibuat dengan
+     blind count).
+  2. HARAP LIHAT panel "Pencatatan Fisik": deskripsi jumlah baris dan
+     selisih kumulatif (mis. "M baris · selisih +X").
+  3. Untuk sesi Draft + role Persediaan Tulis, HARAP LIHAT tombol:
+     "Tampilkan Sistem" (hanya sesi blind), "Batalkan", "Simpan
+     Draft", dan "Selesaikan Opname".
+
+H3. Blind count
+  1. Buka sesi Draft dengan blind count aktif.
+  2. HARAP LIHAT: kolom "Sistem" dan "Selisih" disembunyikan.
+  3. Klik "Tampilkan Sistem" -> kolom sistem muncul kembali.
+
+H4. Filter scan
+  1. Ketik SKU atau nama pada field "Scan / ketik SKU untuk
+     filter..." -> daftar baris tersaring sesuai teks.
+  2. Tekan Enter pada field -> fokus berpindah (membantu alur scan).
+
+H5. Simpan Draft
+  1. Isi qty fisik pada satu atau lebih baris (ubah dari nilai awal).
+  2. Klik "Simpan Draft" -> toast "Draft opname disimpan".
+  3. Tanpa ada perubahan, tombol "Simpan Draft" nonaktif.
+
+H6. Selesaikan Opname
+  1. Biarkan minimal satu baris belum dihitung.
+  2. HARAP LIHAT: tombol "Selesaikan Opname" nonaktif (title "N barang
+     belum dihitung").
+  3. Isi fisik semua baris -> tombol aktif -> klik.
+  4. HARAP LIHAT: dialog "Tinjau Hasil Opname" terbuka.
+  5. REGRESI (lihat tes-manual-2026-08-18 skenario C): pilih alasan
+     selisih, selesaikan -> toast konfirmasi koreksi ADJ dibuat
+     otomatis; di Persediaan -> Adjustment muncul dokumen ADJ
+     ter-link ke sesi opname ini; stok terkoreksi.
+
+H7. Batalkan sesi
+  1. Buka sesi Draft lain -> klik "Batalkan".
+  2. HARAP LIHAT: toast "Opname dibatalkan" dan kembali ke
+     /opname/proses; sesi berubah status Dibatalkan.
+
+H8. Sesi tidak ditemukan
+  1. Buka langsung URL /opname/proses/<id yang tidak ada>.
+  2. HARAP LIHAT: halaman dengan judul "Pencatatan Opname", pesan
+     "Sesi tidak ditemukan", dan tombol "Daftar Sesi".
+
+H9. Sesi selesai / non-Draft read-only
+  1. Buka sesi berstatus Selesai (atau Dibatalkan).
+  2. HARAP LIHAT: tombol tulis tidak muncul; pesan "Sesi telah selesai
+     diposting - hanya sesi Draft yang dapat dicatat."; nilai fisik
+     tampil read-only.
+
+KOLOM HASIL: Lulus / Gagal + Catatan.
+
+----------------------------------------------------------------------
+LAMPIRAN - LANGKAH CEPAT YANG MUNGKIN DIBUTUHKAN
+----------------------------------------------------------------------
+- Mulai server: ./dev.sh dari root repo (via Git Bash/MSYS). Log:
+  .dev/logs/. Pastikan port 8000 dan 8080 bebas.
+- Login: buka localhost:8080, masukkan email akun + password dari
+  DEMO_PASSWORD di Backend/.env.
+- Menyiapkan PO Disetujui uji (skenario C): buka Pengadaan ->
+  Purchase Order. Bila tidak ada PO berstatus Disetujui, buat PO baru
+  dengan "Buat dari PR Disetujui" (PO hasil konversi otomatis
+  berstatus Disetujui) atau lakukan alur approval PR/PO.
+- Menyiapkan dokumen sumber retur (skenario E): pastikan ada
+  Penerimaan Selesai (buat via Transaksi -> Barang Masuk -> Simpan &
+  Posting) untuk Retur Pembelian, dan Pengeluaran Selesai (via
+  Transaksi -> Barang Keluar) untuk Retur Penjualan di gudang yang
+  sama.
+- Menyiapkan sesi opname uji (skenario H): Opname -> Jadwal -> Buat
+  Jadwal (pilih gudang berisi stok), lalu buka Opname -> Proses.
+
+----------------------------------------------------------------------
+AKHIR DOKUMEN
+----------------------------------------------------------------------
+Catatan penguji:
+  Tanggal      : ....................
+  Dijalankan oleh: ....................
+  Ringkasan hasil (Lulus/Gagal per skenario):
+    A: ......  B: ......  C: ......  D: ......
+    E: ......  F: ......  G: ......  H: ......

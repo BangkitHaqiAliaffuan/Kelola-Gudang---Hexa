@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
 import type {
   StockCardApi,
@@ -37,7 +37,7 @@ export function useStockCard(
     queryFn: () => {
       const sp = new URLSearchParams({
         item_id: String(itemId),
-        method: encodeURIComponent(method),
+        method,
       });
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
       return api.get<{ data: StockCardApi }>(`/persediaan/stock-card?${sp.toString()}`);
@@ -53,10 +53,12 @@ export function useStockDocuments(
     perPage?: number;
     warehouseId?: number | null;
     search?: string | null;
+    from?: string | null;
+    to?: string | null;
     enabled?: boolean;
   } = {},
 ) {
-  const { type, status, perPage, warehouseId, search, enabled = true } = params;
+  const { type, status, perPage, warehouseId, search, from, to, enabled = true } = params;
   return useQuery({
     queryKey: [
       "persediaan",
@@ -66,14 +68,21 @@ export function useStockDocuments(
       status ?? null,
       warehouseId ?? null,
       search ?? null,
+      from ?? null,
+      to ?? null,
       perPage ?? null,
     ],
+    // Data lama tetap tampil saat ganti scope (filter/pagination) sampai data baru tiba —
+    // pola resmi TanStack Query v5 (placeholderData: keepPreviousData).
+    placeholderData: keepPreviousData,
     queryFn: () => {
       const sp = new URLSearchParams({ per_page: String(perPage ?? DOCS_PER_PAGE) });
       if (type) sp.set("type", type);
       if (status) sp.set("status", status);
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
       if (search) sp.set("search", search);
+      if (from) sp.set("from", from);
+      if (to) sp.set("to", to);
       return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
     },
     enabled: typeof window !== "undefined" && enabled,
