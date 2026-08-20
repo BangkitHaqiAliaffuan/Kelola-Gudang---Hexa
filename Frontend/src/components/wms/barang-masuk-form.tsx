@@ -110,15 +110,21 @@ export function BarangMasukForm({
     [suppliers],
   );
 
-  const poOptions: ComboboxOption[] = useMemo(
-    () =>
-      (approvedPoes?.data ?? []).map((p) => ({
+  const poOptions: ComboboxOption[] = useMemo(() => {
+    const wId = warehouseId ? Number(warehouseId) : undefined;
+    const sup = supplier.trim() || undefined;
+    return (approvedPoes?.data ?? [])
+      .filter((p) => {
+        if (wId != null && p.warehouse_id !== wId) return false;
+        if (sup && p.supplier !== sup) return false;
+        return true;
+      })
+      .map((p) => ({
         value: String(p.id),
         label: p.no,
         keywords: `${p.no} ${p.supplier ?? ""} ${p.warehouse ?? ""}`,
-      })),
-    [approvedPoes],
-  );
+      }));
+  }, [approvedPoes, warehouseId, supplier]);
 
   // Prefill supplier/gudang/No. PO + baris barang saat PO dipilih.
   useEffect(() => {
@@ -189,6 +195,18 @@ export function BarangMasukForm({
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
+    if (selectedPoId) {
+      setSelectedPoId("");
+      setReference("");
+    }
+  };
+
+  const pickSupplier = (name: string) => {
+    setSupplier(name);
+    if (selectedPoId) {
+      setSelectedPoId("");
+      setReference("");
+    }
   };
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
@@ -299,7 +317,7 @@ export function BarangMasukForm({
             <Label>Supplier</Label>
             <FormCombobox
               value={supplier}
-              onValueChange={setSupplier}
+              onValueChange={pickSupplier}
               options={supplierOptions}
               placeholder="Pilih Supplier"
               searchPlaceholder="Cari supplier..."

@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ClipboardList, FileSpreadsheet, Package, Printer, Search, TrendingUp, Wallet } from "lucide-react";
+import {
+  ClipboardList,
+  FileSpreadsheet,
+  Package,
+  Printer,
+  Search,
+  TriangleAlert,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ALL, EmptyState, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
@@ -78,7 +86,9 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
 
   const partners = useMemo(
     () =>
-      Array.from(new Set((data?.data ?? []).map((d) => d.partner).filter((p): p is string => !!p))).sort(),
+      Array.from(
+        new Set((data?.data ?? []).map((d) => d.partner).filter((p): p is string => !!p)),
+      ).sort(),
     [data],
   );
 
@@ -97,16 +107,22 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
     const docs = rows.length;
     const qty = rows.reduce((s, d) => s + Math.abs(d.qty_total ?? 0), 0);
     const nilai = rows.reduce((s, d) => s + Math.abs(d.value_total ?? 0), 0);
-    const months = new Set(rows.map((d) => d.document_date.slice(0, 7))).size;
-    return { docs, qty, nilai, avg: months ? qty / months : 0 };
+    const belumPosting = rows.filter(
+      (d) => d.status !== "Selesai" && d.status !== "Dibatalkan",
+    ).length;
+    return { docs, qty, nilai, belumPosting };
   }, [rows]);
 
   const chart = useMemo(
     () =>
-      [...rows.reduce((byMonth, d) => {
-        const key = d.document_date.slice(0, 7);
-        return byMonth.set(key, (byMonth.get(key) ?? 0) + Math.abs(d.qty_total ?? 0));
-      }, new Map<string, number>()).entries()]
+      [
+        ...rows
+          .reduce((byMonth, d) => {
+            const key = d.document_date.slice(0, 7);
+            return byMonth.set(key, (byMonth.get(key) ?? 0) + Math.abs(d.qty_total ?? 0));
+          }, new Map<string, number>())
+          .entries(),
+      ]
         .sort((a, b) => (a[0] < b[0] ? -1 : 1))
         .map(([key, qty]) => ({ month: formatDate(`${key}-01`), qty })),
     [rows],
@@ -122,17 +138,18 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
       { keterangan: "Gudang", nilai: wh === ALL ? "Semua" : wh },
       { keterangan: partnerLabel, nilai: partner === ALL ? "Semua" : partner },
       { keterangan: "Status", nilai: status === ALL ? "Semua" : status },
+      { keterangan: "Baris", nilai: `${formatNumber(rows.length)} dokumen` },
       { keterangan: "Dicetak", nilai: new Date().toLocaleString("id-ID") },
     ];
     const dataRows = rows.map((d) => ({
       no: d.no,
-      tanggal: formatDate(d.document_date),
+      tanggal: d.document_date,
       tipe: d.type,
       gudang: d.warehouse ?? "—",
       partner: d.partner ?? "—",
       referensi: d.reference_no ?? "—",
-      qty: formatNumber(Math.abs(d.qty_total ?? 0)),
-      nilai: formatIDR(Math.abs(d.value_total ?? 0)),
+      qty: Math.abs(d.qty_total ?? 0),
+      nilai: Math.abs(d.value_total ?? 0),
       pic: d.pic ?? "—",
       status: d.status,
     }));
@@ -290,10 +307,20 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
         description="Data dari sistem persediaan (dokumen Penerimaan/Pengeluaran)"
         actions={
           <>
-            <Button variant="outline" className="rounded-xl" onClick={handleExportCsv}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handleExportCsv}
+              disabled={rows.length === 0 || !rangeValid}
+            >
               <FileSpreadsheet className="h-4 w-4" /> Excel
             </Button>
-            <Button variant="outline" className="rounded-xl" onClick={handlePrint}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handlePrint}
+              disabled={rows.length === 0 || !rangeValid}
+            >
               <Printer className="h-4 w-4" /> Print
             </Button>
           </>
@@ -316,10 +343,11 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
           valueTitle={formatIDR(stats.nilai)}
         />
         <StatCard
-          label="Rata-rata Qty/Bulan"
-          value={`${formatNumber(Math.round(stats.avg))} unit`}
-          icon={TrendingUp}
-          tone="warning"
+          label="Belum Posting"
+          value={formatNumber(stats.belumPosting)}
+          icon={TriangleAlert}
+          tone="danger"
+          valueTitle={`${formatNumber(stats.belumPosting)} dokumen belum diposting`}
         />
       </div>
 
@@ -376,12 +404,19 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
         </div>
       </Panel>
 
-      <Panel title="Grafik Qty per Bulan" description={periodLabel}>
+      <Panel title="Qty per Bulan" description={periodLabel}>
         {chart.length > 0 ? (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chart}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="month"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={24}
+              />
               <YAxis fontSize={12} tickLine={false} axisLine={false} width={44} />
               <Tooltip
                 contentStyle={{
@@ -396,7 +431,10 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState title="Belum ada data" description="Tidak ada dokumen pada periode dan filter ini." />
+          <EmptyState
+            title="Belum ada data"
+            description="Tidak ada dokumen pada periode dan filter ini."
+          />
         )}
       </Panel>
 

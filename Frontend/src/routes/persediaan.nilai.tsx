@@ -174,12 +174,14 @@ function NilaiPersediaan() {
         <StatCard
           label="Total Nilai Stock"
           value={formatIDRCompact(total)}
+          valueTitle={formatIDR(total)}
           hint={`metode ${valuationMethodLabels[method]}`}
           icon={Wallet}
         />
         <StatCard
           label="Barang Termahal"
           value={formatIDRCompact(termahal ? nilaiFor(termahal, method) : 0)}
+          valueTitle={formatIDR(termahal ? nilaiFor(termahal, method) : 0)}
           hint={termahal?.name ?? "—"}
           icon={TrendingUp}
           tone="success"
@@ -187,6 +189,7 @@ function NilaiPersediaan() {
         <StatCard
           label="Barang Termurah"
           value={formatIDRCompact(termurah ? nilaiFor(termurah, method) : 0)}
+          valueTitle={formatIDR(termurah ? nilaiFor(termurah, method) : 0)}
           hint={termurah?.name ?? "—"}
           icon={TrendingDown}
           tone="info"
@@ -208,6 +211,7 @@ function NilaiPersediaan() {
         <StatCard
           label="Nilai Tereservasi"
           value={formatIDRCompact(nilaiReserved)}
+          valueTitle={formatIDR(nilaiReserved)}
           hint="terikat reservasi"
           icon={Lock}
           tone="info"
