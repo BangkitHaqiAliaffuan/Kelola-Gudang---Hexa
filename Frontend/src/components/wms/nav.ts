@@ -87,15 +87,7 @@ export const navGroups: NavGroup[] = [
       { label: "Laporan", to: "/opname/laporan" },
     ],
   },
-  {
-    label: "Barcode",
-    icon: QrCode,
-    children: [
-      { label: "Generate Barcode", to: "/barcode" },
-      { label: "Generate QR Code", to: "/barcode" },
-      { label: "Print Label", to: "/barcode" },
-    ],
-  },
+  { label: "Barcode", icon: QrCode, to: "/barcode" },
   {
     label: "Laporan",
     icon: FileBarChart,

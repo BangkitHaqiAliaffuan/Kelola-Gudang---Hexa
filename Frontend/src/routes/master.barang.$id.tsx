@@ -139,8 +139,10 @@ function DetailBarang() {
         description={`${item.sku} · ${item.category ?? "tanpa kategori"}`}
         actions={
           <>
-            <Button variant="outline" className="rounded-xl">
-              <Printer className="h-4 w-4" /> Cetak Label
+            <Button variant="outline" className="rounded-xl" asChild>
+              <Link to="/barcode" search={{ sku: item.sku }}>
+                <Printer className="h-4 w-4" /> Cetak Label
+              </Link>
             </Button>
             {canWrite && (
               <Button

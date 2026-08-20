@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useStockDocuments } from "@/hooks/use-persediaan";
 import { LaporanBarangMasukKeluar } from "@/components/wms/laporan-barang-masuk-keluar";
+import { LaporanStock } from "@/components/wms/laporan-stock";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
   formatDate,
@@ -94,19 +95,16 @@ function Laporan() {
   const [wh, setWh] = useState(ALL);
 
   const isStockOpname = report === "stock-opname";
-  const isItemReport = [
-    "stock",
-    "stock-minimum",
-    "dead-stock",
-    "fast-moving",
-    "nilai-persediaan",
-  ].includes(report);
+  const isItemReport = ["stock-minimum", "dead-stock", "fast-moving", "nilai-persediaan"].includes(
+    report,
+  );
 
   const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
     type: "Stock Opname",
   });
   const opnameRows: OpnameDoc[] = isStockOpname ? ((opnameDocs?.data ?? []) as OpnameDoc[]) : [];
 
+  if (report === "stock") return <LaporanStock />;
   if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
   if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
 
