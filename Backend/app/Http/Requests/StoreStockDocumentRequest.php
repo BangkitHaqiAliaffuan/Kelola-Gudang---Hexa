@@ -336,6 +336,27 @@ class StoreStockDocumentRequest extends FormRequest
                             "Qty melebihi sisa barang dari dokumen sumber (sisa {$remaining})."
                         );
                     }
+
+                    // Opsi A: untuk Selesai, juga cek stok tersedia di lokasi asal (bin sumber) — sinkron dengan FE Maks = min(sisa, available).
+                    if ($this->input('status') === 'Selesai') {
+                        $availableRaw = ItemStock::where('item_id', $sourceLine->item_id)
+                            ->where('warehouse_id', (int) $this->input('warehouse_id'))
+                            ->when(
+                                $sourceLine->to_bin_id === null,
+                                fn ($q) => $q->whereNull('bin_id'),
+                                fn ($q) => $q->where('bin_id', $sourceLine->to_bin_id),
+                            )
+                            ->value(DB::raw('COALESCE(stock,0) - COALESCE(reserved,0)'));
+                        $available = (int) ($availableRaw ?? 0);
+                        $remaining = max(0, $sourceQty - $alreadyReturned);
+                        $cap = min($remaining, $available);
+                        if ($requested > $cap) {
+                            $validator->errors()->add(
+                                "lines.{$index}.qty",
+                                "Qty melebihi stok tersedia di lokasi asal (tersedia {$available}, sisa dokumen {$remaining}, maks {$cap})."
+                            );
+                        }
+                    }
                 }
             },
             function (Validator $validator) {
