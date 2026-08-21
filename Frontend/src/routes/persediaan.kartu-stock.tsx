@@ -316,11 +316,11 @@ function KartuStock() {
             onValueChange={(v) => setId(Number(v))}
             options={options.map((o) => ({
               value: String(o.id),
-              label: `${o.name} — ${o.sku}`,
-              keywords: `${o.name} ${o.sku} ${o.internal_barcode ?? ""}`.trim(),
+              label: `${o.name} — ${o.sku}${o.barcode ? ` · ${o.barcode}` : ""}`,
+              keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
             }))}
-            placeholder="Pilih barang…"
-            searchPlaceholder="Cari nama atau SKU…"
+            placeholder="Pilih barang / scan barcode…"
+            searchPlaceholder="Cari nama, SKU, barcode…"
             loading={itemsLoading}
             className="max-w-md"
           />
