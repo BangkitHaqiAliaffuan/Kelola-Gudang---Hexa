@@ -6,6 +6,7 @@ import {
   buildSheetSvg,
   computeSheetLayout,
   encodeItem,
+  slugFilename,
 } from "./barcode-label";
 
 const item = {
@@ -127,5 +128,19 @@ describe("buildSheetSvg", () => {
     });
     expect(sheet.startsWith("<svg")).toBe(true);
     expect(sheet.match(/<svg/g)?.length).toBe(1 + 78);
+  });
+});
+
+describe("slugFilename", () => {
+  it("membersihkan karakter ilegal untuk nama file", () => {
+    expect(slugFilename("SKU-10001/001")).toBe("SKU-10001_001");
+    expect(slugFilename("a/b:c*d")).toBe("a_b_c_d");
+    expect(slugFilename("  __label__  ")).toBe("label");
+    expect(slugFilename("")).toBe("label");
+  });
+
+  it("mengganti spasi dan karakter khusus", () => {
+    expect(slugFilename("BRG 001")).toBe("BRG_001");
+    expect(slugFilename("label-50x30")).toBe("label-50x30");
   });
 });

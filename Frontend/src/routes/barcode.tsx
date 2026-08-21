@@ -15,9 +15,8 @@ import {
   MAX_LABELS,
   buildCodeSvg,
   buildPrintHtml,
-  buildSheetSvg,
   computeSheetLayout,
-  downloadSvg,
+  downloadLabelsAsPngOrZip,
   encodeItem,
   printHtml,
   type BarcodeKind,
@@ -152,6 +151,8 @@ function BarcodePage() {
     return { labels, ok: true };
   }, [rows, items, kind, size]);
 
+  const [downloading, setDownloading] = useState(false);
+
   const handlePrint = () => {
     if (rows.length === 0) {
       toast.error("Tambah barang terlebih dahulu");
@@ -163,18 +164,25 @@ function BarcodePage() {
     toast.success(`${labels.length} label dikirim ke printer`);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (rows.length === 0) {
       toast.error("Tambah barang terlebih dahulu");
       return;
     }
     const { labels, ok } = buildLabels();
     if (!ok || labels.length === 0) return;
-    const sheet = buildSheetSvg({ size, labels });
-    const filename =
-      labels.length === 1 && labels[0]?.sku ? `label-${labels[0].sku}.svg` : `label-${size}.svg`;
-    downloadSvg(sheet, filename);
-    toast.success(`Label diunduh sebagai ${filename}`);
+    setDownloading(true);
+    const toastId = toast.loading(
+      labels.length === 1 ? "Menyiapkan PNG..." : `Menyiapkan ${labels.length} PNG (ZIP)...`,
+    );
+    try {
+      const filename = await downloadLabelsAsPngOrZip(labels, size);
+      toast.success(`Label diunduh sebagai ${filename}`, { id: toastId });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal mengunduh label", { id: toastId });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -188,9 +196,9 @@ function BarcodePage() {
               variant="outline"
               className="rounded-xl"
               onClick={handleDownload}
-              disabled={rows.length === 0}
+              disabled={rows.length === 0 || downloading}
             >
-              <Download className="h-4 w-4" /> Download
+              <Download className="h-4 w-4" /> {downloading ? "Menyiapkan..." : "Download PNG"}
             </Button>
             <Button className="rounded-xl" onClick={handlePrint} disabled={rows.length === 0}>
               <Printer className="h-4 w-4" /> Print

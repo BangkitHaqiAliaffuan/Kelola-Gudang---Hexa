@@ -1,0 +1,1580 @@
+======================================================================
+KELOLA GUDANG PRO - DOKUMEN TESTING MANUAL KOMPREHENSIF
+Format: Teks Biasa (TXT) - Bukan Markdown
+Versi: 2026-08-21 | Mencakup Seluruh Fungsi Aplikasi
+======================================================================
+
+Dokumen ini adalah panduan testing manual lengkap untuk aplikasi
+Kelola Gudang Pro (Warehouse Management System). Mencakup seluruh
+modul, seluruh halaman, seluruh fungsi, dan seluruh role.
+
+Dokumen ini menggantikan dan melengkapi:
+  - Frontend/docs/tes-manual-2026-08-18.md  (8 commit 18 Agustus)
+  - Frontend/docs/tes-manual-2026-08-19.txt (3 commit 19 Agustus)
+
+Tulisan ini memakai format teks biasa agar mudah dibaca di editor
+apapun (Notepad, VS Code, browser) tanpa perlu renderer Markdown.
+
+======================================================================
+DAFTAR ISI
+======================================================================
+
+  0. Cara memakai dokumen ini
+  1. Prasyarat & akun uji
+  2. Matriks hak akses per role (fakta dari backend)
+  3. Ringkasan visibilitas menu & guard 403 per role
+  4. Skenario A - Auth & RBAC (login, token, guard, 403)
+  5. Skenario B - Master Data (16 entitas + bulk + Role edit)
+  6. Skenario C - Persediaan 6 halaman (API-backed)
+  7. Skenario D - Transaksi 5 tipe (BM/BK/TF/RP/RJ)
+  8. Skenario E - Pengadaan 3 halaman (PR/PO/Receive Goods)
+  9. Skenario F - Stock Opname 3 halaman + Adjustment Draft-then-post
+ 10. Skenario G - Laporan 10 laporan (3 API + 7 dummy)
+ 11. Skenario H - System, Pengaturan, Barcode, Global Search, Theme
+ 12. Skenario I - Validasi & negative cases
+ 13. Lampiran - File sumber, checklist penguji
+
+======================================================================
+0. CARA MEMAKAI DOKUMEN INI
+======================================================================
+
+- Setiap skenario diberi kode  S-xxx  (mis. S-A01, S-B07).
+- Setiap skenario mencantumkan:
+    Role     : role mana diuji dan ekspektasi (muncul / 403 / tombol hilang)
+    Pre-kondisi: data apa harus ada, login sebagai siapa
+    Langkah  : urutan klik/input yang harus dilakukan penguji
+    Hasil harap: apa yang harus terlihat di UI / DB / API
+- Kolom hasil di akhir tiap skenario:  Lulus / Gagal + Catatan
+- Tanda  HARAP LIHAT  menandakan assertion utama (wajib dicek).
+- Uji per role bergantian (logout lalu login akun lain) untuk
+  memverifikasi gating benar-benar berganti, tidak hardcoded.
+
+======================================================================
+1. PRASYARAT & AKUN UJI
+======================================================================
+
+1.1 Server
+  - Backend Laravel API : http://127.0.0.1:8000   (jalankan via  composer dev  di folder Backend/)
+  - Frontend Vite       : http://localhost:8080    (jalankan via  npm run dev  di folder Frontend/)
+  - Alternatif wrapper  : ./dev.sh dari root repo (Git Bash/MSYS, bukan PowerShell).
+    Pastikan port 8000 dan 8080 bebas sebelum start. Log di .dev/logs/.
+  - Vite mem-proxy  /api  -> http://127.0.0.1:8000  (vite.config.ts).
+    Jika halaman Master menampilkan "Tidak dapat terhubung ke server
+    backend", server Laravel belum jalan.
+
+1.2 Database
+  - Dev DB: kelolagudang  (PostgreSQL 18 di 127.0.0.1:5432, user postgres/postgres)
+  - Test DB: kelolagudang_test (dipakai PHPUnit)
+  - Bila DB kosong: jalankan  php artisan db:seed  di folder Backend/
+    JANGAN jalankan  migrate:fresh  (menghapus seluruh data dev).
+
+1.3 Password
+  - Seluruh akun memakai password yang sama: nilai DEMO_PASSWORD di
+    file Backend/.env  (lihat Frontend/docs/akun-login.md).
+  - Tidak ada password literal di repo.
+
+1.4 Akun uji (6 akun seeded via Backend/database/seeders/UserSeeder.php)
+  ----------------------------------------------------------------------
+  Kode     Nama            Email                              Role
+  ----------------------------------------------------------------------
+  USR-001  Rudi Hartono    rudi.hartono@kelolagudang.id       Administrator
+  USR-002  Siti Aminah     siti.aminah@kelolagudang.id        Supervisor
+  USR-003  Bayu Pratama    bayu.pratama@kelolagudang.id       Operator Gudang *
+  USR-004  Dewi Lestari    dewi.lestari@kelolagudang.id       Auditor
+  USR-005  Agus Salim      agus.salim@kelolagudang.id         Operator Gudang
+  USR-006  Nur Hidayat     nur.hidayat@kelolagudang.id        Supervisor
+  ----------------------------------------------------------------------
+  * CATATAN: di database dev live, USR-003 Bayu Pratama mungkin sudah
+    diubah menjadi Administrator oleh sesi lain. Untuk pengujian
+    Operator Gudang, gunakan USR-005 Agus Salim.
+
+1.5 Prinsip auth
+  - Auth memakai Sanctum bearer-token (bukan cookie/session).
+    POST /api/auth/login  -> { data, access, token }
+    Token disimpan di localStorage key  kg-token  (src/lib/api.ts)
+    dan dikirim sebagai  Authorization: Bearer <token>
+  - Tidak ada /sanctum/csrf-cookie, tidak ada X-XSRF-TOKEN.
+  - Logout  POST /api/auth/logout  menghapus token saat ini.
+
+
+======================================================================
+2. MATRIKS HAK AKSES PER ROLE  (Fakta dari backend)
+======================================================================
+
+Sumber kebenaran:
+  Backend/app/Models/RolePermission.php  (MODULES 9, LEVELS 3)
+  Backend/database/seeders/RolePermissionSeeder.php
+
+  MODULES = Master Data | Transaksi | Persediaan | Stock Opname
+            | Pengadaan | Approval Pengadaan | Laporan | System | Audit Trails
+
+  LEVELS  = Baca < Tulis < Kelola   (Tulis mencakup Baca, Kelola mencakup semua)
+
+  Aturan middleware:
+    GET/HEAD  butuh Baca
+    POST/PUT/PATCH butuh Tulis
+    DELETE    butuh Kelola
+  Jika baris (role, module) tidak ada = tidak punya akses (403).
+
+----------------------------------------------------------------------
+Administrator (USR-001 Rudi Hartono)
+----------------------------------------------------------------------
+  Master Data       : Kelola
+  Transaksi         : Kelola
+  Persediaan        : Kelola
+  Stock Opname      : Kelola
+  Pengadaan         : Kelola
+  Approval Pengadaan: (tidak ada baris - akses via Pengadaan Kelola = override approval)
+  Laporan           : Kelola
+  System            : Kelola
+  Audit Trails      : Kelola
+  -> 8 baris Kelola (semua kecuali Approval Pengadaan)
+
+----------------------------------------------------------------------
+Supervisor (USR-002 Siti Aminah, USR-006 Nur Hidayat)
+----------------------------------------------------------------------
+  Master Data       : Baca
+  Transaksi         : Tulis
+  Persediaan        : Tulis
+  Stock Opname      : Baca
+  Pengadaan         : Tulis
+  Approval Pengadaan: Baca
+  Laporan           : Baca
+  System            : (tidak ada)
+  Audit Trails      : (tidak ada)
+  -> 7 baris
+
+----------------------------------------------------------------------
+Operator Gudang (USR-005 Agus Salim, USR-003 Bayu bila belum diubah)
+----------------------------------------------------------------------
+  Master Data       : Baca
+  Transaksi         : Tulis
+  Persediaan        : Tulis
+  Stock Opname      : Tulis
+  Pengadaan         : Baca
+  Approval Pengadaan: (tidak ada)
+  Laporan           : (tidak ada)
+  System            : (tidak ada)
+  Audit Trails      : (tidak ada)
+  -> 5 baris
+
+----------------------------------------------------------------------
+Auditor (USR-004 Dewi Lestari)
+----------------------------------------------------------------------
+  Master Data       : Baca
+  Transaksi         : Baca
+  Persediaan        : Baca
+  Stock Opname      : Baca
+  Pengadaan         : Baca
+  Laporan           : Baca
+  System            : Baca
+  Audit Trails      : Baca
+  -> 8 baris, semua Baca
+
+----------------------------------------------------------------------
+Catatan:
+  - Barcode tidak masuk matriks (selalu terlihat, tanpa guard).
+  - Dashboard tidak masuk matriks (selalu terlihat).
+  - Approval Pengadaan bukan menu, melainkan kemampuan memutuskan
+    approval PR/PO (toggle "Perlu Persetujuan Saya", kartu
+    "Menunggu Saya", tombol Setujui/Tolak). Diberi bila punya
+    module Approval Pengadaan ATAU Pengadaan Kelola.
+
+
+======================================================================
+3. RINGKASAN VISIBILITAS MENU & GUARD 403 PER ROLE
+======================================================================
+
+Sumber: Frontend/src/components/wms/nav.ts  (navGroups)
+        Frontend/src/components/wms/app-shell.tsx (routeModuleMap + filter)
+
+  Dashboard        : selalu terlihat (semua role)
+  Barcode          : selalu terlihat (semua role, rute /barcode tanpa guard)
+
+  Master Data (16 anak) : butuh Master Data Baca untuk melihat menu.
+    - Tombol Tambah/Edit butuh Master Data Tulis
+    - Tombol/aksi Hapus butuh Master Data Kelola
+    - Edit Role (PUT /api/master/roles/{role}) butuh Master Data Kelola
+      (digate via MasterCrudPage)
+
+  Persediaan (6 anak) : butuh Persediaan Baca/Tulis/Kelola
+    - Stock Saat Ini, Kartu Stock, Mutasi, Stock Minimum, Nilai = Baca
+    - Adjustment form / posting butuh Tulis
+
+  Transaksi (5 anak) : menu di bawah label Transaksi, TAPI posting-nya
+    butuh Persediaan Tulis (karena POST /api/persediaan/stock-documents).
+    Tanpa Persediaan Tulis:
+      - menu Transaksi tetap terlihat bila punya Transaksi Baca
+      - tombol Buat/Posting HILANG, guard 403 bila akses langsung via URL
+
+  Pengadaan (3 anak) : butuh Pengadaan Baca untuk melihat menu.
+    - Buat PR/PO butuh Tulis
+    - Tombol Terima Barang (Receive Goods) butuh Persediaan Tulis
+    - Elemen approval (PO/PR) butuh Approval Pengadaan ATAU Pengadaan Kelola
+
+  Stock Opname (3 anak): butuh Stock Opname Baca/Tulis/Kelola
+    - Mulai jadwal, catat fisik, batalkan, selesaikan butuh Tulis
+
+  Laporan (10 anak): butuh Laporan Baca
+    - Operator Gudang (tanpa Laporan) -> menu Laporan HILANG, guard 403
+
+  System (3 anak): butuh System atau Audit Trails
+    - Audit Trails -> butuh Audit Trails
+    - General Setting, Developer -> butuh System
+    - Supervisor & Operator Gudang -> menu System HILANG, guard 403
+
+  403 screen: bila mengakses URL yang modulnya tidak dimiliki role,
+  AppShell menampilkan layar 403 (bukan blank/redirect), dengan pesan
+  modul yang dibutuhkan.
+
+
+======================================================================
+4. SKENARIO A - AUTH & RBAC
+======================================================================
+
+----------------------------------------------------------------------
+S-A01  Login sukses & token
+----------------------------------------------------------------------
+  Role        : semua
+  Pre-kondisi : server jalan, DB seeded
+  Langkah:
+    1. Buka http://localhost:8080  -> HARAP LIHAT redirect ke /login
+       bila belum login.
+    2. Masukkan email USR-001 dan password DEMO_PASSWORD, klik Masuk.
+    3. HARAP LIHAT redirect ke / (dashboard), nama "Rudi Hartono"
+       muncul di navbar kanan atas beserta role "Administrator".
+    4. Buka DevTools -> Application -> Local Storage -> key kg-token
+       HARAP LIHAT token tersimpan (string panjang, bukan kosong).
+    5. Refresh halaman (F5) -> HARAP LIHAT tetap login (tidak kembali ke /login).
+  Hasil harap: login sukses, token ada, sesi bertahan setelah refresh.
+  Per role  : semua 4 role harus bisa login dengan kredensial masing-masing.
+  Kolom hasil: Lulus / Gagal + Catatan
+  Sumber: Frontend/src/routes/login.tsx, src/hooks/use-auth.tsx, src/lib/api.ts
+
+----------------------------------------------------------------------
+S-A02  Login throttling (5/menit)
+----------------------------------------------------------------------
+  Role        : tidak login
+  Langkah:
+    1. Logout bila sedang login.
+    2. Di /login, masukkan email valid tapi password salah, klik Masuk
+       sebanyak 6 kali berturut-turut dalam 1 menit.
+    3. HARAP LIHAT setelah percobaan ke-6 muncul pesan throttled
+       (429 / "Terlalu banyak percobaan") dan tombol login tertahan.
+  Hasil harap: throttling aktif (middleware throttle:5,1 di AuthController@login).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-A03  Akun non-aktif ditolak
+----------------------------------------------------------------------
+  Role        : Administrator
+  Pre-kondisi : ada user dengan is_active = false (buat via Master -> User
+                lalu toggle non-aktif, atau via seeder).
+  Langkah:
+    1. Login sebagai Administrator, buka Master -> User, buat user baru
+       dengan is_active = false (atau edit user existing menjadi non-aktif).
+    2. Logout, coba login dengan email user non-aktif tersebut.
+    3. HARAP LIHAT login ditolak (401 / pesan kredensial tidak cocok /
+       akun tidak aktif).
+  Hasil harap: user non-aktif tidak bisa login (cek is_active di login).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-A04  Logout menghapus token
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Login sebagai akun apapun.
+    2. Klik avatar di navbar -> Profil -> Logout (atau tombol logout
+       di app-shell).
+    3. HARAP LIHAT redirect ke /login, token kg-token hilang dari
+       localStorage, akses ke / langsung redirect lagi ke /login.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-A05  Guard 403 per modul
+----------------------------------------------------------------------
+  Role        : Auditor vs Operator Gudang vs Supervisor
+  Langkah:
+    1. Login sebagai USR-004 Dewi Lestari (Auditor - semua Baca, tidak
+       punya Approval Pengadaan).
+       - Buka /laporan/stock -> HARAP LIHAT halaman laporan tampil (Auditor punya Laporan Baca).
+       - Buka /system/audit-trails -> tampil (punya Audit Trails Baca).
+       - Coba akses form Tambah Barang Masuk (/transaksi/entri/masuk)
+         -> HARAP LIHAT guard 403 atau tombol Simpan disabled (butuh Persediaan Tulis, Auditor hanya Baca).
+    2. Login sebagai USR-005 Agus Salim (Operator Gudang - tanpa Laporan, tanpa System).
+       - Buka /laporan/stock -> HARAP LIHAT layar 403 (tidak punya Laporan).
+       - Buka /system/audit-trails -> 403.
+       - Buka /persediaan/stock -> tampil (punya Persediaan Tulis).
+       - Buka /transaksi/masuk -> tampil + tombol Buat ada (punya Persediaan Tulis).
+    3. Login sebagai USR-002 Siti Aminah (Supervisor).
+       - Buka /master/role -> HARAP LIHAT menu terlihat tapi tombol Edit
+         mungkin terbatas (butuh Master Data Kelola, Supervisor hanya Baca).
+       - Buka /persediaan/stock -> tampil.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-A06  Profil menampilkan role & hak akses yang benar (regresi hardcoded)
+----------------------------------------------------------------------
+  Role        : semua (uji bergantian)
+  Langkah:
+    1. Login sebagai USR-001 Rudi Hartono, klik avatar navbar -> dialog Profil.
+    2. HARAP LIHAT header dialog = nama + role "Administrator", pill Hak Akses
+       8 modul semua Kelola (Master Data, Transaksi, Persediaan, Stock Opname,
+       Pengadaan, Laporan, System, Audit Trails).
+    3. Logout, login sebagai USR-002 Siti Aminah, buka Profil.
+       HARAP LIHAT role "Supervisor", 7 pill (Master Baca, Transaksi Tulis,
+       Persediaan Tulis, Stock Opname Baca, Pengadaan Tulis, Approval Baca,
+       Laporan Baca).
+    4. Logout, login sebagai USR-005 Agus Salim, buka Profil.
+       HARAP LIHAT role "Operator Gudang", 5 pill (Master Baca, Transaksi Tulis,
+       Persediaan Tulis, Stock Opname Tulis, Pengadaan Baca).
+    5. Logout, login sebagai USR-004 Dewi Lestari, buka Profil.
+       HARAP LIHAT role "Auditor", 8 pill semua Baca.
+    6. HARAP LIHAT setiap ganti user, pill berubah (tidak pernah identik
+       untuk role berbeda).
+  Kolom hasil: Lulus / Gagal + Catatan
+  Sumber: src/components/wms/profile-dialog.tsx, useAuth().access
+
+----------------------------------------------------------------------
+S-A07  Sidebar & quick actions terfilter per role
+----------------------------------------------------------------------
+  Role        : per role
+  Langkah:
+    1. Login sebagai Auditor -> HARAP LIHAT sidebar TIDAK menampilkan
+       tombol Buat yang butuh Tulis, dan menu Laporan/System tetap ada
+       (karena Auditor punya Laporan Baca & System Baca).
+    2. Login sebagai Operator Gudang -> HARAP LIHAT menu Laporan HILANG
+       sepenuhnya, menu System HILANG, tapi menu Persediaan & Transaksi
+       tetap ada.
+    3. Global Search (Ctrl+K / tombol cari) -> HARAP LIHAT hasil hanya
+       menampilkan rute yang role punya aksesnya.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+5. SKENARIO B - MASTER DATA (16 entitas + bulk + Role edit)
+======================================================================
+
+Master Data adalah 16 halaman di bawah /master/*, semuanya API-backed
+(Backend/routes/api.php -> /api/master/* dengan auth:sanctum + role.access:Master Data).
+Tidak ada dummy fallback.
+
+  Daftar 16:
+    1 Kategori              2 Sub Kategori        3 Merk
+    4 Satuan                5 Gudang              6 Rak
+    7 Bin Location          8 Supplier            9 Customer
+   10 Vendor               11 Barang             12 Departemen
+   13 Proyek               14 Work Order         15 User
+   16 Role (katalog + edit hak akses)
+
+  Flow umum per entitas (kecuali Role & Barang khusus):
+    List (search, pagination, sort) -> Tambah -> Edit -> Hapus (dengan guard)
+
+----------------------------------------------------------------------
+S-B01  Kategori CRUD + guard hapus
+----------------------------------------------------------------------
+  Role        : Administrator (Kelola)
+  Langkah:
+    1. Buka /master/kategori -> HARAP LIHAT tabel kategori tampil
+       dari API (paginated, links/meta), bukan data dummy.
+    2. Cari di search box -> HARAP LIHAT hasil terfilter (debounce),
+       pagination tetap jalan client-side (per_page=500 di hook).
+    3. Klik Tambah Kategori -> isi nama unik, simpan.
+       HARAP LIHAT toast sukses, baris baru muncul di tabel.
+    4. Klik baris -> Edit -> ubah nama, simpan.
+       HARAP LIHAT nama ter-update.
+    5. Coba buat kategori dengan nama duplikat -> HARAP LIHAT validasi
+       422 (nama sudah terpakai).
+    6. Hapus kategori yang masih dipakai Sub Kategori/Barang ->
+       HARAP LIHAT 422 ditolak (guard cascade).
+    7. Hapus kategori kosong -> HARAP LIHAT sukses, baris hilang.
+  Per role:
+    - Supervisor/Auditor/Operator Gudang (Baca) -> HARAP LIHAT tombol
+      Tambah HILANG, tombol Edit/Hapus HILANG. Akses langsung via URL
+      form tetap ditolak (UI gate).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B02  Sub Kategori CRUD + relasi Kategori
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/sub-kategori -> tabel tampil.
+    2. Tambah Sub Kategori -> pilih Kategori induk (combobox searchable),
+       isi nama, simpan.
+    3. HARAP LIHAT combobox Kategori memakai FormCombobox searchable
+       (ketik untuk filter, dropdown membuka ke bawah, scroll dua-jari
+       di dialog tidak tertelan).
+    4. Edit -> ganti Kategori induk, simpan.
+    5. Coba hapus Kategori yang masih punya Sub Kategori ->
+       HARAP LIHAT 422.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B03  Merk & Satuan CRUD
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/merk dan /master/satuan bergantian.
+    2. Tambah Merk/Satuan dengan nama unik, simpan, HARAP LIHAT muncul.
+    3. Duplikasi nama -> 422.
+    4. Hapus yang masih dipakai Barang -> 422.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B04  Gudang CRUD + guard hapus (masih punya Rak/Barang)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/gudang -> tabel gudang (kode, nama, alamat).
+    2. Tambah Gudang -> isi nama & alamat, simpan. Kode auto-generate
+       bila kosong. HARAP LIHAT baris baru.
+    3. Coba hapus Gudang yang masih punya Rak/Bin/Item -> 422.
+    4. Hapus Gudang kosong -> sukses.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B05  Rak CRUD (aisle-bay) + auto-fill name
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/rak -> tabel rak (code A-01, name Rak A-01, gudang).
+    2. Tambah Rak -> pilih Gudang, isi Aisle (mis. A) & Bay (01).
+       Kosongkan field Nama -> simpan.
+       HARAP LIHAT nama terisi otomatis "Rak A-01" (auto-fill di
+       RackController bila nama kosong) dan code "A-01".
+    3. Isi Nama manual (mis. "Rak Utama A") -> simpan -> HARAP LIHAT
+       nama sesuai input (tidak di-override).
+    4. Combobox Gudang searchable, dropdown ke bawah.
+    5. Hapus Rak yang masih punya Bin/Item -> 422.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B06  Bin Location CRUD (level-position) + guard lintas gudang
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/bin-location -> tabel bin (code, full_address, rak).
+    2. Tambah Bin -> pilih Gudang -> pilih Rak (rak terfilter per gudang),
+       isi Level & Position, simpan. Code "01-01", full_address mis.
+       "A-01 · 01-01".
+    3. HARAP LIHAT label bin di dropdown Barang menampilkan full_address
+       (bukan hanya code parsial).
+    4. Coba hapus Bin yang masih dipakai Item (default_bin_id) -> 422.
+    5. Pilih Bin untuk Barang -> HARAP LIHAT hanya bin di gudang yang
+       relevan yang tampil (filter via binsInWarehouse).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B07  Supplier / Customer / Vendor CRUD (detail PT + validasi NIB/NPWP)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/supplier -> tabel supplier (code SUP-###, nama, NIB, NPWP).
+    2. Tambah Supplier -> isi:
+       - Nama, legal_name, NIB (13 digit), NPWP (Luhn valid - lihat Npwp.php),
+         PIC name, website, bank info (bank_name, bank_account_no, bank_account_name),
+         payment_terms (NET 30/NET 14/COD/NET 45 nullable),
+         segment/service_type sesuai entitas.
+       HARAP LIHAT validasi:
+         - NIB selain 13 digit -> 422
+         - NPWP tidak Luhn -> 422
+         - website tanpa scheme -> ditolak zod
+    3. Supplier duplikat NIB/NPWP? -> cek unik (bila backend enforce unique).
+    4. Edit -> ubah legal_name, simpan -> HARAP LIHAT ter-update.
+    5. Hapus Supplier yang masih jadi preferred_supplier di Barang -> 422.
+    6. Ulangi untuk /master/customer (segment Retail/Distributor/Proyek/Korporat)
+       dan /master/vendor (service_type Ekspedisi/Maintenance/Kalibrasi/Cleaning).
+    7. HARAP LIHAT filter dropdown (segment/service_type) dan tombol Export CSV
+       (toCsv + UTF-8 BOM) ada di Supplier/Customer/Vendor.
+    8. Detail sheet (klik baris) -> HARAP LIHAT panel party-detail menampilkan
+       alamat PT lengkap.
+    9. Dropdown direction -> HARAP LIHAT membuka ke bawah.
+  Per role : Baca-only role tidak melihat tombol Tambah/Edit/Hapus.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B08  Barang CRUD + auto SKU, barcode, gudang/rak/bin, supplier
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/barang -> tabel barang (sku, nama, kategori, stok, harga).
+    2. Klik Tambah Barang ->
+       HARAP LIHAT field SKU (Kode) sudah terisi otomatis "SKU-xxxxx-001"
+       dengan hint "Diisi otomatis dengan SKU berikutnya - bisa diubah."
+    3. Ganti SKU dengan nilai unik lain (mis. SKU-99000-001), lengkapi:
+       - Kategori (wajib), Sub Kategori (opsional), Merk, Satuan,
+       - Gudang Default, Rak Default, Bin Default (berjenjang, filter per gudang),
+       - Preferred Supplier,
+       - min_stock, max_stock, lead_time, cost (harga),
+       - barcode / internal_barcode,
+       simpan.
+       HARAP LIHAT barang tersimpan dengan SKU ubahan.
+    4. Tambah Barang lagi -> HARAP LIHAT SKU auto-suggest sudah naik
+       (tidak mengulang nilai sebelumnya).
+    5. Coba SKU duplikat -> HARAP LIHAT 422 unique.
+    6. Edit barang existing -> HARAP LIHAT SKU menampilkan nilai lama,
+       hint auto tidak muncul, tidak diganti otomatis.
+    7. Barcodes: HARAP LIHAT internal_barcode auto-generate bila kosong.
+    8. Hapus Barang yang masih dipakai Work Order -> 422.
+    9. Filter kategori/gudang + search + sort header + mobileCard tampil.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B09  Barang bulk actions (hapus massal & ubah status)
+----------------------------------------------------------------------
+  Role        : Administrator (butuh Master Data Kelola untuk DELETE)
+  Langkah:
+    1. Di /master/barang, centang 2-3 baris -> HARAP LIHAT toolbar bulk
+       muncul (Bulk Hapus / Bulk Status).
+    2. Klik Bulk Hapus -> konfirmasi -> HARAP LIHAT barang terhapus
+       (yang tidak terikat Work Order).
+    3. Coba bulk hapus barang yang terikat Work Order -> HARAP LIHAT
+       422 atau sebagian gagal (guards restrictOnDelete).
+    4. Bulk Status -> ubah is_active -> HARAP LIHAT status berubah.
+  Per role : Supervisor (Hanya Baca) -> checkbox bulk mungkin tidak ada.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B10  Barang detail page (master.barang.$id.tsx)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Klik baris barang di /master/barang -> buka /master/barang/$id.
+    2. HARAP LIHAT SSR title statis (tradeoff), data barang dari API,
+       kartu info (kategori, merk, supplier, gudang/rak/bin, stok).
+    3. Tab Kartu Stock / Riwayat -> HARAP LIHAT masih dummy placeholder
+       (stockCard() dummy) - API-backed kartu stock ada di /persediaan/kartu-stock.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B11  Departemen CRUD (head user)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/departemen -> tabel (code DEP-###, nama, head, is_active).
+    2. Tambah -> isi nama unik, pilih Head (user combobox), is_active, simpan.
+       Code DEP-### auto-generate.
+    3. Duplikat nama/code -> 422.
+    4. Hapus -> HARAP LIHAT sukses (head_user_id nullOnDelete).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B12  Proyek CRUD (PIC, tanggal, status, budget)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/proyek -> tabel (code PRJ-###, nama, PIC, status).
+    2. Tambah -> isi nama, PIC (user), start_date, end_date, status
+       (Perencanaan/Berjalan/Selesai), budget, simpan.
+    3. Cek count work_orders_count di resource (whenCounted).
+    4. Hapus Proyek yang masih punya Work Order -> cek guard (cascadeOnDelete
+       untuk WO, jadi WO ikut terhapus - verifikasi).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B13  Work Order CRUD (project, item, unit, target_qty, status)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/work-order -> tabel (no WO/YYYY/####, proyek, barang, qty, status).
+    2. Tambah -> pilih Proyek, Barang (item_id restrictOnDelete), Satuan,
+       target_qty, tanggal mulai/selesai, PIC, status
+       (Perencanaan/Berjalan/Selesai/Ditunda), simpan.
+       HARAP LIHAT no format WO/2026/#### (CodeGenerator::nextYearly).
+    3. Edit -> ganti status, simpan.
+    4. Coba ganti item_id ke barang yang tidak ada -> 422.
+    5. Hapus -> sukses (project_id cascade, item_id restrict).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B14  User CRUD (code, role, is_active, password)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /master/user -> tabel (code USR-###, nama, email, role, is_active).
+    2. Tambah User -> isi nama, email unik, role (salah satu dari 4),
+       is_active, password (8-64, confirmed), password_confirmation, simpan.
+       HARAP LIHAT code USR-### auto-generate, password di-hash.
+    3. Coba password <8 -> 422. Tanpa password_confirmation -> 422.
+    4. Edit -> ubah role, toggle is_active, kosongkan password (artinya
+       tidak diubah) -> simpan -> HARAP LIHAT sukses, password lama tetap.
+    5. Hapus user -> HARAP LIHAT head_user_id/pic_user_id di departemen/proyek/WO
+       menjadi null (nullOnDelete). Lebih disarankan toggle is_active off.
+    6. Search by name/email/code -> HARAP LIHAT filter jalan.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-B15  Role katalog & edit hak akses
+----------------------------------------------------------------------
+  Role        : Administrator (butuh Master Data Kelola)
+  Langkah:
+    1. Buka /master/role -> HARAP LIHAT 4 kartu role (Administrator,
+       Supervisor, Operator Gudang, Auditor) dengan badge user_count /
+       active_user_count dan pill access per modul.
+    2. Klik ... -> Edit pada salah satu role -> HARAP LIHAT dialog matriks
+       ACCESS_MODULES x level (Tidak Ada / Baca / Tulis / Kelola).
+    3. Ubah satu modul (mis. beri Laporan Baca ke Operator Gudang), simpan
+       -> HARAP LIHAT PUT /api/master/roles/{role} sukses, pill ter-update,
+       dan akses role tersebut langsung berubah (tanpa perlu re-login;
+       frontend refetch, backend cek role_permissions realtime).
+    4. Coba kirim access dengan module duplikat / module invalid / level
+       invalid -> HARAP LIHAT 422.
+    5. Kosongkan semua access (empty array) -> HARAP LIHAT role kehilangan
+       semua akses (guard 403 di semua modul).
+    6. Kembalikan ke nilai awal (seed defaults) setelah uji.
+  Per role : Supervisor (Master Baca) -> HARAP LIHAT tombol Edit HILANG.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+6. SKENARIO C - PERSEDIAAN 6 HALAMAN (API-BACKED)
+======================================================================
+
+Persediaan memakai GET /api/persediaan/* (auth:sanctum + role.access:Persediaan).
+Semua halaman butuh Persediaan Baca minimal. Tanpa itu -> 403.
+
+  6 halaman:
+    /persediaan/stock          Stock Saat Ini
+    /persediaan/kartu-stock    Kartu Stock (FIFO/Average/Maximum Cost)
+    /persediaan/mutasi         Mutasi Stock (dokumen Selesai)
+    /persediaan/stock-minimum  Stock Minimum
+    /persediaan/nilai          Nilai Persediaan (valuation)
+    /persediaan/adjustment     Stock Adjustment (Draft/Dibatalkan/Selesai)
+
+  Sumber:
+    Frontend/src/routes/persediaan.*.tsx, persediaan.$section.tsx
+    Frontend/src/hooks/use-persediaan.ts, src/lib/persediaan-types.ts
+    Backend/app/Http/Controllers/StockController.php
+    Backend/app/Http/Controllers/StockDocumentController.php
+
+----------------------------------------------------------------------
+S-C01  Stock Saat Ini - tabel & filter
+----------------------------------------------------------------------
+  Role        : Administrator / Supervisor / Operator Gudang (Tulis)
+                vs Auditor (Baca - hanya lihat)
+  Langkah:
+    1. Login sebagai Administrator, buka /persediaan/stock.
+    2. HARAP LIHAT tabel posisi stock (kolom: Barang, SKU, Satuan, Gudang,
+       Rak, Bin, Qty, Reserved, Available (bold), Minimum, Maximum,
+       Nilai Stock, Status pill Habis/Menipis/Overstock/Normal).
+    3. Filter:
+       - Ketik di search (nama/SKU) -> debounce, HARAP LIHAT rows terfilter.
+       - Pilih Gudang (FilterSelect) -> HARAP LIHAT rows terfilter per gudang.
+       - Pilih Kategori -> HARAP LIHAT rows terfilter per kategori.
+    4. Sort: klik header kolom (Barang, SKU, Qty, dll) -> HARAP LIHAT
+       urutan berubah, ikon sort muncul seragam (via DataTable SortIcon).
+    5. Mobile: perkecil layar -> HARAP LIHAT tabel jadi mobileCard
+       (grid Qty/Reserved/Available).
+    6. Fullscreen: klik Fullscreen -> HARAP LIHAT panel jadi overlay
+       fixed inset-0, tombol Keluar muncul.
+    7. Export -> HARAP LIHAT toast "Export Excel diproses" (placeholder).
+    8. Login sebagai Auditor (Baca) -> HARAP LIHAT tabel tetap tampil
+       (Baca cukup), tapi tidak ada aksi Tulis (tidak relevan di halaman ini).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C02  Kartu Stock - pilih barang + metode penilaian
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /persediaan/kartu-stock.
+    2. PILIH barang via combobox searchable (ketik nama/SKU/barcode,
+       dropdown ke bawah, tidak terpotong dialog).
+    3. HARAP LIHAT kartu stock muncul: header item (SKU, nama, satuan,
+       min/max, cost, gudang, current_stock, reserved), method
+       (FIFO/Average/Maximum Cost), saldo_awal, saldo_akhir, rows
+       (date, no, type IN/OUT, masuk, keluar, saldo, unit_cost,
+       method_cost, nilai, pic, note, partner, reference).
+    4. Ganti metode penilaian (FIFO -> Average -> Maximum Cost)
+       -> HARAP LIHAT unit_cost & nilai berubah sesuai metode.
+    5. Filter tanggal (from/to) -> HARAP LIHAT rows terfilter per periode.
+    6. Coba barang tanpa movement -> HARAP LIHAT empty state (bukan error).
+    7. HARAP LIHAT DataTable dengan sorting header + filter + mobileCard.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C03  Mutasi Stock - dokumen Selesai
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /persediaan/mutasi -> HARAP LIHAT daftar dokumen mutasi
+       (type Penerimaan/Pengeluaran/Transfer/Adjustment/Opname/Retur,
+       no BM/BK/RP/RJ/ADJ/TF/SO, status Selesai, document_date, warehouse,
+       partner, line_count, qty_total, value_total). Eager warehouse/destination.
+    2. Filter by type, status, warehouse, search (no/partner/note),
+       from/to -> HARAP LIHAT terfilter (server-side, method GET).
+    3. Sort kolom -> HARAP LIHAT urutan berubah.
+    4. Klik baris -> HARAP LIHAT sheet detail (stock-document-sheet)
+       dengan lines (item, qty/system/actual, variance, from/to bin, unit_cost)
+       dan kalkulasi subtotal (qty null -> pakai variance untuk Opname).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C04  Stock Minimum - ADU, days of cover, suggested qty
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /persediaan/stock-minimum.
+    2. HARAP LIHAT stat cards compact (nilai kebutuhan) dengan hover tooltip
+       nilai penuh (format compact).
+    3. Tabel: per item -> min, max, stock, available, avg_daily_usage
+       (ADU = konsumsi /30 default, opsi /60 /90 via param days),
+       days_of_cover (stock / ADU, null bila ADU=0), status
+       (Habis/Kritis/Menipis/Normal - prioritas tertinggi), suggested_qty
+       (max - available, ramp minimum max), warehouse/category.
+    4. Filter: search (sku/nama), status (Habis/Kritis/Menipis/Normal),
+       warehouse_id, category_id, days (30/60/90).
+       Ganti days 14/30/60/90 -> HARAP LIHAT ADU & days_of_cover berubah.
+    5. Sort by status/suggested_qty/days_of_cover -> HARAP LIHAT urutan benar
+       (pakai sortAccessor).
+    6. Tombol Fullscreen -> HARAP LIHAT overlay tanpa scroll horizontal
+       (kolom dikurangi saat fullscreen).
+    7. Klik baris -> sheet stock-minimum-sheet dengan info supplier/lead_time.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C05  Nilai Persediaan - 3 metode, moving classification
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /persediaan/nilai.
+    2. HARAP LIHAT tabel valuation: per item -> sku, nama, category, min/max,
+       cost, stock, reserved, available, unit_cost_fifo/avg/max,
+       nilai_fifo/avg/max (stock x unit_cost), last_move_at, moving
+       (Fast <=20 hari, Medium <=60, Slow <=150, Dead >150 atau tanpa movement).
+    3. HARAP LIHAT stat cards grid 3x2 (6 kartu) dengan formatIDRCompact
+       (nilai kompak) + tooltip detail, termasuk Nilai Tereservasi.
+    4. Filter: warehouse_id, category_id, search, per_page.
+    5. HARAP LIHAT nilai = stock x unit_cost (sudah dibulatkan, konsisten).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C06  Adjustment - Draft-then-post (ADJ/YYYY/#####)
+----------------------------------------------------------------------
+  Role        : Administrator (Tulis/Kelola)
+  Langkah:
+    1. Buka /persediaan/adjustment -> daftar dokumen Stock Adjustment
+       (no ADJ/YYYY/#####, status Draft/Selesai/Dibatalkan, document_date,
+       warehouse, line_count).
+    2. Klik Buat Penyesuaian -> HARAP LIHAT form /persediaan/adjustment/new
+       tampil (bukan blank/404, regresi 339199e sudah fix via parent Outlet).
+       Tombol hanya muncul bila punya Persediaan Tulis.
+    3. Isi:
+       - Nomor read-only ADJ/2026/#####, tanggal (default hari ini), Gudang, PIC, Catatan
+       - Baris: Barang (combobox), Bin tujuan/asl, arah "+ Tambah" / "- Kurangi",
+         Qty positif, Alasan (reason_code) wajib selalu (receiving_error, picking_error,
+         damage, theft_shrinkage, vendor_short_ship, uom_mismatch, transfer_unposted,
+         location_error, data_entry, other).
+       HARAP LIHAT tanpa alasan, field amber + tidak bisa submit.
+    4. Simpan Draft (qty positif + to_bin_id untuk IN, qty negatif + from_bin_id untuk OUT)
+       -> HARAP LIHAT toast sukses, dokumen Draft muncul di daftar, stok di
+       Stock Saat Ini TIDAK berubah (belum posting).
+    5. Klik baris Draft -> detail sheet: HARAP LIHAT arah, rak/bin, alasan.
+    6. Posting OUT melebihi stok tersedia -> HARAP LIHAT 422 "stok tidak cukup",
+       dokumen tidak menjadi Selesai.
+    7. Posting valid (qty <= stok) -> HARAP LIHAT status jadi Selesai,
+       Stock Saat Ini terkoreksi, Kartu Stock ada mutasi baru dari dokumen ADJ
+       (alasan tampil).
+    8. Coba arah "+ Tambah" tanpa Bin -> 422 (bin tujuan wajib IN).
+       Coba "- Kurangi" tanpa Bin -> 422 (bin asal wajib OUT).
+       Qty 0 -> 422.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-C07  Persediaan - RBAC per halaman
+----------------------------------------------------------------------
+  Role        : Auditor (Baca) vs tanpa Persediaan
+  Langkah:
+    1. Login Auditor -> buka semua 6 halaman Persediaan ->
+       HARAP LIHAT semua tampil (Baca cukup), tapi tombol Buat/Posting
+       HILANG atau disabled.
+    2. Hapus hak Persediaan dari role (via Master -> Role -> empty array)
+       -> HARAP LIHAT menu Persediaan HILANG, akses /persediaan/stock -> 403.
+       Kembalikan setelah uji.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+7. SKENARIO D - TRANSAKSI 5 TIPE (BM/BK/TF/RP/RJ)
+======================================================================
+
+Transaksi berada di menu Transaksi, TAPI posting-nya ke
+POST /api/persediaan/stock-documents (butuh Persediaan Tulis).
+Tanpa Persediaan Tulis -> tombol Buat HILANG, guard 403 di form.
+
+  5 tipe (Frontend/src/routes/transaksi.*.tsx, transaksi.entri.$section.tsx):
+    /transaksi/masuk            Barang Masuk      (Penerimaan, BM/YYYY/#####)
+    /transaksi/keluar           Barang Keluar     (Pengeluaran, BK/YYYY/#####)
+    /transaksi/transfer         Transfer Gudang   (TF/YYYY/#####)
+    /transaksi/retur-pembelian  Retur Pembelian   (RP/YYYY/#####)
+    /transaksi/retur-penjualan  Retur Penjualan   (RJ/YYYY/#####)
+
+  Sumber:
+    Backend/app/Services/StockDocumentService.php
+    Backend/app/Http/Requests/StoreStockDocumentRequest.php
+    Backend/app/Http/Controllers/StockDocumentController.php
+    Frontend/src/components/wms/barang-masuk-form.tsx, barang-keluar-form.tsx,
+      transfer-gudang-form.tsx, retur-*.tsx, retur-list.tsx
+
+----------------------------------------------------------------------
+S-D01  Barang Masuk - Draft & Posting (Penerimaan)
+----------------------------------------------------------------------
+  Role        : Administrator / Operator Gudang (Persediaan Tulis)
+  Langkah:
+    1. Buka /transaksi/masuk -> daftar BM (no BM/YYYY/#####, status Draft/Selesai,
+       gudang, supplier, line_count, qty_total, value_total).
+       HARAP LIHAT search lintas kolom (no, supplier, gudang, barang) memakai
+       helper stock-document-search (bukan filter lokal saja).
+    2. Klik Buat Barang Masuk -> form Tambah Barang Masuk (barang-masuk-form):
+       - Nomor read-only BM/2026/#####, tanggal, Gudang (combobox), Supplier (combobox),
+         Referensi (PO/SJ, opsional kecuali di Receive Goods), PIC, Catatan,
+         Daftar Barang (tabel desktop + card mobile: Barang, Tujuan Bin, Qty, Harga, Subtotal).
+       - Bin dropdown hanya menampilkan bin di gudang terpilih (binsInWarehouse filter)
+         dengan label full_address (mis. A-01  01-01).
+       - Pilih Barang -> HARAP LIHAT harga auto-fill dari item.cost, bin auto-fill
+         dari item.default_bin_id bila ada di gudang tsb.
+       - Grand Total auto-hitung (qty x harga).
+    3. Ganti Gudang -> HARAP LIHAT bin di baris TER-RESET (kosong), bila sebelumnya
+       memilih PO, selectedPoId & reference TER-RESET.
+    4. Simpan Draft (status Draft) -> HARAP LIHAT toast "Draft BM/... disimpan",
+       dokumen Draft muncul di daftar, stok TIDAK berubah.
+    5. Simpan & Posting (status Selesai, konfirmasi dialog "Posting dokumen? ...
+       tidak dapat dibatalkan" -> Ya, Posting) -> HARAP LIHAT toast
+       "Dokumen BM/... berhasil diposting", status jadi Selesai,
+       Stock Saat Ini naik, Kartu Stock ada mutasi IN.
+    6. Cek validasi:
+       - Tanpa Gudang -> "Pilih gudang terlebih dahulu."
+       - Tanpa baris lengkap (barang/bin/qty/harga) -> "Lengkapi minimal satu baris"
+       - Qty 0 -> 422
+  Per role : Auditor (Persediaan Baca) -> HARAP LIHAT tombol Buat HILANG,
+             form direct URL -> guard 403 / tombol disabled.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-D02  Barang Keluar - Draft & Posting (Pengeluaran)
+----------------------------------------------------------------------
+  Role        : Administrator / Operator Gudang
+  Langkah:
+    1. Buka /transaksi/keluar -> daftar BK.
+    2. Buat Barang Keluar:
+       - Gudang, Customer/Partner (opsional), Referensi, PIC, Catatan
+       - Baris: Barang + From Bin (bin sumber, wajib, hanya bin berisi stok barang tsb),
+         Qty <= stok tersedia, Harga diisi otomatis (server akan backfill moving average
+         di bin asal, qty selalu positif tapi server menegasinya).
+       - Jika qty melebihi stok -> HARAP LIHAT peringatan over-stok, posting ditolak 422.
+    3. Simpan Draft -> stok TIDAK berubah.
+    4. Simpan & Posting -> HARAP LIHAT stok berkurang, Kartu Stock OUT.
+    5. Setelah posting, HARAP LIHAT tidak ada flash warning over-stok selintas
+       saat refetch (fix c088208 - warning konsisten dengan data terbaru).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-D03  Transfer Gudang - pasangan OUT+IN (TF/YYYY/#####)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /transaksi/transfer -> daftar TF.
+    2. Buat Transfer:
+       - Gudang Asal (warehouse_id), Gudang Tujuan (destination_warehouse_id) wajib
+         & harus beda (cross-warehouse validasi).
+       - Referensi, PIC, Catatan
+       - Baris: Barang + From Bin (di gudang asal) + To Bin (di gudang tujuan),
+         Qty <= stok di bin asal.
+       - Server memosting pasangan OUT+IN sekaligus (pair_id linked).
+    3. Simpan Draft -> stok TIDAK berubah.
+    4. Simpan & Posting -> HARAP LIHAT stok di gudang asal berkurang,
+       stok di gudang tujuan bertambah, Stock Saat Ini kedua gudang terkoreksi,
+       Mutasi ada 2 movement ter-link.
+    5. Coba tujuan = asal -> 422. Coba qty > stok -> 422. Coba bin tujuan
+       bukan di gudang tujuan -> HARAP LIHAT validasi atau filter mencegah.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-D04  Retur Pembelian - OUT ke supplier (RP/YYYY/#####, optional sumber BM)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /transaksi/retur-pembelian -> daftar RP.
+    2. Siapkan dokumen BM Selesai di gudang tertentu (buat via Barang Masuk Selesai).
+    3. Buat Retur Pembelian:
+       - Pilih Gudang -> HARAP LIHAT combobox sumber menampilkan maksimal 20
+         dokumen Penerimaan Selesai di gudang terpilih, dengan pencarian server-side
+         (ketik sebagian no/partner -> hasil berubah setelah debounce, bukan filter lokal).
+         Placeholder sebelum pilih gudang: "Pilih gudang dulu".
+       - Pilih dokumen sumber (opsional) -> HARAP LIHAT bila memilih, Supplier
+         terisi otomatis dari partner dokumen, baris hanya boleh memilih barang yang
+         ada di dokumen sumber. Dokumen terpilih tetap tampil sebagai opsi teratas
+         walau tersaring keluar.
+       - Ganti Gudang -> HARAP LIHAT seleksi sumber TER-RESET, supplier/baris ter-bersihkan.
+       - Baris: Barang + From Bin (wajib), qty <= sisa yang dapat diretur (cap di server
+         = qty baris Penerimaan - sudah diretur), unit_cost di-backfill dari baris sumber
+         (bila via sumber), From Bin harus bin dari baris sumber.
+       - Alasan retur (masuk ke note diawali "Alasan: ...").
+    4. Simpan & Posting -> HARAP LIHAT nomor RP/YYYY/#####, partner = Supplier,
+       stok berkurang (OUT), Kartu Stock ada mutasi OUT dari dokumen RP.
+    5. Coba qty melebihi sisa -> 422. Coba tanpa from_bin_id -> 422.
+    6. Tanpa sumber: baris memakai unit_cost dari input (HARAP LIHAT tetap bisa simpan).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-D05  Retur Penjualan - IN dari customer (RJ/YYYY/#####, optional sumber BK)
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /transaksi/retur-penjualan -> daftar RJ.
+    2. Siapkan dokumen BK Selesai di gudang tertentu.
+    3. Buat Retur Penjualan:
+       - Pilih Gudang -> combobox sumber menampilkan Pengeluaran Selesai di gudang tsb
+         (pola sama S-D04, max 20, search server-side, tetap tampil terpilih, reset saat ganti gudang).
+       - Pilih dokumen sumber (opsional) -> HARAP LIHAT Customer terisi otomatis dari
+         partner dokumen, harga & To Bin ter-backfill dari baris Pengeluaran sumber
+         (to_bin_id harus sama dengan from_bin_id baris sumber), cap sisa qty (abs qty BK).
+       - Baris: Barang + To Bin (wajib, harus sama dengan bin asal BK bila via sumber),
+         qty <= sisa.
+    4. Simpan & Posting -> HARAP LIHAT nomor RJ/YYYY/#####, partner = Customer,
+       stok bertambah (IN), Kartu Stock ada mutasi IN dari dokumen RJ.
+    5. Validasi sama: qty melebihi sisa -> 422, to_bin tidak cocok -> 422.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-D06  Transaksi - RBAC & search lintas kolom
+----------------------------------------------------------------------
+  Role        : Auditor (Baca) vs Operator Gudang (Tulis)
+  Langkah:
+    1. Auditor buka /transaksi/masuk -> HARAP LIHAT daftar tetap tampil (Transaksi Baca cukup
+       untuk list dummy, tapi transaksi API butuh Persediaan Tulis untuk posting).
+       Tombol Buat HILANG, akses form -> guard.
+    2. Operator Gudang buka /transaksi/masuk -> HARAP LIHAT tombol Buat ADA
+       (punya Persediaan Tulis).
+    3. Di daftar BM/BK/TF/RP/RJ, ketik di search (no, partner, gudang, nama barang)
+       -> HARAP LIHAT terfilter via helper stock-document-search (murni, bukan sekadar includes lokal).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+8. SKENARIO E - PENGADAAN 3 HALAMAN (PR/PO/Receive Goods)
+======================================================================
+
+Pengadaan (UI dummy kecuali Receive Goods yang API-backed via stock-documents):
+  /pengadaan/purchase-request   Purchase Request (PR)
+  /pengadaan/purchase-order     Purchase Order (PO)
+  /pengadaan/receive-goods      Receive Goods (list = Penerimaan ber-referensi PO)
+  /pengadaan/receive-goods/new  Terima Barang dari PO (form BarangMasukForm varian Pengadaan)
+
+  Sumber:
+    Frontend/src/routes/pengadaan.*.tsx
+    Frontend/src/components/wms/barang-masuk-form.tsx (referenceCombobox + requireReference)
+    Backend (PO/PR masih dummy, Receive Goods -> POST /api/persediaan/stock-documents Penerimaan)
+
+----------------------------------------------------------------------
+S-E01  Purchase Request - lifecycle & approval gate
+----------------------------------------------------------------------
+  Role        : semua (fokus approval)
+  Langkah:
+    1. Buka /pengadaan/purchase-request -> daftar PR (no, tanggal, supplier, status).
+    2. Status PR: Draft -> Menunggu Approval -> Disetujui / Ditolak / Dibatalkan / Selesai.
+    3. Buat PR (butuh Pengadaan Tulis) -> isi barang, qty, harga, supplier, gudang.
+       HARAP LIHAT PR baru status Draft.
+    4. Ajukan Approval (Draft -> Menunggu Approval).
+    5. Gate approval:
+       - Login Administrator (Pengadaan Kelola) atau Supervisor (Approval Pengadaan Baca)
+         -> HARAP LIHAT kartu stat "Perlu Persetujuan Saya" dan tombol filter
+         "Perlu Persetujuan Saya" MUNCUL di Filter, pill kuning "Perlu Persetujuan"
+         di baris Menunggu Approval.
+       - Login Operator Gudang / Auditor (tanpa approval) -> HARAP LIHAT elemen approval
+         TIDAK muncul, tombol Setujui/Tolak di detail sheet TIDAK tersedia.
+    6. Setujui PR (butuh approval) -> status Disetujui.
+       Tolak -> status Ditolak (catatan alasan opsional - nullable).
+    7. Filter PR by status, supplier, gudang, search -> HARAP LIHAT terfilter.
+    8. Toggle "Perlu Persetujuan Saya" + filter lain -> HARAP LIHAT hasil AND.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-E02  Purchase Order - lifecycle & gate approval + Buat dari PR
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Buka /pengadaan/purchase-order -> daftar PO.
+    2. Status PO: Draft -> Menunggu Approval -> Disetujui -> Selesai / Dibatalkan.
+       Sebagian Diterima (bila sudah ada Receive Goods sebagian).
+    3. Buat PO: bisa manual atau "Buat dari PR Disetujui" (konversi PR -> PO).
+       PO hasil konversi otomatis berstatus Disetujui (auto-approve).
+    4. Gate approval PO sama S-E01: kartu "Menunggu Saya" + toggle
+       "Perlu Persetujuan Saya" hanya muncul untuk role berhak (Approval Pengadaan
+       ATAU Pengadaan Kelola). Kombinasi filter AND.
+    5. Klik baris PO Disetujui -> sheet detail -> HARAP LIHAT tombol
+       "Terima Barang" (ikon package check) MUNCUL hanya bila:
+         - PO berstatus Disetujui DAN
+         - role punya Persediaan Tulis
+       PO non-Disetujui -> tombol TIDAK muncul.
+       Auditor (Persediaan Baca) buka PO Disetujui -> tombol TIDAK muncul.
+    6. Klik "Terima Barang" -> HARAP LIHAT navigasi ke
+       /pengadaan/receive-goods/new?po=<id> (lihat S-E03).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-E03  Receive Goods - prefill dari PO + filter gudang&supplier (NEW feature)
+----------------------------------------------------------------------
+  Role        : Administrator / Operator Gudang (Persediaan Tulis) vs Auditor (Baca)
+  Langkah:
+    1. Login Administrator, buka /pengadaan/purchase-order, buka PO Disetujui,
+       klik Terima Barang -> HARAP LIHAT /pengadaan/receive-goods/new terbuka
+       dengan URL ?po=<id>.
+    2. HARAP LIHAT form "Terima Barang dari PO" (BarangMasukForm varian Pengadaan):
+       - Field No. PO (combobox) SUDAH terisi nomor PO tadi (prefill via useProcDocPo).
+       - Supplier, Gudang, Referensi terisi otomatis dari PO.
+       - Baris barang terisi otomatis dari baris PO: nama barang, qty, harga beli,
+         TAPI kolom bin KOSONG (tidak ikut prefill).
+    3. Lengkapi bin tiap baris, Simpan Draft / Simpan & Posting ->
+       HARAP LIHAT dokumen Penerimaan BM/YYYY/##### tersimpan dengan referensi PO,
+       muncul di /pengadaan/receive-goods (list Penerimaan ber-referensi PO)
+       dan di /transaksi/masuk.
+    4. UJI FILTER No. PO (fitur baru):
+       - Di form Receive Goods, HARAP LIHAT opsi No. PO terfilter otomatis
+         berdasarkan Gudang & Supplier yang dipilih:
+           * Pilih Gudang A + Supplier X -> combobox PO hanya menampilkan
+             PO Disetujui di Gudang A & Supplier X.
+           * Ganti Gudang -> opsi PO berubah (filter via poOptions: p.warehouse_id & p.supplier).
+           * Ganti Supplier -> opsi PO berubah.
+       - Pick Supplier atau Pick Gudang saat PO sudah terpilih -> HARAP LIHAT
+         selectedPoId & reference TER-RESET (kosong), daftar PO di-reload untuk gudang baru.
+    5. Prefill via URL langsung: buka /pengadaan/receive-goods/new?po=<id lain>
+       -> HARAP LIHAT prefill sama.
+    6. Require reference: No. PO wajib diisi (requireReference=true) ->
+       HARAP LIHAT tanpa PO, ada pesan "No. PO wajib diisi." dan submit ditolak
+       "Isi No. PO terlebih dahulu."
+    7. Auditor buka /pengadaan/receive-goods/new -> HARAP LIHAT halaman
+       "Akses dibatasi" + "Anda tidak dapat membuat dokumen Receive Goods."
+       + tombol "Kembali ke Daftar".
+    8. Buka /pengadaan/receive-goods (list) -> HARAP LIHAT hanya dokumen
+       Penerimaan yang ber-referensi PO (filter reference_no), bukan semua BM.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-E04  Receive Goods - list & search
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Buka /pengadaan/receive-goods -> tabel Penerimaan ber-referensi PO.
+    2. Search & filter (gudang, supplier, status) -> HARAP LIHAT terfilter.
+    3. Klik baris -> detail sheet (via stock-document-sheet) -> HARAP LIHAT
+       info gudang, supplier, referensi PO, lines.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+9. SKENARIO F - STOCK OPNAME 3 HALAMAN + ADJUSTMENT DRAFT-THEN-POST
+======================================================================
+
+Stock Opname (dummy UI kecuali posting yang via StockDocumentService):
+  /opname/jadwal                 Jadwal (buat sesi)
+  /opname/proses                 Proses (pilih sesi)
+  /opname/proses/$docId          Pencatatan fisik per sesi (khusus)
+  /opname/laporan                Laporan (ringkasan sesi)
+  /opname/laporan/$docId         Detail laporan per sesi
+
+  Adjustment:
+  /persediaan/adjustment         Daftar Adjustment (ADJ, Selesai/Draft)
+  /persediaan/adjustment/new     Form Adjustment baru
+
+  Sumber:
+    Frontend/src/routes/opname.*.tsx
+    Frontend/src/routes/persediaan.adjustment.tsx
+    Backend/app/Services/StockDocumentService.php (postOpname -> Draft, bukan Selesai)
+
+----------------------------------------------------------------------
+S-F01  Opname Jadwal - buat sesi & pratinjau cakupan
+----------------------------------------------------------------------
+  Role        : Administrator / Operator Gudang (Stock Opname Tulis)
+  Langkah:
+    1. Buka /opname/jadwal -> daftar sesi (no SO/YYYY/#####, gudang, tanggal, PIC, status).
+    2. Klik Buat Jadwal -> dialog Buat Jadwal Opname.
+       HARAP LIHAT:
+         - Tinggi dialog max 90% viewport, bisa scroll di dalam (tidak overflow).
+         - Panel Pratinjau Cakupan tinggi terbatas dengan scroll internal, menampilkan
+           N baris stok (nama, SKU, Rak, Bin, stock sistem) di gudang terpilih.
+         - Sebelum pilih gudang: panel menampilkan "Pilih gudang dulu", tombol Buat nonaktif.
+         - Pilih Gudang berisi stok -> tombol aktif, pilih PIC (combobox).
+       Pilih gudang berisi stok, klik Buat Jadwal -> HARAP LIHAT toast "Jadwal opname dibuat",
+       sesi baru muncul di daftar (status Draft, no SO/YYYY/#####, blind_count opsional).
+    3. Combobox Gudang & PIC membuka ke bawah (tidak terpotong).
+  Per role : Auditor (Stock Opname Baca) -> HARAP LIHAT tombol Buat HILANG.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-F02  Opname Proses - pencatatan fisik per sesi (khusus per ID)
+----------------------------------------------------------------------
+  Role        : Administrator (Tulis)
+  Langkah:
+    1. Buka /opname/proses -> panel Pilih Sesi ("Pilih sesi untuk membuka
+       halaman pencatatan fisik").
+    2. Klik kartu sesi -> HARAP LIHAT URL berubah ke /opname/proses/<id>
+       dan halaman pencatatan khusus terbuka (bukan sheet).
+    3. Header: "Pencatatan Opname - <no>" dengan "<gudang> · <tanggal> · PIC <nama>
+       · N belum dicek" (+ "· blind count aktif" bila blind).
+    4. Panel Pencatatan Fisik: deskripsi M baris · selisih +X, tombol
+       "Tampilkan Sistem" (hanya blind), "Batalkan", "Simpan Draft", "Selesaikan Opname".
+    5. Blind count aktif -> HARAP LIHAT kolom Sistem & Selisih disembunyikan.
+       Klik "Tampilkan Sistem" -> kolom muncul.
+    6. Filter scan: ketik SKU/nama di "Scan / ketik SKU untuk filter..." ->
+       HARAP LIHAT rows tersaring, Enter pindah fokus.
+    7. Isi qty fisik beberapa baris, klik Simpan Draft -> HARAP LIHAT
+       toast "Draft opname disimpan", tombol Simpan Draft nonaktif bila tidak ada perubahan.
+    8. Biarkan minimal 1 baris belum dihitung -> HARAP LIHAT tombol
+       "Selesaikan Opname" nonaktif (title "N barang belum dihitung").
+       Isi semua -> tombol aktif -> klik -> dialog Tinjau Hasil Opname.
+    9. Di Tinjau: baris dengan variance !=0 wajib pilih Alasan selisih
+       (reason_code: receiving_error, picking_error, damage, theft_shrinkage,
+       vendor_short_ship, uom_mismatch, transfer_unposted, location_error,
+       data_entry, other). Tanpa alasan -> tombol tetap nonaktif.
+       Pilih alasan -> klik Selesaikan -> HARAP LIHAT toast konfirmasi
+       "Opname selesai — koreksi ADJ Draft dibuat" (bukan langsung Selesai).
+    10. Batalkan sesi Draft -> HARAP LIHAT toast "Opname dibatalkan", kembali
+       ke /opname/proses, status jadi Dibatalkan.
+    11. Buka URL /opname/proses/<id tidak ada> -> HARAP LIHAT "Sesi tidak ditemukan"
+        + tombol Daftar Sesi.
+    12. Buka sesi Selesai/Dibatalkan -> HARAP LIHAT tombol Tulis hilang,
+        pesan "Sesi telah selesai diposting - hanya sesi Draft yang dapat dicatat.",
+        nilai fisik read-only.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-F03  Opname posting = Adjustment Draft (bukan otomatis Selesai)
+----------------------------------------------------------------------
+  Role        : Administrator (penting: regresi dari dokumen 18 Agustus)
+  Pre-kondisi : sesi opname Draft dengan selisih (variance)
+  Langkah:
+    1. Selesaikan opname (S-F02 langkah 9) -> HARAP LIHAT di
+       /persediaan/adjustment muncul dokumen Adjustment baru berstatus DRAFT
+       (bukan Selesai), dengan source_document_id ter-link ke opname,
+       reason_code diwarisi, qty = variance (positif IN ke to_bin, negatif OUT dari from_bin).
+    2. HARAP LIHAT Stock Saat Ini BELUM berubah (karena ADJ masih Draft).
+    3. Klik baris ADJ Draft tersebut -> detail sheet -> HARAP LIHAT
+       referensi opname ter-link (source_document no), arah IN/OUT, rak/bin, alasan.
+    4. Posting ADJ Draft tersebut dari halaman adjustment (tombol Posting) ->
+       HARAP LIHAT status jadi Selesai, Stock Saat Ini baru terkoreksi,
+       Kartu Stock ada mutasi dari dokumen ADJ.
+  Hasil harap: Opname tidak langsung memotong stok; koreksi via Adjustment
+  yang harus diposting manual. Guard frozen_at tetap berlaku saat posting ADJ ter-link.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-F04  Opname Laporan
+----------------------------------------------------------------------
+  Role        : Administrator / Auditor (Stock Opname Baca)
+  Langkah:
+    1. Buka /opname/laporan -> daftar sesi dengan ringkasan (total baris,
+       selisih, status).
+    2. Klik baris -> /opname/laporan/$docId -> HARAP LIHAT detail lengkap
+       (gudang, tanggal, PIC, baris sistem/actual/variance, reason_code,
+       frozen_at). Sesi Selesai menampilkan ADJ koreksi ter-link.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+10. SKENARIO G - LAPORAN 10 LAPORAN
+======================================================================
+
+Laporan (10, di /laporan/*):
+  1 Stock               (API: GET /api/persediaan/stock)  - posisi stock
+  2 Barang Masuk        (API: stock-documents type Penerimaan) - dokumen BM
+  3 Barang Keluar       (API: stock-documents type Pengeluaran) - dokumen BK
+  4 Mutasi              (dummy) - dummy transactions
+  5 Kartu Stock         (dummy) - dummy stockCard()
+  6 Nilai Persediaan    (dummy) - dummy valuation
+  7 Stock Minimum       (dummy) - dummy stock-minimum
+  8 Stock Opname        (hybrid: dummy sesi + ADJ link)
+  9 Dead Stock          (dummy) - slow/dead
+ 10 Fast Moving Item    (dummy) - fast/medium
+
+  Sumber:
+    Frontend/src/routes/laporan.$report.tsx
+    Frontend/src/lib/wms-data.ts (dummy), src/hooks/use-persediaan.ts (API)
+    Frontend/src/lib/csv.ts (toCsv), src/components/wms/kit.tsx
+
+----------------------------------------------------------------------
+S-G01  Laporan Stock / Barang Masuk / Barang Keluar (API-backed)
+----------------------------------------------------------------------
+  Role        : Administrator (Laporan Kelola) / Supervisor / Auditor (Baca)
+  Langkah:
+    1. Buka /laporan/stock -> HARAP LIHAT deliveryNoteReport (dummy mirip stock)
+       TAPI bila Laporan API stock tersedia, data konsisten dengan /persediaan/stock.
+    2. Buka /laporan/barang-masuk -> HARAP LIHAT tabel dari API stock-documents
+       type Penerimaan (no BM, tanggal, gudang, supplier, nilai).
+    3. Buka /laporan/barang-keluar -> HARAP LIHAT tabel dari API type Pengeluaran.
+    4. Filter tanggal (from/to) + search -> HARAP LIHAT terfilter server-side
+       (keepPreviousData, tidak flicker).
+    5. HARAP LIHAT partner: Barang Masuk = Supplier, Barang Keluar = Tujuan/Customer.
+    6. Operator Gudang buka /laporan/stock -> HARAP LIHAT 403 (tanpa Laporan).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-G02  Laporan dummy (Mutasi, Kartu Stock, Nilai, Stock Minimum, dll)
+----------------------------------------------------------------------
+  Role        : Auditor
+  Langkah:
+    1. Buka bergantian /laporan/mutasi, /laporan/kartu-stock,
+       /laporan/nilai-persediaan, /laporan/stock-minimum,
+       /laporan/stock-opname, /laporan/dead-stock, /laporan/fast-moving.
+    2. HARAP LIHAT tiap laporan menampilkan dummy data (deterministic PRNG)
+       dengan formatIDR/formatDate, bukan error API.
+    3. Dead Stock -> HARAP LIHAT hanya item Slow/Dead (moving S-D).
+       Fast Moving -> hanya Fast/Medium.
+    4. Semua laporan harus punya stat cards, table, dan empty state yang konsisten.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-G03  Laporan - filter, sort, chart, CSV, Print
+----------------------------------------------------------------------
+  Role        : Administrator
+  Langkah:
+    1. Di tiap laporan, uji:
+       - Filter tanggal -> HARAP LIHAT data berubah, chart ikut berubah.
+       - Sort kolom -> HARAP LIHAT urutan berubah.
+       - Chart (recharts, bila ada) -> HARAP LIHAT tidak error saat data kosong.
+       - Tombol Export CSV -> HARAP LIHAT file .csv ter-download dengan
+         UTF-8 BOM (bisa dibuka di Excel), header kolom sesuai, angka mentah
+         (bukan format Rp) di CSV, sanitasi nilai yang diawali =+-@ atau tab
+         dengan prefix ' (CSV injection guard).
+       - Tombol Print -> HARAP LIHAT dialog print browser muncul.
+    2. Laporan Barang Masuk/Keluar: HARAP LIHAT CSV memakai angka mentah
+       (fix terbaru: bukan "Rp ..." di CSV).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+11. SKENARIO H - SYSTEM, PENGATURAN, BARCODE, GLOBAL SEARCH, THEME
+======================================================================
+
+----------------------------------------------------------------------
+S-H01  System - Audit Trails
+----------------------------------------------------------------------
+  Role        : Administrator / Auditor (Audit Trails Baca)
+  Langkah:
+    1. Buka /system/audit-trails -> HARAP LIHAT tabel auditLogs dummy
+       (aksi, user, waktu, modul) dengan filter & search.
+    2. Filter by modul/user -> HARAP LIHAT terfilter.
+    3. Supervisor/Operator Gudang (tanpa Audit Trails) buka URL tsb ->
+       HARAP LIHAT 403.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H02  System - General Setting & Developer (butuh System)
+----------------------------------------------------------------------
+  Role        : Administrator (System Kelola)
+  Langkah:
+    1. Buka /system/general-setting -> HARAP LIHAT form setting dummy
+       (nama perusahaan, alamat, logo). Coba ubah & simpan -> HARAP LIHAT
+       toast sukses dummy (tidak persist).
+    2. Buka /system/developer -> HARAP LIHAT halaman API reference placeholder
+       (dummy, jangan ada logic server).
+    3. Tanpa System -> HARAP LIHAT 403.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H03  Pengaturan ( /pengaturan )
+----------------------------------------------------------------------
+  Role        : semua (tapi gate Tulis bila ada form)
+  Langkah:
+    1. Buka /pengaturan -> HARAP LIHAT halaman pengaturan user.
+    2. Cek gate: bila halaman butuh System, tanpa akses -> 403.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H04  Barcode - public (tanpa guard)
+----------------------------------------------------------------------
+  Role        : semua (termasuk tanpa login, bila diizinkan)
+  Langkah:
+    1. Buka /barcode tanpa login (atau dengan login) -> HARAP LIHAT
+       halaman barcode tampil (tidak 403).
+    2. Input SKU/barcode, HARAP LIHAT barcode tergenerate (bwip-js)
+       dan bisa di-print.
+    3. Coba dengan param ?sku=<sku existing> -> HARAP LIHAT barcode
+       langsung tergenerate untuk SKU tsb.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H05  Global Search (Ctrl+K)
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Tekan Ctrl+K (atau klik icon search) -> HARAP LIHAT dialog Global Search.
+    2. Ketik "barang" / "gudang" / "stock" -> HARAP LIHAT hasil terfilter
+       dan hanya menampilkan rute yang role punya aksesnya (filtered via AppShell).
+    3. Pilih hasil -> HARAP LIHAT navigasi ke halaman tsb.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H06  Theme (8 pastel, kg-theme)
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Buka theme switcher (di header/profile) -> HARAP LIHAT 8 tema pastel.
+    2. Pilih tema lain -> HARAP LIHAT warna berubah (oklch via data-theme),
+       localStorage kg-theme ter-update, setelah refresh tema tetap.
+    3. HARAP LIHAT tidak ada tailwind.config.* (CSS adalah source of truth,
+       src/styles.css).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H07  Dashboard ( / )
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Buka / (dashboard) -> HARAP LIHAT stat cards:
+       - Total Barang Masuk / Nilai Masuk / Total Keluar (akumulasi semua dokumen
+         non-Draft, bukan hanya hari ini).
+       - Stock Menipis / Stock Habis (dari API stock-minimum).
+       - Pending Approval & Stock Opname Berjalan (Draft count).
+    2. Panel Perlu Perhatian (stok di bawah minimum) -> HARAP LIHAT barang kritis,
+       klik navigasi ke terkait.
+    3. Panel Aktivitas Terkini -> HARAP LIHAT ~50 entri terbaru, muat cepat
+       (endpoint summary agregat, tidak flash kosong).
+    4. Panel Stock Opname Berjalan -> HARAP LIHAT hanya Draft.
+    5. Quick actions -> HARAP LIHAT terfilter per role (hasModuleLevel).
+       Operator Gudang -> quick action Laporan tidak muncul.
+    6. Reload -> HARAP LIHAT dashboard tetap muat seketika (summary).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-H08  Notifikasi & responsive
+----------------------------------------------------------------------
+  Role        : semua
+  Langkah:
+    1. Cek icon notifikasi di header -> HARAP LIHAT badge jumlah (bila ada),
+       klik menampilkan daftar dummy.
+    2. Perkecil layar ke mobile -> HARAP LIHAT sidebar jadi drawer/bottomNav,
+       DataTable jadi mobileCard, dialog tetap muat (90% tinggi, scroll dalam).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+12. SKENARIO I - VALIDASI & NEGATIVE CASES
+======================================================================
+
+----------------------------------------------------------------------
+S-I01  Master validasi field (harus 422)
+----------------------------------------------------------------------
+  Langkah (coba di form masing-masing):
+    - Kategori nama kosong -> 422
+    - Rak tanpa Gudang -> 422
+    - Bin tanpa Rak -> 422
+    - Supplier NIB bukan 13 digit -> 422
+    - Supplier NPWP Luhn invalid -> 422
+    - Barang tanpa Kategori -> 422
+    - User password <8 atau tanpa confirmation -> 422
+    - Work Order tanpa Project/Item -> 422
+    - Role access module duplikat atau level invalid -> 422
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I02  Persediaan & transaksi guard stok (harus 422)
+----------------------------------------------------------------------
+  Langkah:
+    - Adjustment OUT qty > available -> 422 stok tidak cukup
+    - Barang Keluar qty > available di bin -> 422
+    - Transfer qty > available -> 422
+    - Retur Pembelian qty > sisa (qty BM - sudah diretur) -> 422
+    - Retur Penjualan qty > sisa BK -> 422
+    - Transfer tujuan = asal -> 422
+    - ADJ tanpa reason_code -> 422
+    - BM tanpa warehouse_id -> 422
+    - BM Receive Goods tanpa No. PO (requireReference) -> toast "Isi No. PO"
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I03  Cross-warehouse & bin guard
+----------------------------------------------------------------------
+  Langkah:
+    - Pilih Bin yang bukan di Gudang terpilih untuk BM -> HARAP LIHAT
+      bin tidak muncul di opsi (binsInWarehouse filter). Coba paksa via API
+      (kirim bin_id yang gudangnya beda) -> HARAP LIHAT 422 bila backend validasi.
+    - Retur Pembelian from_bin_id tidak sama dengan bin di dokumen sumber -> 422
+    - Retur Penjualan to_bin_id tidak sama dengan from_bin_id dokumen sumber -> 422
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I04  Draft milik orang lain & idempoten posting
+----------------------------------------------------------------------
+  Langkah:
+    - Buat Dokumen BM Draft sebagai Administrator, posting ulang (POST post)
+      saat sudah Selesai -> HARAP LIHAT no-op (tidak duplikat movement).
+    - Cancel Draft -> HARAP LIHAT status Dibatalkan, POST posting setelah
+      Dibatalkan -> 422.
+    - Draft/Menunggu Approval bisa di-cancel, Selesai tidak bisa.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I05  CSV injection guard
+----------------------------------------------------------------------
+  Langkah:
+    - Buat Supplier dengan nama diawali "=cmd" atau "+cmd" atau "@cmd" atau tab.
+    - Export CSV Supplier -> HARAP LIHAT nilai di CSV diawali single quote '
+      (sanitasi via csv.ts toCsv).
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I06  Debounce & search guard
+----------------------------------------------------------------------
+  Langkah:
+    - Di Master search, ketik cepat -> HARAP LIHAT request tidak membanjiri
+      server (debounce 300ms via useDebounce), hasil akhir sesuai teks akhir.
+    - Di retur combobox sumber, ketik -> HARAP LIHAT pencarian server-side
+      (max 20, debounce), bukan filter lokal.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+----------------------------------------------------------------------
+S-I07  Route & navigation guard
+----------------------------------------------------------------------
+  Langkah:
+    - Akses /master/barang tanpa login -> HARAP LIHAT redirect ke /login.
+    - Akses /transaksi/entri/masuk langsung via URL tanpa Persediaan Tulis
+      -> HARAP LIHAT guard 403 (transaksi.entri.$section guard).
+    - Akses /opname/proses/<id> dengan id tidak ada -> HARAP LIHAT
+      "Sesi tidak ditemukan".
+    - Navigasi ke /persediaan/adjustment/new langsung via URL (butuh Tulis)
+      -> Auditor (Baca) -> HARAP LIHAT tombol tidak ada atau guard.
+  Kolom hasil: Lulus / Gagal + Catatan
+
+
+======================================================================
+13. LAMPIRAN
+======================================================================
+
+----------------------------------------------------------------------
+L-01  File sumber untuk rujukan penguji & developer
+----------------------------------------------------------------------
+  Auth & RBAC:
+    Backend/app/Http/Controllers/AuthController.php        (login 5/min, Bearer)
+    Backend/app/Http/Middleware/EnsureRoleAccess.php       (role.access)
+    Frontend/src/hooks/use-auth.tsx                        (hasModule/hasModuleLevel)
+    Frontend/src/components/wms/app-shell.tsx              (routeModuleMap, 403)
+    Frontend/src/components/wms/nav.ts                     (navGroups, module per group)
+    Frontend/src/lib/schemas.ts                            (ROLE_ACCESS fallback, ACCESS_MODULES)
+
+  Master Data:
+    Backend/routes/api.php                                 (/api/master/*)
+    Backend/app/Http/Controllers/*Controller.php           (Kategori, Item, Rak, Bin, Supplier, User, Role...)
+    Backend/app/Http/Requests/Store*Request.php            (validasi)
+    Frontend/src/hooks/use-master.ts                       (per_page=500, enabled window check)
+    Frontend/src/components/wms/master-crud-pages.tsx      (16 pages)
+    Frontend/src/components/wms/master-forms.tsx           (dialogs, RACK/BIN/Supplier selects)
+    Frontend/src/components/wms/form-combobox.tsx          (searchable combobox)
+
+  Persediaan:
+    Backend/app/Http/Controllers/StockController.php       (stock, stockCard, stockMinimum, valuation)
+    Backend/app/Http/Controllers/StockDocumentController.php (CRUD + post/cancel)
+    Backend/app/Services/StockDocumentService.php          (derive movements, postOpname -> Draft)
+    Frontend/src/routes/persediaan.*.tsx                   (stock, kartu-stock, mutasi, stock-minimum, nilai, adjustment)
+    Frontend/src/hooks/use-persediaan.ts                   (hooks)
+    Frontend/src/lib/persediaan-types.ts                   (types, opnameReasonCodes, StockDocumentPayload)
+
+  Transaksi:
+    Frontend/src/routes/transaksi.*.tsx                    (masuk, keluar, transfer, retur-*)
+    Frontend/src/routes/transaksi.entri.$section.tsx       (form branch, RBAC guard)
+    Frontend/src/components/wms/barang-masuk-form.tsx      (BM + Receive Goods varian, PO filter, prefill)
+    Frontend/src/components/wms/barang-keluar-form.tsx     (BK)
+    Frontend/src/components/wms/transfer-gudang-form.tsx   (TF, destination_warehouse_id)
+    Frontend/src/components/wms/retur-pembelian-form.tsx   (RP, from_bin, source_document_id)
+    Frontend/src/components/wms/retur-penjualan-form.tsx   (RJ, to_bin, source_document_id)
+    Frontend/src/components/wms/stock-document-sheet.tsx   (detail, arah, rak, alasan)
+
+  Pengadaan:
+    Frontend/src/routes/pengadaan.$section.tsx             (PR, PO generic)
+    Frontend/src/routes/pengadaan.receive-goods.tsx        (Receive Goods list)
+    Frontend/src/routes/pengadaan.receive-goods.new.tsx    (Receive Goods form)
+    Frontend/src/components/wms/purchase-order-sheet.tsx   (detail PO + Terima Barang btn)
+    Frontend/src/hooks/use-purchase-order.ts               (useProcDocsPo, useProcDocPo)
+
+  Opname:
+    Frontend/src/routes/opname.$section.tsx                (jadwal, proses, laporan generic)
+    Frontend/src/routes/opname.proses.$docId.tsx           (pencatatan per sesi)
+    Frontend/src/routes/opname.laporan.$docId.tsx          (laporan per sesi)
+    Backend/database/seeders/StockDocumentSeeder.php       (SO sesi + ADJ Draft link)
+
+  Laporan:
+    Frontend/src/routes/laporan.$report.tsx                (10 reports, API vs dummy)
+    Frontend/src/lib/wms-data.ts                           (dummy PRNG)
+    Frontend/src/lib/csv.ts                                (toCsv, downloadCsv, injection guard)
+
+----------------------------------------------------------------------
+L-02  Checklist 1 halaman per role (ringkas untuk cetak)
+----------------------------------------------------------------------
+  Administrator (USR-001):
+    [ ] Login & profil 8 Kelola
+    [ ] Master 16 CRUD semua sukses + bulk + Role edit
+    [ ] Persediaan 6 halaman semua tampil + Adjustment Draft/post
+    [ ] Transaksi 5 tipe Draft & Selesai + stok terkoreksi
+    [ ] Pengadaan PR/PO approval terlihat + Receive Goods prefill + PO filter
+    [ ] Opname jadwal->proses->laporan + ADJ Draft-then-post
+    [ ] Laporan 10 semua tampil + CSV/Chart/Print
+    [ ] System 3 + Dashboard + Barcode + Search + Theme
+
+  Supervisor (USR-002 / USR-006):
+    [ ] Login & profil 7 pill (Approval Baca)
+    [ ] Master hanya lihat (tombol Tambah/Hapus hilang)
+    [ ] Persediaan Tulis: bisa BM/BK/TF/RP/RJ
+    [ ] Pengadaan Tulis: bisa buat PR/PO + elemen approval muncul
+    [ ] Opname Baca: lihat jadwal/laporan, tidak bisa mulai/catatan
+    [ ] Laporan Baca: semua 10 tampil, System hilang (403)
+
+  Operator Gudang (USR-005):
+    [ ] Login & profil 5 pill
+    [ ] Master hanya lihat
+    [ ] Persediaan Tulis: BM/BK/TF/RP/RJ OK
+    [ ] Pengadaan Baca: lihat PR/PO, elemen approval TIDAK muncul
+    [ ] Opname Tulis: bisa jadwal & catat fisik
+    [ ] Laporan HILANG (403), System HILANG (403)
+
+  Auditor (USR-004):
+    [ ] Login & profil 8 Baca
+    [ ] Master hanya lihat (semua 16)
+    [ ] Persediaan Baca: lihat 6 halaman, tombol Buat/Post HILANG
+    [ ] Transaksi Baca: lihat daftar, form guard 403/disabled
+    [ ] Pengadaan Baca: lihat PR/PO/Receive Goods list, Terima Barang HILANG
+    [ ] Opname Baca: lihat jadwal/laporan, tidak bisa catat
+    [ ] Laporan Baca: semua 10 tampil
+    [ ] System Baca: Audit Trails & General Setting tampil (Baca)
+
+----------------------------------------------------------------------
+L-03  Langkah cepat (setup & data uji)
+----------------------------------------------------------------------
+  - Mulai server: ./dev.sh dari root (Git Bash/MSYS). Log: .dev/logs/.
+    Atau manual: composer dev (Backend) + npm run dev (Frontend).
+  - Login: buka localhost:8080, masukkan email + DEMO_PASSWORD dari Backend/.env.
+  - Buat BM uji: Transaksi -> Barang Masuk -> Buat (butuh Persediaan Tulis).
+  - Buat BK uji: Transaksi -> Barang Keluar -> Buat.
+  - Buat sesi opname uji: Opname -> Jadwal -> Buat Jadwal (pilih gudang berisi stok)
+    -> Opname -> Proses -> klik sesi.
+  - Siapkan PO Disetujui: Pengadaan -> Purchase Order -> Buat dari PR Disetujui
+    atau approval PR/PO.
+  - Siapkan retur: pastikan ada BM Selesai (untuk RP) dan BK Selesai (untuk RJ)
+    di gudang yang sama.
+  - Reset hak akses: Master -> Role -> Edit -> kembalikan ke defaults
+    (lihat Bagian 2) setelah uji manipulasi role.
+
+----------------------------------------------------------------------
+AKHIR DOKUMEN
+----------------------------------------------------------------------
+  Tanggal      : 2026-08-21
+  Disusun untuk: Tim QA / Penguji Manual Kelola Gudang Pro
+  Format       : Teks biasa (TXT), lebar 100, tanpa Markdown
+  Sumber kode  : Frontend/nav.ts, AGENTS.md, persediaan-types.ts,
+                 barang-masuk-form.tsx, StockDocumentService.php
+
+  Catatan penguji:
+    Tanggal        : ....................
+    Dijalankan oleh: ....................
+    Lingkungan     : [ ] lokal  [ ] staging  [ ] produksi (ngrok)
+    Ringkasan hasil per skenario:
+      A (Auth)        : ......
+      B (Master)      : ......
+      C (Persediaan)  : ......
+      D (Transaksi)   : ......
+      E (Pengadaan)   : ......
+      F (Opname)      : ......
+      G (Laporan)     : ......
+      H (System etc)  : ......
+      I (Validasi)    : ......

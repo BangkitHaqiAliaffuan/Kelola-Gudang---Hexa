@@ -169,10 +169,13 @@ ${items}
 }
 
 const PX_PER_MM = 96 / 25.4;
+/** Resolusi PNG 300 DPI untuk cetak tajam (96 DPI = 3.78 px/mm, 300 DPI = 11.81 px/mm). */
+const PX_PER_MM_300 = 300 / 25.4;
 
 /**
  * Satu file SVG berisi grid label dari lembar pertama (untuk unduh).
  * SVG bwip-js dinest ke dalam <svg> induk ber-sistem koordinat mm.
+ * @deprecated Gunakan PNG/ZIP helpers di bawah untuk unduhan baru.
  */
 export function buildSheetSvg({ size, labels }: PrintLabels): string {
   const { wMm, hMm, cols, perSheet } = computeSheetLayout(size);
@@ -192,7 +195,7 @@ export function buildSheetSvg({ size, labels }: PrintLabels): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">${children}</svg>`;
 }
 
-/** Unduh string SVG sebagai file (klien-saja). */
+/** Unduh string SVG sebagai file (klien-saja). @deprecated Gunakan downloadPng/downloadZip. */
 export function downloadSvg(svg: string, filename: string): void {
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -203,6 +206,184 @@ export function downloadSvg(svg: string, filename: string): void {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// PNG & ZIP download (baru, dipakai halaman /barcode)
+// ---------------------------------------------------------------------------
+
+/** Amankan nama file dari karakter ilegal (/, :, dsb). */
+export function slugFilename(s: string): string {
+  return s.replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "label";
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Unduh Blob PNG sebagai file. */
+export function downloadPng(blob: Blob, filename: string): void {
+  downloadBlob(blob, filename.endsWith(".png") ? filename : `${filename}.png`);
+}
+
+/**
+ * Render satu SVG string menjadi Blob PNG via <img> + <canvas> (client-only).
+ * Resolusi mengikuti ukuran kanvas yang diminta.
+ */
+export function svgToPngBlob(svg: string, widthPx: number, heightPx: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(widthPx));
+      canvas.height = Math.max(1, Math.round(heightPx));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        reject(new Error("Canvas tidak didukung"));
+        return;
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(
+        (out) => {
+          if (!out) reject(new Error("Gagal membuat PNG"));
+          else resolve(out);
+        },
+        "image/png",
+        1,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Gagal memuat SVG untuk konversi PNG"));
+    };
+    img.src = url;
+  });
+}
+
+function labelCanvasSize(size: LabelSize): { wPx: number; hPx: number } {
+  const { wMm, hMm } = computeSheetLayout(size);
+  return {
+    wPx: Math.max(1, Math.round(wMm * PX_PER_MM_300)),
+    hPx: Math.max(1, Math.round(hMm * PX_PER_MM_300)),
+  };
+}
+
+/**
+ * Bangun PNG untuk satu label (kode + nama + meta) — layout mirip buildPrintHtml
+ * tapi diraster menjadi bitmap 300 DPI. Mengembalikan Blob image/png.
+ */
+export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Promise<Blob> {
+  const { wMm, hMm } = computeSheetLayout(size);
+  const { wPx, hPx } = labelCanvasSize(size);
+  const qrSidePx = Math.max(Math.round(Math.min(wPx, hPx) - 8 * PX_PER_MM_300), Math.round(8 * PX_PER_MM_300));
+
+  // Raster kode SVG menjadi canvas sementara
+  const codeW = wPx - Math.round(4 * PX_PER_MM_300);
+  const codeH =
+    label.kind === "QR Code"
+      ? qrSidePx
+      : Math.round((size === "A4" ? 60 : size === "100x50" ? 22 : size === "50x30" ? 14 : 8) * PX_PER_MM_300);
+  const codeBlob =
+    label.kind === "QR Code"
+      ? await svgToPngBlob(label.svg, qrSidePx, qrSidePx)
+      : await svgToPngBlob(label.svg, codeW, codeH);
+
+  const codeBitmap = await createImageBitmap(codeBlob);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = wPx;
+  canvas.height = hPx;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas tidak didukung");
+
+  // Background putih + border tipis
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, wPx, hPx);
+  ctx.strokeStyle = "#bbbbbb";
+  ctx.lineWidth = Math.max(1, Math.round(0.2 * PX_PER_MM_300));
+  ctx.setLineDash([Math.round(2 * PX_PER_MM_300), Math.round(2 * PX_PER_MM_300)]);
+  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, wPx - ctx.lineWidth, hPx - ctx.lineWidth);
+  ctx.setLineDash([]);
+
+  const pad = Math.round(2 * PX_PER_MM_300);
+  let y = pad;
+
+  if (label.kind === "QR Code") {
+    const x = Math.round((wPx - qrSidePx) / 2);
+    ctx.drawImage(codeBitmap, x, y, qrSidePx, qrSidePx);
+    y += qrSidePx + Math.round(1 * PX_PER_MM_300);
+  } else {
+    const x = Math.round((wPx - codeW) / 2);
+    ctx.drawImage(codeBitmap, x, y, codeW, codeH);
+    y += codeH + Math.round(1 * PX_PER_MM_300);
+  }
+  codeBitmap.close?.();
+
+  // Teks nama + meta (tengah)
+  ctx.fillStyle = "#000000";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  const nameSize = Math.round(9 * (300 / 72) * 0.35);
+  ctx.font = `700 ${nameSize}px Arial, Helvetica, sans-serif`;
+  const name = label.name.length > 28 ? `${label.name.slice(0, 28)}…` : label.name;
+  ctx.fillText(name, wPx / 2, y, wPx - pad * 2);
+  y += nameSize + Math.round(0.5 * PX_PER_MM_300);
+  const metaSize = Math.round(8 * (300 / 72) * 0.32);
+  ctx.font = `${metaSize}px Arial, Helvetica, sans-serif`;
+  ctx.fillStyle = "#333333";
+  ctx.fillText(label.meta, wPx / 2, y, wPx - pad * 2);
+  void wMm;
+  void hMm;
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Gagal membuat PNG label"))), "image/png", 1);
+  });
+}
+
+/**
+ * Download: 1 label → 1 PNG, >1 label → ZIP berisi N PNG (satu per instance).
+ * Nama di dalam ZIP: label-<slugSku>-<index>.png (deduplikasi bila SKU sama).
+ */
+export async function downloadLabelsAsPngOrZip(labels: PrintLabel[], size: LabelSize): Promise<string> {
+  const capped = labels.slice(0, MAX_LABELS);
+  if (capped.length === 0) throw new Error("Tidak ada label untuk diunduh");
+  if (capped.length === 1) {
+    const l = capped[0]!;
+    const blob = await renderLabelToPng(l, size);
+    const base = l.sku ? slugFilename(l.sku) : slugFilename(l.name);
+    const filename = `label-${base}.png`;
+    downloadPng(blob, filename);
+    return filename;
+  }
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+  const counts = new Map<string, number>();
+  for (const l of capped) {
+    const blob = await renderLabelToPng(l, size);
+    const base = l.sku ? slugFilename(l.sku) : slugFilename(l.name);
+    const n = (counts.get(base) ?? 0) + 1;
+    counts.set(base, n);
+    const entryName = `${slugFilename(`label-${base}`)}-${String(n).padStart(3, "0")}.png`;
+    zip.file(entryName, blob);
+  }
+  const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+  const zipName = `label-${size}.zip`;
+  downloadBlob(zipBlob, zipName);
+  return zipName;
 }
 
 /** Cetak dokumen HTML lewat iframe tersembunyi (anti popup-blocker). */
