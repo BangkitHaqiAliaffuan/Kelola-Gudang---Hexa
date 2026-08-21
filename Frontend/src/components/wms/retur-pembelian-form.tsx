@@ -252,10 +252,10 @@ export function ReturPembelianForm() {
   );
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    // Dengan dokumen sumber, barang dibatasi pada baris Penerimaan sumber yang
-    // masih bisa diretur (stok di bin penerimaan > 0).
+    // Dengan dokumen sumber, tampilkan semua barang dari dokumen sumber (ber-bin & tanpa bin)
+    // agar BM selalu terbaca; stok 0 hanya jadi warning/Tersedia 0, bukan hilang.
     if (sourceDocId) {
-      const ids = new Set(returnableSourceLines.map((s) => s.item_id));
+      const ids = new Set(sourceLines.map((s) => s.item_id));
       return itemOptions.filter((o) => ids.has(Number(o.value)));
     }
     if (!l.binId) return itemOptions;
@@ -408,11 +408,11 @@ export function ReturPembelianForm() {
     }
 
     const overLine = lines.find((l) => {
-      if (!l.itemId || !l.binId || !l.qty) return false;
+      if (!l.itemId || !l.qty) return false;
       const available = lineAvailable(l);
       return available !== undefined && Number(l.qty) > available;
     });
-    if (overLine) {
+    if (overLine && status === "Selesai") {
       toast.error("Ada baris dengan qty melebihi stok tersedia di bin terpilih.");
       return;
     }
