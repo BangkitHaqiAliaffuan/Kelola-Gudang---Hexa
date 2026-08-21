@@ -3,8 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Models\Bin;
+use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
