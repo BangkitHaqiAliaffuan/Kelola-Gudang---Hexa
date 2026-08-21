@@ -98,7 +98,7 @@ function StockSaatIni() {
       label: "Gudang",
       className: "min-w-[140px] whitespace-nowrap",
       sortable: true,
-      sortAccessor: (r) => r.warehouse,
+      sortAccessor: (r) => r.warehouse ?? "",
       render: (r) => r.warehouse ?? "—",
     },
     {
@@ -106,16 +106,16 @@ function StockSaatIni() {
       label: "Rak",
       className: "w-[80px] whitespace-nowrap",
       sortable: true,
-      sortAccessor: (r) => r.rack,
-      render: (r) => r.rack ?? "—",
+      sortAccessor: (r) => r.rack ?? "",
+      render: (r) => r.rack ?? "Lantai",
     },
     {
       key: "bin",
       label: "Bin",
       className: "w-[90px] whitespace-nowrap",
       sortable: true,
-      sortAccessor: (r) => r.bin,
-      render: (r) => r.bin ?? "—",
+      sortAccessor: (r) => r.bin ?? "",
+      render: (r) => r.bin ?? "Lantai",
     },
     {
       key: "qty",
@@ -254,7 +254,8 @@ function StockSaatIni() {
                 <Pill tone={statusTone[r.status]}>{r.status}</Pill>
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {r.warehouse ?? "—"} · {r.rack ?? "—"} · {r.bin ?? "—"} · satuan {r.unit ?? "—"}
+                {r.warehouse ?? "—"} · {r.rack ?? "Lantai"} · {r.bin ?? "Lantai"} · satuan{" "}
+                {r.unit ?? "—"}
               </p>
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
                 <div>

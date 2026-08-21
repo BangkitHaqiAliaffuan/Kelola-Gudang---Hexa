@@ -142,7 +142,6 @@ class StoreStockDocumentApiTest extends TestCase
             'qty zero' => ['lines' => [['item_id' => $item->id, 'qty' => 0, 'unit_cost' => 1000, 'to_bin_id' => $bin->id]]],
             'qty negative' => ['lines' => [['item_id' => $item->id, 'qty' => -5, 'unit_cost' => 1000, 'to_bin_id' => $bin->id]]],
             'item missing' => ['lines' => [['item_id' => 99999999, 'qty' => 1, 'unit_cost' => 1000, 'to_bin_id' => $bin->id]]],
-            'bin missing' => ['lines' => [['item_id' => $item->id, 'qty' => 1, 'unit_cost' => 1000]]],
         ];
 
         $before = StockDocument::count();
@@ -322,10 +321,11 @@ class StoreStockDocumentApiTest extends TestCase
 
     public function test_store_pengeluaran_requires_from_bin(): void
     {
+        // Opsi A: Pengeluaran boleh tanpa bin (lantai/gudang) — warehouse-level.
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Pengeluaran',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -333,8 +333,9 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.from_bin_id');
+        ]);
+        $res->assertStatus(201);
+        $this->assertNull($res->json('data.lines.0.from_bin_id'));
     }
 
     public function test_store_transfer_draft_creates_document_without_movements(): void
@@ -1216,36 +1217,40 @@ class StoreStockDocumentApiTest extends TestCase
 
     public function test_store_adjustment_out_requires_from_bin(): void
     {
+        // Opsi A: Adjustment boleh tanpa bin (lantai) — warehouse-level.
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
-                ['item_id' => $item->id, 'qty' => -3],
+                ['item_id' => $item->id, 'qty' => -3, 'reason_code' => 'other'],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.from_bin_id');
+        ]);
+        $res->assertStatus(201);
+        $this->assertNull($res->json('data.lines.0.from_bin_id'));
     }
 
     public function test_store_adjustment_in_requires_to_bin(): void
     {
+        // Opsi A: Adjustment boleh tanpa bin (lantai).
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
-                ['item_id' => $item->id, 'qty' => 3],
+                ['item_id' => $item->id, 'qty' => 3, 'reason_code' => 'other'],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.to_bin_id');
+        ]);
+        $res->assertStatus(201);
+        $this->assertNull($res->json('data.lines.0.to_bin_id'));
     }
 
     public function test_store_adjustment_posted_requires_reason_code(): void

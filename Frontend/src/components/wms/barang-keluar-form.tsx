@@ -106,12 +106,14 @@ export function BarangKeluarForm() {
   );
 
   const binOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
@@ -120,7 +122,8 @@ export function BarangKeluarForm() {
   // otoritatif tetap server saat posting.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of stockRows?.data ?? []) map.set(`${r.item_id}:${r.bin_id}`, r.available);
+    for (const r of stockRows?.data ?? [])
+      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
@@ -128,7 +131,7 @@ export function BarangKeluarForm() {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0) continue;
-      const binKey = String(r.bin_id);
+      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -139,10 +142,11 @@ export function BarangKeluarForm() {
   // Bin-bin yang benar-benar berisi stok di gudang terpilih — dipakai sebagai
   // scope dropdown bin agar operator tidak diganggu 72 bin kosong.
   const stockedBinIds = useMemo(() => {
-    const set = new Set<number>();
+    const set = new Set<string>();
     if (!warehouseId) return set;
     for (const r of stockRows?.data ?? []) {
-      if (r.stock > 0 && r.warehouse_id === Number(warehouseId)) set.add(r.bin_id);
+      if (r.stock > 0 && r.warehouse_id === Number(warehouseId))
+        set.add(r.bin_id === null ? "NULL" : String(r.bin_id));
     }
     return set;
   }, [stockRows, warehouseId]);
@@ -150,7 +154,7 @@ export function BarangKeluarForm() {
   // Kandidat bin per barang di gudang terpilih, diurutkan available desc —
   // dasar auto-suggest bin saat barang dipilih.
   const binCandidatesByItem = useMemo(() => {
-    const map = new Map<string, { bin_id: number; available: number }[]>();
+    const map = new Map<string, { bin_id: number | null; available: number }[]>();
     if (!warehouseId) return map;
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
@@ -159,16 +163,30 @@ export function BarangKeluarForm() {
       map.set(String(r.item_id), list);
     }
     for (const list of map.values()) {
-      list.sort((a, b) => b.available - a.available || a.bin_id - b.bin_id);
+      list.sort((a, b) => b.available - a.available || (a.bin_id ?? -1) - (b.bin_id ?? -1));
     }
     return map;
   }, [stockRows, warehouseId]);
 
-  const lineAvailable = (l: FormLine): number | undefined =>
-    l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
+  const lineAvailable = (l: FormLine): number | undefined => {
+    if (!l.itemId) return undefined;
+    // Opsi A: binId "" = lantai (NULL)
+    const binPart = l.binId === "" ? "NULL" : l.binId;
+    // Jika bin kosong, hanya lookup NULL jika baris memang tanpa bin; jika belum pilih bin, jangan tampilkan tersedia
+    // Untuk BK, bin kosong valid (lantai) -> lookup NULL bucket
+    return availableByKey.get(`${l.itemId}:${binPart}`);
+  };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    if (!l.binId) return itemOptions;
+    if (!l.binId) {
+      // bin "" = lantai: hanya item yang punya stok di NULL bucket
+      if (l.binId === "") {
+        const ids = availableItemIdsByBin.get("NULL");
+        if (!ids) return [];
+        return itemOptions.filter((o) => ids.has(o.value));
+      }
+      return itemOptions;
+    }
     const availableIds = availableItemIdsByBin.get(l.binId);
     if (!availableIds) return [];
     return itemOptions.filter((o) => availableIds.has(o.value));
@@ -180,10 +198,10 @@ export function BarangKeluarForm() {
     if (!warehouseId) return [];
     if (l.itemId) {
       const candidates = binCandidatesByItem.get(l.itemId) ?? [];
-      const ids = new Set(candidates.map((c) => c.bin_id));
-      return binOptions.filter((o) => ids.has(Number(o.value)));
+      const ids = new Set(candidates.map((c) => (c.bin_id === null ? "NULL" : String(c.bin_id))));
+      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
     }
-    return binOptions.filter((o) => stockedBinIds.has(Number(o.value)));
+    return binOptions.filter((o) => stockedBinIds.has(o.value === "" ? "NULL" : o.value));
   };
 
   const hasStockInWarehouse = (l: FormLine): boolean =>
@@ -206,14 +224,21 @@ export function BarangKeluarForm() {
       const item = items?.data.find((x) => String(x.id) === itemId);
       const candidates = binCandidatesByItem.get(itemId) ?? [];
       const currentValid = Boolean(
-        line.binId && candidates.some((c) => c.bin_id === Number(line.binId)),
+        line.binId !== "" &&
+        candidates.some(
+          (c) => String(c.bin_id ?? "NULL") === (line.binId === "" ? "NULL" : line.binId),
+        ),
       );
-      if (currentValid) return { itemId };
+      // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan
+      if (line.binId !== "" && currentValid) return { itemId };
+      if (line.binId === "" && candidates.some((c) => c.bin_id === null)) return { itemId };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
           : candidates[0]
-            ? String(candidates[0].bin_id)
+            ? candidates[0].bin_id === null
+              ? ""
+              : String(candidates[0].bin_id)
             : "";
       return { itemId, binId: preferredBin };
     });
@@ -236,11 +261,11 @@ export function BarangKeluarForm() {
     pic: pic.trim() || null,
     note: note.trim() || null,
     lines: lines
-      .filter((l) => l.itemId && l.binId && l.qty)
+      .filter((l) => l.itemId && l.qty)
       .map((l) => ({
         item_id: Number(l.itemId),
         qty: Number(l.qty),
-        from_bin_id: Number(l.binId),
+        from_bin_id: l.binId ? Number(l.binId) : null,
       })),
   });
 
@@ -252,12 +277,12 @@ export function BarangKeluarForm() {
     }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
-      toast.error("Lengkapi minimal satu baris barang (barang, lokasi bin, dan qty).");
+      toast.error("Lengkapi minimal satu baris barang (barang dan qty).");
       return;
     }
 
     const overLine = lines.find((l) => {
-      if (!l.itemId || !l.binId || !l.qty) return false;
+      if (!l.itemId || !l.qty) return false;
       const available = lineAvailable(l);
       return available !== undefined && Number(l.qty) > available;
     });
@@ -404,7 +429,8 @@ export function BarangKeluarForm() {
             <tbody>
               {lines.map((l, i) => {
                 const available = lineAvailable(l);
-                const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+                const overStock =
+                  !submitted && available !== undefined && (Number(l.qty) || 0) > available;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -486,7 +512,8 @@ export function BarangKeluarForm() {
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
             const available = lineAvailable(l);
-            const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+            const overStock =
+              !submitted && available !== undefined && (Number(l.qty) || 0) > available;
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">

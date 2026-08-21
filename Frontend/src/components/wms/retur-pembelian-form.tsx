@@ -156,12 +156,14 @@ export function ReturPembelianForm() {
   );
 
   const binOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
@@ -170,7 +172,8 @@ export function ReturPembelianForm() {
   // otoritatif tetap server saat posting.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of stockRows?.data ?? []) map.set(`${r.item_id}:${r.bin_id}`, r.available);
+    for (const r of stockRows?.data ?? [])
+      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
@@ -189,10 +192,11 @@ export function ReturPembelianForm() {
   // Bin-bin yang benar-benar berisi stok di gudang terpilih — dipakai sebagai
   // scope dropdown bin agar operator tidak diganggu bin kosong.
   const stockedBinIds = useMemo(() => {
-    const set = new Set<number>();
+    const set = new Set<string>();
     if (!warehouseId) return set;
     for (const r of stockRows?.data ?? []) {
-      if (r.stock > 0 && r.warehouse_id === Number(warehouseId)) set.add(r.bin_id);
+      if (r.stock > 0 && r.warehouse_id === Number(warehouseId))
+        set.add(r.bin_id === null ? "NULL" : String(r.bin_id));
     }
     return set;
   }, [stockRows, warehouseId]);
@@ -200,7 +204,7 @@ export function ReturPembelianForm() {
   // Kandidat bin per barang di gudang terpilih, diurutkan available desc —
   // dasar auto-suggest bin saat barang dipilih.
   const binCandidatesByItem = useMemo(() => {
-    const map = new Map<string, { bin_id: number; available: number }[]>();
+    const map = new Map<string, { bin_id: number | null; available: number }[]>();
     if (!warehouseId) return map;
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
@@ -209,7 +213,7 @@ export function ReturPembelianForm() {
       map.set(String(r.item_id), list);
     }
     for (const list of map.values()) {
-      list.sort((a, b) => b.available - a.available || a.bin_id - b.bin_id);
+      list.sort((a, b) => b.available - a.available || (a.bin_id ?? -1) - (b.bin_id ?? -1));
     }
     return map;
   }, [stockRows, warehouseId]);
@@ -264,16 +268,18 @@ export function ReturPembelianForm() {
     if (sourceDocId) {
       if (!l.itemId) return [];
       const ids = new Set(
-        sourceLines.filter((s) => s.item_id === Number(l.itemId)).map((s) => sourceLineBin(s)),
+        sourceLines
+          .filter((s) => s.item_id === Number(l.itemId))
+          .map((s) => (sourceLineBin(s) === null ? "NULL" : String(sourceLineBin(s)))),
       );
-      return binOptions.filter((o) => ids.has(Number(o.value)));
+      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
     }
     if (l.itemId) {
       const candidates = binCandidatesByItem.get(l.itemId) ?? [];
-      const ids = new Set(candidates.map((c) => c.bin_id));
-      return binOptions.filter((o) => ids.has(Number(o.value)));
+      const ids = new Set(candidates.map((c) => (c.bin_id === null ? "NULL" : String(c.bin_id))));
+      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
     }
-    return binOptions.filter((o) => stockedBinIds.has(Number(o.value)));
+    return binOptions.filter((o) => stockedBinIds.has(o.value === "" ? "NULL" : o.value));
   };
 
   const hasStockInWarehouse = (l: FormLine): boolean =>

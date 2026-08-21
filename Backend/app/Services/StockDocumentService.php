@@ -174,14 +174,19 @@ class StockDocumentService
 
         $frozenAt = $document->frozen_at ?? $document->created_at;
         $moved = $lines->filter(function ($line) use ($document, $frozenAt) {
-            return StockMovement::where('item_id', $line->item_id)
-                ->where('bin_id', $line->from_bin_id)
+            $q = StockMovement::where('item_id', $line->item_id)
                 ->where('occurred_at', '>', $frozenAt)
                 ->where(function ($query) use ($document) {
                     $query->whereNull('stock_document_id')
                         ->orWhere('stock_document_id', '!=', $document->id);
-                })
-                ->exists();
+                });
+            if ($line->from_bin_id === null) {
+                $q->whereNull('bin_id');
+            } else {
+                $q->where('bin_id', $line->from_bin_id);
+            }
+
+            return $q->exists();
         });
 
         if ($moved->isNotEmpty()) {
@@ -248,23 +253,26 @@ class StockDocumentService
         if ($document->type === 'Transfer Gudang') {
             $source = $line->fromBin ?? $line->item->bin;
             $dest = $line->toBin ?? $line->item->bin;
-            $cost = $this->costAt($line->item_id, $source);
+            // Opsi A: bin boleh null (lantai/gudang) — fallback ke warehouse_id dokumen jika bin null.
+            $sourceWarehouseId = $source ? $source->rack->warehouse_id : $document->warehouse_id;
+            $destWarehouseId = $dest ? $dest->rack->warehouse_id : $document->destination_warehouse_id;
+            $cost = $this->costAt($line->item_id, $source, $sourceWarehouseId);
 
             return [
                 [
                     ...$base,
-                    'warehouse_id' => $source->rack->warehouse_id,
-                    'rack_id' => $source->rack_id,
-                    'bin_id' => $source->id,
+                    'warehouse_id' => $sourceWarehouseId,
+                    'rack_id' => $source?->rack_id,
+                    'bin_id' => $source?->id,
                     'direction' => 'OUT',
                     'qty' => $qty,
                     'unit_cost' => $cost,
                 ],
                 [
                     ...$base,
-                    'warehouse_id' => $dest->rack->warehouse_id,
-                    'rack_id' => $dest->rack_id,
-                    'bin_id' => $dest->id,
+                    'warehouse_id' => $destWarehouseId,
+                    'rack_id' => $dest?->rack_id,
+                    'bin_id' => $dest?->id,
                     'direction' => 'IN',
                     'qty' => $qty,
                     'unit_cost' => $cost,
@@ -275,22 +283,25 @@ class StockDocumentService
         // Arah IN memprioritaskan bin tujuan (to_bin_id); bin asal dipakai sebagai
         // fallback agar dokumen lama (BM/BK/ADJ yang hanya mengisi from_bin_id) tetap
         // terposting. Arah OUT memakai bin asal (sumber stok).
+        // Opsi A: bin boleh null — jika semua bin null, warehouse diambil dari dokumen.
         $bin = $direction === 'IN'
             ? ($line->toBin ?? $line->fromBin ?? $line->item->bin)
             : ($line->fromBin ?? $line->item->bin);
 
+        $warehouseId = $bin ? $bin->rack->warehouse_id : $document->warehouse_id;
+
         return [[
             ...$base,
-            'warehouse_id' => $bin->rack->warehouse_id,
-            'rack_id' => $bin->rack_id,
-            'bin_id' => $bin->id,
+            'warehouse_id' => $warehouseId,
+            'rack_id' => $bin?->rack_id,
+            'bin_id' => $bin?->id,
             'direction' => $direction,
             'qty' => $qty,
             'unit_cost' => $direction === 'IN'
                 ? (float) $line->unit_cost
                 : ($this->usesPurchaseCost($document, $line)
                     ? (float) $line->unit_cost
-                    : $this->costAt($line->item_id, $bin)),
+                    : $this->costAt($line->item_id, $bin, $warehouseId)),
         ]];
     }
 
@@ -315,10 +326,14 @@ class StockDocumentService
             return;
         }
 
-        $row = ItemStock::where('item_id', $attributes['item_id'])
-            ->where('warehouse_id', $attributes['warehouse_id'])
-            ->where('bin_id', $attributes['bin_id'])
-            ->first();
+        $query = ItemStock::where('item_id', $attributes['item_id'])
+            ->where('warehouse_id', $attributes['warehouse_id']);
+        if ($attributes['bin_id'] === null) {
+            $query->whereNull('bin_id');
+        } else {
+            $query->where('bin_id', $attributes['bin_id']);
+        }
+        $row = $query->first();
 
         // Stock Opname menyesuaikan stok terhadap kenyataan fisik: guard memakai
         // stok fisik (stock), bukan available, karena reservasi adalah komitmen
@@ -347,11 +362,21 @@ class StockDocumentService
 
     /**
      * Cost to use for OUT movements: the current moving average at that location.
+     * When bin is null (lantai/gudang, Opsi A), lookup by warehouse_id + bin_id IS NULL.
      */
-    private function costAt(int $itemId, $bin): float
+    private function costAt(int $itemId, $bin, ?int $warehouseId = null): float
     {
         if (! $bin) {
-            return 0.0;
+            $wid = $warehouseId;
+            if ($wid === null) {
+                return 0.0;
+            }
+            $avg = ItemStock::where('item_id', $itemId)
+                ->where('warehouse_id', $wid)
+                ->whereNull('bin_id')
+                ->value('unit_cost_avg');
+
+            return (float) ($avg ?? 0);
         }
 
         $avg = ItemStock::where('item_id', $itemId)

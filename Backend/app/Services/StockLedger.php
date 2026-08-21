@@ -39,7 +39,8 @@ class StockLedger
         $costIn = [];
 
         foreach ($movements as $movement) {
-            $key = $movement->warehouse_id.':'.$movement->bin_id;
+            $binPart = $movement->bin_id === null ? 'NULL' : (string) $movement->bin_id;
+            $key = $movement->warehouse_id.':'.$binPart;
             $sign = $movement->direction === 'IN' ? 1 : -1;
 
             $stockByKey[$key] = max(0, ($stockByKey[$key] ?? 0) + $sign * $movement->qty);
@@ -52,23 +53,46 @@ class StockLedger
         }
 
         $validBinIds = [];
+        $hasNullBin = false;
         foreach ($stockByKey as $key => $stock) {
-            [$warehouseId, $binId] = explode(':', $key, 2);
-            $validBinIds[] = (int) $binId;
+            [$warehouseId, $binPart] = explode(':', $key, 2);
+            $binId = $binPart === 'NULL' ? null : (int) $binPart;
+            if ($binId === null) {
+                $hasNullBin = true;
+            } else {
+                $validBinIds[] = $binId;
+            }
 
             $cost = $costIn[$key] ?? null;
             $average = $cost && $cost['qty'] > 0 ? $cost['cost'] / $cost['qty'] : null;
 
-            ItemStock::updateOrInsert(
-                ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => (int) $binId],
-                ['stock' => $stock, 'unit_cost_avg' => $average, 'updated_at' => now()]
-            );
+            if ($binId === null) {
+                DB::table('item_stock')->updateOrInsert(
+                    ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => null],
+                    ['stock' => $stock, 'unit_cost_avg' => $average, 'updated_at' => now()]
+                );
+            } else {
+                ItemStock::updateOrInsert(
+                    ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => $binId],
+                    ['stock' => $stock, 'unit_cost_avg' => $average, 'updated_at' => now()]
+                );
+            }
         }
 
-        if ($validBinIds !== []) {
-            ItemStock::where('item_id', $itemId)
-                ->whereNotIn('bin_id', $validBinIds)
-                ->delete();
+        if ($validBinIds !== [] || $hasNullBin) {
+            $query = ItemStock::where('item_id', $itemId);
+            if ($validBinIds !== [] && $hasNullBin) {
+                $query->where(function ($q) use ($validBinIds) {
+                    $q->whereNotIn('bin_id', $validBinIds)->whereNotNull('bin_id');
+                });
+            } elseif ($validBinIds !== [] && ! $hasNullBin) {
+                $query->where(function ($q) use ($validBinIds) {
+                    $q->whereNotIn('bin_id', $validBinIds)->orWhereNull('bin_id');
+                });
+            } elseif ($validBinIds === [] && $hasNullBin) {
+                $query->whereNotNull('bin_id');
+            }
+            $query->delete();
         }
 
         Item::where('id', $itemId)->update([
@@ -90,13 +114,20 @@ class StockLedger
 
         $allocations = [];
         foreach ($rows as $row) {
-            $allocations[$row->bin_id] = $total > 0 ? (int) floor($reserved * $row->stock / $total) : 0;
+            $key = ($row->bin_id === null ? 'NULL' : (string) $row->bin_id).':'.$row->warehouse_id;
+            $allocations[$key] = $total > 0 ? (int) floor($reserved * $row->stock / $total) : 0;
         }
 
-        foreach ($allocations as $binId => $alloc) {
-            ItemStock::where('item_id', $itemId)
-                ->where('bin_id', $binId)
-                ->update(['reserved' => $alloc]);
+        foreach ($allocations as $key => $alloc) {
+            [$binPart, $warehouseId] = explode(':', $key, 2);
+            $binId = $binPart === 'NULL' ? null : (int) $binPart;
+            $q = ItemStock::where('item_id', $itemId)->where('warehouse_id', (int) $warehouseId);
+            if ($binId === null) {
+                $q->whereNull('bin_id');
+            } else {
+                $q->where('bin_id', $binId);
+            }
+            $q->update(['reserved' => $alloc]);
         }
 
         Item::where('id', $itemId)->update([

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -7,9 +7,11 @@ import {
   Maximize2,
   Minimize2,
   Printer,
+  ScanLine,
   Search,
   Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Area,
   AreaChart,
@@ -31,6 +33,13 @@ import {
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
@@ -83,12 +92,88 @@ function KartuStock() {
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(null);
+  const scanHandledRef = useRef(false);
+
+  const findItemByCode = useCallback(
+    (code: string) => {
+      const c = code.trim();
+      if (!c) return undefined;
+      return options.find(
+        (it) => it.barcode === c || it.internal_barcode === c || it.sku === c || it.barcode?.toLowerCase() === c.toLowerCase(),
+      );
+    },
+    [options],
+  );
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
   const activeId = id ?? options[0]?.id;
   const whId = useMemo(
     () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
     [warehouses, wh],
   );
+
+  useEffect(() => {
+    if (!scanOpen) {
+      if (scannerRef.current) {
+        scannerRef.current
+          .stop()
+          .catch(() => undefined)
+          .finally(() => {
+            scannerRef.current?.clear();
+            scannerRef.current = null;
+          });
+      }
+      scanHandledRef.current = false;
+      return;
+    }
+    let cancelled = false;
+    scanHandledRef.current = false;
+    (async () => {
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled || !scanOpen) return;
+        const scanner = new Html5Qrcode("kartu-stock-reader");
+        scannerRef.current = scanner;
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (scanHandledRef.current) return;
+            const found = findItemByCode(decodedText);
+            if (found) {
+              scanHandledRef.current = true;
+              setId(found.id);
+              toast.success(`Terpilih: ${found.name}`);
+              setScanOpen(false);
+            } else {
+              toast.error(`Barang tidak ditemukan: ${decodedText}`);
+            }
+          },
+          () => undefined,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("NotAllowedError") || msg.includes("Permission")) {
+          toast.error("Izin kamera ditolak — aktifkan di pengaturan browser");
+        } else if (!msg.includes("not found")) {
+          toast.error(`Gagal membuka kamera: ${msg}`);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (scannerRef.current) {
+        scannerRef.current
+          .stop()
+          .catch(() => undefined)
+          .finally(() => {
+            scannerRef.current?.clear();
+            scannerRef.current = null;
+          });
+      }
+    };
+  }, [scanOpen, findItemByCode]);
 
   const cardFifo = useStockCard(activeId, "FIFO", whId);
   const cardAvg = useStockCard(activeId, "Average", whId);
@@ -311,20 +396,44 @@ function KartuStock() {
         />
 
         <Panel title="Pilih Barang">
-          <FormCombobox
-            value={activeId != null ? String(activeId) : ""}
-            onValueChange={(v) => setId(Number(v))}
-            options={options.map((o) => ({
-              value: String(o.id),
-              label: `${o.name} — ${o.sku}${o.barcode ? ` · ${o.barcode}` : ""}`,
-              keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
-            }))}
-            placeholder="Pilih barang / scan barcode…"
-            searchPlaceholder="Cari nama, SKU, barcode…"
-            loading={itemsLoading}
-            className="max-w-md"
-          />
+          <div className="flex gap-2">
+            <FormCombobox
+              value={activeId != null ? String(activeId) : ""}
+              onValueChange={(v) => setId(Number(v))}
+              options={options.map((o) => ({
+                value: String(o.id),
+                label: `${o.name} — ${o.sku}`,
+                keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
+              }))}
+              placeholder="Pilih barang…"
+              searchPlaceholder="Cari nama, SKU, barcode…"
+              loading={itemsLoading}
+              className="max-w-md flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-xl"
+              aria-label="Scan barcode dengan kamera"
+              onClick={() => setScanOpen(true)}
+            >
+              <ScanLine className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">Scan barcode untuk memilih otomatis</p>
         </Panel>
+
+        <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+          <DialogContent className="max-w-md rounded-xl">
+            <DialogHeader>
+              <DialogTitle>Scan Barcode</DialogTitle>
+              <DialogDescription>Arahkan barcode atau QR ke dalam kotak. Pastikan izin kamera diaktifkan dan gunakan HTTPS.</DialogDescription>
+            </DialogHeader>
+            <div id="kartu-stock-reader" className="overflow-hidden rounded-xl border border-border bg-black" />
+            <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR Code</p>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard

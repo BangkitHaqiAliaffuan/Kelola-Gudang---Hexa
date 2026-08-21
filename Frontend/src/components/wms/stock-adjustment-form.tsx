@@ -40,7 +40,15 @@ type FormLine = {
 let lineSeq = 0;
 const newLine = (): FormLine => {
   lineSeq += 1;
-  return { key: `L${lineSeq}`, itemId: "", binId: "", direction: "in", qty: "1", reason: "", note: "" };
+  return {
+    key: `L${lineSeq}`,
+    itemId: "",
+    binId: "",
+    direction: "in",
+    qty: "1",
+    reason: "",
+    note: "",
+  };
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -88,12 +96,14 @@ export function StockAdjustmentForm() {
   );
 
   const binOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
@@ -112,7 +122,8 @@ export function StockAdjustmentForm() {
   // tetap server saat posting.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of stockRows?.data ?? []) map.set(`${r.item_id}:${r.bin_id}`, r.available);
+    for (const r of stockRows?.data ?? [])
+      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
@@ -120,7 +131,7 @@ export function StockAdjustmentForm() {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0) continue;
-      const binKey = String(r.bin_id);
+      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -131,10 +142,11 @@ export function StockAdjustmentForm() {
   // Bin-bin yang benar-benar berisi stok di gudang terpilih — cakupan dropdown
   // bin untuk arah "kurangi" (OUT) agar operator tidak diganggu bin kosong.
   const stockedBinIds = useMemo(() => {
-    const set = new Set<number>();
+    const set = new Set<string>();
     if (!warehouseId) return set;
     for (const r of stockRows?.data ?? []) {
-      if (r.stock > 0 && r.warehouse_id === Number(warehouseId)) set.add(r.bin_id);
+      if (r.stock > 0 && r.warehouse_id === Number(warehouseId))
+        set.add(r.bin_id === null ? "NULL" : String(r.bin_id));
     }
     return set;
   }, [stockRows, warehouseId]);
@@ -142,7 +154,7 @@ export function StockAdjustmentForm() {
   // Kandidat bin per barang di gudang terpilih (berisi stok), diurutkan
   // available desc — dasar auto-suggest bin untuk arah "kurangi".
   const binCandidatesByItem = useMemo(() => {
-    const map = new Map<string, { bin_id: number; available: number }[]>();
+    const map = new Map<string, { bin_id: number | null; available: number }[]>();
     if (!warehouseId) return map;
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
@@ -151,13 +163,18 @@ export function StockAdjustmentForm() {
       map.set(String(r.item_id), list);
     }
     for (const list of map.values()) {
-      list.sort((a, b) => b.available - a.available || a.bin_id - b.bin_id);
+      list.sort((a, b) => b.available - a.available || (a.bin_id ?? -1) - (b.bin_id ?? -1));
     }
     return map;
   }, [stockRows, warehouseId]);
 
-  const lineAvailable = (l: FormLine): number | undefined =>
-    l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
+  const lineAvailable = (l: FormLine): number | undefined => {
+    if (!l.itemId) return undefined;
+    // Opsi A: binId "" = lantai
+    if (l.binId === "" && l.direction === "out") return availableByKey.get(`${l.itemId}:NULL`);
+    if (!l.binId) return undefined;
+    return availableByKey.get(`${l.itemId}:${l.binId}`);
+  };
 
   const hasStockInWarehouse = (l: FormLine): boolean =>
     !l.itemId || (binCandidatesByItem.get(l.itemId)?.length ?? 0) > 0;
@@ -179,18 +196,15 @@ export function StockAdjustmentForm() {
     if (l.direction === "out") {
       if (l.itemId) {
         const candidates = binCandidatesByItem.get(l.itemId) ?? [];
-        const ids = new Set(candidates.map((c) => c.bin_id));
-        return binOptions.filter((o) => ids.has(Number(o.value)));
+        const ids = new Set(candidates.map((c) => (c.bin_id === null ? "NULL" : String(c.bin_id))));
+        return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
       }
-      return binOptions.filter((o) => stockedBinIds.has(Number(o.value)));
+      return binOptions.filter((o) => stockedBinIds.has(o.value === "" ? "NULL" : o.value));
     }
     return binOptions;
   };
 
-  const totalQty = useMemo(
-    () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0),
-    [lines],
-  );
+  const totalQty = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0), [lines]);
 
   const missingReasonCount = useMemo(
     () => lines.filter((l) => l.itemId && !l.reason).length,
@@ -264,14 +278,15 @@ export function StockAdjustmentForm() {
     pic: pic.trim() || null,
     note: note.trim() || null,
     lines: lines
-      .filter((l) => l.itemId && l.binId && l.qty)
+      .filter((l) => l.itemId && l.qty)
       .map((l) => {
         const qty = Math.abs(Number(l.qty) || 0);
         const signed = l.direction === "out" ? -qty : qty;
+        const binVal = l.binId ? Number(l.binId) : null;
         return {
           item_id: Number(l.itemId),
           qty: signed,
-          ...(l.direction === "out" ? { from_bin_id: Number(l.binId) } : { to_bin_id: Number(l.binId) }),
+          ...(l.direction === "out" ? { from_bin_id: binVal } : { to_bin_id: binVal }),
           reason_code: l.reason.trim() || null,
           note: l.note.trim() || null,
         };
@@ -285,9 +300,9 @@ export function StockAdjustmentForm() {
       return;
     }
 
-    const filled = lines.filter((l) => l.itemId && l.binId && l.qty);
+    const filled = lines.filter((l) => l.itemId && l.qty);
     if (filled.length === 0) {
-      toast.error("Lengkapi minimal satu baris (barang, bin, arah, qty, dan alasan).");
+      toast.error("Lengkapi minimal satu baris (barang, arah, qty, dan alasan).");
       return;
     }
 
@@ -471,9 +486,7 @@ export function StockAdjustmentForm() {
                         </p>
                       )}
                       {lineError(i, "to_bin_id") && (
-                        <p className="mt-1 text-xs text-destructive">
-                          {lineError(i, "to_bin_id")}
-                        </p>
+                        <p className="mt-1 text-xs text-destructive">{lineError(i, "to_bin_id")}</p>
                       )}
                     </td>
                     <td className="w-[150px] px-3 py-2 align-top">
@@ -587,7 +600,9 @@ export function StockAdjustmentForm() {
                     loading={binsLoading || stockLoading}
                   />
                   {l.direction === "out" && l.itemId && !hasStockInWarehouse(l) && (
-                    <p className="text-xs text-muted-foreground">Stok tidak tersedia di gudang ini.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Stok tidak tersedia di gudang ini.
+                    </p>
                   )}
                   <div className="flex gap-1">
                     <Button
@@ -640,7 +655,10 @@ export function StockAdjustmentForm() {
                     <p className="text-xs text-amber-600">Alasan wajib diisi.</p>
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="text-destructive" onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}>
+                    <span
+                      className="text-destructive"
+                      onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                    >
                       {lines.length > 1 ? "Hapus" : ""}
                     </span>
                   </div>

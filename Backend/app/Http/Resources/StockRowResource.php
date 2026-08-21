@@ -20,7 +20,7 @@ class StockRowResource extends JsonResource
         };
 
         return [
-            'id' => "{$this->item_id}-{$this->warehouse_id}-{$this->bin_id}",
+            'id' => "{$this->item_id}-{$this->warehouse_id}-".($this->bin_id ?? 'NULL'),
             'item_id' => $this->item_id,
             'sku' => $item?->sku,
             'name' => $item?->name,

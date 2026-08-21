@@ -219,9 +219,9 @@ class StockDocumentController extends Controller
                             : ($sourceCost !== null
                                 ? (float) $sourceCost
                                 : ($isAdjustment
-                                    ? ($adjustBinId ? ($this->averageCost($line['item_id'], $adjustBinId, $fromBins) ?? 0.0) : 0.0)
+                                    ? ($this->averageCost($line['item_id'], $adjustBinId !== null ? (int) $adjustBinId : null, $fromBins, (int) $data['warehouse_id']) ?? 0.0)
                                     : (($isOutbound || $isTransfer)
-                                        ? ($this->averageCost($line['item_id'], $line['from_bin_id'], $fromBins) ?? 0.0)
+                                        ? ($this->averageCost($line['item_id'], isset($line['from_bin_id']) ? (int) $line['from_bin_id'] : null, $fromBins, (int) $data['warehouse_id']) ?? 0.0)
                                         : $line['unit_cost']))),
                         'to_bin_id' => ($isOpname || $isOutbound) ? null : ($line['to_bin_id'] ?? null),
                         'from_bin_id' => $line['from_bin_id'] ?? null,
@@ -253,8 +253,20 @@ class StockDocumentController extends Controller
      * yang sama via StockDocumentService::costAt(), jadi dua sumber ini selalu
      * konsisten.
      */
-    private function averageCost(int $itemId, int $binId, $bins): ?float
+    private function averageCost(int $itemId, ?int $binId, $bins, ?int $fallbackWarehouseId = null): ?float
     {
+        if ($binId === null) {
+            if ($fallbackWarehouseId === null) {
+                return null;
+            }
+            $avg = ItemStock::where('item_id', $itemId)
+                ->where('warehouse_id', $fallbackWarehouseId)
+                ->whereNull('bin_id')
+                ->value('unit_cost_avg');
+
+            return $avg !== null ? (float) $avg : null;
+        }
+
         $bin = $bins->get($binId);
 
         if (! $bin?->rack) {

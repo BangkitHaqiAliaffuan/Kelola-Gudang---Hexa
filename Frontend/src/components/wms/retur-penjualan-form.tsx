@@ -155,12 +155,14 @@ export function ReturPenjualanForm() {
   );
 
   const binOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
@@ -196,9 +198,11 @@ export function ReturPenjualanForm() {
     if (sourceDocId) {
       if (!l.itemId) return [];
       const ids = new Set(
-        sourceLines.filter((s) => s.item_id === Number(l.itemId)).map((s) => sourceLineBin(s)),
+        sourceLines
+          .filter((s) => s.item_id === Number(l.itemId))
+          .map((s) => (sourceLineBin(s) === null ? "NULL" : String(sourceLineBin(s)))),
       );
-      return binOptions.filter((o) => ids.has(Number(o.value)));
+      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
     }
     return binOptions;
   };

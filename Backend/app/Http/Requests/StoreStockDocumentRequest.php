@@ -71,18 +71,19 @@ class StoreStockDocumentRequest extends FormRequest
             // dipakai untuk Penerimaan & Retur Penjualan tanpa sumber (dan sebagai
             // fallback Stock Opname).
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
+            // Opsi A: Penerimaan & Pengeluaran boleh tanpa bin (lantai/gudang) — bin opsional.
             'lines.*.to_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
-                Rule::requiredIf(fn () => in_array($this->input('type'), ['Penerimaan', 'Transfer Gudang', 'Retur Penjualan'], true)),
+                Rule::requiredIf(fn () => in_array($this->input('type'), ['Transfer Gudang', 'Retur Penjualan'], true)),
                 Rule::prohibitedIf(fn () => $this->input('type') === 'Stock Opname'),
             ],
             'lines.*.from_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
-                Rule::requiredIf(fn () => in_array($this->input('type'), ['Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Stock Opname'], true)),
+                Rule::requiredIf(fn () => in_array($this->input('type'), ['Transfer Gudang', 'Retur Pembelian', 'Stock Opname'], true)),
             ],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
             // Alasan selisih (root cause) — dipakai Stock Opname yang langsung disimpan Selesai.
@@ -133,16 +134,8 @@ class StoreStockDocumentRequest extends FormRequest
                         continue;
                     }
 
-                    $binField = $qty > 0 ? 'to_bin_id' : 'from_bin_id';
-
-                    if (empty($line[$binField])) {
-                        $validator->errors()->add(
-                            "lines.{$index}.{$binField}",
-                            $qty > 0
-                                ? 'Bin tujuan wajib diisi untuk penambahan stok.'
-                                : 'Bin asal wajib diisi untuk pengurangan stok.'
-                        );
-                    }
+                    // Opsi A: bin boleh null (lantai/gudang) — tidak wajib, warehouse_id dokumen sebagai lokasi.
+                    // Validasi bin-warehouse di after berikutnya hanya untuk bin non-null.
 
                     if ($status === 'Selesai' && empty($line['reason_code'])) {
                         $validator->errors()->add(
@@ -323,9 +316,8 @@ class StoreStockDocumentRequest extends FormRequest
                         continue;
                     }
 
-                    $sourceBinId = (int) ($sourceLine->to_bin_id ?? 0);
-
-                    if ($sourceBinId && (int) ($line['from_bin_id'] ?? 0) !== $sourceBinId) {
+                    // Opsi A: bin boleh null — null vs null cocok, null vs bin tidak cocok.
+                    if ((int) ($sourceLine->to_bin_id ?? 0) !== (int) ($line['from_bin_id'] ?? 0)) {
                         $validator->errors()->add(
                             "lines.{$index}.from_bin_id",
                             'Bin asal harus sama dengan bin tujuan baris sumber (Penerimaan).'
@@ -445,9 +437,7 @@ class StoreStockDocumentRequest extends FormRequest
                         continue;
                     }
 
-                    $sourceBinId = (int) ($sourceLine->from_bin_id ?? 0);
-
-                    if ($sourceBinId && (int) ($line['to_bin_id'] ?? 0) !== $sourceBinId) {
+                    if ((int) ($sourceLine->from_bin_id ?? 0) !== (int) ($line['to_bin_id'] ?? 0)) {
                         $validator->errors()->add(
                             "lines.{$index}.to_bin_id",
                             'Bin tujuan harus sama dengan bin asal baris sumber (Pengeluaran).'

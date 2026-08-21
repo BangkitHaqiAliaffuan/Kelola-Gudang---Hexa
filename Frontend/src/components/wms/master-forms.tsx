@@ -2859,7 +2859,7 @@ export function ItemFormDialog({
                       }));
                     return (
                       <FormItem>
-                        <FormLabel>Rak Default</FormLabel>
+                        <FormLabel>Rak Default (opsional)</FormLabel>
                         <FormControl>
                           <FormCombobox
                             value={field.value ? String(field.value) : ""}
@@ -2894,7 +2894,7 @@ export function ItemFormDialog({
                       }));
                     return (
                       <FormItem>
-                        <FormLabel>Bin Default</FormLabel>
+                        <FormLabel>Bin Default (opsional)</FormLabel>
                         <FormControl>
                           <FormCombobox
                             value={field.value ? String(field.value) : ""}

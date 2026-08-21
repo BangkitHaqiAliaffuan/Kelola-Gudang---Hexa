@@ -22,7 +22,7 @@ export type StockRowApi = {
   warehouse: string | null;
   rack: string | null;
   bin: string | null;
-  bin_id: number;
+  bin_id: number | null;
   stock: number;
   reserved: number;
   available: number;

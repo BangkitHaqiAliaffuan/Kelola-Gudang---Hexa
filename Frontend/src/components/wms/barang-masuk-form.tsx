@@ -158,12 +158,14 @@ export function BarangMasukForm({
   );
 
   const binOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
@@ -219,12 +221,12 @@ export function BarangMasukForm({
     pic: pic.trim() || null,
     note: note.trim() || null,
     lines: lines
-      .filter((l) => l.itemId && l.binId && l.qty && l.cost)
+      .filter((l) => l.itemId && l.qty && l.cost)
       .map((l) => ({
         item_id: Number(l.itemId),
         qty: Number(l.qty),
         unit_cost: Number(l.cost),
-        to_bin_id: Number(l.binId),
+        to_bin_id: l.binId ? Number(l.binId) : null,
       })),
   });
 
@@ -240,7 +242,7 @@ export function BarangMasukForm({
     }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
-      toast.error("Lengkapi minimal satu baris barang (barang, lokasi bin, qty, dan harga).");
+      toast.error("Lengkapi minimal satu baris barang (barang, qty, dan harga).");
       return;
     }
 
