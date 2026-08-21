@@ -504,12 +504,19 @@ export function ReturPembelianForm() {
             {!warehouseId && (
               <p className="text-xs text-muted-foreground">Pilih gudang untuk memuat dokumen.</p>
             )}
-            {sourceDocId && sourceDetail?.data && returnableSourceLines.length === 0 && (
-              <p className="text-xs text-destructive">
-                Dokumen ini tidak memiliki barang yang bisa diretur (stok di bin penerimaan sudah
-                habis/dipindah).
-              </p>
+            {sourceDocId && sourceDetail?.data && sourceLines.length === 0 && (
+              <p className="text-xs text-destructive">Dokumen ini tidak memiliki baris barang.</p>
             )}
+            {sourceDocId &&
+              sourceDetail?.data &&
+              !stockLoading &&
+              sourceLines.length > 0 &&
+              returnableSourceLines.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  Stok di bin penerimaan untuk semua barang sudah habis/dipindah — retur masih bisa
+                  disimpan Draft, posting Selesai akan cek stok tersedia di lokasi asal.
+                </p>
+              )}
             {docError("source_document_id") && (
               <p className="text-xs text-destructive">{docError("source_document_id")}</p>
             )}
@@ -626,7 +633,7 @@ export function ReturPembelianForm() {
                         avoidCollisions={false}
                         loading={stockLoading}
                       />
-                      {l.itemId && !hasStockInWarehouse(l) && (
+                      {l.itemId && !sourceDocId && !hasStockInWarehouse(l) && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Stok tidak tersedia di gudang ini.
                         </p>
@@ -713,7 +720,7 @@ export function ReturPembelianForm() {
                     avoidCollisions={false}
                     loading={stockLoading}
                   />
-                  {l.itemId && !hasStockInWarehouse(l) && (
+                  {l.itemId && !sourceDocId && !hasStockInWarehouse(l) && (
                     <p className="text-xs text-muted-foreground">
                       Stok tidak tersedia di gudang ini.
                     </p>
