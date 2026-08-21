@@ -44,9 +44,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
+import { findItemByCode } from "@/lib/barcode-label";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
 import { valuationMethodLabels } from "@/lib/persediaan-types";
 import {
@@ -93,19 +95,30 @@ function KartuStock() {
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
-  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(null);
+  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(
+    null,
+  );
   const scanHandledRef = useRef(false);
 
-  const findItemByCode = useCallback(
+  const handleHardwareScan = useCallback(
     (code: string) => {
-      const c = code.trim();
-      if (!c) return undefined;
-      return options.find(
-        (it) => it.barcode === c || it.internal_barcode === c || it.sku === c || it.barcode?.toLowerCase() === c.toLowerCase(),
-      );
+      if (!options.length) {
+        toast.error("Data barang belum siap — coba lagi sesaat");
+        return;
+      }
+      const found = findItemByCode(options, code);
+      if (found) {
+        setId(found.id);
+        toast.success(`Terpilih: ${found.name}`);
+      } else {
+        toast.error(`Barang tidak ditemukan: ${code.trim()}`);
+      }
     },
     [options],
   );
+
+  // Scanner fisik (USB wedge): burst cepat + Enter → otomatis pilih barang.
+  useBarcodeScanner({ onScan: handleHardwareScan, enabled: !scanOpen });
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
   const activeId = id ?? options[0]?.id;
   const whId = useMemo(
@@ -145,23 +158,34 @@ function KartuStock() {
     scanHandledRef.current = false;
     (async () => {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
+        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
         if (cancelled || !scanOpen) return;
-        const scanner = new Html5Qrcode("kartu-stock-reader");
+        const scanner = new Html5Qrcode("kartu-stock-reader", {
+          verbose: false,
+          useBarCodeDetectorIfSupported: true,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+          ],
+        });
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 10, qrbox: { width: 300, height: 150 } },
           (decodedText) => {
             if (scanHandledRef.current) return;
-            const found = findItemByCode(decodedText);
+            const found = findItemByCode(options, decodedText);
             if (found) {
               scanHandledRef.current = true;
               setId(found.id);
               toast.success(`Terpilih: ${found.name}`);
               setScanOpen(false);
             } else {
-              toast.error(`Barang tidak ditemukan: ${decodedText}`);
+              toast.error(`Barang tidak ditemukan: ${decodedText.trim()}`);
             }
           },
           () => undefined,
@@ -179,7 +203,7 @@ function KartuStock() {
       cancelled = true;
       void stopScanner();
     };
-  }, [scanOpen, findItemByCode, stopScanner]);
+  }, [scanOpen, options, stopScanner]);
 
   const cardFifo = useStockCard(activeId, "FIFO", whId);
   const cardAvg = useStockCard(activeId, "Average", whId);
@@ -409,7 +433,8 @@ function KartuStock() {
               options={options.map((o) => ({
                 value: String(o.id),
                 label: `${o.name} — ${o.sku}`,
-                keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
+                keywords:
+                  `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
               }))}
               placeholder="Pilih barang…"
               searchPlaceholder="Cari nama, SKU, barcode…"
@@ -427,17 +452,27 @@ function KartuStock() {
               <ScanLine className="h-4 w-4" />
             </Button>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">Scan barcode untuk memilih otomatis</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Scan dengan kamera atau scanner fisik untuk memilih otomatis
+          </p>
         </Panel>
 
         <Dialog open={scanOpen} onOpenChange={setScanOpen}>
           <DialogContent className="max-w-md rounded-xl">
             <DialogHeader>
               <DialogTitle>Scan Barcode</DialogTitle>
-              <DialogDescription>Arahkan barcode atau QR ke dalam kotak. Pastikan izin kamera diaktifkan dan gunakan HTTPS.</DialogDescription>
+              <DialogDescription>
+                Arahkan barcode atau QR ke dalam kotak. Pastikan izin kamera diaktifkan dan gunakan
+                HTTPS.
+              </DialogDescription>
             </DialogHeader>
-            <div id="kartu-stock-reader" className="overflow-hidden rounded-xl border border-border bg-black" />
-            <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR Code</p>
+            <div
+              id="kartu-stock-reader"
+              className="overflow-hidden rounded-xl border border-border bg-black"
+            />
+            <p className="text-center text-xs text-muted-foreground">
+              Mendukung EAN-13, Code 128, dan QR Code
+            </p>
           </DialogContent>
         </Dialog>
 

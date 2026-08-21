@@ -64,6 +64,28 @@ export function encodeItem(item: Pick<ItemApi, "sku" | "barcode" | "internal_bar
   return item.internal_barcode || item.barcode || item.sku;
 }
 
+/** Normalisasi untuk matching scan: trim + buang \r\n + lower-case. */
+export function normalizeCode(s: string): string {
+  return s
+    .trim()
+    .replace(/[\r\n]/g, "")
+    .toLowerCase();
+}
+
+/** Cari ItemApi yang kodenya cocok dengan hasil scan (internal/barcode/sku). */
+export function findItemByCode<
+  T extends Pick<ItemApi, "id" | "sku" | "barcode" | "internal_barcode">,
+>(items: T[], code: string): T | undefined {
+  const c = normalizeCode(code);
+  if (!c) return undefined;
+  return items.find(
+    (it) =>
+      normalizeCode(it.internal_barcode ?? "") === c ||
+      normalizeCode(it.barcode ?? "") === c ||
+      normalizeCode(it.sku) === c,
+  );
+}
+
 /**
  * Bangun SVG kode (CODE128 untuk barcode, QR untuk QR Code) sebagai string.
  * Sinkron & SSR-safe (tidak menyentuh DOM). Melempar bila nilai kosong.
@@ -214,7 +236,12 @@ export function downloadSvg(svg: string, filename: string): void {
 
 /** Amankan nama file dari karakter ilegal (/, :, dsb). */
 export function slugFilename(s: string): string {
-  return s.replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "") || "label";
+  return (
+    s
+      .replace(/[^A-Za-z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "") || "label"
+  );
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -289,14 +316,19 @@ function labelCanvasSize(size: LabelSize): { wPx: number; hPx: number } {
 export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Promise<Blob> {
   const { wMm, hMm } = computeSheetLayout(size);
   const { wPx, hPx } = labelCanvasSize(size);
-  const qrSidePx = Math.max(Math.round(Math.min(wPx, hPx) - 8 * PX_PER_MM_300), Math.round(8 * PX_PER_MM_300));
+  const qrSidePx = Math.max(
+    Math.round(Math.min(wPx, hPx) - 8 * PX_PER_MM_300),
+    Math.round(8 * PX_PER_MM_300),
+  );
 
   // Raster kode SVG menjadi canvas sementara
   const codeW = wPx - Math.round(4 * PX_PER_MM_300);
   const codeH =
     label.kind === "QR Code"
       ? qrSidePx
-      : Math.round((size === "A4" ? 60 : size === "100x50" ? 22 : size === "50x30" ? 14 : 8) * PX_PER_MM_300);
+      : Math.round(
+          (size === "A4" ? 60 : size === "100x50" ? 22 : size === "50x30" ? 14 : 8) * PX_PER_MM_300,
+        );
   const codeBlob =
     label.kind === "QR Code"
       ? await svgToPngBlob(label.svg, qrSidePx, qrSidePx)
@@ -350,7 +382,11 @@ export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Prom
   void hMm;
 
   return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Gagal membuat PNG label"))), "image/png", 1);
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Gagal membuat PNG label"))),
+      "image/png",
+      1,
+    );
   });
 }
 
@@ -358,7 +394,10 @@ export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Prom
  * Download: 1 label → 1 PNG, >1 label → ZIP berisi N PNG (satu per instance).
  * Nama di dalam ZIP: label-<slugSku>-<index>.png (deduplikasi bila SKU sama).
  */
-export async function downloadLabelsAsPngOrZip(labels: PrintLabel[], size: LabelSize): Promise<string> {
+export async function downloadLabelsAsPngOrZip(
+  labels: PrintLabel[],
+  size: LabelSize,
+): Promise<string> {
   const capped = labels.slice(0, MAX_LABELS);
   if (capped.length === 0) throw new Error("Tidak ada label untuk diunduh");
   if (capped.length === 1) {
@@ -380,7 +419,11 @@ export async function downloadLabelsAsPngOrZip(labels: PrintLabel[], size: Label
     const entryName = `${slugFilename(`label-${base}`)}-${String(n).padStart(3, "0")}.png`;
     zip.file(entryName, blob);
   }
-  const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+  const zipBlob = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
   const zipName = `label-${size}.zip`;
   downloadBlob(zipBlob, zipName);
   return zipName;

@@ -6,6 +6,8 @@ import {
   buildSheetSvg,
   computeSheetLayout,
   encodeItem,
+  findItemByCode,
+  normalizeCode,
   slugFilename,
 } from "./barcode-label";
 
@@ -128,6 +130,40 @@ describe("buildSheetSvg", () => {
     });
     expect(sheet.startsWith("<svg")).toBe(true);
     expect(sheet.match(/<svg/g)?.length).toBe(1 + 78);
+  });
+});
+
+describe("normalizeCode", () => {
+  it("trim, buang CR/LF, lower-case", () => {
+    expect(normalizeCode("  BRG-001 \r\n")).toBe("brg-001");
+    expect(normalizeCode("SKU-10001-001")).toBe("sku-10001-001");
+    expect(normalizeCode("  ")).toBe("");
+  });
+});
+
+describe("findItemByCode", () => {
+  const items = [
+    { id: 1, sku: "SKU-10001-001", barcode: "8990000000001", internal_barcode: "BRG-001" },
+    { id: 2, sku: "SKU-10001-002", barcode: null, internal_barcode: null },
+    { id: 3, sku: "SKU-10001-003", barcode: "8990000000003", internal_barcode: "" },
+  ] as const;
+
+  it("cocok internal/barcode/sku tanpa memperhatikan besar-kecil huruf & spasi", () => {
+    expect(findItemByCode([...items], "brg-001")?.id).toBe(1);
+    expect(findItemByCode([...items], " BRG-001\r\n")?.id).toBe(1);
+    expect(findItemByCode([...items], "8990000000001")?.id).toBe(1);
+    expect(findItemByCode([...items], "SKU-10001-002")?.id).toBe(2);
+    expect(findItemByCode([...items], "sku-10001-002")?.id).toBe(2);
+  });
+
+  it("fallback sku bila barcode kosong", () => {
+    expect(findItemByCode([...items], "8990000000003")?.id).toBe(3);
+    expect(findItemByCode([...items], "sku-10001-003")?.id).toBe(3);
+  });
+
+  it("tidak ada kecocokan -> undefined", () => {
+    expect(findItemByCode([...items], "TIDAK-ADA")).toBeUndefined();
+    expect(findItemByCode([...items], "  ")).toBeUndefined();
   });
 });
 
