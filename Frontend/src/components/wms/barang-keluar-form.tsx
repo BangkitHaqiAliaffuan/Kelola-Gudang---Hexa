@@ -264,6 +264,10 @@ export function BarangKeluarForm() {
       toast.error("Pilih gudang terlebih dahulu.");
       return;
     }
+    if (!purpose.trim()) {
+      toast.error("Pilih tujuan terlebih dahulu.");
+      return;
+    }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
       toast.error("Lengkapi minimal satu baris barang (barang dan qty).");
@@ -352,18 +356,22 @@ export function BarangKeluarForm() {
             )}
           </div>
           <div className="space-y-1.5">
-            <Label>Tujuan</Label>
+            <Label>
+              Tujuan <span className="text-destructive">*</span>
+            </Label>
             <FormCombobox
               value={purpose}
               onValueChange={setPurpose}
               options={purposeOptions}
               placeholder="Customer / Departemen / Proyek"
               searchPlaceholder="Cari tujuan..."
-              allowEmpty
               side="bottom"
               avoidCollisions={false}
               loading={customersLoading || departmentsLoading || projectsLoading}
             />
+            {docError("partner") && (
+              <p className="text-xs text-destructive">{docError("partner")}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Referensi (SO / SPK / DO)</Label>

@@ -43,7 +43,12 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::exists('stock_documents', 'id'),
                 Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Retur Pembelian', 'Retur Penjualan'], true)),
             ],
-            'partner' => ['nullable', 'string', 'max:255'],
+            'partner' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn () => $this->input('type') === 'Pengeluaran'),
+            ],
             'reference_no' => ['nullable', 'string', 'max:255'],
             'pic' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],

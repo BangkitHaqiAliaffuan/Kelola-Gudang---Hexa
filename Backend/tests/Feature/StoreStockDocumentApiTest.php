@@ -264,6 +264,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Selesai',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'partner' => 'PT Aneka Mandiri',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 4, 'from_bin_id' => $bin->id],
@@ -309,6 +310,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Selesai',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 100, 'from_bin_id' => $bin->id],
             ],
@@ -330,6 +332,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1],
             ],
@@ -837,6 +840,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-11',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id],
             ],
@@ -928,6 +932,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'source_document_id' => $source->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id],
@@ -1316,6 +1321,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Selesai',
             'document_date' => $date,
             'warehouse_id' => $this->warehouseIdOf($binId),
+            'partner' => 'PT Test',
             'lines' => [
                 ['item_id' => $itemId, 'qty' => $qty, 'from_bin_id' => $binId],
             ],
@@ -1384,6 +1390,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-11',
             'warehouse_id' => $wh->id,
+            'partner' => 'PT Test',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id],
             ],
