@@ -113,17 +113,31 @@ function KartuStock() {
     [warehouses, wh],
   );
 
+  const stopScanner = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    scannerRef.current = null;
+    try {
+      const state = (scanner as unknown as { getState?: () => number }).getState?.();
+      // Html5QrcodeScannerState.SCANNING = 2, NOT_STARTED = 1
+      if (state === undefined || state === 2) {
+        await scanner.stop();
+      }
+    } catch {
+      // ignore: stop saat belum STARTED melempar, tidak perlu bubble
+    }
+    try {
+      if (document.getElementById("kartu-stock-reader")) {
+        await scanner.clear();
+      }
+    } catch {
+      // clear pada DOM yang sudah ter-unmount aman diabaikan
+    }
+  }, []);
+
   useEffect(() => {
     if (!scanOpen) {
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => undefined)
-          .finally(() => {
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          });
-      }
+      void stopScanner();
       scanHandledRef.current = false;
       return;
     }
@@ -163,17 +177,9 @@ function KartuStock() {
     })();
     return () => {
       cancelled = true;
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => undefined)
-          .finally(() => {
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          });
-      }
+      void stopScanner();
     };
-  }, [scanOpen, findItemByCode]);
+  }, [scanOpen, findItemByCode, stopScanner]);
 
   const cardFifo = useStockCard(activeId, "FIFO", whId);
   const cardAvg = useStockCard(activeId, "Average", whId);
