@@ -147,6 +147,8 @@ export function useRoles() {
     queryKey: keys.roles,
     queryFn: () => api.get<{ data: RoleCatalog[] }>("/master/roles"),
     enabled: typeof window !== "undefined",
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   });
 }
 
@@ -160,7 +162,11 @@ export function useUpdateRole() {
   return useMutation({
     mutationFn: ({ role, access }: RolePermissionPayload) =>
       api.put<{ data: RoleCatalog }>(`/master/roles/${encodeURIComponent(role)}`, { access }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.roles }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: keys.roles });
+      await qc.refetchQueries({ queryKey: keys.roles });
+      await qc.invalidateQueries({ queryKey: keys.users });
+    },
   });
 }
 

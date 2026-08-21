@@ -71,19 +71,18 @@ class StoreStockDocumentRequest extends FormRequest
             // dipakai untuk Penerimaan & Retur Penjualan tanpa sumber (dan sebagai
             // fallback Stock Opname).
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
-            // Opsi A: Penerimaan & Pengeluaran boleh tanpa bin (lantai/gudang) — bin opsional.
+            // Opsi A: Semua transaksi boleh tanpa bin (lantai/gudang) — bin opsional kecuali Stock Opname (butuh lokasi fisik).
             'lines.*.to_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
-                Rule::requiredIf(fn () => in_array($this->input('type'), ['Transfer Gudang', 'Retur Penjualan'], true)),
                 Rule::prohibitedIf(fn () => $this->input('type') === 'Stock Opname'),
             ],
             'lines.*.from_bin_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('bins', 'id'),
-                Rule::requiredIf(fn () => in_array($this->input('type'), ['Transfer Gudang', 'Retur Pembelian', 'Stock Opname'], true)),
+                Rule::requiredIf(fn () => $this->input('type') === 'Stock Opname'),
             ],
             'lines.*.note' => ['nullable', 'string', 'max:255'],
             // Alasan selisih (root cause) — dipakai Stock Opname yang langsung disimpan Selesai.

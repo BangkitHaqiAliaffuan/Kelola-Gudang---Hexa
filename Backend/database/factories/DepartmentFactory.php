@@ -18,7 +18,7 @@ class DepartmentFactory extends Factory
         return [
             'code' => 'DEP-'.$this->faker->unique()->numberBetween(1000, 9999),
             'name' => $this->faker->unique()->company(),
-            'head_user_id' => User::factory(),
+            'head_user_id' => User::factory()->state(fn () => ['role' => fake()->randomElement(['Supervisor', 'Operator Gudang', 'Auditor'])]),
             'is_active' => true,
         ];
     }

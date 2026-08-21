@@ -657,11 +657,11 @@ class StoreStockDocumentApiTest extends TestCase
 
     public function test_store_retur_pembelian_requires_from_bin(): void
     {
+        // Opsi A: Retur Pembelian boleh tanpa bin (lantai) — warehouse-level.
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
-        $before = StockDocument::count();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Pembelian',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -669,10 +669,9 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.from_bin_id');
-
-        $this->assertSame($before, StockDocument::count());
+        ]);
+        $res->assertStatus(201);
+        $this->assertNull($res->json('data.lines.0.from_bin_id'));
     }
 
     /** Buat dokumen Penerimaan Selesai dan kembalikan (doc, line pertama). */
@@ -1021,11 +1020,11 @@ class StoreStockDocumentApiTest extends TestCase
 
     public function test_store_retur_penjualan_requires_to_bin(): void
     {
+        // Opsi A: Retur Penjualan boleh tanpa bin (lantai).
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
-        $before = StockDocument::count();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -1033,10 +1032,9 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.to_bin_id');
-
-        $this->assertSame($before, StockDocument::count());
+        ]);
+        $res->assertStatus(201);
+        $this->assertNull($res->json('data.lines.0.to_bin_id'));
     }
 
     public function test_store_retur_penjualan_bin_not_in_warehouse_returns_422(): void

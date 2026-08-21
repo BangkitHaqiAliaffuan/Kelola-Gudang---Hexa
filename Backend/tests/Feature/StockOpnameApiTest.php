@@ -671,7 +671,7 @@ class StockOpnameApiTest extends TestCase
         $this->seedInbound($itemA, $wh, $binA, 10);
         $this->seedInbound($itemB, $wh, $binB, 5);
 
-        $docId = $this->postJson('/api/persediaan/stock-documents', [
+        $response = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Opname',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -680,7 +680,9 @@ class StockOpnameApiTest extends TestCase
                 ['item_id' => $itemA->id, 'from_bin_id' => $binA->id],
                 ['item_id' => $itemB->id, 'from_bin_id' => $binB->id],
             ],
-        ])->assertStatus(201)->json('data.id');
+        ]);
+        file_put_contents(base_path('debug_opname.json'), json_encode($response->json(), JSON_PRETTY_PRINT));
+        $docId = $response->assertStatus(201)->json('data.id');
 
         $detail = $this->getJson("/api/persediaan/stock-documents/{$docId}")->assertOk()->json('data');
         $lineAId = $detail['lines'][0]['id'];

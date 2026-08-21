@@ -19,7 +19,12 @@ class DepartmentSeeder extends Seeder
             'Umum',
         ];
 
-        $users = User::orderBy('id')->get();
+        $users = User::where('role', '!=', 'Administrator')->where('is_active', true)->orderBy('id')->get();
+
+        // Fallback jika tidak ada user non-admin (mis. fresh DB sebelum UserSeeder) — gunakan semua user aktif.
+        if ($users->isEmpty()) {
+            $users = User::where('is_active', true)->orderBy('id')->get();
+        }
 
         foreach ($departments as $i => $name) {
             Department::create([

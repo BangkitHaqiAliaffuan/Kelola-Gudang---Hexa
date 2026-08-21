@@ -110,6 +110,7 @@ class StockDocumentService
                     'pic' => $document->pic,
                     'note' => 'Koreksi otomatis dari opname '.$document->no,
                     'created_by' => $document->created_by,
+                    'requester_user_id' => $document->requester_user_id,
                 ]);
 
                 $varianceLines->each(function (StockDocumentLine $line, int $index) use ($adjustment) {

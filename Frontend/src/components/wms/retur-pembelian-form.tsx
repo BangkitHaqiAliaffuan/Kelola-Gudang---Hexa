@@ -230,10 +230,10 @@ export function ReturPembelianForm() {
   // sumber.
   const lineSource = (l: FormLine) => {
     if (!sourceLines.length || !l.itemId) return undefined;
+    const lineBin = l.binId ? Number(l.binId) : null;
     return (
-      sourceLines.find(
-        (s) => s.item_id === Number(l.itemId) && sourceLineBin(s) === Number(l.binId),
-      ) ?? sourceLines.find((s) => s.item_id === Number(l.itemId))
+      sourceLines.find((s) => s.item_id === Number(l.itemId) && sourceLineBin(s) === lineBin) ??
+      sourceLines.find((s) => s.item_id === Number(l.itemId))
     );
   };
 
@@ -367,11 +367,11 @@ export function ReturPembelianForm() {
     pic: pic.trim() || null,
     note: buildNote(),
     lines: lines
-      .filter((l) => l.itemId && l.binId && l.qty)
+      .filter((l) => l.itemId && l.qty)
       .map((l) => ({
         item_id: Number(l.itemId),
         qty: Number(l.qty),
-        from_bin_id: Number(l.binId),
+        from_bin_id: l.binId ? Number(l.binId) : null,
         source_line_id: sourceDocId ? (lineSource(l)?.id ?? null) : null,
       })),
   });
@@ -388,12 +388,12 @@ export function ReturPembelianForm() {
     }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
-      toast.error("Lengkapi minimal satu baris barang (barang, lokasi bin, dan qty).");
+      toast.error("Lengkapi minimal satu baris barang (barang dan qty).");
       return;
     }
 
     const overSourceLine = lines.find((l) => {
-      if (!l.itemId || !l.binId || !l.qty) return false;
+      if (!l.itemId || !l.qty) return false;
       const src = lineSource(l);
       return src != null && Number(l.qty) > (src.qty ?? 0);
     });

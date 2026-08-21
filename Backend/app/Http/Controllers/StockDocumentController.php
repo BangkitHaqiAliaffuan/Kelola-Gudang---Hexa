@@ -166,6 +166,8 @@ class StockDocumentController extends Controller
                             : ($isOutbound ? ($data['type'] === 'Retur Pembelian' ? 'RP' : 'BK')
                                 : ($data['type'] === 'Retur Penjualan' ? 'RJ' : 'BM'))));
 
+                $authId = $request->user('sanctum')?->id;
+
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
@@ -182,7 +184,8 @@ class StockDocumentController extends Controller
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
                     'note' => $data['note'] ?? null,
-                    'created_by' => $request->user('sanctum')?->id,
+                    'created_by' => $authId,
+                    'requester_user_id' => $authId,
                 ]);
 
                 foreach ($data['lines'] as $index => $line) {
@@ -222,7 +225,7 @@ class StockDocumentController extends Controller
                                     ? ($this->averageCost($line['item_id'], $adjustBinId !== null ? (int) $adjustBinId : null, $fromBins, (int) $data['warehouse_id']) ?? 0.0)
                                     : (($isOutbound || $isTransfer)
                                         ? ($this->averageCost($line['item_id'], isset($line['from_bin_id']) ? (int) $line['from_bin_id'] : null, $fromBins, (int) $data['warehouse_id']) ?? 0.0)
-                                        : $line['unit_cost']))),
+                                        : ($line['unit_cost'] ?? 0)))),
                         'to_bin_id' => ($isOpname || $isOutbound) ? null : ($line['to_bin_id'] ?? null),
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
@@ -232,6 +235,9 @@ class StockDocumentController extends Controller
                 }
 
                 if ($data['status'] === 'Selesai') {
+                    if ($document->requester_user_id !== null && $document->requester_user_id === $authId) {
+                        throw new \InvalidArgumentException('Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.');
+                    }
                     $this->service->post($document);
                 }
 
@@ -404,6 +410,11 @@ class StockDocumentController extends Controller
      */
     public function post(StockDocument $stockDocument)
     {
+        $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.'], 422);
+        }
+
         try {
             $document = $this->service->post($stockDocument);
         } catch (\InvalidArgumentException $e) {
@@ -422,6 +433,11 @@ class StockDocumentController extends Controller
     {
         if ($stockDocument->isPosted()) {
             return response()->json(['message' => 'Dokumen yang sudah diposting tidak dapat dibatalkan.'], 422);
+        }
+
+        $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh membatalkan laporannya sendiri.'], 422);
         }
 
         $stockDocument->update(['status' => 'Dibatalkan', 'posted_at' => null]);

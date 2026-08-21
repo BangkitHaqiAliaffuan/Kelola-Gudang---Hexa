@@ -213,6 +213,8 @@ export type StockDocumentApi = {
   note: string | null;
   posted_at: string | null;
   created_by: string | null;
+  requester_user_id: number | null;
+  requester: string | null;
   blind_count: boolean;
   frozen_at: string | null;
   line_count: number;

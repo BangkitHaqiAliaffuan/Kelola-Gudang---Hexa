@@ -29,6 +29,8 @@ class StockDocumentResource extends JsonResource
             'note' => $this->note,
             'posted_at' => $this->posted_at?->toIso8601String(),
             'created_by' => $this->whenLoaded('creator', fn () => $this->creator?->name),
+            'requester_user_id' => $this->requester_user_id,
+            'requester' => $this->whenLoaded('requester', fn () => $this->requester?->name),
             'line_count' => $this->whenCounted('lines'),
             'checked_count' => $this->when(isset($this->resource->checked_count), (int) $this->resource->checked_count),
             'qty_total' => $this->when(isset($this->resource->qty_total), (int) $this->resource->qty_total),

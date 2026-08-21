@@ -45,6 +45,7 @@ class StockDocument extends Model
         'note',
         'posted_at',
         'created_by',
+        'requester_user_id',
     ];
 
     protected $casts = [
@@ -82,6 +83,11 @@ class StockDocument extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requester_user_id');
     }
 
     public function isPosted(): bool

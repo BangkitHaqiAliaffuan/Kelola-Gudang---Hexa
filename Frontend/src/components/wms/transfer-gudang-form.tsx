@@ -95,22 +95,26 @@ export function TransferGudangForm() {
   );
 
   const fromBinOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInWarehouse.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInWarehouse.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInWarehouse],
   );
 
   const toBinOptions: ComboboxOption[] = useMemo(
-    () =>
-      binsInDestination.map((b) => ({
+    () => [
+      { value: "", label: "Tanpa Bin — Lantai / Gudang", keywords: "lantai gudang tanpa bin" },
+      ...binsInDestination.map((b) => ({
         value: String(b.id),
         label: b.full_address ?? b.name,
         keywords: `${b.code} ${b.rack_name ?? ""}`,
       })),
+    ],
     [binsInDestination],
   );
 
@@ -129,7 +133,8 @@ export function TransferGudangForm() {
   // validasi otoritatif tetap server saat posting.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of stockRows?.data ?? []) map.set(`${r.item_id}:${r.bin_id}`, r.available);
+    for (const r of stockRows?.data ?? [])
+      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
@@ -137,7 +142,7 @@ export function TransferGudangForm() {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0) continue;
-      const binKey = String(r.bin_id);
+      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -145,8 +150,13 @@ export function TransferGudangForm() {
     return map;
   }, [stockRows]);
 
-  const lineAvailable = (l: FormLine): number | undefined =>
-    l.itemId && l.fromBinId ? availableByKey.get(`${l.itemId}:${l.fromBinId}`) : undefined;
+  const lineAvailable = (l: FormLine): number | undefined => {
+    if (!l.itemId) return undefined;
+    const binPart = l.fromBinId === "" ? "NULL" : l.fromBinId;
+    // Jika fromBinId kosong (lantai), lookup NULL bucket; jika belum pilih bin samasekali, jangan tampilkan
+    // Transfer selalu punya fromBinId (bisa ""), jadi lookup selalu
+    return availableByKey.get(`${l.itemId}:${binPart}`);
+  };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
     if (!l.fromBinId) return itemOptions;
@@ -217,12 +227,12 @@ export function TransferGudangForm() {
     pic: pic.trim() || null,
     note: note.trim() || null,
     lines: lines
-      .filter((l) => l.itemId && l.fromBinId && l.toBinId && l.qty)
+      .filter((l) => l.itemId && l.qty)
       .map((l) => ({
         item_id: Number(l.itemId),
         qty: Number(l.qty),
-        from_bin_id: Number(l.fromBinId),
-        to_bin_id: Number(l.toBinId),
+        from_bin_id: l.fromBinId ? Number(l.fromBinId) : null,
+        to_bin_id: l.toBinId ? Number(l.toBinId) : null,
       })),
   });
 
@@ -238,12 +248,12 @@ export function TransferGudangForm() {
     }
     const payload = buildPayload(status);
     if (payload.lines.length === 0) {
-      toast.error("Lengkapi minimal satu baris barang (barang, bin asal, bin tujuan, dan qty).");
+      toast.error("Lengkapi minimal satu baris barang (barang dan qty).");
       return;
     }
 
     const overLine = lines.find((l) => {
-      if (!l.itemId || !l.fromBinId || !l.toBinId || !l.qty) return false;
+      if (!l.itemId || !l.qty) return false;
       const available = lineAvailable(l);
       return available !== undefined && Number(l.qty) > available;
     });
@@ -392,7 +402,8 @@ export function TransferGudangForm() {
             <tbody>
               {lines.map((l, i) => {
                 const available = lineAvailable(l);
-                const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+                const overStock =
+                  !submitted && available !== undefined && (Number(l.qty) || 0) > available;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[210px] px-3 py-2 align-top">
@@ -484,7 +495,8 @@ export function TransferGudangForm() {
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
             const available = lineAvailable(l);
-            const overStock = !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+            const overStock =
+              !submitted && available !== undefined && (Number(l.qty) || 0) > available;
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">

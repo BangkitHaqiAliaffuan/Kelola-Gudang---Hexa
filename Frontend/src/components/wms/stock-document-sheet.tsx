@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/use-auth";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { opnameReasonLabel } from "@/lib/persediaan-types";
 import type {
@@ -143,6 +144,8 @@ export function StockDocumentSheet({
   onCancel?: () => void;
   busy?: boolean;
 }) {
+  const { user } = useAuth();
+  const isSelf = doc?.requester_user_id != null && user?.id === doc.requester_user_id;
   const lines = doc?.lines ?? [];
   const isOpname = doc?.type === "Stock Opname" || (lines.length > 0 && lines.every(isOpnameLine));
   const isAdjustment = doc?.type === "Stock Adjustment";
@@ -355,6 +358,13 @@ export function StockDocumentSheet({
               )}
             </div>
 
+            {isSelf && doc.status === "Draft" && (
+              <div className="border-t border-border bg-destructive/10 px-5 py-2">
+                <p className="text-xs font-medium text-destructive">
+                  Pembuat dokumen tidak boleh memposting atau membatalkan laporannya sendiri.
+                </p>
+              </div>
+            )}
             <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-card px-5 py-3">
               <Button
                 variant="outline"
@@ -370,7 +380,8 @@ export function StockDocumentSheet({
                       variant="outline"
                       className="rounded-xl"
                       onClick={onCancel}
-                      disabled={busy}
+                      disabled={busy || isSelf}
+                      title={isSelf ? "Pembuat tidak boleh membatalkan sendiri" : undefined}
                     >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -381,7 +392,12 @@ export function StockDocumentSheet({
                     </Button>
                   )}
                   {onPost && (
-                    <Button className="rounded-xl" onClick={onPost} disabled={busy}>
+                    <Button
+                      className="rounded-xl"
+                      onClick={onPost}
+                      disabled={busy || isSelf}
+                      title={isSelf ? "Pembuat tidak boleh memposting sendiri" : undefined}
+                    >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (

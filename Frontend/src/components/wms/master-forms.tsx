@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { CrudFormDialog } from "./master-crud";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -3178,11 +3179,13 @@ export function DepartmentFormDialog({
               control={form.control}
               name="head_user_id"
               render={({ field }) => {
-                const userOptions: ComboboxOption[] = (users?.data ?? []).map((u) => ({
-                  value: String(u.id),
-                  label: u.name,
-                  keywords: u.code,
-                }));
+                const userOptions: ComboboxOption[] = (users?.data ?? [])
+                  .filter((u) => u.role !== "Administrator" && u.is_active)
+                  .map((u) => ({
+                    value: String(u.id),
+                    label: `${u.name} — ${u.code}`,
+                    keywords: u.code,
+                  }));
                 return (
                   <FormItem>
                     <FormLabel>
@@ -3200,6 +3203,9 @@ export function DepartmentFormDialog({
                         avoidCollisions={false}
                       />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Administrator tidak dapat menjadi kepala departemen.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 );
@@ -4045,6 +4051,7 @@ export function RoleEditDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const update = useUpdateRole();
+  const navigate = useNavigate();
   const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
   const [canApprove, setCanApprove] = useState(false);
 
@@ -4077,6 +4084,7 @@ export function RoleEditDialog({
       await update.mutateAsync({ role: role.name, access });
       toast.success("Hak akses role diperbarui");
       onOpenChange(false);
+      navigate({ to: "/master/$section", params: { section: "role" } });
     } catch (err) {
       toast.error((err as Error).message);
     }
