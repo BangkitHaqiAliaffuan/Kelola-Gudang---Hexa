@@ -246,8 +246,7 @@ export function ReturPembelianForm() {
   const returnableSourceLines = useMemo(
     () =>
       sourceLines.filter(
-        (s) =>
-          (availableByKey.get(`${s.item_id}:${sourceLineBin(s) ?? "NULL"}`) ?? 0) > 0,
+        (s) => (availableByKey.get(`${s.item_id}:${sourceLineBin(s) ?? "NULL"}`) ?? 0) > 0,
       ),
     [sourceLines, availableByKey],
   );

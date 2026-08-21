@@ -140,18 +140,6 @@ export function BarangKeluarForm() {
     return set;
   }, [stockRows, warehouseId]);
 
-  const availableItemIdsByBin = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0) continue;
-      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
-      const set = map.get(binKey) ?? new Set<string>();
-      set.add(String(r.item_id));
-      map.set(binKey, set);
-    }
-    return map;
-  }, [stockRows]);
-
   // Bin-bin yang benar-benar berisi stok di gudang terpilih — dipakai sebagai
   // scope dropdown bin agar operator tidak diganggu 72 bin kosong.
   const stockedBinIds = useMemo(() => {
@@ -187,26 +175,10 @@ export function BarangKeluarForm() {
     return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
-  const lineItemOptions = (l: FormLine): ComboboxOption[] => {
+  const lineItemOptions = (): ComboboxOption[] => {
     if (!warehouseId) return [];
-    if (l.binId === "") {
-      // Opsi A lantai: hanya item yang punya stok di NULL bucket di gudang terpilih
-      const ids = new Set<string>();
-      for (const r of stockRows?.data ?? []) {
-        if (r.stock > 0 && r.warehouse_id === Number(warehouseId) && r.bin_id === null) ids.add(String(r.item_id));
-      }
-      if (ids.size === 0) return [];
-      return itemOptions.filter((o) => ids.has(o.value));
-    }
-    if (!l.binId) {
-      // Belum pilih bin: hanya tampilkan barang yang ada di gudang terpilih
-      if (itemIdsInWarehouse.size === 0) return [];
-      return itemOptions.filter((o) => itemIdsInWarehouse.has(o.value));
-    }
-    const availableIds = availableItemIdsByBin.get(l.binId);
-    if (!availableIds) return [];
-    // Bin spesifik sudah unik global (bin milik satu gudang), intersect dengan gudang agar tidak bocor
-    return itemOptions.filter((o) => availableIds.has(o.value) && itemIdsInWarehouse.has(o.value));
+    if (itemIdsInWarehouse.size === 0) return [];
+    return itemOptions.filter((o) => itemIdsInWarehouse.has(o.value));
   };
 
   // Dropdown bin scoped: hanya bin berisi stok di gudang ini; saat barang sudah
@@ -454,8 +426,10 @@ export function BarangKeluarForm() {
                       <FormCombobox
                         value={l.itemId}
                         onValueChange={(v) => pickItem(l.key, v)}
-                        options={lineItemOptions(l)}
-                        placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
+                        options={lineItemOptions()}
+                        placeholder={
+                          warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"
+                        }
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
@@ -537,7 +511,7 @@ export function BarangKeluarForm() {
                   <FormCombobox
                     value={l.itemId}
                     onValueChange={(v) => pickItem(l.key, v)}
-                    options={lineItemOptions(l)}
+                    options={lineItemOptions()}
                     placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
