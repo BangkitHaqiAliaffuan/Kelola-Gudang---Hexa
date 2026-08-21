@@ -104,11 +104,12 @@ export function buildCodeSvg(
   return toSVG({
     bcid: "code128",
     text,
-    height: opts?.codeHeightMm ?? 14,
+    scale: 2,
+    height: opts?.codeHeightMm ?? 10,
     includetext: true,
     textxalign: "center",
     textsize: 10,
-    padding: 2,
+    padding: 10,
     backgroundcolor: "FFFFFF",
     barcolor: "000000",
   });

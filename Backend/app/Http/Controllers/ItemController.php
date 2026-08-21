@@ -8,6 +8,8 @@ use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Http\Resources\ItemResource;
 use App\Models\Item;
+use App\Models\ProcDocLine;
+use App\Models\StockDocumentLine;
 use App\Models\WorkOrder;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
@@ -81,7 +83,28 @@ class ItemController extends Controller
             ], 422);
         }
 
-        $item->delete();
+        if (StockDocumentLine::where('item_id', $item->id)->exists()) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena memiliki riwayat transaksi stock (mutasi/dokumen persediaan).',
+            ], 422);
+        }
+
+        if (ProcDocLine::where('item_id', $item->id)->exists()) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena masih digunakan pada dokumen pengadaan (PR/PO).',
+            ], 422);
+        }
+
+        try {
+            $item->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ((int) ($e->getCode()) === 23001 || str_contains($e->getMessage(), 'stock_document_lines')) {
+                return response()->json([
+                    'message' => 'Barang tidak dapat dihapus karena masih memiliki riwayat transaksi stock.',
+                ], 422);
+            }
+            throw $e;
+        }
 
         return response()->json(['message' => 'Barang berhasil dihapus.'], 200);
     }
@@ -97,7 +120,28 @@ class ItemController extends Controller
             ], 422);
         }
 
-        $deleted = Item::whereIn('id', $ids)->delete();
+        if (StockDocumentLine::whereIn('item_id', $ids)->exists()) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena memiliki riwayat transaksi stock (mutasi/dokumen persediaan).',
+            ], 422);
+        }
+
+        if (ProcDocLine::whereIn('item_id', $ids)->exists()) {
+            return response()->json([
+                'message' => 'Barang tidak dapat dihapus karena masih digunakan pada dokumen pengadaan (PR/PO).',
+            ], 422);
+        }
+
+        try {
+            $deleted = Item::whereIn('id', $ids)->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ((int) ($e->getCode()) === 23001 || str_contains($e->getMessage(), 'stock_document_lines')) {
+                return response()->json([
+                    'message' => 'Barang tidak dapat dihapus karena memiliki riwayat transaksi stock.',
+                ], 422);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'message' => "{$deleted} barang berhasil dihapus.",

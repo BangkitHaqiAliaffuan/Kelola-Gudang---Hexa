@@ -167,6 +167,7 @@ function KartuStock() {
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
@@ -175,7 +176,12 @@ function KartuStock() {
         scannerRef.current = scanner;
         await scanner.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 300, height: 150 } },
+          {
+            fps: 15,
+            qrbox: { width: 400, height: 200 },
+            aspectRatio: 1.33,
+            disableFlip: false,
+          },
           (decodedText) => {
             if (scanHandledRef.current) return;
             const found = findItemByCode(options, decodedText);
@@ -468,7 +474,7 @@ function KartuStock() {
             </DialogHeader>
             <div
               id="kartu-stock-reader"
-              className="overflow-hidden rounded-xl border border-border bg-black"
+              className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
             />
             <p className="text-center text-xs text-muted-foreground">
               Mendukung EAN-13, Code 128, dan QR Code

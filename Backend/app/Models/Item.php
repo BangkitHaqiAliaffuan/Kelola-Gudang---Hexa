@@ -97,4 +97,14 @@ class Item extends Model
     {
         return $this->hasMany(ItemStock::class);
     }
+
+    public function stockDocumentLines(): HasMany
+    {
+        return $this->hasMany(StockDocumentLine::class);
+    }
+
+    public function procDocLines(): HasMany
+    {
+        return $this->hasMany(ProcDocLine::class);
+    }
 }
