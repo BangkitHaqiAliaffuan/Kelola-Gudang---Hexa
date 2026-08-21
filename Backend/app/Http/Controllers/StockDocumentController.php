@@ -235,7 +235,7 @@ class StockDocumentController extends Controller
                 }
 
                 if ($data['status'] === 'Selesai') {
-                    if ($document->requester_user_id !== null && $document->requester_user_id === $authId) {
+                    if (in_array($data['type'], ['Stock Adjustment', 'Stock Opname'], true) && $document->requester_user_id !== null && $document->requester_user_id === $authId) {
                         throw new \InvalidArgumentException('Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.');
                     }
                     $this->service->post($document);
@@ -411,7 +411,7 @@ class StockDocumentController extends Controller
     public function post(StockDocument $stockDocument)
     {
         $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
-        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+        if (in_array($stockDocument->type, ['Stock Adjustment', 'Stock Opname'], true) && $stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
             return response()->json(['message' => 'Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.'], 422);
         }
 
@@ -436,7 +436,7 @@ class StockDocumentController extends Controller
         }
 
         $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
-        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+        if (in_array($stockDocument->type, ['Stock Adjustment', 'Stock Opname'], true) && $stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
             return response()->json(['message' => 'Pembuat dokumen tidak boleh membatalkan laporannya sendiri.'], 422);
         }
 

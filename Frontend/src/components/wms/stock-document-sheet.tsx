@@ -146,6 +146,8 @@ export function StockDocumentSheet({
 }) {
   const { user } = useAuth();
   const isSelf = doc?.requester_user_id != null && user?.id === doc.requester_user_id;
+  const isSelfBlocked =
+    isSelf && (doc?.type === "Stock Adjustment" || doc?.type === "Stock Opname");
   const lines = doc?.lines ?? [];
   const isOpname = doc?.type === "Stock Opname" || (lines.length > 0 && lines.every(isOpnameLine));
   const isAdjustment = doc?.type === "Stock Adjustment";
@@ -358,7 +360,7 @@ export function StockDocumentSheet({
               )}
             </div>
 
-            {isSelf && doc.status === "Draft" && (
+            {isSelfBlocked && doc.status === "Draft" && (
               <div className="border-t border-border bg-destructive/10 px-5 py-2">
                 <p className="text-xs font-medium text-destructive">
                   Pembuat dokumen tidak boleh memposting atau membatalkan laporannya sendiri.
@@ -380,8 +382,8 @@ export function StockDocumentSheet({
                       variant="outline"
                       className="rounded-xl"
                       onClick={onCancel}
-                      disabled={busy || isSelf}
-                      title={isSelf ? "Pembuat tidak boleh membatalkan sendiri" : undefined}
+                      disabled={busy || isSelfBlocked}
+                      title={isSelfBlocked ? "Pembuat tidak boleh membatalkan sendiri" : undefined}
                     >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -395,8 +397,8 @@ export function StockDocumentSheet({
                     <Button
                       className="rounded-xl"
                       onClick={onPost}
-                      disabled={busy || isSelf}
-                      title={isSelf ? "Pembuat tidak boleh memposting sendiri" : undefined}
+                      disabled={busy || isSelfBlocked}
+                      title={isSelfBlocked ? "Pembuat tidak boleh memposting sendiri" : undefined}
                     >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

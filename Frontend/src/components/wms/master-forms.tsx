@@ -2494,8 +2494,8 @@ export function ItemFormDialog({
             default_rack_id: "",
             default_bin_id: "",
             preferred_supplier_id: "",
-            cost: 0,
-            price: 0,
+            cost: 100,
+            price: 100,
             min_stock: 0,
             max_stock: undefined,
             lead_time: 0,
@@ -2922,7 +2922,7 @@ export function ItemFormDialog({
                     <FormItem>
                       <FormLabel>Harga Pokok (Rp)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} step="any" className="rounded-xl" {...field} />
+                        <Input type="number" min={100} step="any" className="rounded-xl" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -2935,7 +2935,7 @@ export function ItemFormDialog({
                     <FormItem>
                       <FormLabel>Harga Jual (Rp)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={0} step="any" className="rounded-xl" {...field} />
+                        <Input type="number" min={100} step="any" className="rounded-xl" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

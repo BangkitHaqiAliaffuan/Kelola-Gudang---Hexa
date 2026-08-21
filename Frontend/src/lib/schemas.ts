@@ -206,10 +206,10 @@ export const itemSchema = z
     preferred_supplier_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
     cost: z.coerce
       .number({ invalid_type_error: "Harga pokok wajib diisi" })
-      .min(0, "Tidak boleh negatif"),
+      .min(100, "Minimal Rp 100"),
     price: z.coerce
       .number({ invalid_type_error: "Harga jual wajib diisi" })
-      .min(0, "Tidak boleh negatif"),
+      .min(100, "Minimal Rp 100"),
     min_stock: z.coerce.number().int().min(0).default(0),
     max_stock: z.coerce.number().int().min(0).optional(),
     lead_time: z.coerce.number().int().min(0).default(0),
