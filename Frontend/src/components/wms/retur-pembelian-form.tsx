@@ -181,7 +181,7 @@ export function ReturPembelianForm() {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
       if (r.stock <= 0) continue;
-      const binKey = String(r.bin_id);
+      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -218,8 +218,11 @@ export function ReturPembelianForm() {
     return map;
   }, [stockRows, warehouseId]);
 
-  const lineAvailable = (l: FormLine): number | undefined =>
-    l.itemId && l.binId ? availableByKey.get(`${l.itemId}:${l.binId}`) : undefined;
+  const lineAvailable = (l: FormLine): number | undefined => {
+    if (!l.itemId) return undefined;
+    const binPart = l.binId === "" ? "NULL" : l.binId;
+    return availableByKey.get(`${l.itemId}:${binPart}`);
+  };
 
   // Bin asal retur dari baris Penerimaan sumber: BM buatan form sungguhan
   // menyimpan bin di `to_bin_id`, BM lama (seed) hanya di `from_bin_id`.
@@ -242,7 +245,10 @@ export function ReturPembelianForm() {
   // baris sumber, konsisten dengan validasi server).
   const returnableSourceLines = useMemo(
     () =>
-      sourceLines.filter((s) => (availableByKey.get(`${s.item_id}:${sourceLineBin(s)}`) ?? 0) > 0),
+      sourceLines.filter(
+        (s) =>
+          (availableByKey.get(`${s.item_id}:${sourceLineBin(s) ?? "NULL"}`) ?? 0) > 0,
+      ),
     [sourceLines, availableByKey],
   );
 

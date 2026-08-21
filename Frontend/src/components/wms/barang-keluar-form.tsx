@@ -117,15 +117,28 @@ export function BarangKeluarForm() {
     [binsInWarehouse],
   );
 
-  // Ketersediaan per (barang, bin) dari /persediaan/stock; dipakai sebagai
-  // peringatan proaktif + penyaringan opsi barang per bin — validasi
-  // otoritatif tetap server saat posting.
+  // Ketersediaan per (barang, bin, gudang) dari /persediaan/stock; dipakai sebagai
+  // peringatan proaktif + penyaringan opsi barang per gudang/bin — validasi
+  // otoritatif tetap server saat posting. Gudang dipilih wajib, barang hanya
+  // menampilkan item yang punya stok di gudang tersebut.
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of stockRows?.data ?? [])
-      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
+      map.set(`${r.warehouse_id}:${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
+
+  // Item IDs yang punya stok >0 di gudang terpilih — untuk filter barang per gudang.
+  const itemIdsInWarehouse = useMemo(() => {
+    const set = new Set<string>();
+    if (!warehouseId) return set;
+    const wid = Number(warehouseId);
+    for (const r of stockRows?.data ?? []) {
+      if (r.stock <= 0 || r.warehouse_id !== wid) continue;
+      set.add(String(r.item_id));
+    }
+    return set;
+  }, [stockRows, warehouseId]);
 
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -169,27 +182,31 @@ export function BarangKeluarForm() {
   }, [stockRows, warehouseId]);
 
   const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId) return undefined;
-    // Opsi A: binId "" = lantai (NULL)
+    if (!l.itemId || !warehouseId) return undefined;
     const binPart = l.binId === "" ? "NULL" : l.binId;
-    // Jika bin kosong, hanya lookup NULL jika baris memang tanpa bin; jika belum pilih bin, jangan tampilkan tersedia
-    // Untuk BK, bin kosong valid (lantai) -> lookup NULL bucket
-    return availableByKey.get(`${l.itemId}:${binPart}`);
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    if (!l.binId) {
-      // bin "" = lantai: hanya item yang punya stok di NULL bucket
-      if (l.binId === "") {
-        const ids = availableItemIdsByBin.get("NULL");
-        if (!ids) return [];
-        return itemOptions.filter((o) => ids.has(o.value));
+    if (!warehouseId) return [];
+    if (l.binId === "") {
+      // Opsi A lantai: hanya item yang punya stok di NULL bucket di gudang terpilih
+      const ids = new Set<string>();
+      for (const r of stockRows?.data ?? []) {
+        if (r.stock > 0 && r.warehouse_id === Number(warehouseId) && r.bin_id === null) ids.add(String(r.item_id));
       }
-      return itemOptions;
+      if (ids.size === 0) return [];
+      return itemOptions.filter((o) => ids.has(o.value));
+    }
+    if (!l.binId) {
+      // Belum pilih bin: hanya tampilkan barang yang ada di gudang terpilih
+      if (itemIdsInWarehouse.size === 0) return [];
+      return itemOptions.filter((o) => itemIdsInWarehouse.has(o.value));
     }
     const availableIds = availableItemIdsByBin.get(l.binId);
     if (!availableIds) return [];
-    return itemOptions.filter((o) => availableIds.has(o.value));
+    // Bin spesifik sudah unik global (bin milik satu gudang), intersect dengan gudang agar tidak bocor
+    return itemOptions.filter((o) => availableIds.has(o.value) && itemIdsInWarehouse.has(o.value));
   };
 
   // Dropdown bin scoped: hanya bin berisi stok di gudang ini; saat barang sudah
@@ -438,7 +455,7 @@ export function BarangKeluarForm() {
                         value={l.itemId}
                         onValueChange={(v) => pickItem(l.key, v)}
                         options={lineItemOptions(l)}
-                        placeholder="Pilih barang / scan barcode"
+                        placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari nama, SKU, barcode..."
                         side="top"
                         avoidCollisions={false}
@@ -521,7 +538,7 @@ export function BarangKeluarForm() {
                     value={l.itemId}
                     onValueChange={(v) => pickItem(l.key, v)}
                     options={lineItemOptions(l)}
-                    placeholder="Pilih barang / scan barcode"
+                    placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}
                     loading={itemsLoading || stockLoading}
