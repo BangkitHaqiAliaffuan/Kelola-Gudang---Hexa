@@ -3622,7 +3622,7 @@ export function WorkOrderFormDialog({
                 const itemOptions: ComboboxOption[] = (items?.data ?? []).map((it) => ({
                   value: String(it.id),
                   label: it.name,
-                  keywords: [it.sku, it.internal_barcode].filter(Boolean).join(" "),
+                  keywords: [it.sku, it.barcode, it.internal_barcode].filter(Boolean).join(" "),
                 }));
                 return (
                   <FormItem>
@@ -3632,7 +3632,8 @@ export function WorkOrderFormDialog({
                         value={String(field.value)}
                         onValueChange={(v) => field.onChange(Number(v))}
                         options={itemOptions}
-                        placeholder="Pilih barang"
+                        placeholder="Pilih barang / scan barcode"
+                        searchPlaceholder="Cari nama, SKU, barcode..."
                         loading={itemsLoading}
                         side="bottom"
                         avoidCollisions={false}

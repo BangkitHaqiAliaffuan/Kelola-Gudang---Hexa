@@ -513,7 +513,8 @@ export function TransferGudangForm() {
                     value={l.itemId}
                     onValueChange={(v) => pickItem(l.key, v)}
                     options={lineItemOptions(l)}
-                    placeholder="Pilih barang"
+                    placeholder="Pilih barang / scan barcode"
+                    searchPlaceholder="Cari nama, SKU, barcode..."
                     side="top"
                     avoidCollisions={false}
                     loading={itemsLoading || (Boolean(l.fromBinId) && stockLoading)}
