@@ -26,7 +26,10 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useStockDocuments } from "@/hooks/use-persediaan";
 import { LaporanBarangMasukKeluar } from "@/components/wms/laporan-barang-masuk-keluar";
+import { LaporanKartuStock } from "@/components/wms/laporan-kartu-stock";
+import { LaporanMutasi } from "@/components/wms/laporan-mutasi";
 import { LaporanStock } from "@/components/wms/laporan-stock";
+import { LaporanStockMinimum } from "@/components/wms/laporan-stock-minimum";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
   formatDate,
@@ -108,6 +111,9 @@ function Laporan() {
   if (report === "stock") return <LaporanStock />;
   if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
   if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
+  if (report === "kartu-stock") return <LaporanKartuStock />;
+  if (report === "stock-minimum") return <LaporanStockMinimum />;
+  if (report === "mutasi") return <LaporanMutasi />;
 
   const source: Row[] = isStockOpname
     ? opnameRows.map((d) => ({

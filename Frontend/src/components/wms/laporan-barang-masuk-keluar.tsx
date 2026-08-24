@@ -47,7 +47,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
   const partnerLabel = isMasuk ? "Supplier" : "Tujuan";
 
   const { status: authStatus, hasModuleLevel } = useAuth();
-  const canView = hasModuleLevel("Persediaan", "Baca");
+  const canView = hasModuleLevel("Laporan", "Baca");
   const noAccess = authStatus === "authenticated" && !canView;
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();

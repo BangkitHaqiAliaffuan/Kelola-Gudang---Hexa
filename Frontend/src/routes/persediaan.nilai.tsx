@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Wallet, TrendingUp, TrendingDown, PackageX, Zap, Lock } from "lucide-react";
+import { Download, FileSpreadsheet, Search, Wallet, TrendingUp, TrendingDown, PackageX, Zap, Lock } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { toast } from "sonner";
 import {
   ALL,
   EmptyState,
@@ -12,13 +13,19 @@ import {
   StatCard,
   TableSkeleton,
 } from "@/components/wms/kit";
+import { DataTable, type Column } from "@/components/wms/data-table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockValuation } from "@/hooks/use-persediaan";
-import { valuationMethodLabels, type StockValuationApi } from "@/lib/persediaan-types";
+import { stockMovingTypes, valuationMethodLabels, type StockValuationApi } from "@/lib/persediaan-types";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import {
   formatIDR,
   formatIDRCompact,
+  formatNumber,
   valuationMethods,
   type ValuationMethod,
 } from "@/lib/wms-data";
@@ -54,6 +61,9 @@ function NilaiPersediaan() {
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
+  const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q);
+  const [moving, setMoving] = useState(ALL);
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
@@ -64,6 +74,7 @@ function NilaiPersediaan() {
   const { data, isLoading } = useStockValuation({
     warehouseId: wh === ALL ? null : (whId ?? null),
     categoryId: cat === ALL ? null : (catId ?? null),
+    search: debouncedQ.trim() || null,
   });
 
   const rows = useMemo(() => data?.data ?? [], [data]);
@@ -123,6 +134,106 @@ function NilaiPersediaan() {
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
 
+  const filteredRows = useMemo(
+    () => rows.filter((r) => moving === ALL || r.moving === moving),
+    [rows, moving],
+  );
+
+  const movingTone = (m: StockValuationApi["moving"]) =>
+    m === "Dead" ? "danger" : m === "Slow" ? "warning" : m === "Medium" ? "info" : "success";
+
+  const handleExport = () => {
+    const content = toCsv(
+      filteredRows.map((r) => ({
+        sku: r.sku ?? "",
+        name: r.name ?? "",
+        category: r.category ?? "",
+        unit: r.unit ?? "",
+        stock: r.stock,
+        reserved: r.reserved,
+        available: r.available,
+        unit_cost: unitCostFor(r, method),
+        nilai: nilaiFor(r, method),
+        moving: r.moving,
+      })),
+      [
+        { key: "sku", label: "SKU" },
+        { key: "name", label: "Barang" },
+        { key: "category", label: "Kategori" },
+        { key: "unit", label: "Satuan" },
+        { key: "stock", label: "Stok" },
+        { key: "reserved", label: "Reserved" },
+        { key: "available", label: "Available" },
+        { key: "unit_cost", label: `HPP ${valuationMethodLabels[method]}` },
+        { key: "nilai", label: `Nilai ${valuationMethodLabels[method]}` },
+        { key: "moving", label: "Moving" },
+      ],
+    );
+    downloadCsv(`nilai-persediaan-${method.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`, content);
+    toast.success(`Export ${formatNumber(filteredRows.length)} baris`);
+  };
+
+  const columns: Column<StockValuationApi>[] = [
+    {
+      key: "name",
+      label: "Barang",
+      className: "min-w-[200px]",
+      sortable: true,
+      render: (r) => <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>{r.name ?? "—"}</span>,
+    },
+    {
+      key: "sku",
+      label: "SKU",
+      className: "w-[110px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => <span className="font-mono text-xs">{r.sku ?? "—"}</span>,
+    },
+    {
+      key: "category",
+      label: "Kategori",
+      className: "min-w-[130px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => r.category ?? "—",
+    },
+    {
+      key: "stock",
+      label: "Stok",
+      className: "text-right w-[90px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => formatNumber(r.stock),
+    },
+    {
+      key: "available",
+      label: "Available",
+      className: "text-right w-[100px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => formatNumber(r.available),
+    },
+    {
+      key: "unit_cost",
+      label: `HPP ${valuationMethodLabels[method]}`,
+      className: "text-right min-w-[120px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => unitCostFor(r, method),
+      render: (r) => formatIDR(unitCostFor(r, method)),
+    },
+    {
+      key: "nilai",
+      label: `Nilai ${valuationMethodLabels[method]}`,
+      className: "text-right min-w-[130px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => nilaiFor(r, method),
+      render: (r) => formatIDR(nilaiFor(r, method)),
+    },
+    {
+      key: "moving",
+      label: "Moving",
+      className: "w-[100px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => <Pill tone={movingTone(r.moving) as never}>{r.moving}</Pill>,
+    },
+  ];
+
   return (
     <>
       <PageHeader
@@ -150,23 +261,14 @@ function NilaiPersediaan() {
       />
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2">
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouseNames}
-            loading={warehousesLoading}
-          />
-          <FilterSelect
-            className="w-full"
-            value={cat}
-            onChange={setCat}
-            placeholder="Semua Kategori"
-            options={categoryNames}
-            loading={catsLoading}
-          />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari barang atau SKU..." className="rounded-xl pl-9" />
+          </div>
+          <FilterSelect className="w-full" value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouseNames} loading={warehousesLoading} />
+          <FilterSelect className="w-full" value={cat} onChange={setCat} placeholder="Semua Kategori" options={categoryNames} loading={catsLoading} />
+          <FilterSelect className="w-full" value={moving} onChange={setMoving} placeholder="Semua Moving" options={[...stockMovingTypes]} />
         </div>
       </Panel>
 
@@ -298,7 +400,7 @@ function NilaiPersediaan() {
             </div>
           )}
         </Panel>
-        <Panel title="Perbandingan Metode" description="Nilai persediaan aktual dari kartu stock">
+          <Panel title="Perbandingan Metode" description="Nilai persediaan aktual dari kartu stock">
           {isLoading ? (
             <TableSkeleton rows={3} cols={2} />
           ) : (
@@ -327,6 +429,39 @@ function NilaiPersediaan() {
           )}
         </Panel>
       </div>
+
+      <Panel
+        title="Daftar Nilai Persediaan"
+        description={`${formatNumber(filteredRows.length)} barang · metode ${valuationMethodLabels[method]}`}
+        actions={
+          <Button variant="outline" className="rounded-xl" onClick={handleExport} disabled={filteredRows.length === 0}>
+            <FileSpreadsheet className="h-4 w-4" /> Export
+          </Button>
+        }
+      >
+        <DataTable
+          columns={columns}
+          rows={filteredRows}
+          pageSize={12}
+          loading={isLoading}
+          initialSort={{ key: "nilai", dir: "desc" }}
+          mobileCard={(r) => (
+            <div className="space-y-1.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                <p className="truncate text-sm font-semibold">{r.name ?? "—"}</p>
+                <Pill tone={movingTone(r.moving) as never}>{r.moving}</Pill>
+              </div>
+              <p className="truncate font-mono text-xs text-muted-foreground">{r.sku ?? "—"} · {r.category ?? "—"}</p>
+              <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
+                <div><p className="text-muted-foreground">Stok</p><b>{formatNumber(r.stock)}</b></div>
+                <div><p className="text-muted-foreground">Available</p><b>{formatNumber(r.available)}</b></div>
+                <div><p className="text-muted-foreground">Moving</p><b>{r.moving}</b></div>
+              </div>
+              <p className="text-xs">HPP: <b>{formatIDR(unitCostFor(r, method))}</b> · Nilai: <b>{formatIDR(nilaiFor(r, method))}</b></p>
+            </div>
+          )}
+        />
+      </Panel>
     </>
   );
 }

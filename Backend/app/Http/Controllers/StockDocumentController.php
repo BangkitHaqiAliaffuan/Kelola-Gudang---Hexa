@@ -247,9 +247,6 @@ class StockDocumentController extends Controller
                 }
 
                 if ($data['status'] === 'Selesai') {
-                    if (in_array($data['type'], ['Stock Adjustment', 'Stock Opname'], true) && $document->requester_user_id !== null && $document->requester_user_id === $authId) {
-                        throw new \InvalidArgumentException('Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.');
-                    }
                     $this->service->post($document);
                 }
 

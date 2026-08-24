@@ -45,7 +45,7 @@ const statusTone: Record<StockRowApi["status"], Tone> = {
  */
 export function LaporanStock() {
   const { status: authStatus, hasModuleLevel } = useAuth();
-  const canView = hasModuleLevel("Persediaan", "Baca");
+  const canView = hasModuleLevel("Laporan", "Baca");
   const noAccess = authStatus === "authenticated" && !canView;
 
   const { data, isLoading } = useStockRows();

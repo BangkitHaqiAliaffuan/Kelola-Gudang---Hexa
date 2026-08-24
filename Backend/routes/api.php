@@ -7,6 +7,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\MerkController;
+use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
@@ -80,4 +81,8 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan']
 Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('proc-docs/{procDoc}/approve', [ProcDocController::class, 'approve'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');
+});
+
+Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->group(function () {
+    Route::get('mutasi', [LaporanController::class, 'mutasi']);
 });

@@ -296,6 +296,35 @@ export type StockDocumentPayload = {
   lines: StockDocumentLinePayload[];
 };
 
+// ---- Laporan Mutasi (GET /api/laporan/mutasi) ----
+// Agregat per item per periode: saldo_awal, masuk, keluar, saldo_akhir, nilai.
+
+export type LaporanMutasiRowApi = {
+  id: number;
+  item_id: number;
+  sku: string | null;
+  name: string | null;
+  unit: string | null;
+  category: string | null;
+  category_id: number | null;
+  saldo_awal: number;
+  masuk: number;
+  keluar: number;
+  saldo_akhir: number;
+  nilai_akhir: number;
+  unit_cost_avg: number;
+};
+
+export type LaporanMutasiParams = {
+  from: string;
+  to: string;
+  warehouseId?: number | null;
+  categoryId?: number | null;
+  search?: string | null;
+  perPage?: number;
+  page?: number;
+};
+
 // ---- Update dokumen Stock Opname draft (PUT /api/persediaan/stock-documents/{id}) ----
 // Mengganti seluruh baris sesi opname; system_qty baris yang ada dipertahankan
 // dari snapshot dokumen asli (baris baru boleh kosong — di-backfill server).

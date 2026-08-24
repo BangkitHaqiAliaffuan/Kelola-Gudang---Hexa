@@ -427,7 +427,7 @@ export function StockAdjustmentForm() {
 
       <Panel
         title="Daftar Barang"
-        description="Arah tambah (+) menambah stok ke bin tujuan; arah kurangi (−) mengurangi stok dari bin asal. Alasan selisih wajib diisi setiap baris."
+        description="Arah tambah (+) menambah stok ke bin tujuan; arah kurangi (−) mengurangi stok dari bin asal. Untuk koreksi dari Stock Opname, selesaikan Opname agar selisih terisi otomatis — manual hanya untuk koreksi darurat. Alasan selisih wajib diisi setiap baris."
         actions={
           <Button
             size="sm"

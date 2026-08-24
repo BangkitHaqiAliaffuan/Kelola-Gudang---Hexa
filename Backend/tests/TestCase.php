@@ -25,6 +25,10 @@ abstract class TestCase extends BaseTestCase
             ['role' => 'Test Admin', 'module' => 'Persediaan'],
             ['level' => 'Kelola'],
         );
+        RolePermission::firstOrCreate(
+            ['role' => 'Test Admin', 'module' => 'Laporan'],
+            ['level' => 'Kelola'],
+        );
 
         $user = new User([
             'name' => 'Master Admin',

@@ -31,15 +31,19 @@ export function useStockCard(
   itemId: number | undefined,
   method: ValuationMethod,
   warehouseId?: number | null,
+  from?: string | null,
+  to?: string | null,
 ) {
   return useQuery({
-    queryKey: ["persediaan", "stock-card", itemId, method, warehouseId ?? null],
+    queryKey: ["persediaan", "stock-card", itemId, method, warehouseId ?? null, from ?? null, to ?? null],
     queryFn: () => {
       const sp = new URLSearchParams({
         item_id: String(itemId),
         method,
       });
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
+      if (from) sp.set("from", from);
+      if (to) sp.set("to", to);
       return api.get<{ data: StockCardApi }>(`/persediaan/stock-card?${sp.toString()}`);
     },
     enabled: itemId != null && typeof window !== "undefined",
@@ -169,15 +173,17 @@ export function useStockValuation(
   params: {
     warehouseId?: number | null;
     categoryId?: number | null;
+    search?: string | null;
   } = {},
 ) {
-  const { warehouseId, categoryId } = params;
+  const { warehouseId, categoryId, search } = params;
   return useQuery({
-    queryKey: ["persediaan", "valuation", warehouseId ?? null, categoryId ?? null],
+    queryKey: ["persediaan", "valuation", warehouseId ?? null, categoryId ?? null, search ?? null],
     queryFn: () => {
       const sp = new URLSearchParams({ per_page: String(PER_PAGE) });
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
       if (categoryId != null) sp.set("category_id", String(categoryId));
+      if (search) sp.set("search", search);
       return api.get<Paginated<StockValuationApi>>(`/persediaan/valuation?${sp.toString()}`);
     },
     enabled: typeof window !== "undefined",
