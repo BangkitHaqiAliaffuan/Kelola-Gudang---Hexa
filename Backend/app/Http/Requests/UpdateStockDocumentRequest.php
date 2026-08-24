@@ -45,6 +45,20 @@ class UpdateStockDocumentRequest extends FormRequest
     {
         return [
             function (Validator $validator) {
+                $lines = $this->input('lines') ?? [];
+                $seen = [];
+                foreach ($lines as $index => $line) {
+                    $key = ($line['item_id'] ?? 0).'-'.(($line['from_bin_id'] ?? null) === null ? 'NULL' : $line['from_bin_id']);
+                    if (isset($seen[$key])) {
+                        $validator->errors()->add(
+                            "lines.{$index}.item_id",
+                            'Baris duplikat: kombinasi barang dan bin sudah ada.'
+                        );
+                    }
+                    $seen[$key] = true;
+                }
+            },
+            function (Validator $validator) {
                 /** @var StockDocument|null $document */
                 $document = $this->route('stockDocument');
 

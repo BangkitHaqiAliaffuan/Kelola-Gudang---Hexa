@@ -334,93 +334,101 @@ class StockDocumentController extends Controller
 
         $data = $request->validated();
 
-        $stockDocument->update([
-            'document_date' => $data['document_date'] ?? $stockDocument->document_date,
-            'pic' => $data['pic'] ?? $stockDocument->pic,
-            'note' => $data['note'] ?? $stockDocument->note,
-            'blind_count' => $data['blind_count'] ?? $stockDocument->blind_count,
-        ]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $stockDocument, $request) {
+            $stockDocument->update([
+                'document_date' => $data['document_date'] ?? $stockDocument->document_date,
+                'pic' => $data['pic'] ?? $stockDocument->pic,
+                'note' => $data['note'] ?? $stockDocument->note,
+                'blind_count' => $data['blind_count'] ?? $stockDocument->blind_count,
+            ]);
 
-        $stockRows = (function () use ($data, $stockDocument) {
-            $linesColl = collect($data['lines']);
-            $binIds = $linesColl->pluck('from_bin_id')->filter(fn ($v) => $v !== null && $v !== '' && $v !== 0)->unique()->values();
-            $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
-            $q = ItemStock::where('warehouse_id', $stockDocument->warehouse_id);
-            if ($binIds->isNotEmpty() && $hasNull) {
-                $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
-            } elseif ($binIds->isNotEmpty()) {
-                $q->whereIn('bin_id', $binIds);
-            } elseif ($hasNull) {
-                $q->whereNull('bin_id');
-            } else {
-                $q->whereRaw('1=0');
-            }
-            return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
-        })();
-
-        $existing = $stockDocument->lines()->get()
-            ->keyBy(fn (StockDocumentLine $line) => $line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id));
-
-        $payloadKeys = [];
-
-        foreach ($data['lines'] as $index => $line) {
-            $key = ($line['item_id'] ?? 0).'-'.((($line['from_bin_id'] ?? null) === null) ? 'NULL' : $line['from_bin_id']);
-            $payloadKeys[$key] = true;
-
-            $stockRow = $stockRows->get($key);
-            $current = $existing->get($key);
-
-            $attributes = [
-                'line_no' => $index + 1,
-                // system_qty dipertahankan dari snapshot dokumen asli; hanya
-                // baris BARU yang di-backfill dari item_stock saat ini.
-                'system_qty' => array_key_exists('system_qty', $line)
-                    ? $line['system_qty']
-                    : ($current ? $current->system_qty : (int) ($stockRow?->stock ?? 0)),
-                'actual_qty' => $line['actual_qty'] ?? null,
-                'unit_cost' => (float) ($line['unit_cost'] ?? $stockRow?->unit_cost_avg ?? 0),
-                'note' => array_key_exists('note', $line) ? $line['note'] : ($current?->note ?? null),
-            ];
-
-            // Alasan selisih hanya diubah bila dikirim (save draft biasa tidak
-            // menimpa alasan yang sudah diisi saat review).
-            if (array_key_exists('reason_code', $line)) {
-                $attributes['reason_code'] = $line['reason_code'] ?? null;
-            }
-
-            // Jejak audit: siapa & kapan terakhir kali baris dihitung fisik.
-            if (array_key_exists('actual_qty', $line)) {
-                if ($line['actual_qty'] !== null) {
-                    $attributes['counted_by_user_id'] = $request->user('sanctum')?->id;
-                    $attributes['counted_at'] = now();
+            $stockRows = (function () use ($data, $stockDocument) {
+                $linesColl = collect($data['lines']);
+                $binIds = $linesColl->pluck('from_bin_id')->filter(fn ($v) => $v !== null && $v !== '' && $v !== 0)->unique()->values();
+                $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
+                $q = ItemStock::where('warehouse_id', $stockDocument->warehouse_id);
+                if ($binIds->isNotEmpty() && $hasNull) {
+                    $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
+                } elseif ($binIds->isNotEmpty()) {
+                    $q->whereIn('bin_id', $binIds);
+                } elseif ($hasNull) {
+                    $q->whereNull('bin_id');
                 } else {
-                    $attributes['counted_by_user_id'] = null;
-                    $attributes['counted_at'] = null;
+                    $q->whereRaw('1=0');
+                }
+                return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
+            })();
+
+            $existing = $stockDocument->lines()->get()
+                ->keyBy(fn (StockDocumentLine $line) => $line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id));
+
+            $payloadKeys = [];
+            foreach ($data['lines'] as $line) {
+                $key = ($line['item_id'] ?? 0).'-'.((($line['from_bin_id'] ?? null) === null) ? 'NULL' : $line['from_bin_id']);
+                $payloadKeys[$key] = true;
+            }
+
+            // Hapus baris orphan dulu sebelum re-number agar tidak tabrakan unique.
+            $orphanIds = $existing->filter(fn (StockDocumentLine $line) => ! isset($payloadKeys[$line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id)]))->keys();
+            if ($orphanIds->isNotEmpty()) {
+                $stockDocument->lines()->whereIn('id', $orphanIds)->delete();
+                // Refresh existing setelah delete
+                $existing = $existing->filter(fn (StockDocumentLine $line) => isset($payloadKeys[$line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id)]));
+            }
+
+            // Geser line_no ke offset aman agar tidak tabrakan saat reorder.
+            $stockDocument->lines()->update(['line_no' => \Illuminate\Support\Facades\DB::raw('line_no + 100000')]);
+
+            foreach ($data['lines'] as $index => $line) {
+                $key = ($line['item_id'] ?? 0).'-'.((($line['from_bin_id'] ?? null) === null) ? 'NULL' : $line['from_bin_id']);
+                $stockRow = $stockRows->get($key);
+                $current = $existing->get($key);
+
+                $attributes = [
+                    'line_no' => $index + 1,
+                    // system_qty dipertahankan dari snapshot dokumen asli; hanya
+                    // baris BARU yang di-backfill dari item_stock saat ini.
+                    'system_qty' => array_key_exists('system_qty', $line)
+                        ? $line['system_qty']
+                        : ($current ? $current->system_qty : (int) ($stockRow?->stock ?? 0)),
+                    'actual_qty' => $line['actual_qty'] ?? null,
+                    'unit_cost' => (float) ($line['unit_cost'] ?? $stockRow?->unit_cost_avg ?? 0),
+                    'note' => array_key_exists('note', $line) ? $line['note'] : ($current?->note ?? null),
+                ];
+
+                if (array_key_exists('reason_code', $line)) {
+                    $attributes['reason_code'] = $line['reason_code'] ?? null;
+                }
+
+                if (array_key_exists('actual_qty', $line)) {
+                    if ($line['actual_qty'] !== null) {
+                        $attributes['counted_by_user_id'] = $request->user('sanctum')?->id;
+                        $attributes['counted_at'] = now();
+                    } else {
+                        $attributes['counted_by_user_id'] = null;
+                        $attributes['counted_at'] = null;
+                    }
+                }
+
+                if ($current) {
+                    // Gunakan query update agar tidak trigger unique per-row sebelum offset selesai
+                    StockDocumentLine::where('id', $current->id)->update($attributes);
+                } else {
+                    StockDocumentLine::create([
+                        'document_id' => $stockDocument->id,
+                        'item_id' => $line['item_id'],
+                        'from_bin_id' => $line['from_bin_id'],
+                        'to_bin_id' => null,
+                        'qty' => null,
+                        ...$attributes,
+                    ]);
                 }
             }
 
-            if ($current) {
-                $current->update($attributes);
-            } else {
-                StockDocumentLine::create([
-                    'document_id' => $stockDocument->id,
-                    'item_id' => $line['item_id'],
-                    'from_bin_id' => $line['from_bin_id'],
-                    'to_bin_id' => null,
-                    'qty' => null,
-                    ...$attributes,
-                ]);
-            }
-        }
-
-        // Hapus baris yang tidak lagi ada di payload (mis. gudang berubah cakupan).
-        $stockDocument->lines()
-            ->whereIn('id', $existing->filter(fn (StockDocumentLine $line) => ! isset($payloadKeys[$line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id)]))->keys())
-            ->delete();
-
-        return new StockDocumentResource($stockDocument->load([
-            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
-        ])->loadCount('lines'));
+            return new StockDocumentResource($stockDocument->load([
+                'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
+            ])->loadCount('lines'));
+        });
     }
 
     /**

@@ -57,13 +57,11 @@ export function OpnameReviewDialog({
 
   const entries = useMemo<ReviewEntry[]>(
     () =>
-      lines
-        .filter((l) => l.from_bin_id != null)
-        .map((l) => {
-          const raw = (records[l.id] ?? "").trim();
-          const actual = raw === "" ? null : Number(raw);
-          return { line: l, actual, variance: (actual ?? 0) - (l.system_qty ?? 0) };
-        }),
+      lines.map((l) => {
+        const raw = (records[l.id] ?? "").trim();
+        const actual = raw === "" ? null : Number(raw);
+        return { line: l, actual, variance: (actual ?? 0) - (l.system_qty ?? 0) };
+      }),
     [lines, records],
   );
 
@@ -74,6 +72,7 @@ export function OpnameReviewDialog({
   const busy = update.isPending || post.isPending;
 
   const confirm = () => {
+    if (busy) return;
     if (uncounted > 0) {
       toast.error(`${uncounted} barang belum dihitung — lengkapi semua fisik dulu.`);
       return;
@@ -91,7 +90,7 @@ export function OpnameReviewDialog({
           pic: session.pic,
           lines: entries.map((e) => ({
             item_id: e.line.item_id,
-            from_bin_id: e.line.from_bin_id!,
+            from_bin_id: e.line.from_bin_id ?? null,
             system_qty: e.line.system_qty,
             actual_qty: e.actual,
             unit_cost: e.line.unit_cost,
@@ -142,7 +141,7 @@ export function OpnameReviewDialog({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{line.name ?? "—"}</p>
                   <p className="truncate font-mono text-xs text-muted-foreground">
-                    {line.sku ?? "—"} · Bin {line.from_bin ?? "—"}
+                    {line.sku ?? "—"} · Bin {line.from_bin ?? "Lantai"}
                   </p>
                 </div>
                 <div className="text-xs">

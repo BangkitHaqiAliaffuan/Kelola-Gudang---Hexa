@@ -434,8 +434,10 @@ class StockOpnameApiTest extends TestCase
     public function test_post_opname_with_uncounted_lines_returns_422(): void
     {
         $item = $this->makeItem();
-        [$wh, , $bin] = $this->makeLocation();
+        [$wh, $rack, $bin] = $this->makeLocation();
+        $bin2 = \App\Models\Bin::factory()->create(['rack_id' => $rack->id]);
         $this->seedInbound($item, $wh, $bin, 10);
+        $this->seedInbound($item, $wh, $bin2, 5);
 
         $docId = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Opname',
@@ -444,13 +446,14 @@ class StockOpnameApiTest extends TestCase
             'warehouse_id' => $wh->id,
             'lines' => [
                 ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+                ['item_id' => $item->id, 'from_bin_id' => $bin2->id],
             ],
         ])->assertStatus(201)->json('data.id');
 
         $this->putJson("/api/persediaan/stock-documents/{$docId}", [
             'lines' => [
                 ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 6],
-                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+                ['item_id' => $item->id, 'from_bin_id' => $bin2->id],
             ],
         ])->assertOk();
 
