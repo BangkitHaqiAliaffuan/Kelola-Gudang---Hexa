@@ -354,14 +354,17 @@ class StoreStockDocumentRequest extends FormRequest
                         );
                     }
 
-                    // Opsi A: untuk Selesai, jika sumber tanpa bin (lantai), juga cek stok tersedia di lokasi asal (NULL) — sinkron dengan FE Maks = min(sisa, available).
-                    // Untuk sumber ber-bin, biarkan assertNoNegativeStock di posting yang handle (agar Draft tetap lolos).
-                    if ($this->input('status') === 'Selesai' && $sourceLine->to_bin_id === null) {
-                        $availableRaw = ItemStock::where('item_id', $sourceLine->item_id)
-                            ->where('warehouse_id', (int) $this->input('warehouse_id'))
-                            ->whereNull('bin_id')
-                            ->value(DB::raw('COALESCE(stock,0) - COALESCE(reserved,0)'));
-                        $available = (int) ($availableRaw ?? 0);
+                    // Selesai: cek stok tersedia di lokasi asal (bin sumber) — min(sisa, available) untuk semua bin (lantai maupun ber-bin), Draft hanya sisa.
+                    if ($this->input('status') === 'Selesai') {
+                        $q = ItemStock::where('item_id', $sourceLine->item_id)
+                            ->where('warehouse_id', (int) $this->input('warehouse_id'));
+                        if ($sourceLine->to_bin_id === null) {
+                            $q->whereNull('bin_id');
+                        } else {
+                            $q->where('bin_id', $sourceLine->to_bin_id);
+                        }
+                        $row = $q->first();
+                        $available = $row ? ((int) $row->stock - (int) $row->reserved) : 0;
                         $remaining = max(0, $sourceQty - $alreadyReturned);
                         $cap = min($remaining, $available);
                         if ($requested > $cap) {

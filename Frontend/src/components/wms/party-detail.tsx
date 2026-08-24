@@ -2,6 +2,7 @@ import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 import { Pill } from "./kit";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,8 @@ export function SupplierDetailSheet({
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
 }) {
+  const { hasModuleLevel } = useAuth();
+  const canEdit = hasModuleLevel("Master Data", "Tulis");
   return (
     <Sheet open={entity !== null} onOpenChange={onOpenChange}>
       <SheetContent
@@ -95,9 +98,11 @@ export function SupplierDetailSheet({
               <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
                 Tutup
               </Button>
-              <Button className="rounded-xl" onClick={onEdit}>
-                <Pencil className="h-4 w-4" /> Edit
-              </Button>
+              {canEdit && (
+                <Button className="rounded-xl" onClick={onEdit}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -115,6 +120,8 @@ export function CustomerDetailSheet({
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
 }) {
+  const { hasModuleLevel } = useAuth();
+  const canEdit = hasModuleLevel("Master Data", "Tulis");
   return (
     <Sheet open={entity !== null} onOpenChange={onOpenChange}>
       <SheetContent
@@ -166,9 +173,11 @@ export function CustomerDetailSheet({
               <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
                 Tutup
               </Button>
-              <Button className="rounded-xl" onClick={onEdit}>
-                <Pencil className="h-4 w-4" /> Edit
-              </Button>
+              {canEdit && (
+                <Button className="rounded-xl" onClick={onEdit}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -186,6 +195,8 @@ export function VendorDetailSheet({
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
 }) {
+  const { hasModuleLevel } = useAuth();
+  const canEdit = hasModuleLevel("Master Data", "Tulis");
   return (
     <Sheet open={entity !== null} onOpenChange={onOpenChange}>
       <SheetContent
@@ -235,9 +246,11 @@ export function VendorDetailSheet({
               <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
                 Tutup
               </Button>
-              <Button className="rounded-xl" onClick={onEdit}>
-                <Pencil className="h-4 w-4" /> Edit
-              </Button>
+              {canEdit && (
+                <Button className="rounded-xl" onClick={onEdit}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+              )}
             </div>
           </>
         )}

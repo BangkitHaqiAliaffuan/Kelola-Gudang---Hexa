@@ -28,7 +28,8 @@ export function OpnameCreateDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { user } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: users, isLoading: usersLoading } = useUsers();
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
@@ -48,9 +49,10 @@ export function OpnameCreateDialog({
   );
 
   const canSubmit =
-    whId != null && date.length > 0 && warehouseRows.length > 0 && !create.isPending;
+    whId != null && date.length > 0 && warehouseRows.length > 0 && !create.isPending && canCreate;
 
   const submit = () => {
+    if (!canCreate) return;
     if (!canSubmit || whId == null) return;
 
     create.mutate(
@@ -237,19 +239,21 @@ export function OpnameCreateDialog({
           >
             Batal
           </Button>
-          <Button
-            className="rounded-xl"
-            onClick={submit}
-            disabled={!canSubmit}
-            title={warehouseRows.length === 0 ? "Gudang belum memiliki baris stok" : undefined}
-          >
-            {create.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CalendarDays className="h-4 w-4" />
-            )}
-            Buat Jadwal
-          </Button>
+          {canCreate && (
+            <Button
+              className="rounded-xl"
+              onClick={submit}
+              disabled={!canSubmit}
+              title={warehouseRows.length === 0 ? "Gudang belum memiliki baris stok" : undefined}
+            >
+              {create.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CalendarDays className="h-4 w-4" />
+              )}
+              Buat Jadwal
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

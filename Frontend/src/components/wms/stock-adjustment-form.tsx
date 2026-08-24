@@ -429,13 +429,15 @@ export function StockAdjustmentForm() {
         title="Daftar Barang"
         description="Arah tambah (+) menambah stok ke bin tujuan; arah kurangi (−) mengurangi stok dari bin asal. Untuk koreksi dari Stock Opname, selesaikan Opname agar selisih terisi otomatis — manual hanya untuk koreksi darurat. Alasan selisih wajib diisi setiap baris."
         actions={
-          <Button
-            size="sm"
-            className="rounded-lg"
-            onClick={() => setLines((p) => [...p, newLine()])}
-          >
-            <Plus className="h-4 w-4" /> Tambah Baris
-          </Button>
+          canCreate && (
+            <Button
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setLines((p) => [...p, newLine()])}
+            >
+              <Plus className="h-4 w-4" /> Tambah Baris
+            </Button>
+          )
         }
         bodyClassName="p-0"
       >
@@ -585,16 +587,18 @@ export function StockAdjustmentForm() {
                       )}
                     </td>
                     <td className="px-3 py-2 align-top">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-lg text-destructive"
-                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                        disabled={lines.length === 1}
-                        aria-label="Hapus baris"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canCreate && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-lg text-destructive"
+                          onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                          disabled={lines.length === 1}
+                          aria-label="Hapus baris"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -704,12 +708,14 @@ export function StockAdjustmentForm() {
                     <p className="text-xs text-amber-600">Alasan wajib diisi.</p>
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span
-                      className="text-destructive"
-                      onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                    >
-                      {lines.length > 1 ? "Hapus" : ""}
-                    </span>
+                    {canCreate && (
+                      <span
+                        className="text-destructive"
+                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                      >
+                        {lines.length > 1 ? "Hapus" : ""}
+                      </span>
+                    )}
                   </div>
                   {lineError(i, "qty") && (
                     <p className="text-xs text-destructive">{lineError(i, "qty")}</p>

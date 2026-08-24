@@ -140,11 +140,13 @@ export function StockDocumentSheet({
   doc: StockDocumentApi | null;
   onOpenChange: (open: boolean) => void;
   isLoading?: boolean;
-  onPost?: () => void;
-  onCancel?: () => void;
+  onPost?: (() => void) | undefined;
+  onCancel?: (() => void) | undefined;
   busy?: boolean;
 }) {
-  const { user } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
+  const canPost = hasModuleLevel("Persediaan", "Tulis");
+  const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const isSelf = doc?.requester_user_id != null && user?.id === doc.requester_user_id;
   const isSelfBlocked =
     isSelf && (doc?.type === "Stock Adjustment" || doc?.type === "Stock Opname");
@@ -377,7 +379,7 @@ export function StockDocumentSheet({
               </Button>
               {doc.type === "Stock Adjustment" && doc.status === "Draft" && (
                 <>
-                  {onCancel && (
+                  {canCancel && onCancel && (
                     <Button
                       variant="outline"
                       className="rounded-xl"
@@ -393,7 +395,7 @@ export function StockDocumentSheet({
                       Batalkan
                     </Button>
                   )}
-                  {onPost && (
+                  {canPost && onPost && (
                     <Button
                       className="rounded-xl"
                       onClick={onPost}

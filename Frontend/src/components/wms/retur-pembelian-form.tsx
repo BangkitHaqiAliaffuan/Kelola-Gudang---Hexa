@@ -240,6 +240,16 @@ export function ReturPembelianForm() {
     return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
+  // Maks qty valid dari API: Draft = sisa dokumen, Selesai = min(sisa, tersedia) — konsisten BE
+  const maxQtyForLine = (l: FormLine, status: "Draft" | "Selesai"): number | null => {
+    const src = lineSource(l);
+    if (!src) return null;
+    const remaining = src.remaining_qty ?? src.qty ?? 0;
+    if (status === "Draft") return remaining;
+    const available = lineAvailable(l);
+    return available !== undefined ? Math.min(remaining, available) : remaining;
+  };
+
   // Bin asal retur dari baris Penerimaan sumber: BM buatan form sungguhan
   // menyimpan bin di `to_bin_id`, BM lama (seed) hanya di `from_bin_id`.
   const sourceLineBin = (s: StockDocumentLineApi): number | null => s.to_bin_id ?? s.from_bin_id;
@@ -415,23 +425,23 @@ export function ReturPembelianForm() {
       return;
     }
 
-    const overSourceLine = lines.find((l) => {
-      if (!l.itemId || !l.qty) return false;
-      const src = lineSource(l);
-      return src != null && Number(l.qty) > (src.remaining_qty ?? src.qty ?? 0);
-    });
-    if (overSourceLine) {
-      toast.error("Ada baris dengan qty melebihi jumlah barang pada dokumen sumber.");
-      return;
-    }
-
     const overLine = lines.find((l) => {
       if (!l.itemId || !l.qty) return false;
-      const available = lineAvailable(l);
-      return available !== undefined && Number(l.qty) > available;
+      const max = maxQtyForLine(l, status);
+      return max !== null && Number(l.qty) > max;
     });
-    if (overLine && status === "Selesai") {
-      toast.error("Ada baris dengan qty melebihi stok tersedia di bin terpilih.");
+    if (overLine) {
+      const max = maxQtyForLine(overLine, status);
+      const src = lineSource(overLine);
+      const rem = src?.remaining_qty ?? src?.qty ?? 0;
+      const av = lineAvailable(overLine);
+      if (status === "Draft") {
+        toast.error(`Ada baris dengan qty melebihi sisa dokumen sumber (maks ${rem}).`);
+      } else {
+        toast.error(
+          `Ada baris dengan qty melebihi batas (maks ${max} — sisa ${rem}, tersedia ${av ?? "—"}).`,
+        );
+      }
       return;
     }
 
@@ -595,13 +605,15 @@ export function ReturPembelianForm() {
       <Panel
         title="Daftar Barang"
         actions={
-          <Button
-            size="sm"
-            className="rounded-lg"
-            onClick={() => setLines((p) => [...p, newLine()])}
-          >
-            <Plus className="h-4 w-4" /> Tambah Baris
-          </Button>
+          canCreate && (
+            <Button
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setLines((p) => [...p, newLine()])}
+            >
+              <Plus className="h-4 w-4" /> Tambah Baris
+            </Button>
+          )
         }
         bodyClassName="p-0"
       >
@@ -619,13 +631,15 @@ export function ReturPembelianForm() {
             <tbody>
               {lines.map((l, i) => {
                 const available = lineAvailable(l);
+                const src = lineSource(l);
+                const maxSelesai = maxQtyForLine(l, "Selesai");
                 const overStock =
                   !submitted && available !== undefined && (Number(l.qty) || 0) > available;
-                const src = lineSource(l);
                 const overSource =
                   !submitted &&
                   src != null &&
                   (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
+                const overMax = !submitted && maxSelesai !== null && (Number(l.qty) || 0) > maxSelesai;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -686,15 +700,10 @@ export function ReturPembelianForm() {
                         min={1}
                         value={l.qty}
                         onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                        className={`h-9 w-24 rounded-lg ${overStock || overSource ? "border-destructive" : ""}`}
+                        className={`h-9 w-24 rounded-lg ${overMax ? "border-destructive" : ""}`}
                       />
                       {lineError(i, "qty") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "qty")}</p>
-                      )}
-                      {overStock && (
-                        <p className="mt-1 text-xs text-destructive">
-                          Melebihi tersedia ({formatNumber(available)})
-                        </p>
                       )}
                       {overSource && (
                         <p className="mt-1 text-xs text-destructive">
@@ -702,9 +711,15 @@ export function ReturPembelianForm() {
                           {formatNumber(src?.remaining_qty ?? src?.qty ?? 0)})
                         </p>
                       )}
-                      {src && !overSource && sourceDocId && (
+                      {overStock && !overSource && (
+                        <p className="mt-1 text-xs text-destructive">
+                          Melebihi tersedia ({formatNumber(available)})
+                        </p>
+                      )}
+                      {src && !overMax && sourceDocId && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Maks {formatNumber(src.qty ?? 0)} dari {sourceDetail?.data.no}
+                          Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
+                          {available !== undefined && (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(available)})` : ""}
                         </p>
                       )}
                     </td>
@@ -712,16 +727,18 @@ export function ReturPembelianForm() {
                       {available !== undefined ? formatNumber(available) : "—"}
                     </td>
                     <td className="px-3 py-2 align-top">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-lg text-destructive"
-                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                        disabled={lines.length === 1}
-                        aria-label="Hapus baris"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canCreate && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-lg text-destructive"
+                          onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                          disabled={lines.length === 1}
+                          aria-label="Hapus baris"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -733,10 +750,13 @@ export function ReturPembelianForm() {
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
             const available = lineAvailable(l);
+            const src = lineSource(l);
+            const maxSelesai = maxQtyForLine(l, "Selesai");
             const overStock =
               !submitted && available !== undefined && (Number(l.qty) || 0) > available;
-            const src = lineSource(l);
-            const overSource = !submitted && src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
+            const overSource =
+              !submitted && src != null && (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
+            const overMax = !submitted && maxSelesai !== null && (Number(l.qty) || 0) > maxSelesai;
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
@@ -784,25 +804,28 @@ export function ReturPembelianForm() {
                       min={1}
                       value={l.qty}
                       onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                      className={`h-9 w-24 rounded-lg ${overStock || overSource ? "border-destructive" : ""}`}
+                      className={`h-9 w-24 rounded-lg ${overMax ? "border-destructive" : ""}`}
                     />
                     <span className="ml-auto text-sm text-muted-foreground">
                       Tersedia di Bin {available !== undefined ? formatNumber(available) : "—"}
                     </span>
                   </div>
-                  {overStock && (
+                  {overSource && (
+                    <p className="text-xs text-destructive">
+                      Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}).
+                    </p>
+                  )}
+                  {overStock && !overSource && (
                     <p className="text-xs text-destructive">
                       Qty melebihi stok tersedia di bin ini.
                     </p>
                   )}
-                  {overSource && (
-                    <p className="text-xs text-destructive">
-                      Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.qty ?? 0)}).
-                    </p>
-                  )}
-                  {src && !overSource && sourceDocId && (
+                  {src && !overMax && sourceDocId && (
                     <p className="text-xs text-muted-foreground">
-                      Maks {formatNumber(src.qty ?? 0)} dari {sourceDetail?.data.no}
+                      Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
+                      {available !== undefined && (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
+                        ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(available)})`
+                        : ""}
                     </p>
                   )}
                   {lineError(i, "from_bin_id") && (
@@ -810,14 +833,16 @@ export function ReturPembelianForm() {
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span />
-                    <button
-                      type="button"
-                      className="text-destructive"
-                      onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                      disabled={lines.length === 1}
-                    >
-                      Hapus
-                    </button>
+                    {canCreate && (
+                      <button
+                        type="button"
+                        className="text-destructive"
+                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                        disabled={lines.length === 1}
+                      >
+                        Hapus
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

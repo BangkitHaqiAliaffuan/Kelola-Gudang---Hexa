@@ -418,13 +418,15 @@ export function BarangKeluarForm() {
       <Panel
         title="Daftar Barang"
         actions={
-          <Button
-            size="sm"
-            className="rounded-lg"
-            onClick={() => setLines((p) => [...p, newLine()])}
-          >
-            <Plus className="h-4 w-4" /> Tambah Baris
-          </Button>
+          canCreate && (
+            <Button
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setLines((p) => [...p, newLine()])}
+            >
+              <Plus className="h-4 w-4" /> Tambah Baris
+            </Button>
+          )
         }
         bodyClassName="p-0"
       >
@@ -522,16 +524,18 @@ export function BarangKeluarForm() {
                       {available !== undefined ? formatNumber(available) : "—"}
                     </td>
                     <td className="px-3 py-2 align-top">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-lg text-destructive"
-                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                        disabled={lines.length === 1}
-                        aria-label="Hapus baris"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canCreate && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-lg text-destructive"
+                          onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                          disabled={lines.length === 1}
+                          aria-label="Hapus baris"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -609,14 +613,16 @@ export function BarangKeluarForm() {
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{lines.length === 1 ? "" : ""}</span>
-                    <button
-                      type="button"
-                      className="text-destructive"
-                      onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                      disabled={lines.length === 1}
-                    >
-                      Hapus
-                    </button>
+                    {canCreate && (
+                      <button
+                        type="button"
+                        className="text-destructive"
+                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                        disabled={lines.length === 1}
+                      >
+                        Hapus
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

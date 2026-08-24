@@ -412,13 +412,15 @@ export function BarangMasukForm({
       <Panel
         title="Daftar Barang"
         actions={
-          <Button
-            size="sm"
-            className="rounded-lg"
-            onClick={() => setLines((p) => [...p, newLine()])}
-          >
-            <Plus className="h-4 w-4" /> Tambah Baris
-          </Button>
+          canCreate && (
+            <Button
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setLines((p) => [...p, newLine()])}
+            >
+              <Plus className="h-4 w-4" /> Tambah Baris
+            </Button>
+          )
         }
         bodyClassName="p-0"
       >
@@ -516,16 +518,18 @@ export function BarangMasukForm({
                       </p>
                     </td>
                     <td className="px-3 py-2 align-top">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 rounded-lg text-destructive"
-                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                        disabled={lines.length === 1}
-                        aria-label="Hapus baris"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canCreate && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 rounded-lg text-destructive"
+                          onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                          disabled={lines.length === 1}
+                          aria-label="Hapus baris"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -596,14 +600,16 @@ export function BarangMasukForm({
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{item?.unit ?? ""}</span>
-                    <button
-                      type="button"
-                      className="text-destructive"
-                      onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
-                      disabled={lines.length === 1}
-                    >
-                      Hapus
-                    </button>
+                    {canCreate && (
+                      <button
+                        type="button"
+                        className="text-destructive"
+                        onClick={() => setLines((p) => p.filter((x) => x.key !== l.key))}
+                        disabled={lines.length === 1}
+                      >
+                        Hapus
+                      </button>
+                    )}
                   </div>
                   {lineError(i, "to_bin_id") && (
                     <p className="text-xs text-destructive">{lineError(i, "to_bin_id")}</p>
@@ -621,21 +627,25 @@ export function BarangMasukForm({
       </Panel>
 
       <div className="sticky bottom-20 z-10 flex flex-wrap justify-end gap-2 rounded-2xl border border-border bg-card/95 p-3 shadow-soft backdrop-blur md:bottom-4">
-        <Button
-          variant="outline"
-          className="rounded-xl"
-          onClick={() => submit("Draft")}
-          disabled={create.isPending || !canCreate}
-        >
-          <Save className="h-4 w-4" /> Simpan Draft
-        </Button>
-        <Button
-          className="rounded-xl"
-          onClick={() => setConfirmPosting(true)}
-          disabled={create.isPending || !canCreate}
-        >
-          <Save className="h-4 w-4" /> Simpan & Posting
-        </Button>
+        {canCreate && (
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => submit("Draft")}
+            disabled={create.isPending}
+          >
+            <Save className="h-4 w-4" /> Simpan Draft
+          </Button>
+        )}
+        {canCreate && (
+          <Button
+            className="rounded-xl"
+            onClick={() => setConfirmPosting(true)}
+            disabled={create.isPending}
+          >
+            <Save className="h-4 w-4" /> Simpan & Posting
+          </Button>
+        )}
       </div>
 
       <AlertDialog open={confirmPosting} onOpenChange={(o) => !o && setConfirmPosting(false)}>

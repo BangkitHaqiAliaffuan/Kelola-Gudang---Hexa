@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/use-auth";
 import { usePostStockDocument, useUpdateStockDocument } from "@/hooks/use-persediaan";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import { isApiError } from "@/lib/api";
@@ -48,6 +49,8 @@ export function OpnameReviewDialog({
   records: Record<number, string>;
   onCompleted?: () => void;
 }) {
+  const { hasModuleLevel } = useAuth();
+  const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const update = useUpdateStockDocument();
   const post = usePostStockDocument();
 
@@ -72,6 +75,7 @@ export function OpnameReviewDialog({
   const busy = update.isPending || post.isPending;
 
   const confirm = () => {
+    if (!canCreate) return;
     if (busy) return;
     if (uncounted > 0) {
       toast.error(`${uncounted} barang belum dihitung — lengkapi semua fisik dulu.`);
@@ -209,23 +213,25 @@ export function OpnameReviewDialog({
           >
             <X className="h-4 w-4" /> Batal
           </Button>
-          <Button
-            className="rounded-xl"
-            onClick={confirm}
-            disabled={busy || uncounted > 0 || missing.length > 0}
-            title={missing.length > 0 ? "Pilih alasan untuk semua baris selisih" : undefined}
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCheck className="h-4 w-4" />
-            )}
-            {update.isPending
-              ? "Menyimpan..."
-              : post.isPending
-                ? "Posting..."
-                : "Selesaikan Opname"}
-          </Button>
+          {canCreate && (
+            <Button
+              className="rounded-xl"
+              onClick={confirm}
+              disabled={busy || uncounted > 0 || missing.length > 0}
+              title={missing.length > 0 ? "Pilih alasan untuk semua baris selisih" : undefined}
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCheck className="h-4 w-4" />
+              )}
+              {update.isPending
+                ? "Menyimpan..."
+                : post.isPending
+                  ? "Posting..."
+                  : "Selesaikan Opname"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

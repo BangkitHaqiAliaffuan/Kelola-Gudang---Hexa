@@ -61,6 +61,8 @@ function StockAdjustment() {
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
+  const canWrite = hasModuleLevel("Persediaan", "Tulis");
+  const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
@@ -249,8 +251,8 @@ function StockAdjustment() {
         doc={detail?.data ?? null}
         isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
-        onPost={() => detail?.data && setConfirmPostId(detail.data.id)}
-        onCancel={() => detail?.data && setConfirmCancelId(detail.data.id)}
+        onPost={canWrite ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
+        onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
         busy={busy}
       />
 
