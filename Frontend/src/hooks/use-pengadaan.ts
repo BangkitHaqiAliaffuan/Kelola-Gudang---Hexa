@@ -86,3 +86,14 @@ export function useCancelProcDoc() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pengadaan"] }),
   });
 }
+
+export function useReassignProcDoc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approverUserId }: { id: number; approverUserId: number }) =>
+      api.post<{ data: ProcDocApi }>(`/pengadaan/proc-docs/${id}/reassign`, {
+        approver_user_id: approverUserId,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["pengadaan"] }),
+  });
+}

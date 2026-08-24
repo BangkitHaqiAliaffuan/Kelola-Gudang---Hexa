@@ -139,13 +139,25 @@ class StockDocumentController extends Controller
             : collect();
 
         // Baris Stock Opname di-snapshot server-side dari item_stock: system_qty &
-        // unit_cost (moving average) diambil per (item, bin) sehingga konsisten dengan
+        // unit_cost (moving average) diambil per (item, bin) termasuk lantai (NULL) sehingga konsisten dengan
         // Stock Saat Ini / Nilai Persediaan pada saat jadwal dibuat.
         $stockRows = $isOpname
-            ? ItemStock::where('warehouse_id', $data['warehouse_id'])
-                ->whereIn('bin_id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
-                ->get()
-                ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id)
+            ? (function () use ($data) {
+                $linesColl = collect($data['lines']);
+                $binIds = $linesColl->pluck('from_bin_id')->filter(fn ($v) => $v !== null && $v !== '' && $v !== 0)->unique()->values();
+                $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
+                $q = ItemStock::where('warehouse_id', $data['warehouse_id']);
+                if ($binIds->isNotEmpty() && $hasNull) {
+                    $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
+                } elseif ($binIds->isNotEmpty()) {
+                    $q->whereIn('bin_id', $binIds);
+                } elseif ($hasNull) {
+                    $q->whereNull('bin_id');
+                } else {
+                    $q->whereRaw('1=0');
+                }
+                return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
+            })()
             : collect();
 
         // Baris dokumen sumber untuk Retur Pembelian/Penjualan yang ter-link —
@@ -193,7 +205,7 @@ class StockDocumentController extends Controller
                         ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_cost
                         : null;
 
-                    $stockKey = $isOpname ? (($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0)) : null;
+                    $stockKey = $isOpname ? (($line['item_id'] ?? 0).'-'.(($line['from_bin_id'] ?? null) === null ? 'NULL' : $line['from_bin_id'])) : null;
                     $stockRow = $isOpname ? $stockRows->get($stockKey) : null;
 
                     // Stock Adjustment adalah koreksi (bukan pembelian): unit_cost
@@ -332,18 +344,30 @@ class StockDocumentController extends Controller
             'blind_count' => $data['blind_count'] ?? $stockDocument->blind_count,
         ]);
 
-        $stockRows = ItemStock::where('warehouse_id', $stockDocument->warehouse_id)
-            ->whereIn('bin_id', collect($data['lines'])->pluck('from_bin_id')->filter()->unique()->values())
-            ->get()
-            ->keyBy(fn ($row) => $row->item_id.'-'.$row->bin_id);
+        $stockRows = (function () use ($data, $stockDocument) {
+            $linesColl = collect($data['lines']);
+            $binIds = $linesColl->pluck('from_bin_id')->filter(fn ($v) => $v !== null && $v !== '' && $v !== 0)->unique()->values();
+            $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
+            $q = ItemStock::where('warehouse_id', $stockDocument->warehouse_id);
+            if ($binIds->isNotEmpty() && $hasNull) {
+                $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
+            } elseif ($binIds->isNotEmpty()) {
+                $q->whereIn('bin_id', $binIds);
+            } elseif ($hasNull) {
+                $q->whereNull('bin_id');
+            } else {
+                $q->whereRaw('1=0');
+            }
+            return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
+        })();
 
         $existing = $stockDocument->lines()->get()
-            ->keyBy(fn (StockDocumentLine $line) => $line->item_id.'-'.$line->from_bin_id);
+            ->keyBy(fn (StockDocumentLine $line) => $line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id));
 
         $payloadKeys = [];
 
         foreach ($data['lines'] as $index => $line) {
-            $key = ($line['item_id'] ?? 0).'-'.($line['from_bin_id'] ?? 0);
+            $key = ($line['item_id'] ?? 0).'-'.((($line['from_bin_id'] ?? null) === null) ? 'NULL' : $line['from_bin_id']);
             $payloadKeys[$key] = true;
 
             $stockRow = $stockRows->get($key);
@@ -394,7 +418,7 @@ class StockDocumentController extends Controller
 
         // Hapus baris yang tidak lagi ada di payload (mis. gudang berubah cakupan).
         $stockDocument->lines()
-            ->whereIn('id', $existing->filter(fn (StockDocumentLine $line) => ! isset($payloadKeys[$line->item_id.'-'.$line->from_bin_id]))->keys())
+            ->whereIn('id', $existing->filter(fn (StockDocumentLine $line) => ! isset($payloadKeys[$line->item_id.'-'.($line->from_bin_id === null ? 'NULL' : $line->from_bin_id)]))->keys())
             ->delete();
 
         return new StockDocumentResource($stockDocument->load([

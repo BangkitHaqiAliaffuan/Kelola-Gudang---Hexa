@@ -36,9 +36,11 @@ import {
   useApproveProcDoc,
   useCancelProcDoc,
   useDeleteProcDoc,
+  useReassignProcDoc,
   useRejectProcDoc,
   useSubmitProcDoc,
 } from "@/hooks/use-pengadaan";
+import { useUsers } from "@/hooks/use-master";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { canDecideProcDoc, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
 
@@ -154,19 +156,23 @@ export function PurchaseRequestSheet({
   const reject = useRejectProcDoc();
   const cancel = useCancelProcDoc();
   const remove = useDeleteProcDoc();
+  const reassign = useReassignProcDoc();
+  const { data: usersData } = useUsers();
 
   const [confirmAction, setConfirmAction] = useState<
     "submit" | "approve" | "cancel" | "delete" | null
   >(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [reassignUserId, setReassignUserId] = useState("");
 
   const busy =
     submit.isPending ||
     approve.isPending ||
     reject.isPending ||
     cancel.isPending ||
-    remove.isPending;
+    remove.isPending ||
+    reassign.isPending;
 
   const runAction = (action: "submit" | "approve" | "cancel" | "delete") => {
     if (!doc) return;
@@ -273,6 +279,50 @@ export function PurchaseRequestSheet({
             {doc.approved_by && <Field label="Disetujui oleh" value={doc.approved_by ?? "—"} />}
             {doc.approved_at && <Field label="Tanggal Approval" value={fmtDate(doc.approved_at)} />}
           </div>
+
+          {isPending && canManage && (
+            <div className="rounded-xl border border-dashed border-border px-4 py-3">
+              <p className="text-xs font-semibold text-muted-foreground">Alihkan Approver (Kelola)</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Hanya Pengadaan Kelola yang dapat mengalihkan. Approver baru tidak boleh sama dengan pemohon.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <select
+                  value={reassignUserId}
+                  onChange={(e) => setReassignUserId(e.target.value)}
+                  className="h-9 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+                >
+                  <option value="">Pilih approver baru...</option>
+                  {(usersData?.data ?? [])
+                    .filter((u) => u.is_active && u.id !== doc.requester_user_id)
+                    .map((u) => (
+                      <option key={u.id} value={String(u.id)}>
+                        {u.name} — {u.role}
+                      </option>
+                    ))}
+                </select>
+                <Button
+                  className="rounded-xl"
+                  disabled={!reassignUserId || busy}
+                  onClick={async () => {
+                    if (!reassignUserId) return;
+                    try {
+                      const res = await reassign.mutateAsync({
+                        id: doc.id,
+                        approverUserId: Number(reassignUserId),
+                      });
+                      toast.success(`Approver dialihkan ke ${res.data.approver ?? "—"}`);
+                      setReassignUserId("");
+                    } catch (err) {
+                      toast.error((err as Error).message);
+                    }
+                  }}
+                >
+                  Alihkan
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-border">
             <div className="border-b border-border px-4 py-2.5">

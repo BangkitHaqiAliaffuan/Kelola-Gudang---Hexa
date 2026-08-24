@@ -25,7 +25,7 @@ class UpdateStockDocumentRequest extends FormRequest
             'blind_count' => ['nullable', 'boolean'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')],
-            'lines.*.from_bin_id' => ['required', 'integer', Rule::exists('bins', 'id')],
+            'lines.*.from_bin_id' => ['nullable', 'integer', Rule::exists('bins', 'id')],
             // system_qty dipertahankan dari snapshot dokumen asli; bila kosong
             // (baris baru), di-backfill dari item_stock di controller.
             'lines.*.system_qty' => ['nullable', 'integer', 'min:0'],

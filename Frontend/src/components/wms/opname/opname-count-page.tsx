@@ -70,13 +70,11 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   }, [lines, records]);
 
   const buildLines = () =>
-    lines
-      .filter((l) => l.from_bin_id != null)
-      .map((l) => {
+    lines.map((l) => {
         const raw = (records[l.id] ?? "").trim();
         return {
           item_id: l.item_id,
-          from_bin_id: l.from_bin_id!,
+          from_bin_id: l.from_bin_id ?? null,
           system_qty: l.system_qty,
           actual_qty: raw === "" ? null : Number(raw),
           unit_cost: l.unit_cost,

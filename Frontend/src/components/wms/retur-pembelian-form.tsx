@@ -189,7 +189,7 @@ export function ReturPembelianForm() {
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of stockRows?.data ?? [])
-      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
+      map.set(`${r.warehouse_id}:${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
@@ -235,9 +235,9 @@ export function ReturPembelianForm() {
   }, [stockRows, warehouseId]);
 
   const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId) return undefined;
+    if (!l.itemId || !warehouseId) return undefined;
     const binPart = l.binId === "" ? "NULL" : l.binId;
-    return availableByKey.get(`${l.itemId}:${binPart}`);
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
   // Bin asal retur dari baris Penerimaan sumber: BM buatan form sungguhan
@@ -262,9 +262,11 @@ export function ReturPembelianForm() {
   const returnableSourceLines = useMemo(
     () =>
       sourceLines.filter(
-        (s) => (availableByKey.get(`${s.item_id}:${sourceLineBin(s) ?? "NULL"}`) ?? 0) > 0,
+        (s) =>
+          (availableByKey.get(`${warehouseId}:${s.item_id}:${sourceLineBin(s) ?? "NULL"}`) ?? 0) >
+          0,
       ),
-    [sourceLines, availableByKey],
+    [sourceLines, availableByKey, warehouseId],
   );
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
@@ -416,7 +418,7 @@ export function ReturPembelianForm() {
     const overSourceLine = lines.find((l) => {
       if (!l.itemId || !l.qty) return false;
       const src = lineSource(l);
-      return src != null && Number(l.qty) > (src.qty ?? 0);
+      return src != null && Number(l.qty) > (src.remaining_qty ?? src.qty ?? 0);
     });
     if (overSourceLine) {
       toast.error("Ada baris dengan qty melebihi jumlah barang pada dokumen sumber.");
@@ -607,7 +609,7 @@ export function ReturPembelianForm() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Tersedia", ""].map((h) => (
+                {["Barang", "Asal Bin", "Qty", "Tersedia di Bin", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -621,7 +623,9 @@ export function ReturPembelianForm() {
                   !submitted && available !== undefined && (Number(l.qty) || 0) > available;
                 const src = lineSource(l);
                 const overSource =
-                  !submitted && src != null && (Number(l.qty) || 0) > (src.qty ?? 0);
+                  !submitted &&
+                  src != null &&
+                  (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -694,7 +698,8 @@ export function ReturPembelianForm() {
                       )}
                       {overSource && (
                         <p className="mt-1 text-xs text-destructive">
-                          Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.qty ?? 0)})
+                          Melebihi jumlah dari dokumen sumber (maks{" "}
+                          {formatNumber(src?.remaining_qty ?? src?.qty ?? 0)})
                         </p>
                       )}
                       {src && !overSource && sourceDocId && (
@@ -782,7 +787,7 @@ export function ReturPembelianForm() {
                       className={`h-9 w-24 rounded-lg ${overStock || overSource ? "border-destructive" : ""}`}
                     />
                     <span className="ml-auto text-sm text-muted-foreground">
-                      Tersedia {available !== undefined ? formatNumber(available) : "—"}
+                      Tersedia di Bin {available !== undefined ? formatNumber(available) : "—"}
                     </span>
                   </div>
                   {overStock && (
@@ -881,8 +886,13 @@ export function ReturPembelianForm() {
             <DialogTitle>Scan Barcode</DialogTitle>
             <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
           </DialogHeader>
-          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
-          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+          <div
+            id={readerId}
+            className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
+          />
+          <p className="text-center text-xs text-muted-foreground">
+            Mendukung EAN-13, Code 128, dan QR
+          </p>
         </DialogContent>
       </Dialog>
     </>

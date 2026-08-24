@@ -175,6 +175,8 @@ export type StockDocumentLineApi = {
   reason_code: string | null;
   counted_by: string | null;
   counted_at: string | null;
+  remaining_qty?: number | null;
+  returned_qty?: number | null;
 };
 
 // Alasan selisih Stock Opname (root cause) — mirror StockDocumentLine::REASON_CODES.
@@ -304,7 +306,7 @@ export type UpdateStockDocumentPayload = {
   note?: string | null;
   lines: {
     item_id: number;
-    from_bin_id: number;
+    from_bin_id: number | null;
     system_qty?: number | null;
     actual_qty?: number | null;
     unit_cost?: number | null;

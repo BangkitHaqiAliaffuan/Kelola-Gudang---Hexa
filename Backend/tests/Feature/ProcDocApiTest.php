@@ -230,6 +230,7 @@ class ProcDocApiTest extends TestCase
         $this->assertSame(1, $doc->fresh()->lines()->count());
 
         // Setelah diajukan (Menunggu Approval), update diblokir.
+        $this->makeSupervisor();
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $this->putJson("/api/pengadaan/proc-docs/{$doc->id}", [
@@ -280,6 +281,7 @@ class ProcDocApiTest extends TestCase
         ])->assertStatus(201)->json('data.no');
 
         $doc2 = ProcDoc::where('no', $no2)->firstOrFail();
+        $this->makeSupervisor();
         $this->postJson("/api/pengadaan/proc-docs/{$doc2->id}/submit")->assertOk();
 
         $this->deleteJson("/api/pengadaan/proc-docs/{$doc2->id}")->assertStatus(422);
@@ -304,6 +306,7 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
+        $this->makeSupervisor();
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
             ->assertOk()
             ->assertJsonPath('data.status', 'Menunggu Approval')
@@ -383,6 +386,7 @@ class ProcDocApiTest extends TestCase
         ])->assertStatus(201)->json('data.no');
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->makeSupervisor();
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         // Requester (meski Pengadaan Kelola) tidak boleh menyetujui sendiri — SoD.
@@ -416,19 +420,23 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Tanpa Supervisor aktif (selain requester) → approver null, tak ada penugasan.
+        // Tanpa Supervisor aktif → fallback ke Pengadaan Kelola (Procurement Test dari setUp).
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $doc->refresh();
-        $this->assertNull($doc->approver_user_id);
-
-        // User Pengadaan Kelola (bukan requester) dapat memutuskan sebagai override.
+        $this->assertNotNull($doc->approver_user_id);
+        // Hanya approver yang ditugaskan yang boleh memutuskan (strict).
         $kelola = $this->makeUser('Kelola Test');
         RolePermission::firstOrCreate(
             ['role' => 'Kelola Test', 'module' => 'Pengadaan'],
             ['level' => 'Kelola'],
         );
         Sanctum::actingAs($kelola, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
+
+        // Approver yang ditugaskan (fallback Kelola) dapat menyetujui.
+        $assigned = User::find($doc->approver_user_id);
+        Sanctum::actingAs($assigned, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Disetujui');
@@ -461,22 +469,19 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Satu-satunya Supervisor == requester → tidak ditugaskan sebagai approver.
+        // Satu-satunya Supervisor == requester → fallback ke Pengadaan Kelola (strict, tidak null).
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $doc->refresh();
-        $this->assertNull($doc->approver_user_id);
+        $this->assertNotNull($doc->approver_user_id);
+        $this->assertNotEquals($supervisor->id, $doc->approver_user_id);
 
         // Supervisor (requester) tidak boleh menyetujui sendiri — SoD.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
 
-        // User Pengadaan Kelola lain dapat memutuskan.
-        $kelola = $this->makeUser('Kelola Test');
-        RolePermission::firstOrCreate(
-            ['role' => 'Kelola Test', 'module' => 'Pengadaan'],
-            ['level' => 'Kelola'],
-        );
-        Sanctum::actingAs($kelola, ['*'], 'sanctum');
+        // Hanya approver yang ditugaskan (fallback Kelola) yang boleh menyetujui.
+        $assigned = User::find($doc->approver_user_id);
+        Sanctum::actingAs($assigned, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Disetujui');
@@ -568,6 +573,7 @@ class ProcDocApiTest extends TestCase
             ->assertJsonPath('data.status', 'Dibatalkan');
 
         $pending = $makeDoc();
+        $this->makeSupervisor();
         $this->postJson("/api/pengadaan/proc-docs/{$pending->id}/submit")->assertOk();
         $this->postJson("/api/pengadaan/proc-docs/{$pending->id}/cancel")
             ->assertOk()
@@ -591,7 +597,9 @@ class ProcDocApiTest extends TestCase
         $approved = ProcDoc::where('no', $no2)->firstOrFail();
         $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/submit")->assertOk();
 
-        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $approved->refresh();
+        $assigned = User::find($approved->approver_user_id);
+        Sanctum::actingAs($assigned, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$approved->id}/approve")->assertOk();
 
         // PR Disetujui yang belum dirujuk PO kini dapat dibatalkan.
@@ -615,8 +623,9 @@ class ProcDocApiTest extends TestCase
 
         $referenced = ProcDoc::where('no', $no3)->firstOrFail();
         $this->postJson("/api/pengadaan/proc-docs/{$referenced->id}/submit")->assertOk();
-
-        Sanctum::actingAs($supervisor, ['*'], 'sanctum');
+        $referenced->refresh();
+        $assignedRef = User::find($referenced->approver_user_id);
+        Sanctum::actingAs($assignedRef, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$referenced->id}/approve")->assertOk();
         $this->actingAsProcurement();
 
@@ -916,6 +925,7 @@ class ProcDocApiTest extends TestCase
         [$department, $supplier, $warehouse] = $this->makeContext();
         $item = $this->makeItem();
 
+        Sanctum::actingAs($nonApprover, ['*'], 'sanctum');
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
@@ -929,13 +939,12 @@ class ProcDocApiTest extends TestCase
 
         $doc = ProcDoc::where('no', $no)->firstOrFail();
 
-        // Tanpa role ber-modul 'Approval Pengadaan' → tak ada penugasan approver.
+        // Tanpa Approval Pengadaan → fallback ke Pengadaan Kelola (strict, tidak null).
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
         $doc->refresh();
-        $this->assertNull($doc->approver_user_id);
+        $this->assertNotNull($doc->approver_user_id);
 
-        // Pengadaan Tulis tanpa modul approval → 403.
-        Sanctum::actingAs($nonApprover, ['*'], 'sanctum');
+        // Pengadaan Tulis tanpa modul approval dan bukan approver → 403.
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
     }
 
@@ -984,7 +993,8 @@ class ProcDocApiTest extends TestCase
         $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
 
         $doc->refresh();
-        $this->assertNull($doc->approver_user_id);
+        $this->assertNotNull($doc->approver_user_id);
+        $this->assertNotEquals($requester->id, $doc->approver_user_id);
     }
 
     public function test_department_head_can_approve_pr_without_module(): void
@@ -1150,6 +1160,208 @@ class ProcDocApiTest extends TestCase
             ->assertJsonPath('data.status', 'Disetujui');
     }
 
+    public function test_only_assigned_can_approve_when_head_exists(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $head = $this->makeUser('Operator Gudang');
+        $department->update(['head_user_id' => $head->id]);
+        $otherApprover = $this->makeSupervisor();
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.approver_user_id', $head->id);
+
+        // User dengan Approval Pengadaan lain (bukan assigned) → 403 strict.
+        Sanctum::actingAs($otherApprover, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
+
+        // Kelola juga tidak bisa override jika bukan assigned.
+        $this->actingAsProcurement();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
+
+        // Assigned head dapat menyetujui.
+        Sanctum::actingAs($head, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'Disetujui');
+    }
+
+    public function test_kelola_cannot_override_assigned(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
+        $department->update(['head_user_id' => $supervisor->id]);
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
+
+        $this->actingAsProcurement();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
+    }
+
+    public function test_pr_fallback_to_approval_and_kelola(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        // department tanpa head → fallback ke Approval Pengadaan
+        $supervisor = $this->makeSupervisor();
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.approver_user_id', $supervisor->id);
+    }
+
+    public function test_pr_submit_returns_422_when_no_eligible_approver(): void
+    {
+        // Nonaktifkan semua user Kelola/Approval agar tidak ada fallback.
+        User::query()->update(['is_active' => false]);
+        // Buat requester baru aktif
+        $requester = User::factory()->create(['is_active' => true, 'role' => 'Requester Tulis']);
+        RolePermission::firstOrCreate(['role' => 'Requester Tulis', 'module' => 'Pengadaan'], ['level' => 'Tulis']);
+        Sanctum::actingAs($requester, ['*'], 'sanctum');
+
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.approver_user_id.0', fn ($v) => str_contains((string) $v, 'Tidak ada approver'));
+    }
+
+    public function test_inactive_head_falls_back(): void
+    {
+        $head = $this->makeUser('Operator Gudang');
+        $head->update(['is_active' => false]);
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $department->update(['head_user_id' => $head->id]);
+        $item = $this->makeItem();
+        $supervisor = $this->makeSupervisor();
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")
+            ->assertOk()
+            ->assertJsonPath('data.approver_user_id', $supervisor->id);
+    }
+
+    public function test_reassign_by_kelola_and_strict(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $head = $this->makeUser('Operator Gudang');
+        $department->update(['head_user_id' => $head->id]);
+
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
+
+        $newApprover = $this->makeSupervisor();
+        // Reassign butuh Kelola
+        $this->actingAsProcurement();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reassign", ['approver_user_id' => $newApprover->id])
+            ->assertOk()
+            ->assertJsonPath('data.approver_user_id', $newApprover->id);
+
+        // Old head tidak bisa lagi
+        Sanctum::actingAs($head, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertStatus(403);
+
+        // New approver bisa
+        Sanctum::actingAs($newApprover, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/approve")->assertOk();
+    }
+
+    public function test_reassign_blocked_for_non_kelola_and_cannot_assign_requester(): void
+    {
+        [$department, $supplier, $warehouse] = $this->makeContext();
+        $item = $this->makeItem();
+        $head = $this->makeUser('Operator Gudang');
+        $department->update(['head_user_id' => $head->id]);
+
+        $requester = $this->makeUser('Requester Tulis');
+        RolePermission::firstOrCreate(['role' => 'Requester Tulis', 'module' => 'Pengadaan'], ['level' => 'Tulis']);
+
+        Sanctum::actingAs($requester, ['*'], 'sanctum');
+        $no = $this->postJson('/api/pengadaan/proc-docs', [
+            'kind' => 'PR',
+            'document_date' => '2026-08-12',
+            'requester_user_id' => $requester->id,
+            'department_id' => $department->id,
+            'supplier_id' => $supplier->id,
+            'warehouse_id' => $warehouse->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'price' => 1000]],
+        ])->assertStatus(201)->json('data.no');
+
+        $doc = ProcDoc::where('no', $no)->firstOrFail();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/submit")->assertOk();
+
+        // Non-Kelola tidak bisa reassign
+        Sanctum::actingAs($head, ['*'], 'sanctum');
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reassign", ['approver_user_id' => $head->id])
+            ->assertStatus(403);
+
+        // Kelola tidak boleh assign ke requester (SoD)
+        $this->actingAsProcurement();
+        $this->postJson("/api/pengadaan/proc-docs/{$doc->id}/reassign", ['approver_user_id' => $requester->id])
+            ->assertStatus(422);
+    }
+
     /** Buat PR yang sudah Disetujui (requester = user procurement aktif). */
     private function makeApprovedPr(
         Item $item,
@@ -1158,6 +1370,7 @@ class ProcDocApiTest extends TestCase
         Warehouse $warehouse,
         array $lines,
     ): ProcDoc {
+        $supervisor = $this->makeSupervisor();
         $no = $this->postJson('/api/pengadaan/proc-docs', [
             'kind' => 'PR',
             'document_date' => '2026-08-12',
@@ -1170,7 +1383,6 @@ class ProcDocApiTest extends TestCase
         $pr = ProcDoc::where('no', $no)->firstOrFail();
         $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/submit")->assertOk();
 
-        $supervisor = $this->makeSupervisor();
         Sanctum::actingAs($supervisor, ['*'], 'sanctum');
         $this->postJson("/api/pengadaan/proc-docs/{$pr->id}/approve")->assertOk();
 

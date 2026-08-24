@@ -272,6 +272,14 @@ class ProcDocController extends Controller
             return response()->json(['message' => 'Hanya dokumen pengadaan berstatus Draft yang dapat diajukan.'], 422);
         }
 
+        $approverId = ApprovalEngine::resolveApprover($procDoc);
+        if ($approverId === null) {
+            return response()->json([
+                'message' => 'Tidak ada approver yang memenuhi syarat — hubungi Administrator untuk atur kepala departemen atau hak akses Approval Pengadaan.',
+                'errors' => ['approver_user_id' => ['Tidak ada approver yang memenuhi syarat.']],
+            ], 422);
+        }
+
         $procDoc->update(['status' => 'Menunggu Approval', 'submitted_at' => now()]);
 
         ApprovalEngine::start($procDoc);
@@ -280,9 +288,40 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Setujui dokumen pengadaan yang menunggu approval (role Supervisor atau
-     * user Pengadaan Kelola sebagai override; requester tidak boleh menyetujui
-     * sendiri).
+     * Alihkan approver dokumen Menunggu Approval ke user lain (hanya Pengadaan Kelola).
+     */
+    public function reassign(Request $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
+    {
+        $user = $request->user();
+        if (! $user || ! ApprovalEngine::isKelola($user)) {
+            return response()->json(['message' => 'Hanya Pengadaan Kelola yang dapat mengalihkan approver.'], 403);
+        }
+
+        if (! $procDoc->isPendingApproval()) {
+            return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat dialihkan.'], 422);
+        }
+
+        $data = $request->validate([
+            'approver_user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $newApprover = User::find($data['approver_user_id']);
+        if (! $newApprover || ! $newApprover->is_active) {
+            return response()->json(['message' => 'Approver tidak aktif.'], 422);
+        }
+
+        if ((int) $newApprover->id === (int) $procDoc->requester_user_id) {
+            return response()->json(['message' => 'Approver tidak boleh sama dengan pemohon (SoD).'], 422);
+        }
+
+        ApprovalEngine::reassign($procDoc, (int) $newApprover->id, (int) $user->id);
+
+        return new ProcDocResource($this->loadDetail($procDoc->fresh()));
+    }
+
+    /**
+     * Setujui dokumen pengadaan yang menunggu approval (hanya approver
+     * yang ditugaskan; requester tidak boleh menyetujui sendiri).
      */
     public function approve(ProcDoc $procDoc): ProcDocResource|JsonResponse
     {
@@ -301,7 +340,8 @@ class ProcDocController extends Controller
     }
 
     /**
-     * Tolak dokumen pengadaan yang menunggu approval — catatan penolakan opsional.
+     * Tolak dokumen pengadaan yang menunggu approval — hanya approver yang
+     * ditugaskan; catatan penolakan opsional.
      */
     public function reject(Request $request, ProcDoc $procDoc): ProcDocResource|JsonResponse
     {

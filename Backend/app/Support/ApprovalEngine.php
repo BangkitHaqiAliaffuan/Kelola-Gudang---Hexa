@@ -10,9 +10,10 @@ use App\Models\User;
 /**
  * Approval engine untuk dokumen pengadaan (PR/PO) — single-level.
  * PR: approver = kepala departemen pemohon (departments.head_user_id,
- * user-based). PO: approver = user aktif ber-role yang punya modul 'Approval
- * Pengadaan' (diatur admin via Master → Role). User Pengadaan Kelola dapat
- * memutuskan sebagai override; requester tidak pernah boleh memutuskan (SoD).
+ * user-based) dengan fallback deterministik: Approval Pengadaan → Pengadaan
+ * Kelola. PO: approver = user aktif ber-role yang punya modul 'Approval
+ * Pengadaan'. Hanya approver yang ditugaskan (approver_user_id) yang boleh
+ * memutuskan; requester tidak pernah boleh memutuskan (SoD).
  * Penolakan bersifat terminal.
  */
 class ApprovalEngine
@@ -32,13 +33,12 @@ class ApprovalEngine
 
     /**
      * Menentukan approver aktif (Level 1) untuk dokumen yang diajukan.
-     * - PR: kepala departemen pemohon (departments.head_user_id, user-based —
-     *   bukan role). Null bila head kosong atau head === requester (SoD) →
-     *   dokumen menunggu tanpa penugasan; hanya user Pengadaan Kelola yang
-     *   dapat memutuskan.
+     * - PR: kepala departemen pemohon (departments.head_user_id, user-based)
+     *   jika aktif && != requester; fallback ke user aktif pertama dengan
+     *   modul 'Approval Pengadaan', lalu fallback ke Pengadaan Kelola.
+     *   Null hanya bila tidak ada eligible sama sekali → submit 422.
      * - PO: user aktif pertama (by id) ber-role ber-modul 'Approval Pengadaan',
-     *   selain requester. Null bila tidak ada yang memenuhi → butuh penugasan
-     *   manual; user berhak memutuskan mana pun tetap bisa memutuskan.
+     *   selain requester. Null bila tidak ada yang memenuhi.
      */
     public static function resolveApprover(ProcDoc $procDoc): ?int
     {
@@ -47,11 +47,37 @@ class ApprovalEngine
         if ($procDoc->kind === 'PR') {
             $headId = $procDoc->department?->head_user_id;
 
-            if ($headId === null || $headId === $requesterId) {
-                return null;
+            if ($headId !== null && $headId !== $requesterId) {
+                $head = User::whereKey($headId)->where('is_active', true)->first();
+                if ($head !== null) {
+                    return $head->id;
+                }
             }
 
-            return $headId;
+            $approvalRoles = RolePermission::where('module', self::APPROVAL_MODULE)
+                ->pluck('role');
+
+            $fallbackApproval = User::whereIn('role', $approvalRoles)
+                ->where('is_active', true)
+                ->when($requesterId !== null, fn ($q) => $q->whereKeyNot($requesterId))
+                ->orderBy('id')
+                ->first();
+
+            if ($fallbackApproval !== null) {
+                return $fallbackApproval->id;
+            }
+
+            $kelolaRoles = RolePermission::where('module', 'Pengadaan')
+                ->where('level', 'Kelola')
+                ->pluck('role');
+
+            $fallbackKelola = User::whereIn('role', $kelolaRoles)
+                ->where('is_active', true)
+                ->when($requesterId !== null, fn ($q) => $q->whereKeyNot($requesterId))
+                ->orderBy('id')
+                ->first();
+
+            return $fallbackKelola?->id;
         }
 
         $approvalRoles = RolePermission::where('module', self::APPROVAL_MODULE)
@@ -109,10 +135,8 @@ class ApprovalEngine
     }
 
     /**
-     * Apakah user berhak memutuskan dokumen: approver yang ditugaskan
-     * (approver_user_id — mencakup kepala departemen untuk PR), role ber-modul
-     * 'Approval Pengadaan', atau siapa pun dengan Pengadaan Kelola (override) —
-     * kecuali requester (SoD).
+     * Apakah user berhak memutuskan dokumen: hanya approver yang ditugaskan
+     * (approver_user_id) — kecuali requester (SoD). Tidak ada override role.
      */
     public static function canDecide(ProcDoc $procDoc, int $userId): bool
     {
@@ -120,22 +144,30 @@ class ApprovalEngine
             return false;
         }
 
-        if ($procDoc->approver_user_id === $userId) {
-            return true;
-        }
+        return $procDoc->approver_user_id !== null && $procDoc->approver_user_id === $userId;
+    }
 
-        $user = User::find($userId);
-        if ($user === null) {
-            return false;
-        }
-
-        if (self::roleCanApprove($user->role)) {
-            return true;
-        }
-
+    /**
+     * Apakah user memiliki Pengadaan Kelola (untuk reassign).
+     */
+    public static function isKelola(User $user): bool
+    {
         return RolePermission::where('role', $user->role)
             ->where('module', 'Pengadaan')
             ->where('level', 'Kelola')
             ->exists();
+    }
+
+    /**
+     * Alihkan approver dokumen Menunggu Approval ke user lain (hanya Pengadaan Kelola).
+     */
+    public static function reassign(ProcDoc $procDoc, int $newApproverId, int $actorId): void
+    {
+        ProcDocApproval::where('proc_doc_id', $procDoc->id)
+            ->where('level', 1)
+            ->where('status', 'Menunggu')
+            ->update(['approver_user_id' => $newApproverId]);
+
+        $procDoc->update(['approver_user_id' => $newApproverId]);
     }
 }
