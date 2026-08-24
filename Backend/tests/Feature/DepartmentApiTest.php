@@ -29,7 +29,7 @@ class DepartmentApiTest extends TestCase
 
     public function test_index_resolves_head_name(): void
     {
-        $head = User::factory()->create(['name' => 'Bayu Pratama']);
+        $head = User::factory()->create(['name' => 'Bayu Pratama', 'role' => 'Supervisor', 'is_active' => true]);
         Department::factory()->create(['head_user_id' => $head->id]);
 
         $this->getJson('/api/master/departments')

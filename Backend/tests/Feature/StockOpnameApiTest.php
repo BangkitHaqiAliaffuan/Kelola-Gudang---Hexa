@@ -75,6 +75,7 @@ class StockOpnameApiTest extends TestCase
 
     public function test_store_opname_draft_without_from_bin_returns_422(): void
     {
+        // Opsi A floor-stock: Stock Opname tanpa bin (bin_id NULL = lantai) kini valid — floor stock ikut diopname.
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
 
@@ -86,8 +87,10 @@ class StockOpnameApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.from_bin_id');
+        ])->assertStatus(201)
+            ->assertJsonPath('data.type', 'Stock Opname')
+            ->assertJsonPath('data.status', 'Draft')
+            ->assertJsonPath('data.lines.0.from_bin_id', null);
     }
 
     public function test_store_opname_rejects_qty_on_lines(): void
