@@ -50,26 +50,30 @@ export function OpnameProsesPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Sedang Berjalan"
-          value={formatNumber(analytics.running)}
+          value={listLoading ? "…" : formatNumber(analytics.running)}
           icon={ClipboardCheck}
+          loading={listLoading}
         />
         <StatCard
           label="Belum Dicek"
-          value={formatNumber(analytics.unchecked)}
+          value={listLoading ? "…" : formatNumber(analytics.unchecked)}
           icon={ListChecks}
           tone="warning"
+          loading={listLoading}
         />
         <StatCard
           label="Sudah Dicek"
-          value={formatNumber(analytics.checked)}
+          value={listLoading ? "…" : formatNumber(analytics.checked)}
           icon={CheckCheck}
           tone="success"
+          loading={listLoading}
         />
         <StatCard
           label="Selisih"
-          value={formatNumber(analytics.selisih)}
+          value={listLoading ? "…" : formatNumber(analytics.selisih)}
           icon={TriangleAlert}
           tone="danger"
+          loading={listLoading}
         />
       </div>
 

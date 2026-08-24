@@ -123,26 +123,30 @@ export function OpnameJadwalPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Sedang Berjalan"
-          value={formatNumber(analytics.running)}
+          value={isLoading ? "…" : formatNumber(analytics.running)}
           icon={ClipboardCheck}
+          loading={isLoading}
         />
         <StatCard
           label="Belum Dicek"
-          value={formatNumber(analytics.unchecked)}
+          value={isLoading ? "…" : formatNumber(analytics.unchecked)}
           icon={ListChecks}
           tone="warning"
+          loading={isLoading}
         />
         <StatCard
           label="Sudah Dicek"
-          value={formatNumber(analytics.checked)}
+          value={isLoading ? "…" : formatNumber(analytics.checked)}
           icon={CheckCheck}
           tone="success"
+          loading={isLoading}
         />
         <StatCard
           label="Selisih"
-          value={formatNumber(analytics.selisih)}
+          value={isLoading ? "…" : formatNumber(analytics.selisih)}
           icon={TriangleAlert}
           tone="danger"
+          loading={isLoading}
         />
       </div>
 

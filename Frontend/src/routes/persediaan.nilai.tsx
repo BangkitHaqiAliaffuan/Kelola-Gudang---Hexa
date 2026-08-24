@@ -172,47 +172,59 @@ function NilaiPersediaan() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard
+          loading={isLoading}
           label="Total Nilai Stock"
-          value={formatIDRCompact(total)}
-          valueTitle={formatIDR(total)}
-          hint={`metode ${valuationMethodLabels[method]}`}
+          value={isLoading ? "…" : formatIDRCompact(total)}
+          {...(isLoading ? {} : { valueTitle: formatIDR(total), hint: `metode ${valuationMethodLabels[method]}` })}
           icon={Wallet}
         />
         <StatCard
+          loading={isLoading}
           label="Barang Termahal"
-          value={formatIDRCompact(termahal ? nilaiFor(termahal, method) : 0)}
-          valueTitle={formatIDR(termahal ? nilaiFor(termahal, method) : 0)}
-          hint={termahal?.name ?? "—"}
+          value={isLoading ? "…" : formatIDRCompact(termahal ? nilaiFor(termahal, method) : 0)}
+          {...(isLoading
+            ? {}
+            : {
+                valueTitle: formatIDR(termahal ? nilaiFor(termahal, method) : 0),
+                hint: termahal?.name ?? "—",
+              })}
           icon={TrendingUp}
           tone="success"
         />
         <StatCard
+          loading={isLoading}
           label="Barang Termurah"
-          value={formatIDRCompact(termurah ? nilaiFor(termurah, method) : 0)}
-          valueTitle={formatIDR(termurah ? nilaiFor(termurah, method) : 0)}
-          hint={termurah?.name ?? "—"}
+          value={isLoading ? "…" : formatIDRCompact(termurah ? nilaiFor(termurah, method) : 0)}
+          {...(isLoading
+            ? {}
+            : {
+                valueTitle: formatIDR(termurah ? nilaiFor(termurah, method) : 0),
+                hint: termurah?.name ?? "—",
+              })}
           icon={TrendingDown}
           tone="info"
         />
         <StatCard
+          loading={isLoading}
           label="Dead Stock"
-          value={String(dead.length)}
-          hint="tidak bergerak > 5 bulan"
+          value={isLoading ? "…" : String(dead.length)}
+          {...(isLoading ? {} : { hint: "tidak bergerak > 5 bulan" })}
           icon={PackageX}
           tone="danger"
         />
         <StatCard
+          loading={isLoading}
           label="Fast Moving"
-          value={String(fast.length)}
-          hint="bergerak < 20 hari"
+          value={isLoading ? "…" : String(fast.length)}
+          {...(isLoading ? {} : { hint: "bergerak < 20 hari" })}
           icon={Zap}
           tone="warning"
         />
         <StatCard
+          loading={isLoading}
           label="Nilai Tereservasi"
-          value={formatIDRCompact(nilaiReserved)}
-          valueTitle={formatIDR(nilaiReserved)}
-          hint="terikat reservasi"
+          value={isLoading ? "…" : formatIDRCompact(nilaiReserved)}
+          {...(isLoading ? {} : { valueTitle: formatIDR(nilaiReserved), hint: "terikat reservasi" })}
           icon={Lock}
           tone="info"
         />

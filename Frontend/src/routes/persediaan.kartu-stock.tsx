@@ -484,28 +484,36 @@ function KartuStock() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
+            loading={card.isLoading || card.isFetching}
             label="Saldo Awal"
-            value={`${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
+            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
             icon={Boxes}
             tone="info"
           />
           <StatCard
+            loading={card.isLoading || card.isFetching}
             label="Total Masuk"
-            value={`${formatNumber(totalMasuk)} ${unit}`}
+            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(totalMasuk)} ${unit}`}
             icon={ArrowDownLeft}
             tone="success"
           />
           <StatCard
+            loading={card.isLoading || card.isFetching}
             label="Total Keluar"
-            value={`${formatNumber(totalKeluar)} ${unit}`}
+            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(totalKeluar)} ${unit}`}
             icon={ArrowUpRight}
             tone="warning"
           />
           <StatCard
+            loading={card.isLoading || card.isFetching}
             label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
-            value={formatIDRCompact(lastRow?.nilai ?? 0)}
-            valueTitle={formatIDR(lastRow?.nilai ?? 0)}
-            hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
+            value={(card.isLoading || card.isFetching) ? "…" : formatIDRCompact(lastRow?.nilai ?? 0)}
+            {...((card.isLoading || card.isFetching)
+              ? {}
+              : {
+                  valueTitle: formatIDR(lastRow?.nilai ?? 0),
+                  hint: `${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`,
+                })}
             icon={Wallet}
           />
         </div>
@@ -557,6 +565,7 @@ function KartuStock() {
               const c = methodCards[m];
               const cRows = c.data?.data.rows ?? [];
               const cLast = cRows[cRows.length - 1];
+              const isLoading = c.isLoading || c.isFetching;
               return (
                 <div
                   key={m}
@@ -568,9 +577,9 @@ function KartuStock() {
                   <p className="text-xs font-semibold text-muted-foreground">
                     {valuationMethodLabels[m]}
                   </p>
-                  <p className="mt-1 text-lg font-bold">{formatIDR(cLast?.nilai ?? 0)}</p>
+                  <p className="mt-1 text-lg font-bold">{isLoading ? "…" : formatIDR(cLast?.nilai ?? 0)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    HPP {formatIDR(cLast?.method_cost ?? 0)} / {unit}
+                    {isLoading ? "…" : `HPP ${formatIDR(cLast?.method_cost ?? 0)} / ${unit}`}
                   </p>
                 </div>
               );

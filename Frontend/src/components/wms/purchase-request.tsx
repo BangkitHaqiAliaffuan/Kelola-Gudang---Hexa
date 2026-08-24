@@ -332,6 +332,7 @@ export function PurchaseRequestPage() {
             hint="Dokumen permintaan"
             icon={ClipboardList}
             tone="brand"
+            loading={isLoading}
           />
           <StatCard
             label="Menunggu Approval"
@@ -339,6 +340,7 @@ export function PurchaseRequestPage() {
             hint="Perlu ditindaklanjuti"
             icon={ShoppingCart}
             tone="warning"
+            loading={isLoading}
           />
           {canApproveAny && (
             <StatCard
@@ -347,6 +349,7 @@ export function PurchaseRequestPage() {
               hint="Dapat Anda setujui/tolak"
               icon={UserCheck}
               tone="brand"
+              loading={isLoading}
             />
           )}
           <StatCard
@@ -355,6 +358,7 @@ export function PurchaseRequestPage() {
             hint="Siap diterbitkan PO"
             icon={BadgeCheck}
             tone="success"
+            loading={isLoading}
           />
           <StatCard
             label="Nilai Total"
@@ -363,6 +367,7 @@ export function PurchaseRequestPage() {
             hint="Estimasi seluruh PR"
             icon={ShoppingCart}
             tone="info"
+            loading={isLoading}
           />
         </div>
 

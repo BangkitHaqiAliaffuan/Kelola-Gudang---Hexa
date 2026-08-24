@@ -298,31 +298,34 @@ function StockMinimum() {
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
+            loading={isLoading}
             label="Perlu Restock"
-            value={formatNumber(stats.perlu)}
-            hint="di bawah minimum"
+            value={isLoading ? "…" : formatNumber(stats.perlu)}
+            {...(isLoading ? {} : { hint: "di bawah minimum" })}
             icon={TriangleAlert}
             tone="warning"
           />
           <StatCard
+            loading={isLoading}
             label="Nilai Kebutuhan"
-            value={formatIDRCompact(stats.nilai)}
-            valueTitle={formatIDR(stats.nilai)}
-            hint="total usulan restock"
+            value={isLoading ? "…" : formatIDRCompact(stats.nilai)}
+            {...(isLoading ? {} : { valueTitle: formatIDR(stats.nilai), hint: "total usulan restock" })}
             icon={PackageX}
             tone="brand"
           />
           <StatCard
+            loading={isLoading}
             label="Barang Habis"
-            value={formatNumber(stats.habis)}
-            hint="stok nol"
+            value={isLoading ? "…" : formatNumber(stats.habis)}
+            {...(isLoading ? {} : { hint: "stok nol" })}
             icon={TriangleAlert}
             tone="danger"
           />
           <StatCard
+            loading={isLoading}
             label="Supplier Terkait"
-            value={formatNumber(stats.suppliers)}
-            hint="untuk restock"
+            value={isLoading ? "…" : formatNumber(stats.suppliers)}
+            {...(isLoading ? {} : { hint: "untuk restock" })}
             icon={Truck}
             tone="info"
           />

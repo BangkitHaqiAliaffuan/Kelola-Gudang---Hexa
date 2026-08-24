@@ -217,26 +217,30 @@ function Laporan() {
           <>
             <StatCard
               label="Total Sesi"
-              value={formatNumber(opnameRows.length)}
+              value={opnameLoading ? "…" : formatNumber(opnameRows.length)}
               icon={ClipboardCheck}
+              loading={opnameLoading}
             />
             <StatCard
               label="Berjalan"
-              value={formatNumber(runningCount)}
+              value={opnameLoading ? "…" : formatNumber(runningCount)}
               icon={ClipboardCheck}
               tone="warning"
+              loading={opnameLoading}
             />
             <StatCard
               label="Selesai"
-              value={formatNumber(doneCount)}
+              value={opnameLoading ? "…" : formatNumber(doneCount)}
               icon={CheckCheck}
               tone="success"
+              loading={opnameLoading}
             />
             <StatCard
               label="Belum Dicek"
-              value={formatNumber(unchecked)}
+              value={opnameLoading ? "…" : formatNumber(unchecked)}
               icon={ListChecks}
               tone="danger"
+              loading={opnameLoading}
             />
           </>
         ) : (

@@ -331,25 +331,33 @@ export function LaporanStock() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total SKU" value={formatNumber(stats.sku)} icon={Boxes} />
+        <StatCard
+          label="Total SKU"
+          value={isLoading ? "…" : formatNumber(stats.sku)}
+          icon={Boxes}
+          loading={isLoading}
+        />
         <StatCard
           label="Total Qty"
-          value={`${formatNumber(stats.qty)} unit`}
+          value={isLoading ? "…" : `${formatNumber(stats.qty)} unit`}
           icon={Package}
           tone="info"
+          loading={isLoading}
         />
         <StatCard
           label="Nilai Persediaan"
-          value={formatIDR(stats.nilai)}
+          value={isLoading ? "…" : formatIDR(stats.nilai)}
           icon={Wallet}
           tone="success"
-          valueTitle={formatIDR(stats.nilai)}
+          valueTitle={isLoading ? undefined : formatIDR(stats.nilai)}
+          loading={isLoading}
         />
         <StatCard
           label="Habis"
-          value={formatNumber(stats.habis)}
+          value={isLoading ? "…" : formatNumber(stats.habis)}
           icon={TriangleAlert}
           tone="danger"
+          loading={isLoading}
         />
       </div>
 

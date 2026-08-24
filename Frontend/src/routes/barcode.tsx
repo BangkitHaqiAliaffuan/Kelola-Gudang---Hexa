@@ -1,12 +1,20 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { Download, Minus, Plus, Printer, Trash2 } from "lucide-react";
+import { Download, Minus, Plus, Printer, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, Panel } from "@/components/wms/kit";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { FormCombobox, type ComboboxOption } from "@/components/wms/form-combobox";
+import { useWmsScanner } from "@/hooks/use-wms-scanner";
 import { useItems } from "@/hooks/use-master";
 import { formatIDR } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
@@ -102,6 +110,25 @@ function BarcodePage() {
   const removeRow = useCallback((id: number) => {
     setRows((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const [scanTarget, setScanTarget] = useState<number | null>(null);
+  const { scanOpen, setScanOpen, readerId } = useWmsScanner({
+    items: items as never,
+    onPick: (item) => {
+      const pickedId = (item as { id: number }).id;
+      if (scanTarget != null) {
+        setRows((prev) => {
+          if (prev.some((r) => r.itemId === pickedId)) return prev;
+          if (!prev.some((r) => r.id === scanTarget)) {
+            return prev;
+          }
+          return prev.map((r) => (r.id === scanTarget ? { ...r, itemId: pickedId } : r));
+        });
+      } else {
+        addRow(pickedId);
+      }
+    },
+  });
 
   useEffect(() => {
     if (sku && !seeded.current && items.length > 0) {
@@ -260,18 +287,33 @@ function BarcodePage() {
                   const it = items.find((i) => i.id === r.itemId);
                   return (
                     <div key={r.id} className="space-y-2 rounded-xl border border-border p-2.5">
-                      <FormCombobox
-                        value={it ? String(it.id) : ""}
-                        onValueChange={(v) => {
-                          const itemId = Number(v);
-                          if (itemId) addRow(itemId);
-                          else removeRow(r.id);
-                        }}
-                        options={options}
-                        placeholder="Pilih barang / scan barcode"
-                        searchPlaceholder="Cari nama, SKU, barcode..."
-                        className="h-9"
-                      />
+                      <div className="flex gap-1">
+                        <FormCombobox
+                          value={it ? String(it.id) : ""}
+                          onValueChange={(v) => {
+                            const itemId = Number(v);
+                            if (itemId) addRow(itemId);
+                            else removeRow(r.id);
+                          }}
+                          options={options}
+                          placeholder="Pilih barang / scan barcode"
+                          searchPlaceholder="Cari nama, SKU, barcode..."
+                          className="h-9 flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 rounded-lg"
+                          aria-label="Scan barcode"
+                          onClick={() => {
+                            setScanTarget(r.id);
+                            setScanOpen(true);
+                          }}
+                        >
+                          <ScanLine className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center rounded-lg border border-border">
                           <button
@@ -375,6 +417,17 @@ function BarcodePage() {
           )}
         </Panel>
       </div>
+
+      <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Scan Barcode</DialogTitle>
+            <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
+          </DialogHeader>
+          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
+          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

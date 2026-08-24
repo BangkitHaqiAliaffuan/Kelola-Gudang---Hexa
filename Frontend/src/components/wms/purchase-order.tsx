@@ -189,13 +189,19 @@ export function PurchaseOrderPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={ShoppingCart} />
+        <StatCard
+          label="Total Dokumen"
+          value={formatNumber(rows.length)}
+          icon={ShoppingCart}
+          loading={isLoading}
+        />
         {canApproveAny && (
           <StatCard
             label="Menunggu Saya"
             value={formatNumber(approvable)}
             icon={ShoppingCart}
             tone="brand"
+            loading={isLoading}
           />
         )}
         <StatCard
@@ -203,12 +209,14 @@ export function PurchaseOrderPage() {
           value={formatNumber(openDocs)}
           icon={ShoppingCart}
           tone="warning"
+          loading={isLoading}
         />
         <StatCard
           label="Selesai / Disetujui"
           value={formatNumber(doneDocs)}
           icon={ShoppingCart}
           tone="success"
+          loading={isLoading}
         />
         <StatCard
           label="Nilai Total"
@@ -216,6 +224,7 @@ export function PurchaseOrderPage() {
           valueTitle={formatIDR(totalValue)}
           icon={ShoppingCart}
           tone="info"
+          loading={isLoading}
         />
       </div>
 

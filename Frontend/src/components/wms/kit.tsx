@@ -118,20 +118,24 @@ export function StatCard({
   icon: Icon,
   tone = "brand",
   valueTitle,
+  loading = false,
 }: {
   label: string;
   value: string;
-  hint?: string;
+  hint?: string | undefined;
   icon: LucideIcon;
   tone?: Tone;
-  valueTitle?: string;
+  valueTitle?: string | undefined;
+  loading?: boolean;
 }) {
   return (
     <div className="card-soft card-hover p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-          {valueTitle ? (
+          {loading ? (
+            <Skeleton className="mt-1.5 h-7 w-24 rounded-lg" />
+          ) : valueTitle ? (
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -147,7 +151,7 @@ export function StatCard({
               {value}
             </p>
           )}
-          {hint && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>}
+          {hint && !loading && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>}
         </div>
         <span
           className={cn(

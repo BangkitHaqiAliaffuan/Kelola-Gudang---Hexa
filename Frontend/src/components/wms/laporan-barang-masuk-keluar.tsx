@@ -328,26 +328,36 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total Dokumen" value={formatNumber(stats.docs)} icon={ClipboardList} />
+        <StatCard
+          label="Total Dokumen"
+          value={isLoading || isFetching ? "…" : formatNumber(stats.docs)}
+          icon={ClipboardList}
+          loading={isLoading || isFetching}
+        />
         <StatCard
           label="Total Qty"
-          value={`${formatNumber(stats.qty)} unit`}
+          value={isLoading || isFetching ? "…" : `${formatNumber(stats.qty)} unit`}
           icon={Package}
           tone="info"
+          loading={isLoading || isFetching}
         />
         <StatCard
           label="Total Nilai"
-          value={formatIDR(stats.nilai)}
+          value={isLoading || isFetching ? "…" : formatIDR(stats.nilai)}
           icon={Wallet}
           tone="success"
-          valueTitle={formatIDR(stats.nilai)}
+          valueTitle={isLoading || isFetching ? undefined : formatIDR(stats.nilai)}
+          loading={isLoading || isFetching}
         />
         <StatCard
           label="Belum Posting"
-          value={formatNumber(stats.belumPosting)}
+          value={isLoading || isFetching ? "…" : formatNumber(stats.belumPosting)}
           icon={TriangleAlert}
           tone="danger"
-          valueTitle={`${formatNumber(stats.belumPosting)} dokumen belum diposting`}
+          valueTitle={
+            isLoading || isFetching ? undefined : `${formatNumber(stats.belumPosting)} dokumen belum diposting`
+          }
+          loading={isLoading || isFetching}
         />
       </div>
 

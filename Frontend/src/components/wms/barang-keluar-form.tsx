@@ -1,10 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
 import { Button } from "@/components/ui/button";
+import { useWmsScanner } from "@/hooks/use-wms-scanner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,9 +78,17 @@ export function BarangKeluarForm() {
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [confirmPosting, setConfirmPosting] = useState(false);
+  const [scanTarget, setScanTarget] = useState<string | null>(null);
   // Set saat submit dimulai: menahan rendering peringatan over-stock selama
   // jendela refetch pasca-posting (invalidateQueries) sebelum navigate selesai.
   const [submitted, setSubmitted] = useState(false);
+
+  const { scanOpen, setScanOpen, readerId } = useWmsScanner({
+    items: (items?.data ?? []) as never,
+    onPick: (item) => {
+      if (scanTarget) pickItem(scanTarget, String(item.id));
+    },
+  });
 
   const binsInWarehouse = useMemo(
     () =>
@@ -431,18 +447,34 @@ export function BarangKeluarForm() {
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
-                      <FormCombobox
-                        value={l.itemId}
-                        onValueChange={(v) => pickItem(l.key, v)}
-                        options={lineItemOptions()}
-                        placeholder={
-                          warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"
-                        }
-                        searchPlaceholder="Cari nama, SKU, barcode..."
-                        side="top"
-                        avoidCollisions={false}
-                        loading={itemsLoading || stockLoading}
-                      />
+                      <div className="flex gap-1">
+                        <FormCombobox
+                          value={l.itemId}
+                          onValueChange={(v) => pickItem(l.key, v)}
+                          options={lineItemOptions()}
+                          placeholder={
+                            warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"
+                          }
+                          searchPlaceholder="Cari nama, SKU, barcode..."
+                          side="top"
+                          avoidCollisions={false}
+                          loading={itemsLoading || stockLoading}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 rounded-lg"
+                          aria-label="Scan barcode"
+                          onClick={() => {
+                            setScanTarget(l.key);
+                            setScanOpen(true);
+                          }}
+                        >
+                          <ScanLine className="h-4 w-4" />
+                        </Button>
+                      </div>
                       {lineError(i, "item_id") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "item_id")}</p>
                       )}
@@ -516,15 +548,31 @@ export function BarangKeluarForm() {
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
-                  <FormCombobox
-                    value={l.itemId}
-                    onValueChange={(v) => pickItem(l.key, v)}
-                    options={lineItemOptions()}
-                    placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
-                    side="top"
-                    avoidCollisions={false}
-                    loading={itemsLoading || stockLoading}
-                  />
+                  <div className="flex gap-2">
+                    <FormCombobox
+                      value={l.itemId}
+                      onValueChange={(v) => pickItem(l.key, v)}
+                      options={lineItemOptions()}
+                      placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
+                      side="top"
+                      avoidCollisions={false}
+                      loading={itemsLoading || stockLoading}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-lg"
+                      aria-label="Scan barcode"
+                      onClick={() => {
+                        setScanTarget(l.key);
+                        setScanOpen(true);
+                      }}
+                    >
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <FormCombobox
                     value={l.binId}
                     onValueChange={(v) => pickBin(l.key, v)}
@@ -630,6 +678,17 @@ export function BarangKeluarForm() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={scanOpen} onOpenChange={setScanOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Scan Barcode</DialogTitle>
+            <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
+          </DialogHeader>
+          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
+          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

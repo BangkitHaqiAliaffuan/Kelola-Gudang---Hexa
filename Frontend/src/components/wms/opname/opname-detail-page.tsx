@@ -367,31 +367,35 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Item" value={formatNumber(lines.length)} icon={Package} />
+        <StatCard label="Item" value={isLoading ? "…" : formatNumber(lines.length)} icon={Package} loading={isLoading} />
         <StatCard
           label="Tercatat"
-          value={formatNumber(summary.checked)}
+          value={isLoading ? "…" : formatNumber(summary.checked)}
           icon={ClipboardCheck}
           tone="success"
+          loading={isLoading}
         />
         <StatCard
           label="Belum Dicek"
-          value={formatNumber(summary.uncounted)}
+          value={isLoading ? "…" : formatNumber(summary.uncounted)}
           icon={ListChecks}
           tone="warning"
+          loading={isLoading}
         />
-        <StatCard label="Lebih" value={formatNumber(summary.plus)} icon={TrendingUp} tone="info" />
+        <StatCard label="Lebih" value={isLoading ? "…" : formatNumber(summary.plus)} icon={TrendingUp} tone="info" loading={isLoading} />
         <StatCard
           label="Kurang"
-          value={formatNumber(summary.minus)}
+          value={isLoading ? "…" : formatNumber(summary.minus)}
           icon={TrendingDown}
           tone="danger"
+          loading={isLoading}
         />
         <StatCard
           label="Nilai Selisih"
-          value={formatIDR(summary.value)}
+          value={isLoading ? "…" : formatIDR(summary.value)}
           icon={TriangleAlert}
           valueTitle={formatIDR(summary.value)}
+          loading={isLoading}
         />
       </div>
 

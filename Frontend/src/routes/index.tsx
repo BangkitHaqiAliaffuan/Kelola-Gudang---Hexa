@@ -254,6 +254,7 @@ function Dashboard() {
       hint: "seluruh gudang",
       icon: Package,
       tone: "brand" as const,
+      loading: valLoading,
     },
     {
       label: "Total SKU",
@@ -261,6 +262,7 @@ function Dashboard() {
       hint: "barang aktif terdaftar",
       icon: Barcode,
       tone: "info" as const,
+      loading: itemsLoading,
     },
     {
       label: "Total Gudang",
@@ -268,6 +270,7 @@ function Dashboard() {
       hint: "lokasi penyimpanan",
       icon: Warehouse,
       tone: "neutral" as const,
+      loading: warehousesLoading,
     },
     {
       label: "Stok Tereservasi",
@@ -275,6 +278,7 @@ function Dashboard() {
       hint: "terikat permintaan",
       icon: Lock,
       tone: "info" as const,
+      loading: valLoading,
     },
     {
       label: "Total Barang Masuk",
@@ -282,6 +286,7 @@ function Dashboard() {
       hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
+      loading: summaryLoading,
     },
     {
       label: "Nilai Barang Masuk",
@@ -290,6 +295,7 @@ function Dashboard() {
       hint: `${masukCount} dokumen`,
       icon: ArrowDownToLine,
       tone: "success" as const,
+      loading: summaryLoading,
     },
     {
       label: "Total Barang Keluar",
@@ -297,6 +303,7 @@ function Dashboard() {
       hint: `${keluarCount} dokumen`,
       icon: ArrowUpFromLine,
       tone: "warning" as const,
+      loading: summaryLoading,
     },
     {
       label: "Stock Menipis",
@@ -304,6 +311,7 @@ function Dashboard() {
       hint: "di bawah minimum",
       icon: TriangleAlert,
       tone: "warning" as const,
+      loading: minLoading,
     },
     {
       label: "Stock Habis",
@@ -311,6 +319,7 @@ function Dashboard() {
       hint: "perlu restock segera",
       icon: PackageX,
       tone: "danger" as const,
+      loading: minLoading,
     },
     {
       label: "Nilai Persediaan",
@@ -319,6 +328,7 @@ function Dashboard() {
       hint: "metode FIFO",
       icon: Wallet,
       tone: "brand" as const,
+      loading: valLoading,
     },
     {
       label: "Pending Approval",
@@ -326,6 +336,7 @@ function Dashboard() {
       hint: "menunggu supervisor",
       icon: CheckCheck,
       tone: "info" as const,
+      loading: pendingLoading,
     },
     {
       label: "Stock Opname Berjalan",
@@ -333,6 +344,7 @@ function Dashboard() {
       hint: "sesi aktif",
       icon: ClipboardCheck,
       tone: "success" as const,
+      loading: opnameLoading,
     },
   ];
 

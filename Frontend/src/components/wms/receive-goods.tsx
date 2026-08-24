@@ -166,13 +166,25 @@ export function ReceiveGoodsPage() {
         />
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label="Total Dokumen" value={formatNumber(rows.length)} icon={PackageCheck} />
-          <StatCard label="Draft" value={formatNumber(draftDocs)} icon={FileText} tone="warning" />
+          <StatCard
+            label="Total Dokumen"
+            value={formatNumber(rows.length)}
+            icon={PackageCheck}
+            loading={isLoading}
+          />
+          <StatCard
+            label="Draft"
+            value={formatNumber(draftDocs)}
+            icon={FileText}
+            tone="warning"
+            loading={isLoading}
+          />
           <StatCard
             label="Selesai"
             value={formatNumber(doneDocs)}
             icon={CheckCircle2}
             tone="success"
+            loading={isLoading}
           />
           <StatCard
             label="Nilai Total"
@@ -180,6 +192,7 @@ export function ReceiveGoodsPage() {
             valueTitle={formatIDR(totalValue)}
             icon={Wallet}
             tone="info"
+            loading={isLoading}
           />
         </div>
 
