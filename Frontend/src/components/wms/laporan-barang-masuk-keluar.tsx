@@ -22,7 +22,7 @@ import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
-import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 
 const statusTone = (s: StockDocumentApi["status"]): Tone =>
   s === "Selesai"
@@ -343,10 +343,10 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
         />
         <StatCard
           label="Total Nilai"
-          value={isLoading || isFetching ? "…" : formatIDR(stats.nilai)}
+          value={isLoading || isFetching ? "…" : formatIDRCompact(stats.nilai)}
           icon={Wallet}
           tone="success"
-          valueTitle={isLoading || isFetching ? undefined : formatIDR(stats.nilai)}
+          {...(isLoading || isFetching ? {} : { valueTitle: formatIDR(stats.nilai) })}
           loading={isLoading || isFetching}
         />
         <StatCard

@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useStockDocument } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
-import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 
 const varianceTone = (l: StockDocumentLineApi): "neutral" | "success" | "info" | "danger" => {
   if (l.actual_qty == null) return "neutral";
@@ -392,9 +392,9 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
         />
         <StatCard
           label="Nilai Selisih"
-          value={isLoading ? "…" : formatIDR(summary.value)}
+          value={isLoading ? "…" : formatIDRCompact(summary.value)}
           icon={TriangleAlert}
-          valueTitle={formatIDR(summary.value)}
+          {...(isLoading ? {} : { valueTitle: formatIDR(summary.value) })}
           loading={isLoading}
         />
       </div>

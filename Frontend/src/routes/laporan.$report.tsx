@@ -31,6 +31,7 @@ import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
   formatDate,
   formatIDR,
+  formatIDRCompact,
   formatNumber,
   items,
   monthly,
@@ -254,7 +255,8 @@ function Laporan() {
             />
             <StatCard
               label="Nilai Persediaan"
-              value={formatIDR(totalValue)}
+              value={formatIDRCompact(totalValue)}
+              valueTitle={formatIDR(totalValue)}
               icon={Wallet}
               tone="success"
             />

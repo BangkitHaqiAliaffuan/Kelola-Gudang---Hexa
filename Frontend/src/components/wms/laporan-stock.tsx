@@ -346,10 +346,10 @@ export function LaporanStock() {
         />
         <StatCard
           label="Nilai Persediaan"
-          value={isLoading ? "…" : formatIDR(stats.nilai)}
+          value={isLoading ? "…" : formatIDRCompact(stats.nilai)}
           icon={Wallet}
           tone="success"
-          valueTitle={isLoading ? undefined : formatIDR(stats.nilai)}
+          {...(isLoading ? {} : { valueTitle: formatIDR(stats.nilai) })}
           loading={isLoading}
         />
         <StatCard
