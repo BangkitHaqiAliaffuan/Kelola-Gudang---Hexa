@@ -180,10 +180,11 @@ class StockDocumentController extends Controller
 
                 $authId = $request->user('sanctum')?->id;
 
+                $initialStatus = $data['status'] === 'Selesai' ? 'Draft' : $data['status'];
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
-                    'status' => $data['status'],
+                    'status' => $initialStatus,
                     'blind_count' => $data['blind_count'] ?? true,
                     'document_date' => $data['document_date'],
                     // Stock Opname: momen "freeze" book balance — barang yang bergerak
@@ -244,6 +245,10 @@ class StockDocumentController extends Controller
                         'note' => $line['note'] ?? null,
                         'reason_code' => $line['reason_code'] ?? null,
                     ]);
+                }
+
+                if ($data['status'] === 'Selesai') {
+                    $document = $this->service->post($document);
                 }
 
                 return $document;

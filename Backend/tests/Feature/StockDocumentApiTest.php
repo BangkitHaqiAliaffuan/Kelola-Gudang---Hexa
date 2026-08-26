@@ -207,6 +207,45 @@ class StockDocumentApiTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_store_penerimaan_selesai_creates_movements(): void
+    {
+        $item = Item::factory()->create();
+        $wh = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => now()->toDateString(),
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                [
+                    'item_id' => $item->id,
+                    'qty' => 10,
+                    'to_bin_id' => $bin->id,
+                    'unit_cost' => 1500,
+                ],
+            ],
+        ])->assertStatus(201)
+          ->assertJsonPath('data.status', 'Selesai')
+          ->assertJsonPath('data.posted_at', fn ($value) => $value !== null);
+
+        $this->assertDatabaseHas('stock_movements', [
+            'direction' => 'IN',
+            'qty' => 10,
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'bin_id' => $bin->id,
+        ]);
+
+        $stock = ItemStock::where('item_id', $item->id)
+            ->where('warehouse_id', $wh->id)
+            ->where('bin_id', $bin->id)
+            ->value('stock');
+        $this->assertSame(10, (int) $stock);
+    }
+
     private function makeDoc(string $type, string $status, ?Warehouse $warehouse = null): StockDocument
     {
         $warehouse ??= Warehouse::factory()->create();
