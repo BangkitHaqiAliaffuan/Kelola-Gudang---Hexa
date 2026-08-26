@@ -218,9 +218,13 @@ function KartuStock() {
     };
   }, [scanOpen, options, stopScanner]);
 
-  const cardFifo = useStockCard(activeIdForFetch, "FIFO", whIdForFetch);
-  const cardAvg = useStockCard(activeIdForFetch, "Average", whIdForFetch);
-  const cardMax = useStockCard(activeIdForFetch, "Maximum Cost", whIdForFetch);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  // Jangka panjang: kirim rentang tanggal ke server agar saldo_awal/saldo_akhir dan saldo baris di-recompute ledger (bukan hanya hide client)
+  const cardFifo = useStockCard(activeIdForFetch, "FIFO", whIdForFetch, dateFrom || null, dateTo || null);
+  const cardAvg = useStockCard(activeIdForFetch, "Average", whIdForFetch, dateFrom || null, dateTo || null);
+  const cardMax = useStockCard(activeIdForFetch, "Maximum Cost", whIdForFetch, dateFrom || null, dateTo || null);
   const card = method === "FIFO" ? cardFifo : method === "Average" ? cardAvg : cardMax;
   const methodCards: Record<ValuationMethod, typeof card> = {
     FIFO: cardFifo,
@@ -244,12 +248,11 @@ function KartuStock() {
   const debouncedQ = useDebouncedValue(q);
   const [jenis, setJenis] = useState(ALL);
   const [pic, setPic] = useState(ALL);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
   const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
 
+  // Jangka panjang: dateFrom/to sudah dikirim ke server (saldo di-recompute ledger), jadi filter tanggal client tidak perlu lagi — hanya q/jenis/pic client.
   const filteredRows = useMemo(
     () =>
       tableRows.filter((r) => {
@@ -262,12 +265,9 @@ function KartuStock() {
           return false;
         if (jenis !== ALL && r.type !== jenis) return false;
         if (pic !== ALL && r.pic !== pic) return false;
-        const d = r.date.slice(0, 10);
-        if (dateFrom && d < dateFrom) return false;
-        if (dateTo && d > dateTo) return false;
         return true;
       }),
-    [tableRows, debouncedQ, jenis, pic, dateFrom, dateTo],
+    [tableRows, debouncedQ, jenis, pic],
   );
 
   const chart = useMemo(
@@ -367,28 +367,28 @@ function KartuStock() {
       key: "masuk",
       label: "Masuk",
       className: "text-right w-[100px] whitespace-nowrap text-success",
-      sortable: true,
+      sortable: false,
       render: (r) => (r.masuk ? `+${formatNumber(r.masuk)}` : "-"),
     },
     {
       key: "keluar",
       label: "Keluar",
       className: "text-right w-[100px] whitespace-nowrap text-destructive",
-      sortable: true,
+      sortable: false,
       render: (r) => (r.keluar ? `-${formatNumber(r.keluar)}` : "-"),
     },
     {
       key: "saldo",
       label: "Saldo",
       className: "text-right w-[100px] whitespace-nowrap font-semibold",
-      sortable: true,
+      sortable: false,
       render: (r) => `${formatNumber(r.saldo)} ${r.unit ?? ""}`,
     },
     {
       key: "nilai",
       label: `Nilai (${method})`,
       className: "text-right min-w-[130px] whitespace-nowrap",
-      sortable: true,
+      sortable: false,
       render: (r) => formatIDR(r.nilai),
     },
     {
@@ -679,7 +679,7 @@ function KartuStock() {
           pageSize={10}
           loading={itemsLoading || card.isFetching}
           onRowClick={(r) => openDetail(r)}
-          initialSort={{ key: "date", dir: "desc" }}
+          initialSort={{ key: "date", dir: "asc" }}
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
