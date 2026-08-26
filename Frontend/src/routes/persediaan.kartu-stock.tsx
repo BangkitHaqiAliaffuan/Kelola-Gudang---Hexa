@@ -232,7 +232,7 @@ function KartuStock() {
   const cardData = card.data?.data;
   const rows = useMemo(() => (cardData?.rows as CardRow[] | undefined) ?? [], [cardData]);
   const unit = item?.unit ?? "pcs";
-  const saldoAwal = cardData?.saldo_awal ?? 0;
+  const saldoSekarang = item?.current_stock ?? cardData?.saldo_akhir ?? 0;
   const lastRow = rows[rows.length - 1];
 
   const totalMasuk = rows.reduce((a, r) => a + r.masuk, 0);
@@ -496,11 +496,11 @@ function KartuStock() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             loading={card.isLoading || card.isFetching}
-            label="Saldo Awal"
+            label="Saldo Sekarang"
             value={
               card.isLoading || card.isFetching
                 ? "…"
-                : `${formatNumber(Math.max(saldoAwal, 0))} ${unit}`
+                : `${formatNumber(Math.max(saldoSekarang, 0))} ${unit}`
             }
             icon={Boxes}
             tone="info"
