@@ -246,10 +246,6 @@ class StockDocumentController extends Controller
                     ]);
                 }
 
-                if ($data['status'] === 'Selesai') {
-                    $this->service->post($document);
-                }
-
                 return $document;
             });
         } catch (\InvalidArgumentException $e) {
