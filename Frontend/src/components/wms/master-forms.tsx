@@ -2922,7 +2922,13 @@ export function ItemFormDialog({
                     <FormItem>
                       <FormLabel>Harga Pokok (Rp)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={100} step="any" className="rounded-xl" {...field} />
+                        <Input
+                          type="number"
+                          min={100}
+                          step="any"
+                          className="rounded-xl"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -2935,7 +2941,13 @@ export function ItemFormDialog({
                     <FormItem>
                       <FormLabel>Harga Jual (Rp)</FormLabel>
                       <FormControl>
-                        <Input type="number" min={100} step="any" className="rounded-xl" {...field} />
+                        <Input
+                          type="number"
+                          min={100}
+                          step="any"
+                          className="rounded-xl"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

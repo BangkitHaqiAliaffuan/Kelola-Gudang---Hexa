@@ -3,25 +3,25 @@
 Dokumen desain untuk mengubah halaman `laporan/barang-masuk` dan `laporan/barang-keluar`
 dari data dummy statis menjadi laporan sungguhan berbasis API `GET /api/persediaan/stock-documents`.
 
-Status: **disetujui — menunggu implementasi** (atau *implemented*, per kesepakatan terakhir).
+Status: **disetujui — menunggu implementasi** (atau _implemented_, per kesepakatan terakhir).
 Lingkup: hanya 2 halaman laporan tersebut. 8 laporan lain di `laporan.$report.tsx` tidak tersentuh.
 
 ---
 
 ## 1. Ringkasan
 
-| Aspek | Nilai |
-| --- | --- |
-| Endpoint | `GET /api/persediaan/stock-documents` |
-| Type yang dipakai | `Penerimaan` (Barang Masuk) dan `Pengeluaran` (Barang Keluar) |
-| Otentikasi | Bearer token (`kg-token`) via `src/lib/api.ts`; butuh `role.access: Persediaan` Baca |
-| Pendekatan | **Server-side scoping** (type + rentang tanggal + gudang) + **filter client** (cari / partner / status) |
-| Komponen baru | `src/components/wms/laporan-barang-masuk-keluar.tsx` |
-| Perubahan lain | `use-persediaan.ts` (param `from`/`to` + `placeholderData`), `laporan.$report.tsx` (branch), `csv.ts` (sanitasi formula) |
+| Aspek             | Nilai                                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Endpoint          | `GET /api/persediaan/stock-documents`                                                                                    |
+| Type yang dipakai | `Penerimaan` (Barang Masuk) dan `Pengeluaran` (Barang Keluar)                                                            |
+| Otentikasi        | Bearer token (`kg-token`) via `src/lib/api.ts`; butuh `role.access: Persediaan` Baca                                     |
+| Pendekatan        | **Server-side scoping** (type + rentang tanggal + gudang) + **filter client** (cari / partner / status)                  |
+| Komponen baru     | `src/components/wms/laporan-barang-masuk-keluar.tsx`                                                                     |
+| Perubahan lain    | `use-persediaan.ts` (param `from`/`to` + `placeholderData`), `laporan.$report.tsx` (branch), `csv.ts` (sanitasi formula) |
 
 ## 2. Kondisi saat ini (masalah)
 
-Saat ini kedua laporan jatuh ke cabang *dummy* umum di `laporan.$report.tsx:139-146`:
+Saat ini kedua laporan jatuh ke cabang _dummy_ umum di `laporan.$report.tsx:139-146`:
 
 1. Data berasal dari `transactions.slice(0, 500)` (`src/lib/wms-data.ts`) — **tidak difilter berdasarkan
    jenis dokumen**, sehingga laporan Barang Masuk dan Barang Keluar menampilkan campuran transaksi.
@@ -34,20 +34,23 @@ Saat ini kedua laporan jatuh ke cabang *dummy* umum di `laporan.$report.tsx:139-
 ## 3. Keputusan desain + referensi
 
 ### 3.1 Server-side scoping dengan `placeholderData: keepPreviousData`
+
 - Query dibatasi di server oleh `type`, `from`, `to`, dan `warehouse_id` (bila gudang dipilih).
   Cache TanStack Query dikunci oleh `["persediaan","stock-documents","list", type, status, warehouseId, search, from, to, perPage]`.
 - Saat user mengganti rentang/gudang, `placeholderData: keepPreviousData` membuat data lama tetap tampil sampai
   data baru tiba; flag `isFetching` menandai pemuatan. Ini pola resmi TanStack Query v5
-  (panduan *Paginated Queries*: `placeholderData: keepPreviousData` menggantikan `keepPreviousData: true` v4).
+  (panduan _Paginated Queries_: `placeholderData: keepPreviousData` menggantikan `keepPreviousData: true` v4).
 - Menghindari "flash loading" / tabel kosong setiap ganti filter.
 
 ### 3.2 Filter client
+
 - **Cari**: teks bebas (no, supplier/tujuan, gudang, PIC, tanggal, referensi, status) via
   `buildStockDocumentSearchText` (`src/lib/stock-document-search.ts`) + `useDebouncedValue` (250ms).
 - **Partner**: dropdown unik dari `doc.partner` pada hasil fetch (label Supplier untuk Masuk, Tujuan untuk Keluar).
 - **Status**: dari `stockDocumentStatuses`. Konstanta `ALL` untuk nilai "semua".
 
 ### 3.3 Stat cards dihitung dari hasil fetch
+
 - Endpoint `summary()` (`/persediaan/stock-documents/summary`) hanya global tanpa filter → **tidak bisa** dipakai
   untuk kartu yang mencerminkan rentang/filter. Karena itu kartu dihitung dari baris hasil fetch yang sudah
   terfilter:
@@ -59,12 +62,14 @@ Saat ini kedua laporan jatuh ke cabang *dummy* umum di `laporan.$report.tsx:139-
   `transaksi-keluar.tsx:110-118`.
 
 ### 3.4 Chart: satu seri (recharts)
+
 - `ResponsiveContainer` → `BarChart` → `XAxis` / `YAxis` / `Tooltip` / `Bar` — pola resmi recharts dan sudah
   dipakai di `laporan.$report.tsx:289-309`.
 - **Satu seri** "Qty" per bulan (`Math.abs`), disusun ascending per `YYYY-MM`. Label bulan memakai locale id-ID.
 - `Tooltip` diformat dengan `formatNumber`.
 
 ### 3.5 CSV export
+
 - Memakai `toCsv`/`downloadCsv` (`src/lib/csv.ts`): UTF-8 BOM agar terbuka benar di Excel, CRLF, escaping koma/quote.
 - CSV **mencerminkan filter aktif** (baris hasil filter saat ini), dengan blok metadata di baris pertama
   (judul laporan, rentang tanggal, filter gudang/partner/status, waktu generate).
@@ -73,11 +78,13 @@ Saat ini kedua laporan jatuh ke cabang *dummy* umum di `laporan.$report.tsx:139-
   sehingga tidak terkena aturan ini (nilai negatif dihitung `abs` sebelum export).
 
 ### 3.6 Print
+
 - **Satu alur print**: `window.open("", "_blank", ...)` → tulis HTML → `win.document.close()` → `win.focus()` →
   `setTimeout(win.print, 150)`. Precedent: `printProcDoc` di `purchase-request-sheet.tsx:76-136`.
 - Ditampilkan header laporan, periode, tabel baris hasil filter, total, dan footer "Dicetak: …".
 
 ### 3.7 RBAC
+
 - Grup menu Laporan di `nav.ts` tidak membawa `module`, sehingga `app-shell` tidak menggating 2 rute ini.
 - Komponen menggating sendiri dengan `hasModuleLevel("Persediaan", "Baca")` dari `useAuth`; bila tidak punya,
   tampilkan pesan tanpa akses dan **tidak melakukan fetch** (`enabled: canView`).
@@ -112,6 +119,7 @@ rows ──► stat cards, chart bulanan, tabel (drill-down sheet), CSV, print
 ## 5. Detail implementasi
 
 ### 5.1 `use-persediaan.ts` — tambah `from`/`to` + `placeholderData`
+
 - Parameter baru: `from?: string | null`, `to?: string | null` (format `YYYY-MM-DD`).
 - Masuk ke queryKey dan query string (`from=…&to=…`).
 - Tambah `placeholderData: keepPreviousData` (import dari `@tanstack/react-query`) pada `useStockDocuments`.
@@ -120,64 +128,72 @@ rows ──► stat cards, chart bulanan, tabel (drill-down sheet), CSV, print
 ### 5.2 `laporan-barang-masuk-keluar.tsx` (komponen baru)
 
 Props:
+
 ```ts
-export function LaporanBarangMasukKeluar({
-  type,
-}: {
-  type: "Penerimaan" | "Pengeluaran";
-})
+export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Pengeluaran" });
 ```
 
 State:
+
 - `q` + `debouncedQ`, `wh` (ALL | nama gudang), `partner` (ALL), `status` (ALL)
 - `from`/`to` (string `YYYY-MM-DD`), default: hari ini & 12 bulan ke belakang (awal bulan)
 - `selectedId: number | null` untuk `StockDocumentSheet`
 
 Fetch:
+
 - `whId = warehouses?.data.find(w => w.name === wh)?.id ?? null` (null = semua)
 - `useStockDocuments({ type, warehouseId: whId, from, to, enabled: canView && from && to && from <= to })`
 
 Kolom tabel (`Column<StockDocumentApi>`, `sortable`, `onRowClick` → sheet):
-| Kolom | Kunci | Rendering |
-| --- | --- | --- |
-| Nomor | `no` | mono teks-primary |
-| Tanggal | `document_date` | `formatDate` |
-| Gudang | `warehouse` | `?? "—"` |
-| Partner (Supplier/Tujuan) | `partner` | `?? "—"` |
-| Referensi | `reference_no` | `?? "—"` |
-| Qty | `qty_total` | `formatNumber(Math.abs(…))` |
-| Nilai | `value_total` | `formatIDR(Math.abs(…))` |
-| PIC | `pic` | `?? "—"` |
-| Status | `status` | `<Pill tone>` (success/neutral/danger/warning) |
+
+| Kolom                     | Kunci           | Rendering                                      |
+| ------------------------- | --------------- | ---------------------------------------------- |
+| Nomor                     | `no`            | mono teks-primary                              |
+| Tanggal                   | `document_date` | `formatDate`                                   |
+| Gudang                    | `warehouse`     | `?? "—"`                                       |
+| Partner (Supplier/Tujuan) | `partner`       | `?? "—"`                                       |
+| Referensi                 | `reference_no`  | `?? "—"`                                       |
+| Qty                       | `qty_total`     | `formatNumber(Math.abs(…))`                    |
+| Nilai                     | `value_total`   | `formatIDR(Math.abs(…))`                       |
+| PIC                       | `pic`           | `?? "—"`                                       |
+| Status                    | `status`        | `<Pill tone>` (success/neutral/danger/warning) |
 
 `mobileCard` wajib untuk `DataTable` (pola `transaksi-masuk.tsx:194-209`).
 
 Chart data:
+
 - `monthKey = iso.slice(0, 7)` → kumpulkan `{ key, qty }`, urut ascending, label `formatDate` bulan pertama.
 - `Bar dataKey="qty" name="Qty" fill="var(--primary)" radius={[6,6,0,0]}`.
 
 CSV:
+
 - Blok metadata: `[["Laporan", title], ["Periode", "…"], ["Filter", "…"], ["Dicetak", new Date().toLocaleString("id-ID")]]`.
 - Baris data: Nomor, Tanggal, Tipe, Gudang, Partner, Referensi, Qty (abs, `formatNumber`), Nilai (abs, `formatIDR`), PIC, Status.
 - `downloadCsv(\`laporan-barang-${type === "Penerimaan" ? "masuk" : "keluar"}-${from}-${to}.csv\`, csv)`.
 
 Print:
+
 - HTML dengan judul, periode, tabel baris (abs), total, footer. Alur `printProcDoc`.
 
 RBAC:
+
 - `const { hasModuleLevel } = useAuth(); const canView = hasModuleLevel("Persediaan", "Baca");`
 - Bila `!canView`: render `EmptyState` "Anda tidak memiliki akses ke laporan ini" + blokir fetch.
 
 ### 5.3 `laporan.$report.tsx` — branch
+
 - Import komponen baru; di dalam `Laporan()`:
+
 ```ts
 if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
 if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
 ```
+
 - Judul `<head>` (`titles`) tetap dipakai dan sudah benar: "Laporan Barang Masuk / Barang Keluar".
 - Cabang generik (opname/item/transaksi dummy) tetap untuk 8 laporan lain.
 
 ### 5.4 `csv.ts` — sanitasi formula-injection
+
 - Di `escapeCell`, setelah konversi ke string, jika diawali `=`, `+`, `-`, `@` → prefiks `'`.
 - Header/label aman; sel numerik dipakai via nilai terformat (abs), sehingga aturan ini tidak mengubah angka.
 
@@ -195,10 +211,10 @@ if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluar
 
 ## 7. File yang berubah
 
-| File | Perubahan |
-| --- | --- |
-| `Frontend/docs/desain-laporan-barang-masuk-keluar.md` | (baru) dokumen ini |
-| `Frontend/src/hooks/use-persediaan.ts` | `useStockDocuments`: param `from`/`to`, `placeholderData: keepPreviousData` |
-| `Frontend/src/components/wms/laporan-barang-masuk-keluar.tsx` | (baru) komponen laporan parameterized by type |
-| `Frontend/src/routes/laporan.$report.tsx` | branch `barang-masuk` / `barang-keluar` → komponen baru |
-| `Frontend/src/lib/csv.ts` | sanitasi formula-injection di `escapeCell` |
+| File                                                          | Perubahan                                                                   |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `Frontend/docs/desain-laporan-barang-masuk-keluar.md`         | (baru) dokumen ini                                                          |
+| `Frontend/src/hooks/use-persediaan.ts`                        | `useStockDocuments`: param `from`/`to`, `placeholderData: keepPreviousData` |
+| `Frontend/src/components/wms/laporan-barang-masuk-keluar.tsx` | (baru) komponen laporan parameterized by type                               |
+| `Frontend/src/routes/laporan.$report.tsx`                     | branch `barang-masuk` / `barang-keluar` → komponen baru                     |
+| `Frontend/src/lib/csv.ts`                                     | sanitasi formula-injection di `escapeCell`                                  |

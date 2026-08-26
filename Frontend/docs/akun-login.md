@@ -4,14 +4,14 @@ Daftar akun yang di-seed oleh backend (`Backend/database/seeders/UserSeeder.php`
 
 **Password semua akun diambil dari `DEMO_PASSWORD` di `Backend/.env`** (wajib diisi sebelum `php artisan db:seed`; tanpa nilai, seeder menolak jalan). Nilai password tidak disimpan di repo.
 
-| Code | Nama | Email | Role |
-| ---- | ---- | ----- | ---- |
-| USR-001 | Rudi Hartono | `rudi.hartono@kelolagudang.id` | Administrator |
-| USR-002 | Siti Aminah | `siti.aminah@kelolagudang.id` | Supervisor |
+| Code    | Nama         | Email                          | Role            |
+| ------- | ------------ | ------------------------------ | --------------- |
+| USR-001 | Rudi Hartono | `rudi.hartono@kelolagudang.id` | Administrator   |
+| USR-002 | Siti Aminah  | `siti.aminah@kelolagudang.id`  | Supervisor      |
 | USR-003 | Bayu Pratama | `bayu.pratama@kelolagudang.id` | Operator Gudang |
-| USR-004 | Dewi Lestari | `dewi.lestari@kelolagudang.id` | Auditor |
-| USR-005 | Agus Salim | `agus.salim@kelolagudang.id` | Operator Gudang |
-| USR-006 | Nur Hidayat | `nur.hidayat@kelolagudang.id` | Supervisor |
+| USR-004 | Dewi Lestari | `dewi.lestari@kelolagudang.id` | Auditor         |
+| USR-005 | Agus Salim   | `agus.salim@kelolagudang.id`   | Operator Gudang |
+| USR-006 | Nur Hidayat  | `nur.hidayat@kelolagudang.id`  | Supervisor      |
 
 ## Rekomendasi
 

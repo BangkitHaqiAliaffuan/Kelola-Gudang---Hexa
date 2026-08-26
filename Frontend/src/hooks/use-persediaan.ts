@@ -35,7 +35,15 @@ export function useStockCard(
   to?: string | null,
 ) {
   return useQuery({
-    queryKey: ["persediaan", "stock-card", itemId, method, warehouseId ?? null, from ?? null, to ?? null],
+    queryKey: [
+      "persediaan",
+      "stock-card",
+      itemId,
+      method,
+      warehouseId ?? null,
+      from ?? null,
+      to ?? null,
+    ],
     queryFn: () => {
       const sp = new URLSearchParams({
         item_id: String(itemId),

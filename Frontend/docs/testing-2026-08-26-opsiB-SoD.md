@@ -1,12 +1,13 @@
 # Tes Manual — Perubahan 26 Agustus 2026 (Opsi B & SoD Store)
 
 Dokumen uji manual untuk perubahan commit hari ini:
+
 - `018aa3a` feat(persediaan): Opsi B retur & kartu-stock - Maks pakai sisa + total gudang
 - `def969f` fix: remove redundant SoD gate in store for Stock Adjustment Selesai
 
-| Commit | Perubahan |
-| ------ | --------- |
-| `018aa3a` | Opsi B: retur fleksibel per gudang, kartu-stock tambah kolom source, DataTable useEffect |
+| Commit    | Perubahan                                                                                   |
+| --------- | ------------------------------------------------------------------------------------------- |
+| `018aa3a` | Opsi B: retur fleksibel per gudang, kartu-stock tambah kolom source, DataTable useEffect    |
 | `def969f` | SoD store: hapus gate otorisasi Selesai di store, posting sekarang hanya via /post terpisah |
 
 ## Prasyarat
@@ -17,12 +18,12 @@ Dokumen uji manual untuk perubahan commit hari ini:
 
 Akun utama (role yang cocok skenario di bawah):
 
-| Code | Nama | Role | Keterangan |
-| ---- | ---- | ---- | ---------- |
-| USR-001 | Rudi Hartono | Administrator | Punya Persediaan Tulis & Master Data Tulis |
-| USR-002 | Siti Aminah | Supervisor | Punya Persediaan Tulis |
-| USR-003 | Bayu Pratama | Operator Gudang | Tidak punya akses approval Persediaan |
-| USR-004 | Dewi Lestari | Auditor | Tidak punya akses approval Persediaan |
+| Code    | Nama         | Role            | Keterangan                                 |
+| ------- | ------------ | --------------- | ------------------------------------------ |
+| USR-001 | Rudi Hartono | Administrator   | Punya Persediaan Tulis & Master Data Tulis |
+| USR-002 | Siti Aminah  | Supervisor      | Punya Persediaan Tulis                     |
+| USR-003 | Bayu Pratama | Operator Gudang | Tidak punya akses approval Persediaan      |
+| USR-004 | Dewi Lestari | Auditor         | Tidak punya akses approval Persediaan      |
 
 ---
 
@@ -88,7 +89,7 @@ Akun utama (role yang cocok skenario di bawah):
 4. Isi baris: **Qty** = 5, **Alasan** = "Stok banyak".
 5. Pilih status **Selesai**.
 6. Klik **Simpan & Posting** → konfirmasi.
-7. **Harap lihat:** posting **ditolak** (422), pesan: *"Qty melebihi stok tersedia di gudang (tersedia 3, sisa 10, maks 3)"*.
+7. **Harap lihat:** posting **ditolak** (422), pesan: _"Qty melebihi stok tersedia di gudang (tersedia 3, sisa 10, maks 3)"_.
 8. Ulangi dari awal, tapi status **Draft**, Qty 5.
 9. **Harap lihat:** posting **sukses** 201, dokumen disimpan Draft, stok tetap unchanged.
 
@@ -106,11 +107,12 @@ Akun utama (role yang cocok skenario di bawah):
 4. Pilih status **Selesai**.
 5. Klik **Simpan & Posting**.
 6. **Harap lihat:** toast sukses, dokumen muncul di daftar dengan status **Selesai**, stok langsung ter-update (cek Persediaan → Stock Saat Ini).
-7. *Alternatif:* Ulangi langkah 2–4, tapi klik hanya **Simpan Draft** (tanpa status Selesai).
+7. _Alternatif:_ Ulangi langkah 2–4, tapi klik hanya **Simpan Draft** (tanpa status Selesai).
 8. **Harap lihat:** dokumen status **Draft**, stok belum berubah.
 
-*Lalu*, tetap di halaman detail dokumen ADJ tsb, coba **POST** `.../post`:
-- Sebagai **USR-001** (pembuat): **Harap lihat:** 422 pesan *"Pembuat dokumen tidak boleh memposting laporannya sendiri."*
+_Lalu_, tetap di halaman detail dokumen ADJ tsb, coba **POST** `.../post`:
+
+- Sebagai **USR-001** (pembuat): **Harap lihat:** 422 pesan _"Pembuat dokumen tidak boleh memposting laporannya sendiri."_
 - Sebagai **USR-002** (Supervisor/user lain): **Harap lihat:** 200 sukses, dokumen berstatus **Selesai** baru.
 
 **Kolom hasil:** Lulus / Gagal + Catatan.

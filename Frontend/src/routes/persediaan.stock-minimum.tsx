@@ -309,7 +309,9 @@ function StockMinimum() {
             loading={isLoading}
             label="Nilai Kebutuhan"
             value={isLoading ? "…" : formatIDRCompact(stats.nilai)}
-            {...(isLoading ? {} : { valueTitle: formatIDR(stats.nilai), hint: "total usulan restock" })}
+            {...(isLoading
+              ? {}
+              : { valueTitle: formatIDR(stats.nilai), hint: "total usulan restock" })}
             icon={PackageX}
             tone="brand"
           />

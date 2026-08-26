@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Download, FileSpreadsheet, Search, Wallet, TrendingUp, TrendingDown, PackageX, Zap, Lock } from "lucide-react";
+import {
+  Download,
+  FileSpreadsheet,
+  Search,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  PackageX,
+  Zap,
+  Lock,
+} from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import {
@@ -19,7 +29,11 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockValuation } from "@/hooks/use-persediaan";
-import { stockMovingTypes, valuationMethodLabels, type StockValuationApi } from "@/lib/persediaan-types";
+import {
+  stockMovingTypes,
+  valuationMethodLabels,
+  type StockValuationApi,
+} from "@/lib/persediaan-types";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import {
@@ -169,7 +183,10 @@ function NilaiPersediaan() {
         { key: "moving", label: "Moving" },
       ],
     );
-    downloadCsv(`nilai-persediaan-${method.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`, content);
+    downloadCsv(
+      `nilai-persediaan-${method.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`,
+      content,
+    );
     toast.success(`Export ${formatNumber(filteredRows.length)} baris`);
   };
 
@@ -179,7 +196,11 @@ function NilaiPersediaan() {
       label: "Barang",
       className: "min-w-[200px]",
       sortable: true,
-      render: (r) => <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>{r.name ?? "—"}</span>,
+      render: (r) => (
+        <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>
+          {r.name ?? "—"}
+        </span>
+      ),
     },
     {
       key: "sku",
@@ -264,11 +285,36 @@ function NilaiPersediaan() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari barang atau SKU..." className="rounded-xl pl-9" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari barang atau SKU..."
+              className="rounded-xl pl-9"
+            />
           </div>
-          <FilterSelect className="w-full" value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouseNames} loading={warehousesLoading} />
-          <FilterSelect className="w-full" value={cat} onChange={setCat} placeholder="Semua Kategori" options={categoryNames} loading={catsLoading} />
-          <FilterSelect className="w-full" value={moving} onChange={setMoving} placeholder="Semua Moving" options={[...stockMovingTypes]} />
+          <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouseNames}
+            loading={warehousesLoading}
+          />
+          <FilterSelect
+            className="w-full"
+            value={cat}
+            onChange={setCat}
+            placeholder="Semua Kategori"
+            options={categoryNames}
+            loading={catsLoading}
+          />
+          <FilterSelect
+            className="w-full"
+            value={moving}
+            onChange={setMoving}
+            placeholder="Semua Moving"
+            options={[...stockMovingTypes]}
+          />
         </div>
       </Panel>
 
@@ -277,7 +323,9 @@ function NilaiPersediaan() {
           loading={isLoading}
           label="Total Nilai Stock"
           value={isLoading ? "…" : formatIDRCompact(total)}
-          {...(isLoading ? {} : { valueTitle: formatIDR(total), hint: `metode ${valuationMethodLabels[method]}` })}
+          {...(isLoading
+            ? {}
+            : { valueTitle: formatIDR(total), hint: `metode ${valuationMethodLabels[method]}` })}
           icon={Wallet}
         />
         <StatCard
@@ -326,7 +374,9 @@ function NilaiPersediaan() {
           loading={isLoading}
           label="Nilai Tereservasi"
           value={isLoading ? "…" : formatIDRCompact(nilaiReserved)}
-          {...(isLoading ? {} : { valueTitle: formatIDR(nilaiReserved), hint: "terikat reservasi" })}
+          {...(isLoading
+            ? {}
+            : { valueTitle: formatIDR(nilaiReserved), hint: "terikat reservasi" })}
           icon={Lock}
           tone="info"
         />
@@ -400,7 +450,7 @@ function NilaiPersediaan() {
             </div>
           )}
         </Panel>
-          <Panel title="Perbandingan Metode" description="Nilai persediaan aktual dari kartu stock">
+        <Panel title="Perbandingan Metode" description="Nilai persediaan aktual dari kartu stock">
           {isLoading ? (
             <TableSkeleton rows={3} cols={2} />
           ) : (
@@ -434,7 +484,12 @@ function NilaiPersediaan() {
         title="Daftar Nilai Persediaan"
         description={`${formatNumber(filteredRows.length)} barang · metode ${valuationMethodLabels[method]}`}
         actions={
-          <Button variant="outline" className="rounded-xl" onClick={handleExport} disabled={filteredRows.length === 0}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={handleExport}
+            disabled={filteredRows.length === 0}
+          >
             <FileSpreadsheet className="h-4 w-4" /> Export
           </Button>
         }
@@ -451,13 +506,27 @@ function NilaiPersediaan() {
                 <p className="truncate text-sm font-semibold">{r.name ?? "—"}</p>
                 <Pill tone={movingTone(r.moving) as never}>{r.moving}</Pill>
               </div>
-              <p className="truncate font-mono text-xs text-muted-foreground">{r.sku ?? "—"} · {r.category ?? "—"}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {r.sku ?? "—"} · {r.category ?? "—"}
+              </p>
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
-                <div><p className="text-muted-foreground">Stok</p><b>{formatNumber(r.stock)}</b></div>
-                <div><p className="text-muted-foreground">Available</p><b>{formatNumber(r.available)}</b></div>
-                <div><p className="text-muted-foreground">Moving</p><b>{r.moving}</b></div>
+                <div>
+                  <p className="text-muted-foreground">Stok</p>
+                  <b>{formatNumber(r.stock)}</b>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Available</p>
+                  <b>{formatNumber(r.available)}</b>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Moving</p>
+                  <b>{r.moving}</b>
+                </div>
               </div>
-              <p className="text-xs">HPP: <b>{formatIDR(unitCostFor(r, method))}</b> · Nilai: <b>{formatIDR(nilaiFor(r, method))}</b></p>
+              <p className="text-xs">
+                HPP: <b>{formatIDR(unitCostFor(r, method))}</b> · Nilai:{" "}
+                <b>{formatIDR(nilaiFor(r, method))}</b>
+              </p>
             </div>
           )}
         />

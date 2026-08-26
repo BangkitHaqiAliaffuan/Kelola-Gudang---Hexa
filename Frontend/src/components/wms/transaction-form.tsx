@@ -25,7 +25,14 @@ type Line = { id: string; barcode: string; name: string; qty: number; unit: stri
 
 function newLine(i: number): Line {
   const it = items[(i * 37) % items.length]!;
-  return { id: `L${i}`, barcode: it.barcode, name: it.name, qty: 10 + i * 5, unit: it.unit, price: it.cost };
+  return {
+    id: `L${i}`,
+    barcode: it.barcode,
+    name: it.name,
+    qty: 10 + i * 5,
+    unit: it.unit,
+    price: it.cost,
+  };
 }
 
 function linesFrom(trx: Trx): Line[] {
@@ -62,7 +69,9 @@ export function TransactionFormPage({
     <>
       <PageHeader
         title={`${mode} ${title}`}
-        description={trx ? `Ubah data transaksi ${trx.no}` : `Buat transaksi ${title.toLowerCase()} baru`}
+        description={
+          trx ? `Ubah data transaksi ${trx.no}` : `Buat transaksi ${title.toLowerCase()} baru`
+        }
         actions={
           <Button asChild variant="outline" className="rounded-xl">
             <Link to={listPath as never}>
@@ -162,7 +171,10 @@ export function TransactionFormPage({
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
                     <Label>Deskripsi Pemakaian Produksi</Label>
-                    <Input placeholder="Contoh: material rakitan panel line 2" className="rounded-xl" />
+                    <Input
+                      placeholder="Contoh: material rakitan panel line 2"
+                      className="rounded-xl"
+                    />
                   </div>
                 </>
               ) : (
@@ -189,7 +201,10 @@ export function TransactionFormPage({
                   </div>
                   <div className="space-y-1.5">
                     <Label>Keperluan</Label>
-                    <Input placeholder="Contoh: penggantian sparepart line 2" className="rounded-xl" />
+                    <Input
+                      placeholder="Contoh: penggantian sparepart line 2"
+                      className="rounded-xl"
+                    />
                   </div>
                 </>
               )}
@@ -198,7 +213,11 @@ export function TransactionFormPage({
 
           <div className="space-y-1.5">
             <Label>Referensi</Label>
-            <Input defaultValue={trx?.reference ?? ""} placeholder="PO / SJ / WO" className="rounded-xl" />
+            <Input
+              defaultValue={trx?.reference ?? ""}
+              placeholder="PO / SJ / WO"
+              className="rounded-xl"
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
             <Label>Catatan</Label>
@@ -219,7 +238,11 @@ export function TransactionFormPage({
             >
               <Barcode className="h-4 w-4" /> Scan
             </Button>
-            <Button size="sm" className="rounded-lg" onClick={() => setLines((p) => [...p, newLine(p.length + 3)])}>
+            <Button
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setLines((p) => [...p, newLine(p.length + 3)])}
+            >
               <Plus className="h-4 w-4" /> Tambah
             </Button>
           </>
@@ -247,7 +270,9 @@ export function TransactionFormPage({
                       type="number"
                       value={l.qty}
                       onChange={(e) =>
-                        setLines((p) => p.map((x) => (x.id === l.id ? { ...x, qty: Number(e.target.value) } : x)))
+                        setLines((p) =>
+                          p.map((x) => (x.id === l.id ? { ...x, qty: Number(e.target.value) } : x)),
+                        )
                       }
                       className="h-8 w-24 rounded-lg"
                     />
@@ -282,7 +307,9 @@ export function TransactionFormPage({
                   type="number"
                   value={l.qty}
                   onChange={(e) =>
-                    setLines((p) => p.map((x) => (x.id === l.id ? { ...x, qty: Number(e.target.value) } : x)))
+                    setLines((p) =>
+                      p.map((x) => (x.id === l.id ? { ...x, qty: Number(e.target.value) } : x)),
+                    )
                   }
                   className="h-9 w-24 rounded-lg"
                 />
@@ -300,10 +327,18 @@ export function TransactionFormPage({
       </Panel>
 
       <div className="sticky bottom-20 z-10 flex flex-wrap justify-end gap-2 rounded-2xl border border-border bg-card/95 p-3 shadow-soft backdrop-blur md:bottom-4">
-        <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Disimpan sebagai draft")}>
+        <Button
+          variant="outline"
+          className="rounded-xl"
+          onClick={() => toast.success("Disimpan sebagai draft")}
+        >
           Simpan Draft
         </Button>
-        <Button variant="outline" className="rounded-xl" onClick={() => toast.success("Dokumen dikirim ke printer")}>
+        <Button
+          variant="outline"
+          className="rounded-xl"
+          onClick={() => toast.success("Dokumen dikirim ke printer")}
+        >
           <Printer className="h-4 w-4" /> Cetak
         </Button>
         <Button className="rounded-xl" onClick={() => toast.success("Transaksi berhasil disimpan")}>

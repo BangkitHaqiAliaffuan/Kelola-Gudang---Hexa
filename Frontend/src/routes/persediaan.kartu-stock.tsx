@@ -82,7 +82,11 @@ const typeTone = (t: string): Tone =>
       ? "warning"
       : "info";
 
-type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null; source?: string | null };
+type CardRow = StockCardRowApi & {
+  warehouse?: string | null;
+  destination?: string | null;
+  source?: string | null;
+};
 
 function KartuStock() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
@@ -493,29 +497,33 @@ function KartuStock() {
           <StatCard
             loading={card.isLoading || card.isFetching}
             label="Saldo Awal"
-            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(Math.max(saldoAwal, 0))} ${unit}`}
+            value={
+              card.isLoading || card.isFetching
+                ? "…"
+                : `${formatNumber(Math.max(saldoAwal, 0))} ${unit}`
+            }
             icon={Boxes}
             tone="info"
           />
           <StatCard
             loading={card.isLoading || card.isFetching}
             label="Total Masuk"
-            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(totalMasuk)} ${unit}`}
+            value={card.isLoading || card.isFetching ? "…" : `${formatNumber(totalMasuk)} ${unit}`}
             icon={ArrowDownLeft}
             tone="success"
           />
           <StatCard
             loading={card.isLoading || card.isFetching}
             label="Total Keluar"
-            value={(card.isLoading || card.isFetching) ? "…" : `${formatNumber(totalKeluar)} ${unit}`}
+            value={card.isLoading || card.isFetching ? "…" : `${formatNumber(totalKeluar)} ${unit}`}
             icon={ArrowUpRight}
             tone="warning"
           />
           <StatCard
             loading={card.isLoading || card.isFetching}
             label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
-            value={(card.isLoading || card.isFetching) ? "…" : formatIDRCompact(lastRow?.nilai ?? 0)}
-            {...((card.isLoading || card.isFetching)
+            value={card.isLoading || card.isFetching ? "…" : formatIDRCompact(lastRow?.nilai ?? 0)}
+            {...(card.isLoading || card.isFetching
               ? {}
               : {
                   valueTitle: formatIDR(lastRow?.nilai ?? 0),
@@ -584,7 +592,9 @@ function KartuStock() {
                   <p className="text-xs font-semibold text-muted-foreground">
                     {valuationMethodLabels[m]}
                   </p>
-                  <p className="mt-1 text-lg font-bold">{isLoading ? "…" : formatIDR(cLast?.nilai ?? 0)}</p>
+                  <p className="mt-1 text-lg font-bold">
+                    {isLoading ? "…" : formatIDR(cLast?.nilai ?? 0)}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {isLoading ? "…" : `HPP ${formatIDR(cLast?.method_cost ?? 0)} / ${unit}`}
                   </p>

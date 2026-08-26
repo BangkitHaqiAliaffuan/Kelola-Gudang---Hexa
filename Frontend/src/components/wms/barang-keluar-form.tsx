@@ -557,7 +557,9 @@ export function BarangKeluarForm() {
                       value={l.itemId}
                       onValueChange={(v) => pickItem(l.key, v)}
                       options={lineItemOptions()}
-                      placeholder={warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"}
+                      placeholder={
+                        warehouseId ? "Pilih barang / scan barcode" : "Pilih Gudang dulu"
+                      }
                       side="top"
                       avoidCollisions={false}
                       loading={itemsLoading || stockLoading}
@@ -691,8 +693,13 @@ export function BarangKeluarForm() {
             <DialogTitle>Scan Barcode</DialogTitle>
             <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
           </DialogHeader>
-          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
-          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+          <div
+            id={readerId}
+            className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
+          />
+          <p className="text-center text-xs text-muted-foreground">
+            Mendukung EAN-13, Code 128, dan QR
+          </p>
         </DialogContent>
       </Dialog>
     </>

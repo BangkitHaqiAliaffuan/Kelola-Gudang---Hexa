@@ -282,9 +282,12 @@ export function PurchaseRequestSheet({
 
           {isPending && canManage && (
             <div className="rounded-xl border border-dashed border-border px-4 py-3">
-              <p className="text-xs font-semibold text-muted-foreground">Alihkan Approver (Kelola)</p>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Alihkan Approver (Kelola)
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Hanya Pengadaan Kelola yang dapat mengalihkan. Approver baru tidak boleh sama dengan pemohon.
+                Hanya Pengadaan Kelola yang dapat mengalihkan. Approver baru tidak boleh sama dengan
+                pemohon.
               </p>
               <div className="mt-3 flex gap-2">
                 <select

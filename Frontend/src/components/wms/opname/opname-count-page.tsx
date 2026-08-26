@@ -71,15 +71,15 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   const buildLines = () =>
     lines.map((l) => {
-        const raw = (records[l.id] ?? "").trim();
-        return {
-          item_id: l.item_id,
-          from_bin_id: l.from_bin_id ?? null,
-          system_qty: l.system_qty,
-          actual_qty: raw === "" ? null : Number(raw),
-          unit_cost: l.unit_cost,
-        };
-      });
+      const raw = (records[l.id] ?? "").trim();
+      return {
+        item_id: l.item_id,
+        from_bin_id: l.from_bin_id ?? null,
+        system_qty: l.system_qty,
+        actual_qty: raw === "" ? null : Number(raw),
+        unit_cost: l.unit_cost,
+      };
+    });
 
   const goBack = () => router.navigate({ to: "/opname/$section", params: { section: "proses" } });
 

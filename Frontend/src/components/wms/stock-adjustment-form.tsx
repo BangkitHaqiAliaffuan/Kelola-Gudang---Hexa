@@ -139,15 +139,15 @@ export function StockAdjustmentForm() {
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of stockRows?.data ?? [])
-      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
+      map.set(`${r.warehouse_id}:${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
 
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0) continue;
-      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
+      if (r.stock <= 0 || !r.warehouse_id) continue;
+      const binKey = `${r.warehouse_id}:${r.bin_id === null ? "NULL" : String(r.bin_id)}`;
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -185,11 +185,13 @@ export function StockAdjustmentForm() {
   }, [stockRows, warehouseId]);
 
   const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId) return undefined;
+    if (!l.itemId || !warehouseId) return undefined;
     // Opsi A: binId "" = lantai
-    if (l.binId === "" && l.direction === "out") return availableByKey.get(`${l.itemId}:NULL`);
+    if (l.binId === "" && l.direction === "out")
+      return availableByKey.get(`${warehouseId}:${l.itemId}:NULL`);
     if (!l.binId) return undefined;
-    return availableByKey.get(`${l.itemId}:${l.binId}`);
+    if (l.direction === "in") return undefined; // do not show available if IN? Wait, if they are adjusting stock IN, maybe they still want to see current stock? Let's show it anyway in the UI if it exists:
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${l.binId}`);
   };
 
   const hasStockInWarehouse = (l: FormLine): boolean =>
@@ -197,11 +199,12 @@ export function StockAdjustmentForm() {
 
   // Barang: untuk OUT semua opsi yang berisi stok di bin terpilih; untuk IN semua.
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    if (l.direction === "out" && l.binId) {
-      const availableIds = availableItemIdsByBin.get(l.binId);
+    if (l.direction === "out" && l.binId && warehouseId) {
+      const availableIds = availableItemIdsByBin.get(`${warehouseId}:${l.binId}`);
       if (!availableIds) return [];
       return itemOptions.filter((o) => availableIds.has(o.value));
     }
+    // Jika tidak spesifik OUT dan binId tertentu, kembalikan itemOptions
     return itemOptions;
   };
 
@@ -790,8 +793,13 @@ export function StockAdjustmentForm() {
             <DialogTitle>Scan Barcode</DialogTitle>
             <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
           </DialogHeader>
-          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
-          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+          <div
+            id={readerId}
+            className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
+          />
+          <p className="text-center text-xs text-muted-foreground">
+            Mendukung EAN-13, Code 128, dan QR
+          </p>
         </DialogContent>
       </Dialog>
     </>

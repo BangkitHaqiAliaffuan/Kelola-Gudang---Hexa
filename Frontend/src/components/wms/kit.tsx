@@ -151,7 +151,9 @@ export function StatCard({
               {value}
             </p>
           )}
-          {hint && !loading && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>}
+          {hint && !loading && (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{hint}</p>
+          )}
         </div>
         <span
           className={cn(

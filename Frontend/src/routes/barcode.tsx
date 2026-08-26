@@ -424,8 +424,13 @@ function BarcodePage() {
             <DialogTitle>Scan Barcode</DialogTitle>
             <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
           </DialogHeader>
-          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
-          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+          <div
+            id={readerId}
+            className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
+          />
+          <p className="text-center text-xs text-muted-foreground">
+            Mendukung EAN-13, Code 128, dan QR
+          </p>
         </DialogContent>
       </Dialog>
     </>

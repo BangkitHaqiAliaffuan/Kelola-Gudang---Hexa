@@ -1,7 +1,13 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/api/:path*" },
-    { "source": "/sanctum/:path*", "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/sanctum/:path*" },
+    {
+      "source": "/api/:path*",
+      "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/api/:path*"
+    },
+    {
+      "source": "/sanctum/:path*",
+      "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/sanctum/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "cleanUrls": true

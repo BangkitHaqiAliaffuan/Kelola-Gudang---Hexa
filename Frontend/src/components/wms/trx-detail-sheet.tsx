@@ -13,7 +13,13 @@ import {
 import { formatDate, formatIDR, formatNumber, type Trx } from "@/lib/wms-data";
 
 const statusTone = (s: Trx["status"]): Tone =>
-  s === "Selesai" ? "success" : s === "Draft" ? "neutral" : s === "Dibatalkan" ? "danger" : "warning";
+  s === "Selesai"
+    ? "success"
+    : s === "Draft"
+      ? "neutral"
+      : s === "Dibatalkan"
+        ? "danger"
+        : "warning";
 
 const sectionOf = (t: Trx["type"]) =>
   t === "Barang Masuk"
@@ -46,7 +52,13 @@ export function TrxDetailSheet({
 }) {
   const steps = ["Dibuat", "Diverifikasi", "Diproses", "Selesai"];
   const activeStep =
-    trx?.status === "Selesai" ? 4 : trx?.status === "Draft" ? 1 : trx?.status === "Dibatalkan" ? 1 : 3;
+    trx?.status === "Selesai"
+      ? 4
+      : trx?.status === "Draft"
+        ? 1
+        : trx?.status === "Dibatalkan"
+          ? 1
+          : 3;
 
   return (
     <Sheet open={!!trx} onOpenChange={onOpenChange}>
@@ -102,7 +114,9 @@ export function TrxDetailSheet({
                           <td className="px-3 py-2 text-right">{formatNumber(l.qty)}</td>
                           <td className="px-3 py-2">{l.unit}</td>
                           <td className="px-3 py-2 text-right">{formatIDR(l.price)}</td>
-                          <td className="px-3 py-2 text-right font-semibold">{formatIDR(l.qty * l.price)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {formatIDR(l.qty * l.price)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -134,10 +148,15 @@ export function TrxDetailSheet({
                 <p className="mb-2 text-sm font-semibold">Timeline Status</p>
                 <ol className="space-y-2">
                   {steps.map((s, i) => (
-                    <li key={s} className="flex items-center gap-3 rounded-xl border border-border px-3 py-2">
+                    <li
+                      key={s}
+                      className="flex items-center gap-3 rounded-xl border border-border px-3 py-2"
+                    >
                       <span
                         className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                          i < activeStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                          i < activeStep
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {i + 1}

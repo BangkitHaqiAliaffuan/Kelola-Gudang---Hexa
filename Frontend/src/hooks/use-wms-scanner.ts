@@ -13,7 +13,9 @@ type UseWmsScannerOptions = {
 
 export function useWmsScanner({ items, onPick, readerId = "wms-reader" }: UseWmsScannerOptions) {
   const [scanOpen, setScanOpen] = useState(false);
-  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(null);
+  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(
+    null,
+  );
   const scanHandledRef = useRef(false);
 
   const handleHardwareScan = useCallback(

@@ -149,15 +149,26 @@ export function TransferGudangForm() {
   const availableByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of stockRows?.data ?? [])
-      map.set(`${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
+      map.set(`${r.warehouse_id}:${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
+
+  const itemIdsInWarehouse = useMemo(() => {
+    const set = new Set<string>();
+    if (!warehouseId) return set;
+    const wid = Number(warehouseId);
+    for (const r of stockRows?.data ?? []) {
+      if (r.stock <= 0 || r.warehouse_id !== wid) continue;
+      set.add(String(r.item_id));
+    }
+    return set;
+  }, [stockRows, warehouseId]);
 
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0) continue;
-      const binKey = r.bin_id === null ? "NULL" : String(r.bin_id);
+      if (r.stock <= 0 || !r.warehouse_id) continue;
+      const binKey = `${r.warehouse_id}:${r.bin_id === null ? "NULL" : String(r.bin_id)}`;
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
       map.set(binKey, set);
@@ -166,16 +177,18 @@ export function TransferGudangForm() {
   }, [stockRows]);
 
   const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId) return undefined;
+    if (!l.itemId || !warehouseId) return undefined;
     const binPart = l.fromBinId === "" ? "NULL" : l.fromBinId;
-    // Jika fromBinId kosong (lantai), lookup NULL bucket; jika belum pilih bin samasekali, jangan tampilkan
-    // Transfer selalu punya fromBinId (bisa ""), jadi lookup selalu
-    return availableByKey.get(`${l.itemId}:${binPart}`);
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
-    if (!l.fromBinId) return itemOptions;
-    const availableIds = availableItemIdsByBin.get(l.fromBinId);
+    if (!warehouseId) return [];
+    if (!l.fromBinId) {
+      if (itemIdsInWarehouse.size === 0) return [];
+      return itemOptions.filter((o) => itemIdsInWarehouse.has(o.value));
+    }
+    const availableIds = availableItemIdsByBin.get(`${warehouseId}:${l.fromBinId}`);
     if (!availableIds) return [];
     return itemOptions.filter((o) => availableIds.has(o.value));
   };

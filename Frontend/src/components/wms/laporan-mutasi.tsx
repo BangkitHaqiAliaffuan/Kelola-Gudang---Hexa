@@ -1,8 +1,26 @@
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Boxes, FileSpreadsheet, Package, Printer, Search, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import {
+  Boxes,
+  FileSpreadsheet,
+  Package,
+  Printer,
+  Search,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
-import { ALL, EmptyState, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  EmptyState,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +32,8 @@ import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { LaporanMutasiRowApi } from "@/lib/persediaan-types";
 
-const toISODate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const toISODate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export function LaporanMutasi() {
   const { status: authStatus, hasModuleLevel } = useAuth();
@@ -28,11 +47,19 @@ export function LaporanMutasi() {
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
-  const [from, setFrom] = useState(() => toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
+  const [from, setFrom] = useState(() =>
+    toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
+  );
   const [to, setTo] = useState(() => toISODate(new Date()));
 
-  const whId = useMemo(() => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)), [wh, warehouses]);
-  const catId = useMemo(() => (cat === ALL ? null : (cats?.data.find((c) => c.name === cat)?.id ?? null)), [cats, cat]);
+  const whId = useMemo(
+    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
+    [wh, warehouses],
+  );
+  const catId = useMemo(
+    () => (cat === ALL ? null : (cats?.data.find((c) => c.name === cat)?.id ?? null)),
+    [cats, cat],
+  );
 
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
@@ -161,7 +188,11 @@ export function LaporanMutasi() {
       label: "Barang",
       className: "min-w-[200px]",
       sortable: true,
-      render: (r) => <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>{r.name ?? "—"}</span>,
+      render: (r) => (
+        <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>
+          {r.name ?? "—"}
+        </span>
+      ),
     },
     {
       key: "sku",
@@ -231,10 +262,20 @@ export function LaporanMutasi() {
         description="Ringkas pergerakan stok per SKU (saldo awal, masuk, keluar, saldo akhir) — periode & gudang"
         actions={
           <>
-            <Button variant="outline" className="rounded-xl" onClick={handleExportCsv} disabled={rows.length === 0 || !rangeValid}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handleExportCsv}
+              disabled={rows.length === 0 || !rangeValid}
+            >
               <FileSpreadsheet className="h-4 w-4" /> Excel
             </Button>
-            <Button variant="outline" className="rounded-xl" onClick={handlePrint} disabled={rows.length === 0 || !rangeValid}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handlePrint}
+              disabled={rows.length === 0 || !rangeValid}
+            >
               <Printer className="h-4 w-4" /> Print
             </Button>
           </>
@@ -242,9 +283,26 @@ export function LaporanMutasi() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Total SKU" value={isLoading || isFetching ? "…" : formatNumber(stats.sku)} icon={Boxes} loading={isLoading || isFetching} />
-        <StatCard label="Total Masuk" value={isLoading || isFetching ? "…" : formatNumber(stats.masuk)} icon={TrendingUp} tone="success" loading={isLoading || isFetching} />
-        <StatCard label="Total Keluar" value={isLoading || isFetching ? "…" : formatNumber(stats.keluar)} icon={TrendingDown} tone="warning" loading={isLoading || isFetching} />
+        <StatCard
+          label="Total SKU"
+          value={isLoading || isFetching ? "…" : formatNumber(stats.sku)}
+          icon={Boxes}
+          loading={isLoading || isFetching}
+        />
+        <StatCard
+          label="Total Masuk"
+          value={isLoading || isFetching ? "…" : formatNumber(stats.masuk)}
+          icon={TrendingUp}
+          tone="success"
+          loading={isLoading || isFetching}
+        />
+        <StatCard
+          label="Total Keluar"
+          value={isLoading || isFetching ? "…" : formatNumber(stats.keluar)}
+          icon={TrendingDown}
+          tone="warning"
+          loading={isLoading || isFetching}
+        />
         <StatCard
           label="Nilai Akhir"
           value={isLoading || isFetching ? "…" : formatIDRCompact(stats.nilai)}
@@ -259,12 +317,43 @@ export function LaporanMutasi() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari barang atau SKU..." className="rounded-xl pl-9" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari barang atau SKU..."
+              className="rounded-xl pl-9"
+            />
           </div>
-          <FilterSelect className="w-full" value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouses?.data.map((w) => w.name) ?? []} loading={warehousesLoading} />
-          <FilterSelect className="w-full" value={cat} onChange={setCat} placeholder="Semua Kategori" options={cats?.data.map((c) => c.name) ?? []} loading={catsLoading} />
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Dari tanggal" className="rounded-xl" />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Sampai tanggal" className="rounded-xl" />
+          <FilterSelect
+            className="w-full"
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
+          />
+          <FilterSelect
+            className="w-full"
+            value={cat}
+            onChange={setCat}
+            placeholder="Semua Kategori"
+            options={cats?.data.map((c) => c.name) ?? []}
+            loading={catsLoading}
+          />
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            aria-label="Dari tanggal"
+            className="rounded-xl"
+          />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            aria-label="Sampai tanggal"
+            className="rounded-xl"
+          />
         </div>
       </Panel>
 
@@ -273,21 +362,46 @@ export function LaporanMutasi() {
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={chart} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-              <XAxis type="number" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatIDRCompact(Number(v))} />
-              <YAxis type="category" dataKey="name" fontSize={12} tickLine={false} axisLine={false} width={180} tickFormatter={(n) => (n.length > 20 ? `${n.slice(0, 20)}…` : n)} />
+              <XAxis
+                type="number"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => formatIDRCompact(Number(v))}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={180}
+                tickFormatter={(n) => (n.length > 20 ? `${n.slice(0, 20)}…` : n)}
+              />
               <Tooltip
-                contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", fontSize: 12 }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "1px solid var(--border)",
+                  background: "var(--card)",
+                  fontSize: 12,
+                }}
                 formatter={(value) => [formatIDR(Number(value)), "Nilai Akhir"]}
               />
               <Bar dataKey="nilai" name="Nilai" fill="var(--primary)" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState title="Belum ada data" description="Tidak ada mutasi pada periode dan filter ini." />
+          <EmptyState
+            title="Belum ada data"
+            description="Tidak ada mutasi pada periode dan filter ini."
+          />
         )}
       </Panel>
 
-      <Panel title="Detail Laporan" description={`${formatNumber(rows.length)} SKU${isFetching ? " · memperbarui..." : ""} · ${periodLabel}`}>
+      <Panel
+        title="Detail Laporan"
+        description={`${formatNumber(rows.length)} SKU${isFetching ? " · memperbarui..." : ""} · ${periodLabel}`}
+      >
         <DataTable
           columns={columns}
           rows={rows}
@@ -298,15 +412,30 @@ export function LaporanMutasi() {
             <div className="space-y-1.5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <p className="truncate text-sm font-semibold">{r.name ?? "—"}</p>
-                <Pill tone="neutral">{r.saldo_akhir} {r.unit ?? ""}</Pill>
+                <Pill tone="neutral">
+                  {r.saldo_akhir} {r.unit ?? ""}
+                </Pill>
               </div>
-              <p className="truncate font-mono text-xs text-muted-foreground">{r.sku ?? "—"} · {r.category ?? "—"}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {r.sku ?? "—"} · {r.category ?? "—"}
+              </p>
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
-                <div><p className="text-muted-foreground">Awal</p><b>{formatNumber(r.saldo_awal)}</b></div>
-                <div><p className="text-success">Masuk</p><b>+{formatNumber(r.masuk)}</b></div>
-                <div><p className="text-destructive">Keluar</p><b>{formatNumber(r.keluar)}</b></div>
+                <div>
+                  <p className="text-muted-foreground">Awal</p>
+                  <b>{formatNumber(r.saldo_awal)}</b>
+                </div>
+                <div>
+                  <p className="text-success">Masuk</p>
+                  <b>+{formatNumber(r.masuk)}</b>
+                </div>
+                <div>
+                  <p className="text-destructive">Keluar</p>
+                  <b>{formatNumber(r.keluar)}</b>
+                </div>
               </div>
-              <p className="text-xs">Nilai akhir: <b>{formatIDR(r.nilai_akhir)}</b></p>
+              <p className="text-xs">
+                Nilai akhir: <b>{formatIDR(r.nilai_akhir)}</b>
+              </p>
             </div>
           )}
         />

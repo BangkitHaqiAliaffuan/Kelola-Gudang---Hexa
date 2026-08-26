@@ -367,7 +367,12 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Item" value={isLoading ? "…" : formatNumber(lines.length)} icon={Package} loading={isLoading} />
+        <StatCard
+          label="Item"
+          value={isLoading ? "…" : formatNumber(lines.length)}
+          icon={Package}
+          loading={isLoading}
+        />
         <StatCard
           label="Tercatat"
           value={isLoading ? "…" : formatNumber(summary.checked)}
@@ -382,7 +387,13 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
           tone="warning"
           loading={isLoading}
         />
-        <StatCard label="Lebih" value={isLoading ? "…" : formatNumber(summary.plus)} icon={TrendingUp} tone="info" loading={isLoading} />
+        <StatCard
+          label="Lebih"
+          value={isLoading ? "…" : formatNumber(summary.plus)}
+          icon={TrendingUp}
+          tone="info"
+          loading={isLoading}
+        />
         <StatCard
           label="Kurang"
           value={isLoading ? "…" : formatNumber(summary.minus)}

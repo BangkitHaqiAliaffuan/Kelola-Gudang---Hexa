@@ -12,71 +12,71 @@ Design Style
 
 Gunakan design system modern dengan karakter berikut:
 
- Premium
+Premium
 
- Clean
+Clean
 
- Elegant
+Elegant
 
- Soft
+Soft
 
- Dinamis
+Dinamis
 
- Profesional
+Profesional
 
- Enterprise SaaS
+Enterprise SaaS
 
- Minimalis
+Minimalis
 
- Mudah dipahami operator gudang
+Mudah dipahami operator gudang
 
 Tema warna:
 
- Sediakan pilihan beberapa pastel theme
+Sediakan pilihan beberapa pastel theme
 
- Sky Blue
+Sky Blue
 
- Mint
+Mint
 
- Emerald
+Emerald
 
- Lavender
+Lavender
 
- Peach
+Peach
 
- Soft Orange
+Soft Orange
 
- Slate
+Slate
 
- Light Gray
+Light Gray
 
 Gunakan:
 
- rounded-xl
+rounded-xl
 
- shadow halus
+shadow halus
 
- spacing lega
+spacing lega
 
- icon konsisten
+icon konsisten
 
- card modern
+card modern
 
- animasi ringan
+animasi ringan
 
- loading skeleton
+loading skeleton
 
- hover effect
+hover effect
 
- transition halus
+transition halus
 
 Typography
 
- Inter
+Inter
 
- Plus Jakarta Sans
+Plus Jakarta Sans
 
- atau Manrope
+atau Manrope
 
 Ukuran font nyaman untuk penggunaan harian operator gudang.
 
@@ -86,23 +86,23 @@ Responsive
 
 Desktop:
 
- Sidebar kiri
+Sidebar kiri
 
- Header atas
+Header atas
 
- Workspace lebar
+Workspace lebar
 
 Tablet:
 
- Sidebar collapse
+Sidebar collapse
 
 Mobile:
 
- Bottom navigation
+Bottom navigation
 
- Floating action button
+Floating action button
 
- Responsive table menjadi card
+Responsive table menjadi card
 
 Branding
 
@@ -120,61 +120,61 @@ Dashboard operator gudang harus dapat dipahami dalam beberapa detik.
 
 Widget:
 
- Total Item
+Total Item
 
- Total SKU
+Total SKU
 
- Total Gudang
+Total Gudang
 
- Barang Masuk Hari Ini
+Barang Masuk Hari Ini
 
- Barang Keluar Hari Ini
+Barang Keluar Hari Ini
 
- Stock Menipis
+Stock Menipis
 
- Stock Habis
+Stock Habis
 
- Nilai Persediaan
+Nilai Persediaan
 
- Pending Approval
+Pending Approval
 
- Stock Opname Berjalan
+Stock Opname Berjalan
 
 Grafik:
 
- Barang Masuk per Bulan
+Barang Masuk per Bulan
 
- Barang Keluar per Bulan
+Barang Keluar per Bulan
 
- Pergerakan Stock
+Pergerakan Stock
 
- Nilai Persediaan
+Nilai Persediaan
 
 Activity Timeline
 
- Barang masuk
+Barang masuk
 
- Barang keluar
+Barang keluar
 
- Penyesuaian stok
+Penyesuaian stok
 
- Transfer gudang
+Transfer gudang
 
- Stock opname
+Stock opname
 
 Quick Action
 
- Barang Masuk
+Barang Masuk
 
- Barang Keluar
+Barang Keluar
 
- Transfer
+Transfer
 
- Stock Opname
+Stock Opname
 
- Cetak Barcode
+Cetak Barcode
 
- Tambah Barang
+Tambah Barang
 
 Sidebar Menu
 
@@ -182,105 +182,105 @@ Dashboard
 
 Master Data
 
- Barang
+Barang
 
- Kategori
+Kategori
 
- Sub Kategori
+Sub Kategori
 
- Merk
+Merk
 
- Satuan
+Satuan
 
- Gudang
+Gudang
 
- Rak
+Rak
 
- Bin Location
+Bin Location
 
- Supplier
+Supplier
 
- Customer
+Customer
 
- Vendor
+Vendor
 
- Departemen
+Departemen
 
- Proyek
+Proyek
 
- User
+User
 
- Role
+Role
 
 Persediaan
 
- Stock Saat Ini
+Stock Saat Ini
 
- Kartu Stock
+Kartu Stock
 
- Mutasi Stock
+Mutasi Stock
 
- Stock Minimum
+Stock Minimum
 
- Stock Adjustment
+Stock Adjustment
 
- Nilai Persediaan
+Nilai Persediaan
 
 Transaksi
 
- Barang Masuk
+Barang Masuk
 
- Barang Keluar
+Barang Keluar
 
- Transfer Gudang
+Transfer Gudang
 
- Retur Pembelian
+Retur Pembelian
 
- Retur Penjualan
+Retur Penjualan
 
- Peminjaman Barang
+Peminjaman Barang
 
- Pengembalian Barang
+Pengembalian Barang
 
 Stock Opname
 
- Jadwal
+Jadwal
 
- Proses
+Proses
 
- Hasil
+Hasil
 
- Selisih
+Selisih
 
 Barcode
 
- Generate Barcode
+Generate Barcode
 
- Generate QR Code
+Generate QR Code
 
- Print Label
+Print Label
 
 Laporan
 
- Stock
+Stock
 
- Barang Masuk
+Barang Masuk
 
- Barang Keluar
+Barang Keluar
 
- Mutasi
+Mutasi
 
- Kartu Stock
+Kartu Stock
 
- Nilai Persediaan
+Nilai Persediaan
 
- Stock Minimum
+Stock Minimum
 
- Stock Opname
+Stock Opname
 
- Barang Tidak Bergerak (Dead Stock)
+Barang Tidak Bergerak (Dead Stock)
 
- Fast Moving Item
+Fast Moving Item
 
 Pengaturan
 
@@ -290,43 +290,43 @@ Halaman data barang modern.
 
 Table:
 
- Foto
+Foto
 
- SKU
+SKU
 
- Barcode
+Barcode
 
- Nama Barang
+Nama Barang
 
- Kategori
+Kategori
 
- Merk
+Merk
 
- Gudang Default
+Gudang Default
 
- Stock
+Stock
 
- Satuan
+Satuan
 
- Harga Pokok
+Harga Pokok
 
- Harga Jual
+Harga Jual
 
- Status
+Status
 
 Filter:
 
- Gudang
+Gudang
 
- Kategori
+Kategori
 
- Merk
+Merk
 
- Supplier
+Supplier
 
- Stock
+Stock
 
- Status
+Status
 
 Search
 
@@ -354,31 +354,31 @@ Lampiran
 
 Informasi:
 
- SKU
+SKU
 
- Barcode
+Barcode
 
- QR Code
+QR Code
 
- Nama
+Nama
 
- Merk
+Merk
 
- Kategori
+Kategori
 
- Supplier
+Supplier
 
- Satuan
+Satuan
 
- Berat
+Berat
 
- Dimensi
+Dimensi
 
- Minimum Stock
+Minimum Stock
 
- Maximum Stock
+Maximum Stock
 
- Lead Time
+Lead Time
 
 Preview foto besar.
 
@@ -388,13 +388,13 @@ Halaman transaksi modern.
 
 Filter:
 
- Gudang
+Gudang
 
- Supplier
+Supplier
 
- Tanggal
+Tanggal
 
- Status
+Status
 
 Form:
 
@@ -570,11 +570,11 @@ Fast Moving
 
 Sediakan pilihan metode perhitungan:
 
- FIFO
+FIFO
 
- Average
+Average
 
- Maximum Cost
+Maximum Cost
 
 Tampilkan perubahan tampilan nilai persediaan secara visual (dummy data) saat metode dipilih.
 
@@ -708,17 +708,17 @@ UX
 
 Operator gudang harus bisa:
 
- menemukan barang dalam beberapa detik
+menemukan barang dalam beberapa detik
 
- melihat stok tanpa membuka banyak halaman
+melihat stok tanpa membuka banyak halaman
 
- membuat transaksi dengan langkah sesedikit mungkin
+membuat transaksi dengan langkah sesedikit mungkin
 
- nyaman digunakan sepanjang hari
+nyaman digunakan sepanjang hari
 
- tidak merasa aplikasi rumit
+tidak merasa aplikasi rumit
 
- fokus pada pekerjaan operasional
+fokus pada pekerjaan operasional
 
 Minimalkan jumlah klik.
 
@@ -728,13 +728,13 @@ Responsive
 
 Pastikan seluruh halaman:
 
- responsive
+responsive
 
- mobile friendly
+mobile friendly
 
- tablet friendly
+tablet friendly
 
- desktop optimal
+desktop optimal
 
 Table berubah menjadi card pada mobile.
 
@@ -746,31 +746,31 @@ Dummy Data
 
 Isi seluruh halaman dengan data realistis:
 
- ±300 barang
+±300 barang
 
- 15 kategori
+15 kategori
 
- 8 gudang
+8 gudang
 
- 120 supplier
+120 supplier
 
- 40 customer
+40 customer
 
- 2.000 transaksi
+2.000 transaksi
 
- barcode
+barcode
 
- QR Code
+QR Code
 
- foto barang
+foto barang
 
- grafik
+grafik
 
- laporan
+laporan
 
- timeline
+timeline
 
- aktivitas
+aktivitas
 
 Agar seluruh UI terlihat hidup dan siap dipresentasikan.
 

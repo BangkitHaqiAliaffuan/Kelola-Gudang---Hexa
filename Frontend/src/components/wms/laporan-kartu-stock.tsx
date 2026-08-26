@@ -3,7 +3,15 @@ import { ArrowDownLeft, ArrowUpRight, Boxes, FileSpreadsheet, Printer, Wallet } 
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
@@ -15,10 +23,21 @@ import { downloadCsv, toCsv } from "@/lib/csv";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
 import { valuationMethodLabels } from "@/lib/persediaan-types";
 import { cn } from "@/lib/utils";
-import { formatDate, formatIDR, formatIDRCompact, formatNumber, valuationMethods, type Trx } from "@/lib/wms-data";
+import {
+  formatDate,
+  formatIDR,
+  formatIDRCompact,
+  formatNumber,
+  valuationMethods,
+  type Trx,
+} from "@/lib/wms-data";
 
 const typeTone = (t: string): Tone =>
-  t === "Penerimaan" ? "success" : t === "Pengeluaran" || t === "Stock Adjustment" ? "warning" : "info";
+  t === "Penerimaan"
+    ? "success"
+    : t === "Pengeluaran" || t === "Stock Adjustment"
+      ? "warning"
+      : "info";
 
 type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null };
 
@@ -33,7 +52,9 @@ export function LaporanKartuStock() {
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [wh, setWh] = useState(ALL);
-  const [from, setFrom] = useState(() => toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
+  const [from, setFrom] = useState(() =>
+    toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)),
+  );
   const [to, setTo] = useState(() => toISODate(new Date()));
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -46,7 +67,13 @@ export function LaporanKartuStock() {
   );
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
-  const card = useStockCard(activeId, method, whId, rangeValid ? from : null, rangeValid ? to : null);
+  const card = useStockCard(
+    activeId,
+    method,
+    whId,
+    rangeValid ? from : null,
+    rangeValid ? to : null,
+  );
 
   const item = card.data?.data.item;
   const cardData = card.data?.data;
@@ -69,7 +96,12 @@ export function LaporanKartuStock() {
   const filteredRows = useMemo(
     () =>
       tableRows.filter((r) => {
-        if (debouncedQ && !`${r.no} ${r.reference} ${r.note} ${r.pic} ${r.partner}`.toLowerCase().includes(debouncedQ.toLowerCase()))
+        if (
+          debouncedQ &&
+          !`${r.no} ${r.reference} ${r.note} ${r.pic} ${r.partner}`
+            .toLowerCase()
+            .includes(debouncedQ.toLowerCase())
+        )
           return false;
         if (jenis !== ALL && r.type !== jenis) return false;
         return true;
@@ -97,7 +129,10 @@ export function LaporanKartuStock() {
       tanggal: formatDate(r.date),
       nomor: r.no,
       jenis: r.type,
-      gudang: r.warehouse && r.destination && r.destination !== r.warehouse ? `${r.warehouse} → ${r.destination}` : (r.warehouse ?? "—"),
+      gudang:
+        r.warehouse && r.destination && r.destination !== r.warehouse
+          ? `${r.warehouse} → ${r.destination}`
+          : (r.warehouse ?? "—"),
       satuan: r.unit ?? "—",
       masuk: r.masuk,
       keluar: r.keluar,
@@ -127,7 +162,18 @@ export function LaporanKartuStock() {
       ]);
     downloadCsv(`laporan-kartu-stock-${from}-${to}.csv`, content);
     toast.success("CSV diunduh");
-  }, [periodLabel, warehouseLabel, itemLabel, method, saldoAwal, unit, cardData, filteredRows, from, to]);
+  }, [
+    periodLabel,
+    warehouseLabel,
+    itemLabel,
+    method,
+    saldoAwal,
+    unit,
+    cardData,
+    filteredRows,
+    from,
+    to,
+  ]);
 
   const handlePrint = useCallback(() => {
     const win = window.open("", "_blank", "width=900,height=650");
@@ -151,7 +197,12 @@ export function LaporanKartuStock() {
 
   const toTrx = (r: CardRow, it: NonNullable<typeof item>): Trx => {
     const qty = r.masuk || r.keluar;
-    const type: Trx["type"] = r.type === "Penerimaan" ? "Barang Masuk" : r.type === "Pengeluaran" ? "Barang Keluar" : "Stock Adjustment";
+    const type: Trx["type"] =
+      r.type === "Penerimaan"
+        ? "Barang Masuk"
+        : r.type === "Pengeluaran"
+          ? "Barang Keluar"
+          : "Stock Adjustment";
     return {
       id: `${it.id}-${r.no}`,
       no: r.no,
@@ -174,33 +225,97 @@ export function LaporanKartuStock() {
   };
 
   const columns: Column<(typeof tableRows)[number]>[] = [
-    { key: "date", label: "Tanggal", className: "whitespace-nowrap", sortable: true, render: (r) => formatDate(r.date) },
+    {
+      key: "date",
+      label: "Tanggal",
+      className: "whitespace-nowrap",
+      sortable: true,
+      render: (r) => formatDate(r.date),
+    },
     {
       key: "no",
       label: "Nomor",
       className: "whitespace-nowrap",
       sortable: true,
       render: (r) => (
-        <button type="button" onClick={() => openDetail(r)} className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline">
+        <button
+          type="button"
+          onClick={() => openDetail(r)}
+          className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline"
+        >
           {r.no}
         </button>
       ),
     },
-    { key: "type", label: "Jenis", className: "min-w-[140px] whitespace-nowrap", sortable: true, render: (r) => <Pill tone={typeTone(r.type)}>{r.type}</Pill> },
+    {
+      key: "type",
+      label: "Jenis",
+      className: "min-w-[140px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => <Pill tone={typeTone(r.type)}>{r.type}</Pill>,
+    },
     {
       key: "warehouse",
       label: "Gudang",
       className: "min-w-[160px] whitespace-nowrap",
       sortable: true,
-      render: (r) => (r.warehouse && r.destination && r.destination !== r.warehouse ? `${r.warehouse} → ${r.destination}` : (r.warehouse ?? "—")),
+      render: (r) =>
+        r.warehouse && r.destination && r.destination !== r.warehouse
+          ? `${r.warehouse} → ${r.destination}`
+          : (r.warehouse ?? "—"),
     },
-    { key: "unit", label: "Satuan", className: "w-[80px] whitespace-nowrap", sortable: true, render: (r) => r.unit ?? "—" },
-    { key: "masuk", label: "Masuk", className: "text-right w-[100px] whitespace-nowrap text-success", sortable: true, render: (r) => (r.masuk ? `+${formatNumber(r.masuk)}` : "-") },
-    { key: "keluar", label: "Keluar", className: "text-right w-[100px] whitespace-nowrap text-destructive", sortable: true, render: (r) => (r.keluar ? `-${formatNumber(r.keluar)}` : "-") },
-    { key: "saldo", label: "Saldo", className: "text-right w-[100px] whitespace-nowrap font-semibold", sortable: true, render: (r) => `${formatNumber(r.saldo)} ${r.unit ?? ""}` },
-    { key: "nilai", label: `Nilai (${method})`, className: "text-right min-w-[130px] whitespace-nowrap", sortable: true, render: (r) => formatIDR(r.nilai) },
-    { key: "pic", label: "PIC", className: "min-w-[120px] whitespace-nowrap", sortable: true, render: (r) => r.pic },
-    { key: "note", label: "Catatan", className: "max-w-[240px]", render: (r) => <span className="block truncate text-muted-foreground" title={r.note}>{r.note}</span> },
+    {
+      key: "unit",
+      label: "Satuan",
+      className: "w-[80px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => r.unit ?? "—",
+    },
+    {
+      key: "masuk",
+      label: "Masuk",
+      className: "text-right w-[100px] whitespace-nowrap text-success",
+      sortable: true,
+      render: (r) => (r.masuk ? `+${formatNumber(r.masuk)}` : "-"),
+    },
+    {
+      key: "keluar",
+      label: "Keluar",
+      className: "text-right w-[100px] whitespace-nowrap text-destructive",
+      sortable: true,
+      render: (r) => (r.keluar ? `-${formatNumber(r.keluar)}` : "-"),
+    },
+    {
+      key: "saldo",
+      label: "Saldo",
+      className: "text-right w-[100px] whitespace-nowrap font-semibold",
+      sortable: true,
+      render: (r) => `${formatNumber(r.saldo)} ${r.unit ?? ""}`,
+    },
+    {
+      key: "nilai",
+      label: `Nilai (${method})`,
+      className: "text-right min-w-[130px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => formatIDR(r.nilai),
+    },
+    {
+      key: "pic",
+      label: "PIC",
+      className: "min-w-[120px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => r.pic,
+    },
+    {
+      key: "note",
+      label: "Catatan",
+      className: "max-w-[240px]",
+      render: (r) => (
+        <span className="block truncate text-muted-foreground" title={r.note}>
+          {r.note}
+        </span>
+      ),
+    },
   ];
 
   return (
@@ -216,16 +331,31 @@ export function LaporanKartuStock() {
                   key={m}
                   type="button"
                   onClick={() => setMethod(m)}
-                  className={cn("rounded-lg px-3 py-1.5 text-xs font-semibold transition-all", method === m ? "bg-primary text-primary-foreground shadow-soft" : "text-muted-foreground hover:text-foreground")}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                    method === m
+                      ? "bg-primary text-primary-foreground shadow-soft"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
                   {valuationMethodLabels[m]}
                 </button>
               ))}
             </div>
-            <Button variant="outline" className="rounded-xl" onClick={handleExportCsv} disabled={filteredRows.length === 0}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handleExportCsv}
+              disabled={filteredRows.length === 0}
+            >
               <FileSpreadsheet className="h-4 w-4" /> Excel
             </Button>
-            <Button variant="outline" className="rounded-xl" onClick={handlePrint} disabled={filteredRows.length === 0}>
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={handlePrint}
+              disabled={filteredRows.length === 0}
+            >
               <Printer className="h-4 w-4" /> Cetak
             </Button>
           </>
@@ -237,13 +367,24 @@ export function LaporanKartuStock() {
           <FormCombobox
             value={activeId != null ? String(activeId) : ""}
             onValueChange={(v) => setId(Number(v))}
-            options={options.map((o) => ({ value: String(o.id), label: `${o.name} — ${o.sku}`, keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim() }))}
+            options={options.map((o) => ({
+              value: String(o.id),
+              label: `${o.name} — ${o.sku}`,
+              keywords: `${o.name} ${o.sku} ${o.barcode ?? ""} ${o.internal_barcode ?? ""}`.trim(),
+            }))}
             placeholder="Pilih barang…"
             searchPlaceholder="Cari nama, SKU, barcode…"
             loading={itemsLoading}
             className="w-full"
           />
-          <FilterSelect value={wh} onChange={setWh} placeholder="Semua Gudang" options={warehouses?.data.map((w) => w.name) ?? []} loading={warehousesLoading} className="w-full" />
+          <FilterSelect
+            value={wh}
+            onChange={setWh}
+            placeholder="Semua Gudang"
+            options={warehouses?.data.map((w) => w.name) ?? []}
+            loading={warehousesLoading}
+            className="w-full"
+          />
           <FilterSelect
             value={jenis}
             onChange={setJenis}
@@ -252,20 +393,61 @@ export function LaporanKartuStock() {
             loading={card.isFetching}
             className="w-full"
           />
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-xl" aria-label="Dari tanggal" />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-xl" aria-label="Sampai tanggal" />
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-9 rounded-xl"
+            aria-label="Dari tanggal"
+          />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-9 rounded-xl"
+            aria-label="Sampai tanggal"
+          />
         </div>
-        {!rangeValid && <p className="mt-2 text-xs text-destructive">Rentang tanggal tidak valid (Dari harus ≤ Sampai).</p>}
+        {!rangeValid && (
+          <p className="mt-2 text-xs text-destructive">
+            Rentang tanggal tidak valid (Dari harus ≤ Sampai).
+          </p>
+        )}
       </Panel>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Saldo Awal" value={`${formatNumber(saldoAwal)} ${unit}`} icon={Boxes} tone="info" />
-        <StatCard label="Total Masuk" value={`${formatNumber(totalMasuk)} ${unit}`} icon={ArrowDownLeft} tone="success" />
-        <StatCard label="Total Keluar" value={`${formatNumber(totalKeluar)} ${unit}`} icon={ArrowUpRight} tone="warning" />
-        <StatCard label={`Nilai Akhir — ${valuationMethodLabels[method]}`} value={formatIDRCompact(lastRow?.nilai ?? 0)} valueTitle={formatIDR(lastRow?.nilai ?? 0)} hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`} icon={Wallet} />
+        <StatCard
+          label="Saldo Awal"
+          value={`${formatNumber(saldoAwal)} ${unit}`}
+          icon={Boxes}
+          tone="info"
+        />
+        <StatCard
+          label="Total Masuk"
+          value={`${formatNumber(totalMasuk)} ${unit}`}
+          icon={ArrowDownLeft}
+          tone="success"
+        />
+        <StatCard
+          label="Total Keluar"
+          value={`${formatNumber(totalKeluar)} ${unit}`}
+          icon={ArrowUpRight}
+          tone="warning"
+        />
+        <StatCard
+          label={`Nilai Akhir — ${valuationMethodLabels[method]}`}
+          value={formatIDRCompact(lastRow?.nilai ?? 0)}
+          valueTitle={formatIDR(lastRow?.nilai ?? 0)}
+          hint={`${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} × ${formatIDR(lastRow?.method_cost ?? 0)}`}
+          icon={Wallet}
+        />
       </div>
 
-      <Panel title={item?.name ?? "Memuat…"} description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${periodLabel}`} bodyClassName="p-0">
+      <Panel
+        title={item?.name ?? "Memuat…"}
+        description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${periodLabel}`}
+        bodyClassName="p-0"
+      >
         <DataTable
           columns={columns}
           rows={filteredRows}
@@ -292,7 +474,11 @@ export function LaporanKartuStock() {
       </Panel>
 
       <TrxDetailSheet trx={detail} onOpenChange={(o) => !o && setDetail(null)} editable={false} />
-      <StockDocumentSheet doc={docDetail?.data ?? null} isLoading={docLoading} onOpenChange={(o) => !o && setSelectedId(null)} />
+      <StockDocumentSheet
+        doc={docDetail?.data ?? null}
+        isLoading={docLoading}
+        onOpenChange={(o) => !o && setSelectedId(null)}
+      />
     </>
   );
 }

@@ -171,7 +171,10 @@ export function ProfileHelpDialog({
                         theme === t.id ? "border-primary/40 bg-primary-soft" : "border-border",
                       )}
                     >
-                      <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: t.swatch }} />
+                      <span
+                        className="h-4 w-4 shrink-0 rounded-full"
+                        style={{ background: t.swatch }}
+                      />
                       <span className="truncate">{t.label}</span>
                       {theme === t.id && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
                     </button>
@@ -200,7 +203,9 @@ export function ProfileHelpDialog({
                 {tutorials.map((t, i) => (
                   <AccordionItem key={t.q} value={`t-${i}`}>
                     <AccordionTrigger className="text-left text-sm">{t.q}</AccordionTrigger>
-                    <AccordionContent className="text-sm text-muted-foreground">{t.a}</AccordionContent>
+                    <AccordionContent className="text-sm text-muted-foreground">
+                      {t.a}
+                    </AccordionContent>
                   </AccordionItem>
                 ))}
               </Accordion>

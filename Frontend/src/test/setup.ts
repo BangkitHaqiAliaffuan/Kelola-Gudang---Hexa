@@ -17,7 +17,10 @@ class ResizeObserverStub {
   }
 
   observe() {
-    this.callback([{ contentRect: { width: CHART_WIDTH, height: CHART_HEIGHT } } as ResizeObserverEntry], this);
+    this.callback(
+      [{ contentRect: { width: CHART_WIDTH, height: CHART_HEIGHT } } as ResizeObserverEntry],
+      this,
+    );
   }
 
   unobserve() {}

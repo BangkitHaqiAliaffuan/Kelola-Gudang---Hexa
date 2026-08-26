@@ -355,7 +355,9 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
           icon={TriangleAlert}
           tone="danger"
           valueTitle={
-            isLoading || isFetching ? undefined : `${formatNumber(stats.belumPosting)} dokumen belum diposting`
+            isLoading || isFetching
+              ? undefined
+              : `${formatNumber(stats.belumPosting)} dokumen belum diposting`
           }
           loading={isLoading || isFetching}
         />
