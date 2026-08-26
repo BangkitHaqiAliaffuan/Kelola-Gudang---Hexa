@@ -207,15 +207,7 @@ export function ReturPenjualanForm() {
   // dari baris dokumen itu (tujuan retur).
   const lineBinOptions = (l: FormLine): ComboboxOption[] => {
     if (!warehouseId) return [];
-    if (sourceDocId) {
-      if (!l.itemId) return [];
-      const ids = new Set(
-        sourceLines
-          .filter((s) => s.item_id === Number(l.itemId))
-          .map((s) => (sourceLineBin(s) === null ? "NULL" : String(sourceLineBin(s)))),
-      );
-      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
-    }
+    // Opsi B: retur fleksibel per gudang — tampilkan semua bin di gudang (termasuk lantai).
     return binOptions;
   };
 
@@ -745,8 +737,13 @@ export function ReturPenjualanForm() {
             <DialogTitle>Scan Barcode</DialogTitle>
             <DialogDescription>Arahkan barcode atau QR ke dalam kotak.</DialogDescription>
           </DialogHeader>
-          <div id={readerId} className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black" />
-          <p className="text-center text-xs text-muted-foreground">Mendukung EAN-13, Code 128, dan QR</p>
+          <div
+            id={readerId}
+            className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
+          />
+          <p className="text-center text-xs text-muted-foreground">
+            Mendukung EAN-13, Code 128, dan QR
+          </p>
         </DialogContent>
       </Dialog>
     </>

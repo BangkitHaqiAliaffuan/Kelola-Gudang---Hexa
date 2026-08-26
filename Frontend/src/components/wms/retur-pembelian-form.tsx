@@ -193,6 +193,16 @@ export function ReturPembelianForm() {
     return map;
   }, [stockRows]);
 
+  // Global tersedia per (gudang, barang) — jumlah semua bin termasuk lantai, untuk label habis global
+  const globalAvailableByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of stockRows?.data ?? []) {
+      const k = `${r.warehouse_id}:${r.item_id}`;
+      map.set(k, (map.get(k) ?? 0) + (r.available ?? 0));
+    }
+    return map;
+  }, [stockRows]);
+
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
@@ -240,14 +250,14 @@ export function ReturPembelianForm() {
     return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
   };
 
-  // Maks qty valid dari API: Draft = sisa dokumen, Selesai = min(sisa, tersedia) — konsisten BE
+  // Opsi B: Maks qty valid — Draft = sisa dokumen, Selesai = min(sisa, total tersedia di gudang) — fungible per gudang.
   const maxQtyForLine = (l: FormLine, status: "Draft" | "Selesai"): number | null => {
     const src = lineSource(l);
     if (!src) return null;
     const remaining = src.remaining_qty ?? src.qty ?? 0;
     if (status === "Draft") return remaining;
-    const available = lineAvailable(l);
-    return available !== undefined ? Math.min(remaining, available) : remaining;
+    const totalAvailable = globalAvailableByKey.get(`${warehouseId}:${l.itemId}`);
+    return totalAvailable !== undefined ? Math.min(remaining, totalAvailable) : remaining;
   };
 
   // Bin asal retur dari baris Penerimaan sumber: BM buatan form sungguhan
@@ -299,13 +309,8 @@ export function ReturPembelianForm() {
   const lineBinOptions = (l: FormLine): ComboboxOption[] => {
     if (!warehouseId) return [];
     if (sourceDocId) {
-      if (!l.itemId) return [];
-      const ids = new Set(
-        sourceLines
-          .filter((s) => s.item_id === Number(l.itemId))
-          .map((s) => (sourceLineBin(s) === null ? "NULL" : String(sourceLineBin(s)))),
-      );
-      return binOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
+      // Opsi B: retur fleksibel per gudang — tampilkan semua bin di gudang (termasuk lantai), tidak hanya bin sumber.
+      return binOptions;
     }
     if (l.itemId) {
       const candidates = binCandidatesByItem.get(l.itemId) ?? [];
@@ -434,7 +439,7 @@ export function ReturPembelianForm() {
       const max = maxQtyForLine(overLine, status);
       const src = lineSource(overLine);
       const rem = src?.remaining_qty ?? src?.qty ?? 0;
-      const av = lineAvailable(overLine);
+      const av = globalAvailableByKey.get(`${warehouseId}:${overLine.itemId}`);
       if (status === "Draft") {
         toast.error(`Ada baris dengan qty melebihi sisa dokumen sumber (maks ${rem}).`);
       } else {
@@ -539,12 +544,37 @@ export function ReturPembelianForm() {
               sourceDetail?.data &&
               !stockLoading &&
               sourceLines.length > 0 &&
-              returnableSourceLines.length === 0 && (
-                <p className="text-xs text-amber-600">
-                  Stok di bin penerimaan untuk semua barang sudah habis/dipindah — retur masih bisa
-                  disimpan Draft, posting Selesai akan cek stok tersedia di lokasi asal.
-                </p>
-              )}
+              (() => {
+                const hasGlobal = sourceLines.some(
+                  (s) => (globalAvailableByKey.get(`${warehouseId}:${s.item_id}`) ?? 0) > 0,
+                );
+                const whName =
+                  warehouses?.data.find((w) => w.id === Number(warehouseId))?.name ?? "gudang ini";
+                if (!hasGlobal) {
+                  const remaining = sourceLines.reduce(
+                    (sum, s) => sum + (s.remaining_qty ?? s.qty ?? 0),
+                    0,
+                  );
+                  return (
+                    <p className="text-xs text-amber-600">
+                      Stok barang ini di gudang {whName} sudah habis (terpakai/terjual) — sisa
+                      dokumen {remaining} tidak dapat diretur. Retur hanya bisa disimpan Draft,
+                      posting Selesai butuh stok tersedia global.
+                    </p>
+                  );
+                }
+                if (returnableSourceLines.length === 0) {
+                  return (
+                    <p className="text-xs text-amber-600">
+                      Stok di lokasi penerimaan asal (bin/lantai) sudah habis/dipindah — total
+                      gudang masih tersedia. Retur wajib dari lokasi yang sama dengan Barang Masuk
+                      asal; pindahkan kembali atau retur dari bin tersebut. Posting Selesai akan cek
+                      min(sisa, tersedia di lokasi asal).
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             {docError("source_document_id") && (
               <p className="text-xs text-destructive">{docError("source_document_id")}</p>
             )}
@@ -621,7 +651,7 @@ export function ReturPembelianForm() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Tersedia di Bin", ""].map((h) => (
+                {["Barang", "Asal Bin", "Qty", "Tersedia di Gudang", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -630,16 +660,20 @@ export function ReturPembelianForm() {
             </thead>
             <tbody>
               {lines.map((l, i) => {
-                const available = lineAvailable(l);
+                // Opsi B: Tersedia = total gudang (fungible), bukan per bin.
+                const totalAvailable = globalAvailableByKey.get(`${warehouseId}:${l.itemId}`);
                 const src = lineSource(l);
                 const maxSelesai = maxQtyForLine(l, "Selesai");
                 const overStock =
-                  !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+                  !submitted &&
+                  totalAvailable !== undefined &&
+                  (Number(l.qty) || 0) > totalAvailable;
                 const overSource =
                   !submitted &&
                   src != null &&
                   (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
-                const overMax = !submitted && maxSelesai !== null && (Number(l.qty) || 0) > maxSelesai;
+                const overMax =
+                  !submitted && maxSelesai !== null && (Number(l.qty) || 0) > maxSelesai;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -713,18 +747,21 @@ export function ReturPembelianForm() {
                       )}
                       {overStock && !overSource && (
                         <p className="mt-1 text-xs text-destructive">
-                          Melebihi tersedia ({formatNumber(available)})
+                          Melebihi tersedia di gudang ({formatNumber(totalAvailable)})
                         </p>
                       )}
                       {src && !overMax && sourceDocId && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
-                          {available !== undefined && (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(available)})` : ""}
+                          {totalAvailable !== undefined &&
+                          (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
+                            ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(totalAvailable)})`
+                            : ""}
                         </p>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
-                      {available !== undefined ? formatNumber(available) : "—"}
+                      {totalAvailable !== undefined ? formatNumber(totalAvailable) : "—"}
                     </td>
                     <td className="px-3 py-2 align-top">
                       {canCreate && (
@@ -749,13 +786,15 @@ export function ReturPembelianForm() {
 
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
-            const available = lineAvailable(l);
+            const totalAvailable = globalAvailableByKey.get(`${warehouseId}:${l.itemId}`);
             const src = lineSource(l);
             const maxSelesai = maxQtyForLine(l, "Selesai");
             const overStock =
-              !submitted && available !== undefined && (Number(l.qty) || 0) > available;
+              !submitted && totalAvailable !== undefined && (Number(l.qty) || 0) > totalAvailable;
             const overSource =
-              !submitted && src != null && (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
+              !submitted &&
+              src != null &&
+              (Number(l.qty) || 0) > (src.remaining_qty ?? src.qty ?? 0);
             const overMax = !submitted && maxSelesai !== null && (Number(l.qty) || 0) > maxSelesai;
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
@@ -807,12 +846,14 @@ export function ReturPembelianForm() {
                       className={`h-9 w-24 rounded-lg ${overMax ? "border-destructive" : ""}`}
                     />
                     <span className="ml-auto text-sm text-muted-foreground">
-                      Tersedia di Bin {available !== undefined ? formatNumber(available) : "—"}
+                      Tersedia di Gudang{" "}
+                      {totalAvailable !== undefined ? formatNumber(totalAvailable) : "—"}
                     </span>
                   </div>
                   {overSource && (
                     <p className="text-xs text-destructive">
-                      Melebihi jumlah dari dokumen sumber (maks {formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}).
+                      Melebihi jumlah dari dokumen sumber (maks{" "}
+                      {formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}).
                     </p>
                   )}
                   {overStock && !overSource && (
@@ -823,8 +864,9 @@ export function ReturPembelianForm() {
                   {src && !overMax && sourceDocId && (
                     <p className="text-xs text-muted-foreground">
                       Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
-                      {available !== undefined && (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
-                        ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(available)})`
+                      {totalAvailable !== undefined &&
+                      (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
+                        ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(totalAvailable)})`
                         : ""}
                     </p>
                   )}

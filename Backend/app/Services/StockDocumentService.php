@@ -327,6 +327,25 @@ class StockDocumentService
             return;
         }
 
+        // Opsi B: Retur Pembelian cek total gudang (fungible per gudang), bukan per bin.
+        if ($attributes['movement_type'] === 'Retur Pembelian') {
+            $totalAvailableRaw = ItemStock::where('item_id', $attributes['item_id'])
+                ->where('warehouse_id', $attributes['warehouse_id'])
+                ->selectRaw('COALESCE(SUM(stock),0) - COALESCE(SUM(reserved),0) as total')
+                ->value('total');
+            $available = (int) ($totalAvailableRaw ?? 0);
+            // Untuk retur, tidak ada konsep fisik vs available khusus — pakai total available.
+            if ($attributes['qty'] > $available) {
+                $item = Item::find($attributes['item_id']);
+                $label = $item ? trim(($item->sku ?? '').' '.($item->name ?? '')) : "#{$attributes['item_id']}";
+                throw new \InvalidArgumentException(
+                    "Stok tidak mencukupi untuk {$label} (butuh {$attributes['qty']}, tersedia {$available} di gudang).",
+                );
+            }
+
+            return;
+        }
+
         $query = ItemStock::where('item_id', $attributes['item_id'])
             ->where('warehouse_id', $attributes['warehouse_id']);
         if ($attributes['bin_id'] === null) {

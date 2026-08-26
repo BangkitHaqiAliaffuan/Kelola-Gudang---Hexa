@@ -75,6 +75,9 @@ export type StockCardRowApi = {
   note: string;
   partner: string;
   reference: string;
+  warehouse?: string | null;
+  destination?: string | null;
+  source?: string | null;
 };
 
 export type StockCardApi = {

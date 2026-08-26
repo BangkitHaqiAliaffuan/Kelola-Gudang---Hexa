@@ -334,13 +334,8 @@ class StoreStockDocumentRequest extends FormRequest
                         continue;
                     }
 
-                    // Opsi A: bin boleh null — null vs null cocok, null vs bin tidak cocok.
-                    if ((int) ($sourceLine->to_bin_id ?? 0) !== (int) ($line['from_bin_id'] ?? 0)) {
-                        $validator->errors()->add(
-                            "lines.{$index}.from_bin_id",
-                            'Bin asal harus sama dengan bin tujuan baris sumber (Penerimaan).'
-                        );
-                    }
+                    // Opsi B: retur fleksibel per gudang — from_bin boleh bin mana saja di gudang yang sama (cek warehouse di after hook kedua), tidak harus sama dengan to_bin sumber.
+                    // Hapus validasi bin equality untuk retur (fungible per gudang).
 
                     $sourceQty = (int) $sourceLine->qty;
                     $alreadyReturned = (int) ($returnedByLine->get((int) $sourceLineId) ?? 0);
@@ -354,23 +349,19 @@ class StoreStockDocumentRequest extends FormRequest
                         );
                     }
 
-                    // Selesai: cek stok tersedia di lokasi asal (bin sumber) — min(sisa, available) untuk semua bin (lantai maupun ber-bin), Draft hanya sisa.
+                    // Opsi B: Selesai cek stok tersedia total di gudang (fungible per gudang), bukan per bin sumber.
                     if ($this->input('status') === 'Selesai') {
-                        $q = ItemStock::where('item_id', $sourceLine->item_id)
-                            ->where('warehouse_id', (int) $this->input('warehouse_id'));
-                        if ($sourceLine->to_bin_id === null) {
-                            $q->whereNull('bin_id');
-                        } else {
-                            $q->where('bin_id', $sourceLine->to_bin_id);
-                        }
-                        $row = $q->first();
-                        $available = $row ? ((int) $row->stock - (int) $row->reserved) : 0;
+                        $totalAvailableRaw = ItemStock::where('item_id', $sourceLine->item_id)
+                            ->where('warehouse_id', (int) $this->input('warehouse_id'))
+                            ->selectRaw('COALESCE(SUM(stock),0) - COALESCE(SUM(reserved),0) as total')
+                            ->value('total');
+                        $available = (int) ($totalAvailableRaw ?? 0);
                         $remaining = max(0, $sourceQty - $alreadyReturned);
                         $cap = min($remaining, $available);
                         if ($requested > $cap) {
                             $validator->errors()->add(
                                 "lines.{$index}.qty",
-                                "Qty melebihi stok tersedia di lokasi asal (tersedia {$available}, sisa dokumen {$remaining}, maks {$cap})."
+                                "Qty melebihi stok tersedia di gudang (tersedia {$available}, sisa dokumen {$remaining}, maks {$cap})."
                             );
                         }
                     }
@@ -476,13 +467,7 @@ class StoreStockDocumentRequest extends FormRequest
                         continue;
                     }
 
-                    if ((int) ($sourceLine->from_bin_id ?? 0) !== (int) ($line['to_bin_id'] ?? 0)) {
-                        $validator->errors()->add(
-                            "lines.{$index}.to_bin_id",
-                            'Bin tujuan harus sama dengan bin asal baris sumber (Pengeluaran).'
-                        );
-                    }
-
+                    // Opsi B: retur fleksibel per gudang — to_bin boleh bin mana saja di gudang yang sama.
                     $sourceQty = abs((int) $sourceLine->qty);
                     $alreadyReturned = (int) ($returnedByLine->get((int) $sourceLineId) ?? 0);
                     $requested = (int) ($requestedByLine[(int) $sourceLineId] ?? 0);

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,9 @@ export function DataTable<T extends { id: string | number }>({
 }) {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, totalPages);
   const sorted = useMemo(() => {

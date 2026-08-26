@@ -1466,16 +1466,15 @@ class StoreStockDocumentApiTest extends TestCase
 
     public function test_store_retur_penjualan_source_line_bin_mismatch_returns_422(): void
     {
+        // Opsi B: retur fleksibel per gudang — beda bin dalam gudang sama boleh (fungible).
         $item = $this->makeItem();
         [$wh, $rack, $binA] = $this->makeLocation();
         $binB = Bin::factory()->create(['rack_id' => $rack->id]);
 
         $this->makePostedPenerimaan($item->id, $binA->id, 10, 1500);
         [$source, $sourceLine] = $this->makePostedPengeluaran($item->id, $binA->id, 5);
-        $before = StockDocument::count();
 
-        // Barang dikeluarkan dari bin A, retur masuk ke bin B (gudang sama) → tolak.
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -1484,10 +1483,9 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $binB->id, 'source_line_id' => $sourceLine->id],
             ],
-        ])->assertStatus(422)
-            ->assertJsonValidationErrors('lines.0.to_bin_id');
-
-        $this->assertSame($before, StockDocument::count());
+        ]);
+        $res->assertStatus(201);
+        $this->assertSame($binB->id, (int) $res->json('data.lines.0.to_bin_id'));
     }
 
     public function test_store_retur_penjualan_qty_exceeds_source_returns_422(): void

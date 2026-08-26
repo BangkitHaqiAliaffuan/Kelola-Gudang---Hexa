@@ -82,7 +82,7 @@ const typeTone = (t: string): Tone =>
       ? "warning"
       : "info";
 
-type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null };
+type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null; source?: string | null };
 
 function KartuStock() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
@@ -125,6 +125,9 @@ function KartuStock() {
     () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
     [warehouses, wh],
   );
+  const isWarehouseReady = wh === ALL || !warehousesLoading;
+  const whIdForFetch = isWarehouseReady ? whId : null;
+  const activeIdForFetch = isWarehouseReady ? activeId : undefined;
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current;
@@ -211,9 +214,9 @@ function KartuStock() {
     };
   }, [scanOpen, options, stopScanner]);
 
-  const cardFifo = useStockCard(activeId, "FIFO", whId);
-  const cardAvg = useStockCard(activeId, "Average", whId);
-  const cardMax = useStockCard(activeId, "Maximum Cost", whId);
+  const cardFifo = useStockCard(activeIdForFetch, "FIFO", whIdForFetch);
+  const cardAvg = useStockCard(activeIdForFetch, "Average", whIdForFetch);
+  const cardMax = useStockCard(activeIdForFetch, "Maximum Cost", whIdForFetch);
   const card = method === "FIFO" ? cardFifo : method === "Average" ? cardAvg : cardMax;
   const methodCards: Record<ValuationMethod, typeof card> = {
     FIFO: cardFifo,
@@ -340,10 +343,14 @@ function KartuStock() {
       label: "Gudang",
       className: "min-w-[160px] whitespace-nowrap",
       sortable: true,
-      render: (r) =>
-        r.warehouse && r.destination && r.destination !== r.warehouse
+      render: (r) => {
+        if (r.type === "Transfer Gudang" && r.source && r.destination) {
+          return `${r.source} → ${r.destination}`;
+        }
+        return r.warehouse && r.destination && r.destination !== r.warehouse
           ? `${r.warehouse} → ${r.destination}`
-          : (r.warehouse ?? "—"),
+          : (r.warehouse ?? "—");
+      },
     },
     {
       key: "unit",
@@ -679,9 +686,11 @@ function KartuStock() {
                 <p>Jenis: {r.type}</p>
                 <p>
                   Gudang:{" "}
-                  {r.warehouse && r.destination && r.destination !== r.warehouse
-                    ? `${r.warehouse} → ${r.destination}`
-                    : (r.warehouse ?? "—")}
+                  {r.type === "Transfer Gudang" && r.source && r.destination
+                    ? `${r.source} → ${r.destination}`
+                    : r.warehouse && r.destination && r.destination !== r.warehouse
+                      ? `${r.warehouse} → ${r.destination}`
+                      : (r.warehouse ?? "—")}
                 </p>
                 <p>
                   Saldo: {formatNumber(r.saldo)} {r.unit ?? ""}

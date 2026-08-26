@@ -170,7 +170,7 @@ class StockController extends Controller
         $from = $data['from'] ?? null;
         $to = $data['to'] ?? null;
 
-        $movements = StockMovement::with(['warehouse', 'stockDocument.destination'])
+        $movements = StockMovement::with(['warehouse', 'stockDocument.destination', 'stockDocument.warehouse'])
             ->where('item_id', $item->id)
             ->when($data['warehouse_id'] ?? null, fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
             ->orderBy('occurred_at')
@@ -226,12 +226,24 @@ class StockController extends Controller
                 continue;
             }
 
+            // 1 baris per Transfer untuk global view: skip IN mirror saat tanpa filter gudang
+            $isTransferInGlobal = $movement->movement_type === 'Transfer Gudang'
+                && $movement->direction === 'IN'
+                && ($data['warehouse_id'] ?? null) === null;
+            if ($isTransferInGlobal) {
+                continue;
+            }
+
             $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
             $unitCost = match ($method) {
                 'Average' => $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0),
                 'Maximum Cost' => $maxCost ?? $item->cost ?? 0,
                 default => $saldo > 0 ? $fifoValue / $saldo : ($item->cost ?? 0),
             };
+
+            $isTransfer = $movement->movement_type === 'Transfer Gudang';
+            $sourceWarehouse = $isTransfer ? $movement->stockDocument?->warehouse?->name : null;
+            $destWarehouse = $isTransfer ? $movement->stockDocument?->destination?->name : null;
 
             $rows[] = [
                 'date' => $movement->occurred_at->toIso8601String(),
@@ -240,9 +252,8 @@ class StockController extends Controller
                 'type' => $movement->movement_type,
                 'direction' => $movement->direction,
                 'warehouse' => $movement->warehouse?->name,
-                'destination' => $movement->movement_type === 'Transfer Gudang'
-                    ? $movement->stockDocument?->destination?->name
-                    : null,
+                'destination' => $destWarehouse,
+                'source' => $sourceWarehouse,
                 'masuk' => $movement->direction === 'IN' ? $movement->qty : 0,
                 'keluar' => $movement->direction === 'OUT' ? $movement->qty : 0,
                 'saldo' => $saldo,
