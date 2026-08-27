@@ -2,13 +2,16 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/api/:path*"
+      "destination": "https://dab6-182-8-68-249.ngrok-free.app/api/:path*"
     },
     {
       "source": "/sanctum/:path*",
-      "destination": "https://magnetize-divisibly-humorous.ngrok-free.dev/sanctum/:path*"
+      "destination": "https://dab6-182-8-68-249.ngrok-free.app/sanctum/:path*"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "cleanUrls": true
 }
