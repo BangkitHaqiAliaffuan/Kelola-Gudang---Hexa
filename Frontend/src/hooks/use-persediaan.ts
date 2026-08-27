@@ -156,6 +156,33 @@ export function useCancelStockDocument() {
   });
 }
 
+export function useSubmitStockDocumentApproval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/submit-approval`, null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
+export function useApproveStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision_note }: { id: number; decision_note?: string }) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/approve`, decision_note ? { decision_note } : null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
+export function useRejectStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision_note }: { id: number; decision_note?: string }) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/reject`, { decision_note }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+  });
+}
+
 export function useStockMinimum(
   params: {
     days?: number;

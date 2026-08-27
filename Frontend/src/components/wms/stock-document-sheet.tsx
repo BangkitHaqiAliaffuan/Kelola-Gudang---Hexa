@@ -135,6 +135,9 @@ export function StockDocumentSheet({
   isLoading = false,
   onPost,
   onCancel,
+  onSubmit,
+  onApprove,
+  onReject,
   busy = false,
 }: {
   doc: StockDocumentApi | null;
@@ -142,14 +145,20 @@ export function StockDocumentSheet({
   isLoading?: boolean;
   onPost?: (() => void) | undefined;
   onCancel?: (() => void) | undefined;
+  onSubmit?: (() => void) | undefined;
+  onApprove?: (() => void) | undefined;
+  onReject?: (() => void) | undefined;
   busy?: boolean;
 }) {
   const { user, hasModuleLevel } = useAuth();
   const canPost = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
+  const canSubmit = hasModuleLevel("Persediaan", "Tulis");
+  const canApprove = hasModuleLevel("Persediaan", "Kelola") || user?.role === "Auditor";
   const isSelf = doc?.requester_user_id != null && user?.id === doc.requester_user_id;
   const isSelfBlocked =
     isSelf && (doc?.type === "Stock Adjustment" || doc?.type === "Stock Opname");
+  const isApproveBlocked = isSelf && doc?.status === "Menunggu Approval";
   const lines = doc?.lines ?? [];
   const isOpname = doc?.type === "Stock Opname" || (lines.length > 0 && lines.every(isOpnameLine));
   const isAdjustment = doc?.type === "Stock Adjustment";
@@ -395,19 +404,53 @@ export function StockDocumentSheet({
                       Batalkan
                     </Button>
                   )}
-                  {canPost && onPost && (
+                  {canSubmit && onSubmit && (
                     <Button
                       className="rounded-xl"
-                      onClick={onPost}
-                      disabled={busy || isSelfBlocked}
-                      title={isSelfBlocked ? "Pembuat tidak boleh memposting sendiri" : undefined}
+                      onClick={onSubmit}
+                      disabled={busy}
                     >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <CheckCheck className="h-4 w-4" />
                       )}{" "}
-                      Posting
+                      Ajukan Approval
+                    </Button>
+                  )}
+                </>
+              )}
+              {doc.type === "Stock Adjustment" && doc.status === "Menunggu Approval" && (
+                <>
+                  {canApprove && onReject && (
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={onReject}
+                      disabled={busy || isApproveBlocked}
+                      title={isApproveBlocked ? "Pembuat tidak boleh menolak sendiri" : undefined}
+                    >
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Ban className="h-4 w-4" />
+                      )}{" "}
+                      Tolak
+                    </Button>
+                  )}
+                  {canApprove && onApprove && (
+                    <Button
+                      className="rounded-xl"
+                      onClick={onApprove}
+                      disabled={busy || isApproveBlocked}
+                      title={isApproveBlocked ? "Pembuat tidak boleh menyetujui sendiri" : undefined}
+                    >
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCheck className="h-4 w-4" />
+                      )}{" "}
+                      Setujui
                     </Button>
                   )}
                 </>
