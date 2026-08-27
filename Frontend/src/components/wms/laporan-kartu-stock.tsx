@@ -377,7 +377,7 @@ export function LaporanKartuStock() {
       />
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="flex flex-wrap items-end gap-3">
           <FormCombobox
             value={activeId != null ? String(activeId) : ""}
             onValueChange={(v) => setId(Number(v))}
@@ -389,7 +389,7 @@ export function LaporanKartuStock() {
             placeholder="Pilih barang…"
             searchPlaceholder="Cari nama, SKU, barcode…"
             loading={itemsLoading}
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
           <FilterSelect
             value={wh}
@@ -397,7 +397,7 @@ export function LaporanKartuStock() {
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
           <FilterSelect
             value={jenis}
@@ -405,7 +405,7 @@ export function LaporanKartuStock() {
             placeholder="Semua Jenis"
             options={Array.from(new Set(rows.map((r) => r.type)))}
             loading={card.isFetching}
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
           <Input
             type="date"
@@ -421,7 +421,7 @@ export function LaporanKartuStock() {
             className="h-9 rounded-xl"
             aria-label="Sampai tanggal"
           />
-          <div className="flex items-end justify-start lg:justify-end">
+          <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>

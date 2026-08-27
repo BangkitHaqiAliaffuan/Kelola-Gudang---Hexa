@@ -258,7 +258,9 @@ export function MasterCrudPage<T extends { id: number }>({
             />
           </div>
           {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
-          <ClearFiltersButton visible={hasActive} onClick={handleClear} />
+          <div className="ml-auto flex shrink-0 items-center">
+            <ClearFiltersButton visible={hasActive} onClick={handleClear} />
+          </div>
         </div>
         <DataTable
           columns={allColumns}

@@ -339,8 +339,8 @@ function MasterBarang() {
         title="Filter & Pencarian"
         actions={<SlidersHorizontal className="h-4 w-4 text-muted-foreground" />}
       >
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
-          <div className="relative md:col-span-2">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}
@@ -350,7 +350,7 @@ function MasterBarang() {
             />
           </div>
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={cat}
             onChange={(v) => {
               setCat(v);
@@ -361,7 +361,7 @@ function MasterBarang() {
             loading={catsLoading}
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={subCat}
             onChange={setSubCat}
             placeholder="Semua Sub Kategori"
@@ -369,7 +369,7 @@ function MasterBarang() {
             loading={subsLoading}
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={brand}
             onChange={setBrand}
             placeholder="Semua Merk"
@@ -377,20 +377,20 @@ function MasterBarang() {
             loading={merksLoading}
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={stockF}
             onChange={setStockF}
             placeholder="Semua Stock"
             options={["Normal", "Menipis", "Habis", "Overstock"]}
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={status}
             onChange={setStatus}
             placeholder="Semua Status"
             options={["Aktif", "Nonaktif"]}
           />
-          <div className="flex items-end justify-start xl:justify-end md:col-span-3 xl:col-span-4">
+          <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>

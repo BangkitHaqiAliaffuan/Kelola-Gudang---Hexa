@@ -696,7 +696,7 @@ function KartuStock() {
               />
             </div>
           </div>
-          <div className="flex items-end justify-start md:justify-end col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2 xl:col-start-5 xl:justify-end">
+          <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>

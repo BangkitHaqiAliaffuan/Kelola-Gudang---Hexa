@@ -199,8 +199,8 @@ function StockSaatIni() {
           }
         />
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="relative">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={q}
@@ -210,7 +210,7 @@ function StockSaatIni() {
               />
             </div>
             <FilterSelect
-              className="w-full"
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={wh}
               onChange={setWh}
               placeholder="Semua Gudang"
@@ -218,14 +218,14 @@ function StockSaatIni() {
               loading={warehousesLoading}
             />
             <FilterSelect
-              className="w-full"
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={cat}
               onChange={setCat}
               placeholder="Semua Kategori"
               options={categoryNames}
               loading={catsLoading}
             />
-            <div className="flex items-end justify-start md:justify-end">
+            <div className="ml-auto flex shrink-0 items-end">
               <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
             </div>
           </div>

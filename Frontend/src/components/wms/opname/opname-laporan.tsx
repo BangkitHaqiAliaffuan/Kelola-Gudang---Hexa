@@ -175,7 +175,7 @@ export function OpnameLaporanPage() {
         title="Summary per Sesi"
         description={isLoading ? "Memuat sesi..." : `${formatNumber(filtered.length)} sesi`}
       >
-        <div className="mb-4 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mb-4 flex flex-wrap items-end gap-3">
           <Input
             value={q}
             onChange={(e) => {
@@ -186,7 +186,7 @@ export function OpnameLaporanPage() {
             className="rounded-xl"
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
             onChange={(v) => {
               setWh(v);
@@ -197,7 +197,7 @@ export function OpnameLaporanPage() {
             loading={warehousesLoading}
           />
           <FilterSelect
-            className="w-full"
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={status}
             onChange={(v) => {
               setStatus(v);
@@ -234,7 +234,7 @@ export function OpnameLaporanPage() {
               />
             </div>
           </div>
-          <div className="flex items-end justify-start xl:justify-end">
+          <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>

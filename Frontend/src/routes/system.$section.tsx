@@ -124,8 +124,8 @@ function AuditTrails() {
 
   return (
     <Panel title="Log Aktivitas" description={`${rows.length} entri tercatat`}>
-      <div className="mb-4 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_180px_200px_auto]">
-        <div className="relative">
+      <div className="mb-4 flex flex-wrap items-end gap-2.5">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={q}
@@ -135,20 +135,20 @@ function AuditTrails() {
           />
         </div>
         <FilterSelect
-          className="w-full"
+          className="w-full flex-1 min-w-[140px] max-w-[180px]"
           value={action}
           onChange={setAction}
           placeholder="Semua Aksi"
           options={actions}
         />
         <FilterSelect
-          className="w-full"
+          className="w-full flex-1 min-w-[140px] max-w-[180px]"
           value={module}
           onChange={setModule}
           placeholder="Semua Modul"
           options={modules}
         />
-        <div className="flex items-end justify-start sm:justify-end">
+        <div className="ml-auto flex shrink-0 items-end">
           <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
         </div>
       </div>
