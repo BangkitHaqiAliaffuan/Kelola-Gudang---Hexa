@@ -1,0 +1,112 @@
+[
+    {
+        "id": 29832,
+        "doc_no": "BM\/2026\/02050",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:45:39",
+        "type": "Penerimaan",
+        "direction": "IN",
+        "qty": 90
+    },
+    {
+        "id": 29833,
+        "doc_no": "BK\/2026\/01864",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:46:09",
+        "type": "Pengeluaran",
+        "direction": "OUT",
+        "qty": 80
+    },
+    {
+        "id": 29834,
+        "doc_no": "TF\/2026\/00031",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:46:53",
+        "type": "Transfer Gudang",
+        "direction": "OUT",
+        "qty": 5
+    },
+    {
+        "id": 29835,
+        "doc_no": "TF\/2026\/00031",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:46:53",
+        "type": "Transfer Gudang",
+        "direction": "IN",
+        "qty": 5
+    },
+    {
+        "id": 29836,
+        "doc_no": "RJ\/2026\/00003",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:48:36",
+        "type": "Retur Penjualan",
+        "direction": "IN",
+        "qty": 70
+    },
+    {
+        "id": 29837,
+        "doc_no": "BM\/2026\/02051",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 01:49:56",
+        "type": "Penerimaan",
+        "direction": "IN",
+        "qty": 80
+    },
+    {
+        "id": 29838,
+        "doc_no": "BM\/2026\/02052",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 02:02:58",
+        "type": "Penerimaan",
+        "direction": "IN",
+        "qty": 82
+    },
+    {
+        "id": 29839,
+        "doc_no": "ADJ\/2026\/00759",
+        "doc_date": "2026-08-24T00:00:00.000000Z",
+        "occurred_at": "2026-08-24 00:00:00",
+        "created_at": "2026-08-24 08:38:02",
+        "type": "Stock Adjustment",
+        "direction": "IN",
+        "qty": 1
+    },
+    {
+        "id": 29850,
+        "doc_no": "TF\/2026\/00035",
+        "doc_date": "2026-08-26T00:00:00.000000Z",
+        "occurred_at": "2026-08-26 00:00:00",
+        "created_at": "2026-08-26 08:58:15",
+        "type": "Transfer Gudang",
+        "direction": "OUT",
+        "qty": 234
+    },
+    {
+        "id": 29851,
+        "doc_no": "TF\/2026\/00035",
+        "doc_date": "2026-08-26T00:00:00.000000Z",
+        "occurred_at": "2026-08-26 00:00:00",
+        "created_at": "2026-08-26 08:58:15",
+        "type": "Transfer Gudang",
+        "direction": "IN",
+        "qty": 234
+    },
+    {
+        "id": 29852,
+        "doc_no": "BM\/2026\/02055",
+        "doc_date": "2026-08-26T00:00:00.000000Z",
+        "occurred_at": "2026-08-26 00:00:00",
+        "created_at": "2026-08-26 09:08:28",
+        "type": "Penerimaan",
+        "direction": "IN",
+        "qty": 800
+    }
+]

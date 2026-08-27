@@ -1,0 +1,11 @@
+{
+    "total": 3,
+    "documents": [
+        "SO\/2026\/00014 (Fixed)",
+        "SO\/2026\/00016 (Fixed)"
+    ],
+    "success": 2,
+    "failed": [
+        "TF\/2026\/00033 (Dihapus): Stok tidak mencukupi untuk SKU-10001-009 tes (butuh 100, tersedia 3)."
+    ]
+}
