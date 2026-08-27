@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,16 @@ export function TransferGudangPage() {
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || fromWh !== ALL || toWh !== ALL || status !== ALL,
+    [q, fromWh, toWh, status],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setFromWh(ALL);
+    setToWh(ALL);
+    setStatus(ALL);
+  }, []);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -140,7 +150,7 @@ export function TransferGudangPage() {
       />
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -173,6 +183,9 @@ export function TransferGudangPage() {
             placeholder="Semua Status"
             options={[...stockDocumentStatuses]}
           />
+          <div className="flex items-end justify-start xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 
