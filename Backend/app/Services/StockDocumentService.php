@@ -9,6 +9,7 @@ use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
 use App\Support\CodeGenerator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StockDocumentService
 {
@@ -94,6 +95,12 @@ class StockDocumentService
     private function postOpname(StockDocument $document): StockDocument
     {
         DB::transaction(function () use ($document) {
+            $lockedDoc = StockDocument::where('id', $document->id)
+                ->lockForUpdate()
+                ->first();
+            if ($lockedDoc->status !== 'Draft') {
+                return $lockedDoc;
+            }
             $varianceLines = $document->lines
                 ->filter(fn (StockDocumentLine $line) => $line->actual_qty !== null)
                 ->filter(fn (StockDocumentLine $line) => ((int) $line->actual_qty) - ((int) $line->system_qty) !== 0)
@@ -104,7 +111,7 @@ class StockDocumentService
                     'no' => CodeGenerator::nextYearly(StockDocument::class, 'ADJ', 'no', 5),
                     'type' => 'Stock Adjustment',
                     'status' => 'Draft',
-                    'document_date' => $document->document_date,
+                    'document_date' => $document->frozen_at ?? $document->created_at,
                     'warehouse_id' => $document->warehouse_id,
                     'source_document_id' => $document->id,
                     'pic' => $document->pic,
@@ -176,7 +183,10 @@ class StockDocumentService
         $frozenAt = $document->frozen_at ?? $document->created_at;
         $moved = $lines->filter(function ($line) use ($document, $frozenAt) {
             $q = StockMovement::where('item_id', $line->item_id)
-                ->where('occurred_at', '>', $frozenAt)
+                ->where(function ($qTime) use ($frozenAt) {
+                    $qTime->where('created_at', '>', $frozenAt)
+                        ->orWhere('occurred_at', '>', $frozenAt);
+                })
                 ->where(function ($query) use ($document) {
                     $query->whereNull('stock_document_id')
                         ->orWhere('stock_document_id', '!=', $document->id);
@@ -200,8 +210,18 @@ class StockDocumentService
 
     private function labelsFor($lines): string
     {
+        $lines->loadMissing(['fromBin']);
         $labels = $lines->take(5)
-            ->map(fn ($line) => trim(($line->item?->sku ?? '').' '.($line->item?->name ?? '')))
+            ->map(function ($line) {
+                $sku = $line->item?->sku ?? '';
+                $name = $line->item?->name ?? '';
+                $binCode = $line->fromBin?->code;
+                $lineNo = $line->line_no;
+                $base = trim("{$sku} {$name}");
+                $binPart = $binCode ? " (Bin: {$binCode})" : '';
+                $lineNoPart = $lineNo ? " - Baris ke-{$lineNo}" : '';
+                return "{$base}{$binPart}{$lineNoPart}";
+            })
             ->filter()
             ->values()
             ->implode(', ');
@@ -254,9 +274,24 @@ class StockDocumentService
         if ($document->type === 'Transfer Gudang') {
             $source = $line->fromBin ?? $line->item->bin;
             $dest = $line->toBin ?? $line->item->bin;
-            // Opsi A: bin boleh null (lantai/gudang) — fallback ke warehouse_id dokumen jika bin null.
-            $sourceWarehouseId = $source ? $source->rack->warehouse_id : $document->warehouse_id;
-            $destWarehouseId = $dest ? $dest->rack->warehouse_id : $document->destination_warehouse_id;
+            $sourceWarehouseId = $document->warehouse_id;
+            $destWarehouseId = $document->destination_warehouse_id;
+            if ($source && $source->rack->warehouse_id !== $sourceWarehouseId) {
+                Log::warning('Bin gudang tidak sama dengan dokumen (source)', [
+                    'document_no' => $document->no,
+                    'document_warehouse_id' => $sourceWarehouseId,
+                    'bin_id' => $source->id,
+                    'bin_warehouse_id' => $source->rack->warehouse_id,
+                ]);
+            }
+            if ($dest && $dest->rack->warehouse_id !== $destWarehouseId) {
+                Log::warning('Bin gudang tidak sama dengan dokumen (dest)', [
+                    'document_no' => $document->no,
+                    'document_warehouse_id' => $destWarehouseId,
+                    'bin_id' => $dest->id,
+                    'bin_warehouse_id' => $dest->rack->warehouse_id,
+                ]);
+            }
             $cost = $this->costAt($line->item_id, $source, $sourceWarehouseId);
 
             return [
@@ -284,12 +319,21 @@ class StockDocumentService
         // Arah IN memprioritaskan bin tujuan (to_bin_id); bin asal dipakai sebagai
         // fallback agar dokumen lama (BM/BK/ADJ yang hanya mengisi from_bin_id) tetap
         // terposting. Arah OUT memakai bin asal (sumber stok).
-        // Opsi A: bin boleh null — jika semua bin null, warehouse diambil dari dokumen.
+        // warehouse_id SELALU dari dokumen (sumber kebenaran gudang), bin hanya untuk lokasi fisik.
         $bin = $direction === 'IN'
             ? ($line->toBin ?? $line->fromBin ?? $line->item->bin)
             : ($line->fromBin ?? $line->item->bin);
 
-        $warehouseId = $bin ? $bin->rack->warehouse_id : $document->warehouse_id;
+        $warehouseId = $document->warehouse_id;
+        if ($bin && $bin->rack->warehouse_id !== $warehouseId) {
+            Log::warning('Bin gudang tidak sama dengan dokumen', [
+                'document_no' => $document->no,
+                'document_warehouse_id' => $warehouseId,
+                'bin_id' => $bin->id,
+                'bin_warehouse_id' => $bin->rack->warehouse_id,
+                'direction' => $direction,
+            ]);
+        }
 
         return [[
             ...$base,

@@ -8,8 +8,10 @@ use App\Models\ItemStock;
 use App\Models\Rack;
 use App\Models\RolePermission;
 use App\Models\StockDocument;
+use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\Warehouse;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -744,5 +746,85 @@ class StockOpnameApiTest extends TestCase
         $bin = Bin::factory()->create(['rack_id' => $rack->id]);
 
         return [$wh, $rack, $bin];
+    }
+
+    public function test_opname_blocks_post_if_backdated_movement_inserted_after_frozen_at(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        $opname = StockDocument::findOrFail($docId);
+        $frozenAt = $opname->frozen_at ?? $opname->created_at;
+        $createdAt = Carbon::parse($frozenAt)->addSecond();
+
+        \Illuminate\Support\Facades\DB::table('stock_movements')->insert([
+            'item_id' => $item->id,
+            'warehouse_id' => $wh->id,
+            'rack_id' => $bin->rack_id,
+            'bin_id' => $bin->id,
+            'direction' => 'IN',
+            'qty' => 1,
+            'movement_type' => 'Penerimaan',
+            'reference_no' => 'BM/BACKDATED/001',
+            'unit_cost' => 1000,
+            'occurred_at' => Carbon::now()->subDays(2),
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ]);
+
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 10],
+            ],
+        ])->assertOk();
+
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/post")
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Barang bergerak selama opname'));
+    }
+
+    public function test_opname_post_is_idempotent_under_concurrent_requests(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 7, 'reason_code' => 'picking_error'],
+            ],
+        ])->assertOk();
+
+        $first = $this->postJson("/api/persediaan/stock-documents/{$docId}/post")->assertOk();
+        $second = $this->postJson("/api/persediaan/stock-documents/{$docId}/post")->assertOk();
+
+        $this->assertSame('Selesai', $first->json('data.status'));
+        $this->assertSame('Selesai', $second->json('data.status'));
+
+        $count = \App\Models\StockDocument::where('source_document_id', $docId)
+            ->where('type', 'Stock Adjustment')
+            ->count();
+        $this->assertSame(1, $count, 'Hanya 1 Adjustment yang ter-create walau post 2x');
     }
 }

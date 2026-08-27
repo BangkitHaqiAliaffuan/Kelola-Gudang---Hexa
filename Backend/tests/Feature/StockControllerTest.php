@@ -92,4 +92,116 @@ class StockControllerTest extends TestCase
         $sumStock = (int) ItemStock::where('item_id', $item->id)->sum('stock');
         $this->assertSame($data['saldo_akhir'], $sumStock, 'ItemStock sum stock harus === saldo_akhir');
     }
+
+    public function test_penerimaan_without_bin_uses_document_warehouse_not_item_default(): void
+    {
+        // Item default di Gudang Medan, dokumen Penerimaan ke Sidoarjo tanpa to_bin
+        [$whMedan, , $binMedan] = $this->makeLocation();
+        [$whSidoarjo, , ] = $this->makeLocation();
+        // Pastikan whSidoarjo berbeda dari Medan
+        $item = Item::factory()->create([
+            'default_warehouse_id' => $whMedan->id,
+            'default_bin_id' => $binMedan->id,
+        ]);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $whSidoarjo->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1000],
+            ],
+        ])->assertStatus(201);
+
+        $doc = \App\Models\StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $mov = \App\Models\StockMovement::where('stock_document_id', $doc->id)->firstOrFail();
+        $this->assertSame($whSidoarjo->id, $mov->warehouse_id, 'warehouse_id harus ikut dokumen Sidoarjo, bukan default Medan');
+        // bin_id tetap dari item default (atau null) - tidak diubah
+        $this->assertSame($binMedan->id, $mov->bin_id);
+    }
+
+    public function test_penerimaan_with_matching_bin_still_correct(): void
+    {
+        [$wh, $rack, $bin] = $this->makeLocation();
+        $item = Item::factory()->create([
+            'default_warehouse_id' => $wh->id,
+            'default_bin_id' => $bin->id,
+        ]);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 7, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+
+        $doc = \App\Models\StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $mov = \App\Models\StockMovement::where('stock_document_id', $doc->id)->firstOrFail();
+        $this->assertSame($wh->id, $mov->warehouse_id);
+        $this->assertSame($bin->id, $mov->bin_id);
+    }
+
+    public function test_transfer_uses_document_warehouses_not_bin_warehouses(): void
+    {
+        [$whA, , $binA] = $this->makeLocation();
+        [$whB, , $binB] = $this->makeLocation();
+        // Item default di whA agar fallback bin tidak mengacaukan
+        $item = \App\Models\Item::factory()->create([
+            'default_warehouse_id' => $whA->id,
+            'default_bin_id' => $binA->id,
+        ]);
+
+        // Inject stock dulu ke whA
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $whA->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 2000, 'to_bin_id' => $binA->id],
+            ],
+        ])->assertStatus(201);
+
+        // Transfer whA -> whB dengan bin yang benar (binA di whA, binB di whB)
+        // Sebelum fix, warehouse_id diambil dari bin->rack->warehouse_id (kebetulan sama dengan dokumen karena bin benar),
+        // tapi test ini memastikan setelah fix tetap benar dan tidak regresi.
+        // Untuk simulasi fallback, buat transfer tanpa to_bin (null) -> bin fallback ke item default (whA) tapi warehouse harus tetap whB
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Transfer Gudang',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $whA->id,
+            'destination_warehouse_id' => $whB->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3, 'from_bin_id' => $binA->id, 'to_bin_id' => $binB->id],
+            ],
+        ])->assertStatus(201);
+
+        $doc = \App\Models\StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+        $out = \App\Models\StockMovement::where('stock_document_id', $doc->id)->where('direction', 'OUT')->firstOrFail();
+        $in = \App\Models\StockMovement::where('stock_document_id', $doc->id)->where('direction', 'IN')->firstOrFail();
+        $this->assertSame($whA->id, $out->warehouse_id, 'OUT warehouse_id harus document.warehouse_id');
+        $this->assertSame($whB->id, $in->warehouse_id, 'IN warehouse_id harus document.destination_warehouse_id');
+        $this->assertSame($binA->id, $out->bin_id);
+        $this->assertSame($binB->id, $in->bin_id);
+
+        // Transfer tanpa to_bin (null) -> fallback bin = item default (whA) tapi warehouse harus tetap whB (destination)
+        $res2 = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Transfer Gudang',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $whA->id,
+            'destination_warehouse_id' => $whB->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'from_bin_id' => $binA->id],
+            ],
+        ])->assertStatus(201);
+        $doc2 = \App\Models\StockDocument::where('no', $res2->json('data.no'))->firstOrFail();
+        $in2 = \App\Models\StockMovement::where('stock_document_id', $doc2->id)->where('direction', 'IN')->firstOrFail();
+        $this->assertSame($whB->id, $in2->warehouse_id, 'IN tanpa to_bin: warehouse harus tetap destination, bukan fallback bin warehouse');
+    }
 }
