@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useForm,
   type DefaultValues,
@@ -10,7 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { Download, Eye, Loader2, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "./data-table";
-import { PageHeader, Panel } from "./kit";
+import { ClearFiltersButton, PageHeader, Panel } from "./kit";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,8 @@ export function MasterCrudPage<T extends { id: number }>({
   onDelete,
   filters,
   onExport,
+  slotHasActive,
+  onClearSlot,
 }: {
   title: string;
   description: string;
@@ -74,10 +76,17 @@ export function MasterCrudPage<T extends { id: number }>({
   onDelete?: (row: T) => void | Promise<void>;
   filters?: ReactNode;
   onExport?: () => void;
+  slotHasActive?: boolean;
+  onClearSlot?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const hasActive = q !== "" || !!slotHasActive;
+  const handleClear = useCallback(() => {
+    setQ("");
+    onClearSlot?.();
+  }, [onClearSlot]);
 
   // Master-data write CTAs are gated on the current role's "Master Data" level
   // (Tulis for add/edit, Kelola for delete) — mirror of role.access server-side.
@@ -249,6 +258,7 @@ export function MasterCrudPage<T extends { id: number }>({
             />
           </div>
           {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}
+          <ClearFiltersButton visible={hasActive} onClick={handleClear} />
         </div>
         <DataTable
           columns={allColumns}

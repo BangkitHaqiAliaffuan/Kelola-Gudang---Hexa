@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { MasterCrudPage } from "./master-crud";
 import {
@@ -611,6 +611,11 @@ export function SupplierPage() {
   const [cityFilter, setCityFilter] = useState(ALL);
   const [termsFilter, setTermsFilter] = useState(ALL);
   const del = useDeleteSupplier();
+  const slotHasActive = useMemo(() => cityFilter !== ALL || termsFilter !== ALL, [cityFilter, termsFilter]);
+  const handleClearSlot = useCallback(() => {
+    setCityFilter(ALL);
+    setTermsFilter(ALL);
+  }, []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
@@ -692,6 +697,8 @@ export function SupplierPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <>
             <FilterSelect
@@ -745,6 +752,11 @@ export function CustomerPage() {
   const [cityFilter, setCityFilter] = useState(ALL);
   const [segmentFilter, setSegmentFilter] = useState(ALL);
   const del = useDeleteCustomer();
+  const slotHasActive = useMemo(() => cityFilter !== ALL || segmentFilter !== ALL, [cityFilter, segmentFilter]);
+  const handleClearSlot = useCallback(() => {
+    setCityFilter(ALL);
+    setSegmentFilter(ALL);
+  }, []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
@@ -821,6 +833,8 @@ export function CustomerPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <>
             <FilterSelect
@@ -873,6 +887,8 @@ export function VendorPage() {
   const [viewing, setViewing] = useState<Vendor | null>(null);
   const [serviceFilter, setServiceFilter] = useState(ALL);
   const del = useDeleteVendor();
+  const slotHasActive = useMemo(() => serviceFilter !== ALL, [serviceFilter]);
+  const handleClearSlot = useCallback(() => setServiceFilter(ALL), []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter((r) => serviceFilter === ALL || r.service_type === serviceFilter);
@@ -943,6 +959,8 @@ export function VendorPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <>
             <FilterSelect
@@ -1036,6 +1054,8 @@ export function DepartemenPage() {
   const [editing, setEditing] = useState<Department | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
   const del = useDeleteDepartment();
+  const slotHasActive = useMemo(() => statusFilter !== ALL, [statusFilter]);
+  const handleClearSlot = useCallback(() => setStatusFilter(ALL), []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
@@ -1095,6 +1115,8 @@ export function DepartemenPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <FilterSelect
             value={statusFilter}
@@ -1126,6 +1148,8 @@ export function ProyekPage() {
   const [editing, setEditing] = useState<Project | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
   const del = useDeleteProject();
+  const slotHasActive = useMemo(() => statusFilter !== ALL, [statusFilter]);
+  const handleClearSlot = useCallback(() => setStatusFilter(ALL), []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter((r) => statusFilter === ALL || r.status === statusFilter);
@@ -1201,6 +1225,8 @@ export function ProyekPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <FilterSelect
             value={statusFilter}
@@ -1235,6 +1261,11 @@ export function WorkOrderPage() {
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [projectFilter, setProjectFilter] = useState(ALL);
   const del = useDeleteWorkOrder();
+  const slotHasActive = useMemo(() => statusFilter !== ALL || projectFilter !== ALL, [statusFilter, projectFilter]);
+  const handleClearSlot = useCallback(() => {
+    setStatusFilter(ALL);
+    setProjectFilter(ALL);
+  }, []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
@@ -1315,6 +1346,8 @@ export function WorkOrderPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <>
             <FilterSelect
@@ -1360,6 +1393,11 @@ export function UserPage() {
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [roleFilter, setRoleFilter] = useState(ALL);
   const del = useDeleteUser();
+  const slotHasActive = useMemo(() => statusFilter !== ALL || roleFilter !== ALL, [statusFilter, roleFilter]);
+  const handleClearSlot = useCallback(() => {
+    setStatusFilter(ALL);
+    setRoleFilter(ALL);
+  }, []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter(
@@ -1423,6 +1461,8 @@ export function UserPage() {
             toast.error((err as Error).message);
           }
         }}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <>
             <FilterSelect
@@ -1462,6 +1502,8 @@ export function RolePage() {
   const { data, isLoading } = useRoles();
   const [levelFilter, setLevelFilter] = useState(ALL);
   const [editingRole, setEditingRole] = useState<RoleCatalog | null>(null);
+  const slotHasActive = useMemo(() => levelFilter !== ALL, [levelFilter]);
+  const handleClearSlot = useCallback(() => setLevelFilter(ALL), []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter((r) => {
@@ -1528,6 +1570,8 @@ export function RolePage() {
         rows={filtered}
         isLoading={isLoading}
         onEdit={(r) => setEditingRole(r)}
+        slotHasActive={slotHasActive}
+        onClearSlot={handleClearSlot}
         filters={
           <FilterSelect
             value={levelFilter}
