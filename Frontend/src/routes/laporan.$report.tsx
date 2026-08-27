@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   CheckCheck,
   ClipboardCheck,
@@ -13,6 +13,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { toast } from "sonner";
 import {
   ALL,
+  ClearFiltersButton,
   FilterSelect,
   PageHeader,
   Panel,
@@ -97,6 +98,16 @@ function Laporan() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
+  const [filterDate, setFilterDate] = useState("2026-07-01");
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || filterDate !== "2026-07-01",
+    [q, wh, filterDate],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setFilterDate("2026-07-01");
+  }, []);
 
   const isStockOpname = report === "stock-opname";
   const isItemReport = ["stock-minimum", "dead-stock", "fast-moving", "nilai-persediaan"].includes(
@@ -277,7 +288,7 @@ function Laporan() {
       </div>
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -294,7 +305,15 @@ function Laporan() {
             placeholder="Semua Gudang"
             options={whOptions}
           />
-          <Input type="date" defaultValue="2026-07-01" className="rounded-xl" />
+          <Input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="rounded-xl"
+          />
+          <div className="flex items-end justify-start xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 

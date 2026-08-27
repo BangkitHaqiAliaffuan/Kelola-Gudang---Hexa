@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   Boxes,
@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   ALL,
+  ClearFiltersButton,
   EmptyState,
   FilterSelect,
   PageHeader,
@@ -51,6 +52,18 @@ export function LaporanMutasi() {
     toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
   );
   const [to, setTo] = useState(() => toISODate(new Date()));
+  const hasActiveFilters = useMemo(() => {
+    const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
+    const defaultTo = toISODate(new Date());
+    return q !== "" || wh !== ALL || cat !== ALL || from !== defaultFrom || to !== defaultTo;
+  }, [q, wh, cat, from, to]);
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setCat(ALL);
+    setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
+    setTo(toISODate(new Date()));
+  }, []);
 
   const whId = useMemo(
     () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
@@ -314,7 +327,7 @@ export function LaporanMutasi() {
       </div>
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -354,6 +367,9 @@ export function LaporanMutasi() {
             aria-label="Sampai tanggal"
             className="rounded-xl"
           />
+          <div className="flex items-end justify-start xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 

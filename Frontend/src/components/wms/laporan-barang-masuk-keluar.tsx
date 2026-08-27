@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   ClipboardList,
@@ -10,7 +10,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, EmptyState, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import { ALL, ClearFiltersButton, EmptyState, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,19 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
   );
   const [to, setTo] = useState(() => toISODate(new Date()));
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const hasActiveFilters = useMemo(() => {
+    const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1));
+    const defaultTo = toISODate(new Date());
+    return q !== "" || wh !== ALL || partner !== ALL || status !== ALL || from !== defaultFrom || to !== defaultTo;
+  }, [q, wh, partner, status, from, to]);
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setPartner(ALL);
+    setStatus(ALL);
+    setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
+    setTo(toISODate(new Date()));
+  }, []);
 
   const whId = useMemo(
     () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
@@ -413,6 +426,9 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
             aria-label="Sampai tanggal"
             className="rounded-xl"
           />
+        </div>
+        <div className="mt-3 flex justify-end">
+          <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
         </div>
       </Panel>
 

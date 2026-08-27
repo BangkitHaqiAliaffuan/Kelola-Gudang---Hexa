@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ALL,
+  ClearFiltersButton,
   FilterSelect,
   PageHeader,
   Panel,
@@ -90,6 +91,19 @@ export function LaporanKartuStock() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [jenis, setJenis] = useState(ALL);
+  const hasActiveFilters = useMemo(() => {
+    const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1));
+    const defaultTo = toISODate(new Date());
+    return id !== null || q !== "" || jenis !== ALL || wh !== ALL || from !== defaultFrom || to !== defaultTo;
+  }, [id, q, jenis, wh, from, to]);
+  const handleClearFilters = useCallback(() => {
+    setId(null);
+    setQ("");
+    setJenis(ALL);
+    setWh(ALL);
+    setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
+    setTo(toISODate(new Date()));
+  }, []);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
 
@@ -363,7 +377,7 @@ export function LaporanKartuStock() {
       />
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <FormCombobox
             value={activeId != null ? String(activeId) : ""}
             onValueChange={(v) => setId(Number(v))}
@@ -407,6 +421,9 @@ export function LaporanKartuStock() {
             className="h-9 rounded-xl"
             aria-label="Sampai tanggal"
           />
+          <div className="flex items-end justify-start lg:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
         {!rangeValid && (
           <p className="mt-2 text-xs text-destructive">

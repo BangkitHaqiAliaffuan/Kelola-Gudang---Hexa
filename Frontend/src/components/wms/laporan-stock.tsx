@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   Boxes,
@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import {
   ALL,
+  ClearFiltersButton,
   EmptyState,
   FilterSelect,
   PageHeader,
@@ -58,6 +59,16 @@ export function LaporanStock() {
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
   const [status, setStatus] = useState(ALL);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || cat !== ALL || status !== ALL,
+    [q, wh, cat, status],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setCat(ALL);
+    setStatus(ALL);
+  }, []);
 
   const itemCat = useMemo(
     () => new Map((items?.data ?? []).map((i) => [i.id, i.category])),
@@ -362,7 +373,7 @@ export function LaporanStock() {
       </div>
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -395,6 +406,9 @@ export function LaporanStock() {
             placeholder="Semua Status"
             options={["Habis", "Menipis", "Overstock", "Normal"]}
           />
+          <div className="flex items-end justify-start xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 
