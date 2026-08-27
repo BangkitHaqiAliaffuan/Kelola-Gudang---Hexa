@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import {
   ALL,
+  ClearFiltersButton,
   FilterSelect,
   PageHeader,
   Panel,
@@ -248,6 +249,18 @@ function KartuStock() {
   const debouncedQ = useDebouncedValue(q);
   const [jenis, setJenis] = useState(ALL);
   const [pic, setPic] = useState(ALL);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || jenis !== ALL || pic !== ALL || wh !== ALL || dateFrom !== "" || dateTo !== "",
+    [q, jenis, pic, wh, dateFrom, dateTo],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setJenis(ALL);
+    setPic(ALL);
+    setWh(ALL);
+    setDateFrom("");
+    setDateTo("");
+  }, []);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
   const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
@@ -682,6 +695,9 @@ function KartuStock() {
                 aria-label="Sampai tanggal"
               />
             </div>
+          </div>
+          <div className="flex items-end justify-start md:justify-end col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2 xl:col-start-5 xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
         <DataTable

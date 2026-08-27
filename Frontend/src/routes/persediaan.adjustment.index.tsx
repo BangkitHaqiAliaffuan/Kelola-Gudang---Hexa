@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,17 @@ function StockAdjustment() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || status !== ALL || wh !== ALL || dateFrom !== "" || dateTo !== "",
+    [q, status, wh, dateFrom, dateTo],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setStatus(ALL);
+    setWh(ALL);
+    setDateFrom("");
+    setDateTo("");
+  }, []);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const postDoc = usePostStockDocument();
   const cancelDoc = useCancelStockDocument();
@@ -174,7 +185,7 @@ function StockAdjustment() {
         </div>
       )}
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -222,6 +233,9 @@ function StockAdjustment() {
               className="h-9 rounded-xl"
               aria-label="Sampai tanggal"
             />
+          </div>
+          <div className="flex items-end justify-start lg:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
       </Panel>

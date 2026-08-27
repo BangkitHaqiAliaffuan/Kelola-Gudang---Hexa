@@ -1,8 +1,9 @@
-import { Loader2, Warehouse, Inbox, type LucideIcon } from "lucide-react";
+import { FilterX, Loader2, Warehouse, Inbox, X, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,27 @@ import {
 } from "@/components/ui/select";
 
 export const ALL = "__all__";
+
+export function ClearFiltersButton({
+  onClick,
+  visible,
+  show,
+  label = "Hapus Filter",
+}: {
+  onClick: () => void;
+  visible?: boolean;
+  show?: boolean;
+  label?: string;
+}) {
+  const isVisible = visible ?? show ?? false;
+  if (!isVisible) return null;
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick} className="h-9 rounded-xl gap-1.5" aria-label={label}>
+      <FilterX className="h-4 w-4" />
+      {label}
+    </Button>
+  );
+}
 
 export function FilterSelect({
   value,

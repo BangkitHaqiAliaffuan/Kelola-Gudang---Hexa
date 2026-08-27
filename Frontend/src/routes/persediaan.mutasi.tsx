@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,16 @@ function MutasiStock() {
   const [wh, setWh] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || type !== ALL || status !== ALL || wh !== ALL,
+    [q, type, status, wh],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setType(ALL);
+    setStatus(ALL);
+    setWh(ALL);
+  }, []);
 
   const rows = useMemo(
     () =>
@@ -140,7 +150,7 @@ function MutasiStock() {
         }
       />
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -172,6 +182,9 @@ function MutasiStock() {
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
           />
+          <div className="flex items-end justify-start lg:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
       <Panel title="Daftar Dokumen" description={`${formatNumber(rows.length)} dokumen`}>

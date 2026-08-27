@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Download,
   FileSpreadsheet,
@@ -15,6 +15,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { toast } from "sonner";
 import {
   ALL,
+  ClearFiltersButton,
   EmptyState,
   FilterSelect,
   PageHeader,
@@ -78,6 +79,16 @@ function NilaiPersediaan() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [moving, setMoving] = useState(ALL);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || cat !== ALL || moving !== ALL,
+    [q, wh, cat, moving],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setCat(ALL);
+    setMoving(ALL);
+  }, []);
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
@@ -282,7 +293,7 @@ function NilaiPersediaan() {
       />
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -315,6 +326,9 @@ function NilaiPersediaan() {
             placeholder="Semua Moving"
             options={[...stockMovingTypes]}
           />
+          <div className="flex items-end justify-start md:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 

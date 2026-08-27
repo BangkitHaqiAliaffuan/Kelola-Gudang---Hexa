@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,12 @@ function StockSaatIni() {
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
+  const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setCat(ALL);
+  }, []);
 
   const itemCat = useMemo(
     () => new Map((items?.data ?? []).map((i) => [i.id, i.category])),
@@ -193,7 +199,7 @@ function StockSaatIni() {
           }
         />
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -219,6 +225,9 @@ function StockSaatIni() {
               options={categoryNames}
               loading={catsLoading}
             />
+            <div className="flex items-end justify-start md:justify-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
         </Panel>
       </div>

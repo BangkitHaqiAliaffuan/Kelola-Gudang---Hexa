@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Download,
   Maximize2,
@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import {
   ALL,
+  ClearFiltersButton,
   FilterSelect,
   PageHeader,
   Panel,
@@ -84,6 +85,17 @@ function StockMinimum() {
   const [severity, setSeverity] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || cat !== ALL || days !== String(DEFAULT_DAYS) || severity !== ALL,
+    [q, wh, cat, days, severity],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setCat(ALL);
+    setDays(String(DEFAULT_DAYS));
+    setSeverity(ALL);
+  }, []);
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
@@ -334,8 +346,8 @@ function StockMinimum() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-5">
-            <div className="relative md:col-span-1">
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={q}
@@ -374,6 +386,9 @@ function StockMinimum() {
               placeholder="Semua Status"
               options={[...severityOptions]}
             />
+            <div className="flex items-end justify-start lg:justify-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
         </Panel>
       </div>
