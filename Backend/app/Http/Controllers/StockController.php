@@ -226,13 +226,10 @@ class StockController extends Controller
                 continue;
             }
 
-            // 1 baris per Transfer untuk global view: skip IN mirror saat tanpa filter gudang
-            $isTransferInGlobal = $movement->movement_type === 'Transfer Gudang'
-                && $movement->direction === 'IN'
-                && ($data['warehouse_id'] ?? null) === null;
-            if ($isTransferInGlobal) {
-                continue;
-            }
+            // Definisi Saldo Net: Saldo persediaan adalah proyeksi fold continuous dari SEMUA
+            // pergerakan masuk (IN) dan keluar (OUT). Filter temporal hanya menggeser titik
+            // awal via saldo_awal. Tampilan UX/Global (termasuk transfer IN) harus sepenuhnya
+            // di-emit agar baris row.saldo === saldo_akhir, sehingga chart dan total FE akurat.
 
             $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
             $unitCost = match ($method) {
