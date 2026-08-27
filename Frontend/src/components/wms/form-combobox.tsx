@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, type ButtonProps } from "@/components/ui/button";
@@ -49,7 +49,17 @@ export function FormCombobox({
   ...buttonProps
 }: FormComboboxProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const listRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, [query, options, open]);
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
 
   const pick = (next: string) => {
     onValueChange(next);
@@ -88,14 +98,19 @@ export function FormCombobox({
         {...(side ? { side } : {})}
         {...(avoidCollisions !== undefined ? { avoidCollisions } : {})}
       >
-        <Command>
+        <Command shouldFilter={!onSearchChange} loop>
           <CommandInput
             placeholder={searchPlaceholder}
             className="h-9"
+            value={query}
             disabled={loading && !onSearchChange}
-            {...(onSearchChange ? { onValueChange: onSearchChange } : {})}
+            onValueChange={(v) => {
+              setQuery(v);
+              onSearchChange?.(v);
+            }}
+            autoFocus
           />
-          <CommandList>
+          <CommandList ref={listRef}>
             <CommandEmpty>{loading ? "Memuat..." : "Tidak ditemukan"}</CommandEmpty>
             <CommandGroup>
               {allowEmpty && (
