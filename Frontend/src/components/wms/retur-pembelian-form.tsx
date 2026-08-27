@@ -750,15 +750,6 @@ export function ReturPembelianForm() {
                           Melebihi tersedia di gudang ({formatNumber(totalAvailable)})
                         </p>
                       )}
-                      {src && !overMax && sourceDocId && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
-                          {totalAvailable !== undefined &&
-                          (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
-                            ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(totalAvailable)})`
-                            : ""}
-                        </p>
-                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
                       {totalAvailable !== undefined ? formatNumber(totalAvailable) : "—"}
@@ -859,15 +850,6 @@ export function ReturPembelianForm() {
                   {overStock && !overSource && (
                     <p className="text-xs text-destructive">
                       Qty melebihi stok tersedia di bin ini.
-                    </p>
-                  )}
-                  {src && !overMax && sourceDocId && (
-                    <p className="text-xs text-muted-foreground">
-                      Maks {formatNumber(maxSelesai ?? 0)} dari {sourceDetail?.data.no}
-                      {totalAvailable !== undefined &&
-                      (src?.remaining_qty ?? src?.qty ?? 0) !== maxSelesai
-                        ? ` (sisa ${formatNumber(src?.remaining_qty ?? src?.qty ?? 0)}, tersedia ${formatNumber(totalAvailable)})`
-                        : ""}
                     </p>
                   )}
                   {lineError(i, "from_bin_id") && (
