@@ -624,7 +624,7 @@ function KartuStock() {
         className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
         bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
       >
-        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-6">
           <div className="relative xl:col-span-2">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -658,20 +658,31 @@ function KartuStock() {
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
           />
-          <Input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="h-9 rounded-xl"
-            aria-label="Dari tanggal"
-          />
-          <Input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="h-9 rounded-xl"
-            aria-label="Sampai tanggal"
-          />
+          <div className="flex w-full flex-col gap-1 col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2">
+            <label className="text-xs text-muted-foreground mb-1 block">Filter Periode Transaksi</label>
+            <div className="flex w-full items-center justify-start gap-1 rounded-xl border border-input bg-card p-1.5">
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 w-full min-w-0 flex-1 rounded-lg border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 sm:w-[140px] sm:flex-none"
+                aria-label="Dari tanggal"
+              />
+              <span
+                className="flex shrink-0 items-center justify-center px-1 text-sm text-muted-foreground"
+                aria-hidden="true"
+              >
+                –
+              </span>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 w-full min-w-0 flex-1 rounded-lg border-0 bg-transparent p-1 shadow-none focus-visible:ring-0 sm:w-[140px] sm:flex-none"
+                aria-label="Sampai tanggal"
+              />
+            </div>
+          </div>
         </div>
         <DataTable
           columns={columns}
