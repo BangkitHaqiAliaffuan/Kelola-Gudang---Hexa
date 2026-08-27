@@ -1,8 +1,8 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Code2, Download, History, Search, Settings2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,12 @@ function AuditTrails() {
   const debouncedQ = useDebouncedValue(q);
   const [action, setAction] = useState(ALL);
   const [module, setModule] = useState(ALL);
+  const hasActiveFilters = useMemo(() => q !== "" || action !== ALL || module !== ALL, [q, action, module]);
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setAction(ALL);
+    setModule(ALL);
+  }, []);
 
   const actions = useMemo(() => Array.from(new Set(auditLogs.map((l) => l.action))), []);
   const modules = useMemo(() => Array.from(new Set(auditLogs.map((l) => l.module))), []);
@@ -118,7 +124,7 @@ function AuditTrails() {
 
   return (
     <Panel title="Log Aktivitas" description={`${rows.length} entri tercatat`}>
-      <div className="mb-4 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_180px_200px]">
+      <div className="mb-4 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_180px_200px_auto]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -142,6 +148,9 @@ function AuditTrails() {
           placeholder="Semua Modul"
           options={modules}
         />
+        <div className="flex items-end justify-start sm:justify-end">
+          <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+        </div>
       </div>
       <DataTable
         columns={columns}

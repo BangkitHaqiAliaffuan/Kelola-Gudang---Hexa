@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ClipboardCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard } from "@/components/wms/kit";
 import {
   opnameLabel,
   opnameLabelTone,
@@ -33,6 +33,18 @@ export function OpnameLaporanPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [visible, setVisible] = useState(2);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || status !== ALL || dateFrom !== "" || dateTo !== "",
+    [q, wh, status, dateFrom, dateTo],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setStatus(ALL);
+    setDateFrom("");
+    setDateTo("");
+    setVisible(2);
+  }, []);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
   const searchIndex = useMemo(
@@ -163,7 +175,7 @@ export function OpnameLaporanPage() {
         title="Summary per Sesi"
         description={isLoading ? "Memuat sesi..." : `${formatNumber(filtered.length)} sesi`}
       >
-        <div className="mb-4 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-4 grid items-end gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Input
             value={q}
             onChange={(e) => {
@@ -221,6 +233,9 @@ export function OpnameLaporanPage() {
                 aria-label="Sampai tanggal"
               />
             </div>
+          </div>
+          <div className="flex items-end justify-start xl:justify-end">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
 

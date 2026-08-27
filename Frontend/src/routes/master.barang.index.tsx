@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Download,
   MoreVertical,
@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader, Panel, Pill, ItemThumb, FilterSelect, ALL } from "@/components/wms/kit";
+import { PageHeader, Panel, Pill, ItemThumb, FilterSelect, ALL, ClearFiltersButton } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { ItemFormDialog } from "@/components/wms/master-forms";
 import {
@@ -91,6 +91,18 @@ function MasterBarang() {
   const [stockF, setStockF] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selected, setSelected] = useState<number[]>([]);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || cat !== ALL || subCat !== ALL || brand !== ALL || stockF !== ALL || status !== ALL,
+    [q, cat, subCat, brand, stockF, status],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setCat(ALL);
+    setSubCat(ALL);
+    setBrand(ALL);
+    setStockF(ALL);
+    setStatus(ALL);
+  }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ItemApi | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ItemApi | null>(null);
@@ -378,6 +390,9 @@ function MasterBarang() {
             placeholder="Semua Status"
             options={["Aktif", "Nonaktif"]}
           />
+          <div className="flex items-end justify-start xl:justify-end md:col-span-3 xl:col-span-4">
+            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+          </div>
         </div>
       </Panel>
 
