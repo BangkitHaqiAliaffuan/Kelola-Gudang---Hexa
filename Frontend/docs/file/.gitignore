@@ -1,0 +1,4 @@
+# Dump export — jangan commit ke repo (berisi hash password)
+*.dump
+*.zip
+*.sql
