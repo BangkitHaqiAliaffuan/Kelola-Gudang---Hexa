@@ -1114,7 +1114,7 @@ class StoreStockDocumentApiTest extends TestCase
 
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
-            'status' => 'Selesai',
+            'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
@@ -1123,11 +1123,21 @@ class StoreStockDocumentApiTest extends TestCase
         ]);
 
         $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Draft');
+
+        $docId = $res->json('data.id');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk()->assertJsonPath('data.status', 'Menunggu Approval');
+
+        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $res = $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertOk()
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.posted_at', fn ($v) => $v !== null)
             ->assertJsonPath('data.lines.0.qty', 3)
             ->assertJsonPath('data.lines.0.to_bin_id', $bin->id)
             ->assertJsonPath('data.lines.0.unit_cost', 1500);
+        $this->actingAsMasterAdmin();
 
         $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
 
@@ -1166,7 +1176,7 @@ class StoreStockDocumentApiTest extends TestCase
 
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
-            'status' => 'Selesai',
+            'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
@@ -1175,11 +1185,19 @@ class StoreStockDocumentApiTest extends TestCase
         ]);
 
         $res->assertStatus(201)
+            ->assertJsonPath('data.status', 'Draft');
+        $docId = $res->json('data.id');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk();
+        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $res = $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertOk()
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.qty', -4)
             ->assertJsonPath('data.lines.0.from_bin_id', $bin->id)
             ->assertJsonPath('data.lines.0.to_bin_id', null)
             ->assertJsonPath('data.lines.0.unit_cost', 1500);
+        $this->actingAsMasterAdmin();
 
         $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
 
@@ -1279,18 +1297,24 @@ class StoreStockDocumentApiTest extends TestCase
         [$wh, , $bin] = $this->makeLocation();
         $before = StockDocument::count();
 
-        $this->postJson('/api/persediaan/stock-documents', [
+        $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
-            'status' => 'Selesai',
+            'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => -100, 'from_bin_id' => $bin->id, 'reason_code' => 'damage'],
             ],
-        ])->assertStatus(422)
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Draft');
+        $docId = $res->json('data.id');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk();
+        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertStatus(422)
             ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Stok tidak mencukupi'));
-
-        $this->assertSame($before, StockDocument::count());
+        $this->actingAsMasterAdmin();
+        $this->assertSame($before + 1, StockDocument::count());
     }
 
     public function test_post_adjustment_draft_without_reason_returns_422(): void

@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
 use App\Models\Bin;
 use App\Models\ItemStock;
+use App\Models\RolePermission;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Services\StockDocumentService;
@@ -180,7 +181,7 @@ class StockDocumentController extends Controller
 
                 $authId = $request->user('sanctum')?->id;
 
-                $initialStatus = $data['status'] === 'Selesai' ? 'Draft' : $data['status'];
+                $initialStatus = $data['type'] === 'Stock Adjustment' ? 'Draft' : ($data['status'] === 'Selesai' ? 'Draft' : $data['status']);
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
@@ -247,7 +248,7 @@ class StockDocumentController extends Controller
                     ]);
                 }
 
-                if ($data['status'] === 'Selesai') {
+                if ($data['status'] === 'Selesai' && $data['type'] !== 'Stock Adjustment') {
                     $document = $this->service->post($document);
                 }
 
@@ -473,5 +474,94 @@ class StockDocumentController extends Controller
         $stockDocument->update(['status' => 'Dibatalkan', 'posted_at' => null]);
 
         return new StockDocumentResource($stockDocument->load(['warehouse', 'destination']));
+    }
+
+    public function submitApproval(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Adjustment') {
+            return response()->json(['message' => 'Hanya dokumen Stock Adjustment yang dapat diajukan untuk approval.'], 422);
+        }
+        if ($stockDocument->status !== 'Draft') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Draft yang dapat diajukan.'], 422);
+        }
+
+        $stockDocument->update([
+            'status' => 'Menunggu Approval',
+            'submitted_at' => now(),
+        ]);
+
+        return new StockDocumentResource($stockDocument->load(['warehouse', 'destination', 'requester', 'approver']));
+    }
+
+    public function approve(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Adjustment') {
+            return response()->json(['message' => 'Hanya dokumen Stock Adjustment yang dapat disetujui.'], 422);
+        }
+        if ($stockDocument->status !== 'Menunggu Approval') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat disetujui.'], 422);
+        }
+
+        $user = $request->user('sanctum') ?? $request->user();
+        $authId = $user?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
+        }
+
+        $isAuditor = $user && $user->role === 'Auditor';
+        $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
+        if (! ($isAuditor || $hasKelola)) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk menyetujui dokumen ini.'], 403);
+        }
+
+        $stockDocument->update([
+            'approver_user_id' => $authId,
+            'approved_at' => now(),
+            'decision_note' => $request->input('decision_note'),
+        ]);
+
+        try {
+            $document = $this->service->post($stockDocument->fresh());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return new StockDocumentResource($document->load(['warehouse', 'destination', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack']));
+    }
+
+    public function reject(Request $request, StockDocument $stockDocument)
+    {
+        $request->validate([
+            'decision_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($stockDocument->type !== 'Stock Adjustment') {
+            return response()->json(['message' => 'Hanya dokumen Stock Adjustment yang dapat ditolak.'], 422);
+        }
+        if ($stockDocument->status !== 'Menunggu Approval') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat ditolak.'], 422);
+        }
+
+        $user = $request->user('sanctum') ?? $request->user();
+        $authId = $user?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh menolak laporannya sendiri.'], 422);
+        }
+
+        $isAuditor = $user && $user->role === 'Auditor';
+        $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
+        if (! ($isAuditor || $hasKelola)) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk menolak dokumen ini.'], 403);
+        }
+
+        $stockDocument->update([
+            'status' => 'Dibatalkan',
+            'approver_user_id' => $authId,
+            'approved_at' => now(),
+            'decision_note' => $request->input('decision_note'),
+            'posted_at' => null,
+        ]);
+
+        return new StockDocumentResource($stockDocument->load(['warehouse', 'destination', 'requester', 'approver']));
     }
 }

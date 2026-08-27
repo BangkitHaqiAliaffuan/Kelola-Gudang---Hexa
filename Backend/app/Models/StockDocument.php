@@ -44,14 +44,20 @@ class StockDocument extends Model
         'pic',
         'note',
         'posted_at',
+        'submitted_at',
         'created_by',
         'requester_user_id',
+        'approver_user_id',
+        'approved_at',
+        'decision_note',
     ];
 
     protected $casts = [
         'document_date' => 'datetime',
         'frozen_at' => 'datetime',
         'posted_at' => 'datetime',
+        'submitted_at' => 'datetime',
+        'approved_at' => 'datetime',
         'blind_count' => 'boolean',
     ];
 
@@ -88,6 +94,11 @@ class StockDocument extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_user_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approver_user_id');
     }
 
     public function isPosted(): bool
