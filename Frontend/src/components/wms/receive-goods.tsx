@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
@@ -10,7 +10,7 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,16 @@ export function ReceiveGoodsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || wh !== ALL || partner !== ALL || status !== ALL,
+    [q, wh, partner, status],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setWh(ALL);
+    setPartner(ALL);
+    setStatus(ALL);
+  }, []);
 
   const receipts = useMemo(() => (data?.data ?? []).filter(isPoReceipt), [data]);
 
@@ -197,7 +207,7 @@ export function ReceiveGoodsPage() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -230,6 +240,9 @@ export function ReceiveGoodsPage() {
               placeholder="Semua Status"
               options={[...stockDocumentStatuses]}
             />
+            <div className="flex items-end justify-start xl:justify-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
         </Panel>
       </div>

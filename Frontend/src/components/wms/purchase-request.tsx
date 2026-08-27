@@ -11,7 +11,7 @@ import {
   ShoppingCart,
   UserCheck,
 } from "lucide-react";
-import { ALL, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { PurchaseRequestSheet } from "./purchase-request-sheet";
 import { Button } from "@/components/ui/button";
@@ -205,6 +205,17 @@ export function PurchaseRequestPage() {
   const [restockOpen, setRestockOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useProcDoc(selectedId ?? undefined);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || status !== ALL || dept !== ALL || wh !== ALL || myApproval,
+    [q, status, dept, wh, myApproval],
+  );
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setStatus(ALL);
+    setDept(ALL);
+    setWh(ALL);
+    setMyApproval(false);
+  }, []);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -372,7 +383,7 @@ export function PurchaseRequestPage() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -405,6 +416,9 @@ export function PurchaseRequestPage() {
               options={warehouses?.data.map((w) => w.name) ?? []}
               loading={warehousesLoading}
             />
+            <div className="flex items-end justify-start xl:justify-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
           <div className="mt-3 flex justify-end">
             {canApproveAny && (
