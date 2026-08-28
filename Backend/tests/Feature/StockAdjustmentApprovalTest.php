@@ -49,7 +49,7 @@ class StockAdjustmentApprovalTest extends TestCase
         return User::factory()->create(['role' => 'Operator Gudang', 'is_active' => true]);
     }
 
-    public function test_adj_store_forces_draft_even_if_selesai_sent(): void
+    public function test_adj_store_forces_menunggu_even_if_selesai_sent(): void
     {
         [$wh, , $bin] = $this->makeLocation();
         $item = $this->makeItem();
@@ -62,13 +62,14 @@ class StockAdjustmentApprovalTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 5, 'to_bin_id' => $bin->id, 'reason_code' => 'location_error'],
             ],
-        ])->assertStatus(201)->assertJsonPath('data.status', 'Draft');
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
 
+        $this->assertNotNull($res->json('data.submitted_at'));
         $this->assertNull($res->json('data.posted_at'));
         $this->assertSame(0, StockDocument::find($res->json('data.id'))->movements()->count());
     }
 
-    public function test_submit_approval_draft_to_menunggu(): void
+    public function test_store_adjustment_creates_menunggu_directly(): void
     {
         [$wh, , $bin] = $this->makeLocation();
         $item = $this->makeItem();
@@ -80,12 +81,9 @@ class StockAdjustmentApprovalTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id, 'reason_code' => 'other'],
             ],
-        ])->assertStatus(201);
-        $id = $res->json('data.id');
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
 
-        $this->postJson("/api/persediaan/stock-documents/{$id}/submit-approval")
-            ->assertOk()->assertJsonPath('data.status', 'Menunggu Approval')
-            ->assertJsonPath('data.submitted_at', fn($v) => $v !== null);
+        $this->assertNotNull($res->json('data.submitted_at'));
     }
 
     public function test_approve_with_auditor_succeeds_and_posts_ledger(): void
@@ -107,9 +105,8 @@ class StockAdjustmentApprovalTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [['item_id' => $item->id, 'qty' => 2, 'to_bin_id' => $bin->id, 'reason_code' => 'other']],
-        ])->assertStatus(201);
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $id = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$id}/submit-approval")->assertOk();
 
         $auditor = $this->makeAuditor();
         Sanctum::actingAs($auditor, ['*'], 'sanctum');
@@ -134,9 +131,8 @@ class StockAdjustmentApprovalTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $bin->id, 'reason_code' => 'other']],
-        ])->assertStatus(201);
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $id = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$id}/submit-approval")->assertOk();
 
         // Same requester tries to approve
         $this->postJson("/api/persediaan/stock-documents/{$id}/approve")->assertStatus(422)
@@ -153,9 +149,8 @@ class StockAdjustmentApprovalTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $bin->id, 'reason_code' => 'other']],
-        ])->assertStatus(201);
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $id = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$id}/submit-approval")->assertOk();
 
         $operator = $this->makeOperator(); // no Kelola, not Auditor
         Sanctum::actingAs($operator, ['*'], 'sanctum');
@@ -172,9 +167,8 @@ class StockAdjustmentApprovalTest extends TestCase
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
             'lines' => [['item_id' => $item->id, 'qty' => 5, 'to_bin_id' => $bin->id, 'reason_code' => 'other']],
-        ])->assertStatus(201);
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $id = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$id}/submit-approval")->assertOk();
 
         $auditor = $this->makeAuditor();
         Sanctum::actingAs($auditor, ['*'], 'sanctum');

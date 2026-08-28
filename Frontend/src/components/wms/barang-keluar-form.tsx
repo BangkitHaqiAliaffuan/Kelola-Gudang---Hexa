@@ -150,7 +150,7 @@ export function BarangKeluarForm() {
     if (!warehouseId) return set;
     const wid = Number(warehouseId);
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0 || r.warehouse_id !== wid) continue;
+      if (r.available <= 0 || r.warehouse_id !== wid) continue;
       set.add(String(r.item_id));
     }
     return set;
@@ -162,7 +162,7 @@ export function BarangKeluarForm() {
     const set = new Set<string>();
     if (!warehouseId) return set;
     for (const r of stockRows?.data ?? []) {
-      if (r.stock > 0 && r.warehouse_id === Number(warehouseId))
+      if (r.available > 0 && r.warehouse_id === Number(warehouseId))
         set.add(r.bin_id === null ? "NULL" : String(r.bin_id));
     }
     return set;
@@ -174,7 +174,7 @@ export function BarangKeluarForm() {
     const map = new Map<string, { bin_id: number | null; available: number }[]>();
     if (!warehouseId) return map;
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
+      if (r.available <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
       const list = map.get(String(r.item_id)) ?? [];
       list.push({ bin_id: r.bin_id, available: r.available });
       map.set(String(r.item_id), list);
@@ -185,10 +185,10 @@ export function BarangKeluarForm() {
     return map;
   }, [stockRows, warehouseId]);
 
-  const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId || !warehouseId) return undefined;
+  const lineAvailable = (l: FormLine): number => {
+    if (!l.itemId || !warehouseId) return 0;
     const binPart = l.binId === "" ? "NULL" : l.binId;
-    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`) ?? 0;
   };
 
   const lineItemOptions = (): ComboboxOption[] => {

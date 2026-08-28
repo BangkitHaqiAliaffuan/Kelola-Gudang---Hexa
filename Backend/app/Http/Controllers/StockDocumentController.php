@@ -123,6 +123,15 @@ class StockDocumentController extends Controller
     {
         $data = $request->validated();
 
+        // Guard: Manual & Opname ADJ selalu Menunggu Approval → reason_code wajib sejak create (tutup bypass Draft tanpa alasan).
+        if (($data['type'] ?? null) === 'Stock Adjustment') {
+            foreach ($data['lines'] ?? [] as $idx => $line) {
+                if (empty($line['reason_code'])) {
+                    return response()->json(['message' => 'The given data was invalid.', 'errors' => ["lines.{$idx}.reason_code" => ['Alasan selisih wajib diisi sebelum posting.']]], 422);
+                }
+            }
+        }
+
         $isOutbound = in_array($data['type'], ['Pengeluaran', 'Retur Pembelian'], true);
         $isTransfer = $data['type'] === 'Transfer Gudang';
         $isOpname = $data['type'] === 'Stock Opname';
@@ -181,11 +190,12 @@ class StockDocumentController extends Controller
 
                 $authId = $request->user('sanctum')?->id;
 
-                $initialStatus = $data['type'] === 'Stock Adjustment' ? 'Draft' : ($data['status'] === 'Selesai' ? 'Draft' : $data['status']);
+                $initialStatus = $data['type'] === 'Stock Adjustment' ? 'Menunggu Approval' : ($data['status'] === 'Selesai' ? 'Draft' : $data['status']);
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),
                     'type' => $data['type'],
                     'status' => $initialStatus,
+                    'submitted_at' => $initialStatus === 'Menunggu Approval' ? now() : null,
                     'blind_count' => $data['blind_count'] ?? true,
                     'document_date' => $data['document_date'],
                     // Stock Opname: momen "freeze" book balance — barang yang bergerak
@@ -441,6 +451,10 @@ class StockDocumentController extends Controller
      */
     public function post(StockDocument $stockDocument)
     {
+        if ($stockDocument->status === 'Menunggu Approval') {
+            return response()->json(['message' => 'Gunakan Approve untuk dokumen Menunggu Approval, bukan Post.'], 422);
+        }
+
         $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
         if (in_array($stockDocument->type, ['Stock Adjustment', 'Stock Opname'], true) && $stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
             return response()->json(['message' => 'Pembuat dokumen tidak boleh memposting laporannya sendiri. Minta user lain untuk memposting.'], 422);

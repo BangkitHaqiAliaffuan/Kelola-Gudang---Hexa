@@ -158,7 +158,7 @@ export function TransferGudangForm() {
     if (!warehouseId) return set;
     const wid = Number(warehouseId);
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0 || r.warehouse_id !== wid) continue;
+      if (r.available <= 0 || r.warehouse_id !== wid) continue;
       set.add(String(r.item_id));
     }
     return set;
@@ -167,7 +167,7 @@ export function TransferGudangForm() {
   const availableItemIdsByBin = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const r of stockRows?.data ?? []) {
-      if (r.stock <= 0 || !r.warehouse_id) continue;
+      if (r.available <= 0 || !r.warehouse_id) continue;
       const binKey = `${r.warehouse_id}:${r.bin_id === null ? "NULL" : String(r.bin_id)}`;
       const set = map.get(binKey) ?? new Set<string>();
       set.add(String(r.item_id));
@@ -176,10 +176,35 @@ export function TransferGudangForm() {
     return map;
   }, [stockRows]);
 
-  const lineAvailable = (l: FormLine): number | undefined => {
-    if (!l.itemId || !warehouseId) return undefined;
+  const binCandidatesByItem = useMemo(() => {
+    const map = new Map<string, { bin_id: number | null; available: number }[]>();
+    if (!warehouseId) return map;
+    for (const r of stockRows?.data ?? []) {
+      if (r.available <= 0 || r.warehouse_id !== Number(warehouseId)) continue;
+      const list = map.get(String(r.item_id)) ?? [];
+      list.push({ bin_id: r.bin_id, available: r.available });
+      map.set(String(r.item_id), list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.available - a.available || (a.bin_id ?? -1) - (b.bin_id ?? -1));
+    }
+    return map;
+  }, [stockRows, warehouseId]);
+
+  const stockedBinIds = useMemo(() => {
+    const set = new Set<string>();
+    if (!warehouseId) return set;
+    for (const r of stockRows?.data ?? []) {
+      if (r.available > 0 && r.warehouse_id === Number(warehouseId))
+        set.add(r.bin_id === null ? "NULL" : String(r.bin_id));
+    }
+    return set;
+  }, [stockRows, warehouseId]);
+
+  const lineAvailable = (l: FormLine): number => {
+    if (!l.itemId || !warehouseId) return 0;
     const binPart = l.fromBinId === "" ? "NULL" : l.fromBinId;
-    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`);
+    return availableByKey.get(`${warehouseId}:${l.itemId}:${binPart}`) ?? 0;
   };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
@@ -191,6 +216,16 @@ export function TransferGudangForm() {
     const availableIds = availableItemIdsByBin.get(`${warehouseId}:${l.fromBinId}`);
     if (!availableIds) return [];
     return itemOptions.filter((o) => availableIds.has(o.value));
+  };
+
+  const lineFromBinOptions = (l: FormLine): ComboboxOption[] => {
+    if (!warehouseId) return [];
+    if (l.itemId) {
+      const candidates = binCandidatesByItem.get(l.itemId) ?? [];
+      const ids = new Set(candidates.map((c) => (c.bin_id === null ? "NULL" : String(c.bin_id))));
+      return fromBinOptions.filter((o) => ids.has(o.value === "" ? "NULL" : o.value));
+    }
+    return fromBinOptions.filter((o) => stockedBinIds.has(o.value === "" ? "NULL" : o.value));
   };
 
   const totalQty = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0), [lines]);
@@ -208,14 +243,26 @@ export function TransferGudangForm() {
   const pickItem = (key: string, itemId: string) => {
     patchLine(key, (line) => {
       const item = items?.data.find((x) => String(x.id) === itemId);
-      const defaultBin =
-        item?.default_bin_id != null && binsInWarehouse.some((b) => b.id === item.default_bin_id)
+      const candidates = binCandidatesByItem.get(itemId) ?? [];
+      const currentValid = Boolean(
+        line.fromBinId !== "" &&
+        candidates.some(
+          (c) => String(c.bin_id ?? "NULL") === (line.fromBinId === "" ? "NULL" : line.fromBinId),
+        ),
+      );
+      if (line.fromBinId !== "" && currentValid) return { itemId };
+      if (line.fromBinId === "" && candidates.some((c) => c.bin_id === null)) return { itemId };
+
+      const preferredBin =
+        item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
-          : "";
-      return {
-        itemId,
-        ...(line.fromBinId ? {} : { fromBinId: defaultBin }),
-      };
+          : candidates[0]
+            ? candidates[0].bin_id === null
+              ? ""
+              : String(candidates[0].bin_id)
+            : "";
+      
+      return { itemId, fromBinId: preferredBin };
     });
   };
 
@@ -440,7 +487,7 @@ export function TransferGudangForm() {
                       <FormCombobox
                         value={l.fromBinId}
                         onValueChange={(v) => pickFromBin(l.key, v)}
-                        options={fromBinOptions}
+                        options={lineFromBinOptions(l)}
                         placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                         searchPlaceholder="Cari bin / rak..."
                         side="top"
@@ -551,7 +598,7 @@ export function TransferGudangForm() {
                   <FormCombobox
                     value={l.fromBinId}
                     onValueChange={(v) => pickFromBin(l.key, v)}
-                    options={fromBinOptions}
+                    options={lineFromBinOptions(l)}
                     placeholder={warehouseId ? "Pilih Bin Sumber" : "Pilih Gudang dulu"}
                     side="top"
                     avoidCollisions={false}

@@ -22,7 +22,7 @@ class StoreStockDocumentRequest extends FormRequest
     {
         return [
             'type' => ['required', Rule::in(['Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan', 'Stock Opname', 'Stock Adjustment'])],
-            'status' => ['required', Rule::in(['Draft', 'Selesai'])],
+            'status' => ['required', Rule::in(['Draft', 'Selesai', 'Menunggu Approval'])],
             'document_date' => ['required', 'date'],
             'blind_count' => ['nullable', 'boolean'],
             'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
@@ -155,7 +155,7 @@ class StoreStockDocumentRequest extends FormRequest
                     // Opsi A: bin boleh null (lantai/gudang) — tidak wajib, warehouse_id dokumen sebagai lokasi.
                     // Validasi bin-warehouse di after berikutnya hanya untuk bin non-null.
 
-                    if ($status === 'Selesai' && empty($line['reason_code'])) {
+                    if (in_array($status, ['Selesai', 'Menunggu Approval'], true) && $type === 'Stock Adjustment' && empty($line['reason_code'])) {
                         $validator->errors()->add(
                             "lines.{$index}.reason_code",
                             'Alasan selisih wajib diisi sebelum posting.'

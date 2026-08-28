@@ -1081,7 +1081,7 @@ class StoreStockDocumentApiTest extends TestCase
 
         $res->assertStatus(201)
             ->assertJson(fn (AssertableJson $json) => $json
-                ->where('data.status', 'Draft')
+                ->where('data.status', 'Menunggu Approval')
                 ->where('data.type', 'Stock Adjustment')
                 ->where('data.line_count', 1)
                 ->where('data.no', fn ($v) => (bool) preg_match('/^ADJ\/\d{4}\/\d{5}$/', (string) $v))
@@ -1123,10 +1123,9 @@ class StoreStockDocumentApiTest extends TestCase
         ]);
 
         $res->assertStatus(201)
-            ->assertJsonPath('data.status', 'Draft');
+            ->assertJsonPath('data.status', 'Menunggu Approval');
 
         $docId = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk()->assertJsonPath('data.status', 'Menunggu Approval');
 
         $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
         \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
@@ -1185,9 +1184,8 @@ class StoreStockDocumentApiTest extends TestCase
         ]);
 
         $res->assertStatus(201)
-            ->assertJsonPath('data.status', 'Draft');
+            ->assertJsonPath('data.status', 'Menunggu Approval');
         $docId = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk();
         $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
         \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
         \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
@@ -1305,9 +1303,8 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => -100, 'from_bin_id' => $bin->id, 'reason_code' => 'damage'],
             ],
-        ])->assertStatus(201)->assertJsonPath('data.status', 'Draft');
+        ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $docId = $res->json('data.id');
-        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-approval")->assertOk();
         $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
         \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
         \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
@@ -1317,12 +1314,12 @@ class StoreStockDocumentApiTest extends TestCase
         $this->assertSame($before + 1, StockDocument::count());
     }
 
-    public function test_post_adjustment_draft_without_reason_returns_422(): void
+    public function test_store_adjustment_without_reason_returns_422(): void
     {
         $item = $this->makeItem();
         [$wh, , $bin] = $this->makeLocation();
 
-        $created = $this->postJson('/api/persediaan/stock-documents', [
+        $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Stock Adjustment',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
@@ -1330,11 +1327,7 @@ class StoreStockDocumentApiTest extends TestCase
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id],
             ],
-        ])->assertStatus(201);
-
-        $this->postJson("/api/persediaan/stock-documents/{$created->json('data.id')}/post")
-            ->assertStatus(422)
-            ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Alasan selisih wajib diisi'));
+        ])->assertStatus(422)->assertJsonValidationErrors('lines.0.reason_code');
     }
 
     /** Buat dokumen Pengeluaran Selesai dan kembalikan (doc, line pertama). */

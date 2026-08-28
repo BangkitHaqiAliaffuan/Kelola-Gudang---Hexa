@@ -87,10 +87,10 @@ class StockDocumentService
     /**
      * Stock Opname = penghitungan fisik: dokumen opname tidak memindahkan stok
      * langsung. Saat diselesaikan, sistem membuat dokumen Stock Adjustment yang
-     * berisi baris selisih (variance ≠ 0) dengan status DRAFT (belum diposting),
-     * ter-link ke opname via source_document_id. Posting koreksi dilakukan
-     * terpisah (halaman Penyesuaian) agar ada langkah review sebelum stok
-     * berubah. Opname tanpa selisih tidak menghasilkan ADJ.
+     * berisi baris selisih (variance ≠ 0) dengan status Menunggu Approval
+     * (belum diposting), ter-link ke opname via source_document_id. Posting
+     * koreksi dilakukan terpisah (halaman Penyesuaian via Approve) agar ada
+     * langkah review sebelum stok berubah. Opname tanpa selisih tidak menghasilkan ADJ.
      */
     private function postOpname(StockDocument $document): StockDocument
     {
@@ -110,7 +110,7 @@ class StockDocumentService
                 $adjustment = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, 'ADJ', 'no', 5),
                     'type' => 'Stock Adjustment',
-                    'status' => 'Draft',
+                    'status' => 'Menunggu Approval',
                     'document_date' => $document->frozen_at ?? $document->created_at,
                     'warehouse_id' => $document->warehouse_id,
                     'source_document_id' => $document->id,
@@ -118,6 +118,7 @@ class StockDocumentService
                     'note' => 'Koreksi otomatis dari opname '.$document->no,
                     'created_by' => $document->created_by,
                     'requester_user_id' => $document->requester_user_id,
+                    'submitted_at' => now(),
                 ]);
 
                 $varianceLines->each(function (StockDocumentLine $line, int $index) use ($adjustment) {
@@ -417,9 +418,18 @@ class StockDocumentService
         if ($attributes['qty'] > $available) {
             $item = Item::find($attributes['item_id']);
             $label = $item ? trim(($item->sku ?? '').' '.($item->name ?? '')) : "#{$attributes['item_id']}";
+            
+            $binLabel = $attributes['bin_id'] 
+                ? (\App\Models\Bin::find($attributes['bin_id'])?->code ?? 'Bin') 
+                : 'Lantai/Tanpa Bin';
+                
+            $totalWarehouse = ItemStock::where('item_id', $attributes['item_id'])
+                ->where('warehouse_id', $attributes['warehouse_id'])
+                ->selectRaw('COALESCE(SUM(stock),0) - COALESCE(SUM(reserved),0) AS total')
+                ->value('total') ?? 0;
 
             throw new \InvalidArgumentException(
-                "Stok tidak mencukupi untuk {$label} (butuh {$attributes['qty']}, tersedia {$available})."
+                "Stok tidak mencukupi untuk {$label} (butuh {$attributes['qty']} di letak {$binLabel}, tersedia {$available}). Total keseluruhan di gudang tersedia: {$totalWarehouse}."
             );
         }
     }

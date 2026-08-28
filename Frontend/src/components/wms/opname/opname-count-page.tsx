@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Barcode, ChevronLeft, Eye, X } from "lucide-react";
 import { toast } from "sonner";
+import { useDebouncedValue } from "@/hooks/use-debounce";
 import { EmptyState, PageHeader, Panel, Pill } from "@/components/wms/kit";
 import { OpnameReviewDialog } from "@/components/wms/opname/opname-review-dialog";
 import { Button } from "@/components/ui/button";
@@ -32,15 +33,40 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const [revealed, setRevealed] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+
+  const storageKey = `kg-opname-draft-${docId}`;
 
   useEffect(() => {
-    setRevealed(false);
-    setRecords(
-      Object.fromEntries(
-        lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
-      ),
+    // restore local draft if exists and fresher than server, else hydrate from server
+    let local: Record<number, string> | null = null;
+    try {
+      if (typeof window !== "undefined") {
+        const raw = window.localStorage.getItem(storageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
+          if (parsed.records) local = parsed.records;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const serverRecords = Object.fromEntries(
+      lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
     );
-  }, [docId, lines]);
+    // if local has any keys and server has no actual_qty yet, prefer local
+    const serverHasData = lines.some((l) => l.actual_qty != null);
+    if (local && Object.keys(local).length > 0 && !serverHasData) {
+      setRecords(local);
+      // don't overwrite server—user will be prompted via toast if needed
+      toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+    } else {
+      setRecords(serverRecords);
+    }
+    setRevealed(false);
+  }, [docId, lines, storageKey]);
 
   const scanQ = scan.trim().toLowerCase();
   const filteredLines = useMemo(
@@ -69,19 +95,114 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     return lines.some((l) => (records[l.id] ?? "") !== initial.get(l.id));
   }, [lines, records]);
 
-  const buildLines = () =>
-    lines.map((l) => {
-      const raw = (records[l.id] ?? "").trim();
-      return {
-        item_id: l.item_id,
-        from_bin_id: l.from_bin_id ?? null,
-        system_qty: l.system_qty,
-        actual_qty: raw === "" ? null : Number(raw),
-        unit_cost: l.unit_cost,
-      };
-    });
+  const buildLines = useCallback(
+    () =>
+      lines.map((l) => {
+        const raw = (records[l.id] ?? "").trim();
+        return {
+          item_id: l.item_id,
+          from_bin_id: l.from_bin_id ?? null,
+          system_qty: l.system_qty,
+          actual_qty: raw === "" ? null : Number(raw),
+          unit_cost: l.unit_cost,
+        };
+      }),
+    [lines, records],
+  );
+
+  const hasValidationError = useCallback(() => {
+    const bl = buildLines();
+    return bl.some((l) => l.actual_qty != null && (!Number.isInteger(l.actual_qty) || l.actual_qty < 0));
+  }, [buildLines]);
 
   const goBack = () => router.navigate({ to: "/opname/$section", params: { section: "proses" } });
+
+  // debounced records for autosave (900ms)
+  const debouncedRecords = useDebouncedValue(records, 900);
+
+  // localStorage persistence (always, even offline)
+  useEffect(() => {
+    if (typeof window === "undefined" || !docId) return;
+    // debounce already via debouncedRecords effect below, but also persist quickly for refresh safety
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({ records, savedAt: Date.now() }));
+    } catch {
+      // quota/priv mode
+    }
+  }, [records, storageKey, docId]);
+
+  // autosave to server (silent, when online, dirty, valid, not pending)
+  const silentSave = useCallback(() => {
+    if (!session || session.status !== "Draft" || !canWrite) return;
+    if (!dirty) return;
+    if (update.isPending) return;
+    if (hasValidationError()) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    setAutoSaving(true);
+    update.mutate(
+      {
+        id: session.id,
+        payload: {
+          document_date: session.document_date,
+          pic: session.pic,
+          lines: buildLines(),
+        },
+      },
+      {
+        onSuccess: () => {
+          setLastSavedAt(Date.now());
+          setAutoSaving(false);
+          try {
+            if (typeof window !== "undefined") window.localStorage.removeItem(storageKey);
+          } catch {}
+        },
+        onError: () => setAutoSaving(false),
+      },
+    );
+  }, [session, canWrite, dirty, update, hasValidationError, buildLines, storageKey]);
+
+  useEffect(() => {
+    // trigger autosave when debouncedRecords changes and dirty
+    if (!dirty || !canWrite || session?.status !== "Draft") return;
+    if (hasValidationError()) return;
+    // skip initial empty hydration
+    if (Object.keys(debouncedRecords).length === 0) return;
+    silentSave();
+  }, [debouncedRecords, dirty, canWrite, hasValidationError, silentSave, session]);
+
+  // beforeunload / visibility flush + online/offline
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const flush = () => {
+      if (!dirty || update.isPending || hasValidationError()) return;
+      // try keepalive fetch via silentSave (best effort)
+      silentSave();
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    const onOnline = () => {
+      setIsOnline(true);
+      toast.success("Kembali online — menyinkron draft...");
+      silentSave();
+    };
+    const onOffline = () => {
+      setIsOnline(false);
+      toast.warning("Offline — draft disimpan lokal, akan sinkron saat online");
+    };
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [dirty, update.isPending, hasValidationError, silentSave]);
 
   const saveDraft = () => {
     if (!session) return;
@@ -103,7 +224,13 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         },
       },
       {
-        onSuccess: () => toast.success("Draft opname disimpan"),
+        onSuccess: () => {
+          toast.success("Draft opname disimpan");
+          setLastSavedAt(Date.now());
+          try {
+            if (typeof window !== "undefined") window.localStorage.removeItem(storageKey);
+          } catch {}
+        },
         onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal menyimpan draft"),
       },
     );
@@ -175,10 +302,12 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
       <Panel
         title="Pencatatan Fisik"
-        description={`${formatNumber(lines.length)} baris · selisih ${totalVariance > 0 ? "+" : ""}${formatNumber(totalVariance)}`}
+        description={`${formatNumber(lines.length)} baris · selisih ${totalVariance > 0 ? "+" : ""}${formatNumber(totalVariance)}${!isOnline ? " · offline — draft lokal" : autoSaving ? " · menyimpan..." : lastSavedAt ? ` · tersimpan ${new Date(lastSavedAt).toLocaleTimeString("id-ID")}` : ""}`}
         actions={
           isDraft && canWrite ? (
             <div className="flex flex-wrap items-center gap-2">
+              {autoSaving && <Pill tone="neutral">Menyimpan...</Pill>}
+              {!isOnline && <Pill tone="warning">Offline</Pill>}
               {blind && (
                 <Button
                   variant="outline"

@@ -291,7 +291,7 @@ export type StockDocumentLinePayload = {
 
 export type StockDocumentPayload = {
   type: StockDocumentTypeToStore;
-  status: "Draft" | "Selesai";
+  status: "Draft" | "Selesai" | "Menunggu Approval";
   document_date: string;
   warehouse_id: number;
   destination_warehouse_id?: number | null;

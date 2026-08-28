@@ -13,16 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,7 +68,6 @@ export function StockAdjustmentForm() {
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<FormLine[]>([newLine()]);
   const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
-  const [confirmPosting, setConfirmPosting] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
 
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
@@ -287,7 +276,7 @@ export function StockAdjustmentForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
+  const buildPayload = (status: "Draft" | "Selesai" | "Menunggu Approval"): StockDocumentPayload => ({
     type: "Stock Adjustment",
     status,
     document_date: date || today(),
@@ -312,7 +301,7 @@ export function StockAdjustmentForm() {
       }),
   });
 
-  const submit = async (status: "Draft" | "Selesai") => {
+  const submit = async (status: "Draft" | "Selesai" | "Menunggu Approval") => {
     setApiErrors(undefined);
     if (!warehouseId) {
       toast.error("Pilih gudang terlebih dahulu.");
@@ -345,9 +334,11 @@ export function StockAdjustmentForm() {
     try {
       const res = await create.mutateAsync(payload);
       toast.success(
-        status === "Selesai"
-          ? `Dokumen ${res.data.no} berhasil diposting`
-          : `Draft ${res.data.no} berhasil disimpan`,
+        status === "Menunggu Approval"
+          ? `Dokumen ${res.data.no} diajukan untuk persetujuan`
+          : status === "Selesai"
+            ? `Dokumen ${res.data.no} berhasil diposting`
+            : `Draft ${res.data.no} berhasil disimpan`,
       );
       navigate({ to: "/persediaan/adjustment" });
     } catch (err) {
@@ -740,52 +731,15 @@ export function StockAdjustmentForm() {
 
       <div className="sticky bottom-20 z-10 flex flex-wrap justify-end gap-2 rounded-2xl border border-border bg-card/95 p-3 shadow-soft backdrop-blur md:bottom-4">
         {canCreate && (
-          <>
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => submit("Draft")}
-              disabled={create.isPending}
-            >
-              <Save className="h-4 w-4" /> Simpan Draft
-            </Button>
-            <Button
-              className="rounded-xl"
-              onClick={() => setConfirmPosting(true)}
-              disabled={create.isPending}
-            >
-              <Save className="h-4 w-4" /> Simpan & Posting
-            </Button>
-          </>
+          <Button
+            className="rounded-xl"
+            onClick={() => submit("Menunggu Approval")}
+            disabled={create.isPending}
+          >
+            <Save className="h-4 w-4" /> Ajukan Persetujuan
+          </Button>
         )}
       </div>
-
-      <AlertDialog open={confirmPosting} onOpenChange={(o) => !o && setConfirmPosting(false)}>
-        <AlertDialogContent className="rounded-xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Posting dokumen penyesuaian?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Dokumen akan diposting dan stok langsung ter-update. Tindakan ini tidak dapat
-              dibatalkan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl" onClick={() => setConfirmPosting(false)}>
-              Batal
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="rounded-xl"
-              onClick={(e) => {
-                e.preventDefault();
-                setConfirmPosting(false);
-                void submit("Selesai");
-              }}
-            >
-              Ya, Posting
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent className="max-w-md rounded-xl">
