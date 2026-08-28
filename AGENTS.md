@@ -31,6 +31,7 @@ WMS monorepo — **no root manifest**. Git at root (`main`, `https://github.com/
 ## Git rules
 
 - Never run `git add` / `commit` / `push` / history rewrite (rebase/merge/amend/force-push) without explicit user instruction. When asked, stage only relevant files — never `git add .` / `-A`.
+- **Kata `implementasikan` / `lanjutkan` / `fix` / `crosscheck` / `plan` ≠ izin commit/push.** `implementasikan` hanya berarti ubah file + verifikasi (`tsc`/`vitest`/`php artisan test`); `git add`/`commit`/`push` HANYA bila user menulis eksplisit `commit` / `push` / `git commit`. Tanpa kata itu, berhenti di `git status`/`git diff` (tampilkan diff, jangan commit).
 - Before commit/push: review `git status` + `git diff` / `--cached` line-by-line; scan for secrets (`authtoken`, `api[_-]?key`, `secret`, `password`, `token`, `APP_KEY`, AWS creds, `BEGIN ... PRIVATE KEY`, embedded URL creds); reject `.env*`, `*.key`/`*.pem`/`*.p12`, `ngrok.yml`, `.dev/` artifacts, build output (`dist`, `.output`, `.nitro`, `public/build`), `node_modules`, IDE/OS files. Verify `.gitignore` covers them first. Keep `bun.lock` + `package-lock.json` in sync.
 - If suspicious, stop and report — do not commit/push.
 
