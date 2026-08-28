@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { Barcode, ChevronLeft, Eye, X } from "lucide-react";
 import { toast } from "sonner";
-import { useDebouncedValue } from "@/hooks/use-debounce";
 import { EmptyState, PageHeader, Panel, Pill } from "@/components/wms/kit";
+import { getAuthToken } from "@/lib/api";
 import { OpnameReviewDialog } from "@/components/wms/opname/opname-review-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,13 +117,15 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   const goBack = () => router.navigate({ to: "/opname/$section", params: { section: "proses" } });
 
-  // debounced records for autosave (900ms)
-  const debouncedRecords = useDebouncedValue(records, 900);
+  // hybrid autosave: local per-huruf, server per jeda antar input (onBlur + 1.5s idle + keepalive)
+  const lastSentRef = useRef<string | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const silentSaveRef = useRef<() => void>(() => {});
+  const isSavingRef = useRef(false);
 
-  // localStorage persistence (always, even offline)
+  // localStorage per-huruf (refresh-safe)
   useEffect(() => {
     if (typeof window === "undefined" || !docId) return;
-    // debounce already via debouncedRecords effect below, but also persist quickly for refresh safety
     try {
       window.localStorage.setItem(storageKey, JSON.stringify({ records, savedAt: Date.now() }));
     } catch {
@@ -131,13 +133,16 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     }
   }, [records, storageKey, docId]);
 
-  // autosave to server (silent, when online, dirty, valid, not pending)
   const silentSave = useCallback(() => {
     if (!session || session.status !== "Draft" || !canWrite) return;
     if (!dirty) return;
-    if (update.isPending) return;
+    if (isSavingRef.current || update.isPending) return;
     if (hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    const payload = buildLines();
+    const hash = JSON.stringify(payload);
+    if (lastSentRef.current === hash) return;
+    isSavingRef.current = true;
     setAutoSaving(true);
     update.mutate(
       {
@@ -145,64 +150,107 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         payload: {
           document_date: session.document_date,
           pic: session.pic,
-          lines: buildLines(),
+          lines: payload,
         },
       },
       {
         onSuccess: () => {
+          lastSentRef.current = hash;
           setLastSavedAt(Date.now());
           setAutoSaving(false);
+          isSavingRef.current = false;
           try {
             if (typeof window !== "undefined") window.localStorage.removeItem(storageKey);
           } catch {}
         },
-        onError: () => setAutoSaving(false),
+        onError: () => {
+          setAutoSaving(false);
+          isSavingRef.current = false;
+        },
       },
     );
   }, [session, canWrite, dirty, update, hasValidationError, buildLines, storageKey]);
 
+  // keep ref fresh for keepalive flush without re-registering listeners
   useEffect(() => {
-    // trigger autosave when debouncedRecords changes and dirty
-    if (!dirty || !canWrite || session?.status !== "Draft") return;
-    if (hasValidationError()) return;
-    // skip initial empty hydration
-    if (Object.keys(debouncedRecords).length === 0) return;
-    silentSave();
-  }, [debouncedRecords, dirty, canWrite, hasValidationError, silentSave, session]);
+    silentSaveRef.current = silentSave;
+  }, [silentSave]);
 
-  // beforeunload / visibility flush + online/offline
+  const scheduleAutosave = useCallback(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => silentSaveRef.current(), 1500);
+  }, []);
+
+  const flushAutosave = useCallback(() => {
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    silentSaveRef.current();
+  }, []);
+
+  // keepalive flush for tab close (beacon)
+  const flushKeepalive = useCallback(() => {
+    if (!session || session.status !== "Draft" || !dirty || hasValidationError()) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    const payload = buildLines();
+    const hash = JSON.stringify(payload);
+    if (lastSentRef.current === hash) return;
+    try {
+      const token = getAuthToken();
+      const url = `/api/persediaan/stock-documents/${session.id}`;
+      const body = JSON.stringify({
+        document_date: session.document_date,
+        pic: session.pic,
+        lines: payload,
+      });
+      // keepalive fetch survives pagehide/beforeunload
+      fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "ngrok-skip-browser-warning": "true",
+        },
+        body,
+        keepalive: true,
+      } as RequestInit);
+      lastSentRef.current = hash;
+    } catch {
+      // best effort
+    }
+  }, [session, dirty, hasValidationError, buildLines]);
+
+  // online/offline + visibility/pagehide listeners (stable, not per-keystroke)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const flush = () => {
-      if (!dirty || update.isPending || hasValidationError()) return;
-      // try keepalive fetch via silentSave (best effort)
-      silentSave();
-    };
     const onVis = () => {
-      if (document.visibilityState === "hidden") flush();
+      if (document.visibilityState === "hidden") flushKeepalive();
     };
     const onOnline = () => {
       setIsOnline(true);
       toast.success("Kembali online — menyinkron draft...");
-      silentSave();
+      silentSaveRef.current();
     };
     const onOffline = () => {
       setIsOnline(false);
       toast.warning("Offline — draft disimpan lokal, akan sinkron saat online");
     };
-    window.addEventListener("beforeunload", flush);
+    const onBeforeUnload = () => flushKeepalive();
+    const onPageHide = () => flushKeepalive();
+    window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("pagehide", flush);
+    window.addEventListener("pagehide", onPageHide);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     return () => {
-      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [dirty, update.isPending, hasValidationError, silentSave]);
+  }, [flushKeepalive]);
 
   const saveDraft = () => {
     if (!session) return;
@@ -406,9 +454,11 @@ export function OpnameCountPage({ docId }: { docId: number }) {
                         type="number"
                         min={0}
                         value={raw}
-                        onChange={(e) =>
-                          setRecords((prev) => ({ ...prev, [l.id]: e.target.value }))
-                        }
+                        onChange={(e) => {
+                          setRecords((prev) => ({ ...prev, [l.id]: e.target.value }));
+                          scheduleAutosave();
+                        }}
+                        onBlur={flushAutosave}
                         className="h-8 w-24 rounded-lg"
                       />
                     ) : (
