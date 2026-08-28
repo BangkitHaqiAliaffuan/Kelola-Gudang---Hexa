@@ -98,10 +98,10 @@ class StockDocumentService
             $lockedDoc = StockDocument::where('id', $document->id)
                 ->lockForUpdate()
                 ->first();
-            if ($lockedDoc->status !== 'Draft') {
+            if (! in_array($lockedDoc->status, ['Draft', 'Menunggu Approval'], true)) {
                 return $lockedDoc;
             }
-            $varianceLines = $document->lines
+            $varianceLines = $lockedDoc->lines
                 ->filter(fn (StockDocumentLine $line) => $line->actual_qty !== null)
                 ->filter(fn (StockDocumentLine $line) => ((int) $line->actual_qty) - ((int) $line->system_qty) !== 0)
                 ->values();
@@ -143,7 +143,7 @@ class StockDocumentService
                 // lolos assertAdjustmentReadyForPost saat diposting.
             }
 
-            $document->update(['status' => 'Selesai', 'posted_at' => now()]);
+            $lockedDoc->update(['status' => 'Selesai', 'posted_at' => now()]);
         });
 
         return $document->fresh();
@@ -158,7 +158,7 @@ class StockDocumentService
      * 3. Barang yang bergerak (stock_movements) setelah momen freeze (frozen_at)
      *    dianggap variance tidak valid — wajib dihitung ulang (pola DBA "throw out").
      */
-    private function assertOpnameReadyForPost(StockDocument $document): void
+    public function assertOpnameReadyForPost(StockDocument $document): void
     {
         $lines = $document->lines;
 

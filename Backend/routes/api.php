@@ -64,11 +64,14 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::post('stock-documents/{stockDocument}/post', [StockDocumentController::class, 'post']);
     Route::post('stock-documents/{stockDocument}/cancel', [StockDocumentController::class, 'cancel']);
     Route::post('stock-documents/{stockDocument}/submit-approval', [StockDocumentController::class, 'submitApproval']);
+    Route::post('stock-documents/{stockDocument}/submit-review', [StockDocumentController::class, 'submitReview']);
 });
 
 Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('stock-documents/{stockDocument}/approve', [StockDocumentController::class, 'approve']);
     Route::post('stock-documents/{stockDocument}/reject', [StockDocumentController::class, 'reject']);
+    Route::post('stock-documents/{stockDocument}/approve-review', [StockDocumentController::class, 'approveReview']);
+    Route::post('stock-documents/{stockDocument}/reject-review', [StockDocumentController::class, 'rejectReview']);
 });
 
 Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan'])->group(function () {

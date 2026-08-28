@@ -564,4 +564,100 @@ class StockDocumentController extends Controller
 
         return new StockDocumentResource($stockDocument->load(['warehouse', 'destination', 'requester', 'approver']));
     }
+
+    public function submitReview(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname yang dapat diajukan untuk review.'], 422);
+        }
+        if ($stockDocument->status !== 'Draft') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Draft yang dapat diajukan.'], 422);
+        }
+
+        // Reuse guard konsistensi waktu + kelengkapan hitung (uncounted, reason, moved)
+        try {
+            $this->service->assertOpnameReadyForPost($stockDocument);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $stockDocument->update([
+            'status' => 'Menunggu Approval',
+            'submitted_at' => now(),
+        ]);
+
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'requester', 'approver']));
+    }
+
+    public function approveReview(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname yang dapat disetujui.'], 422);
+        }
+        if ($stockDocument->status !== 'Menunggu Approval') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat disetujui.'], 422);
+        }
+
+        $user = $request->user('sanctum') ?? $request->user();
+        $authId = $user?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
+        }
+
+        $isAuditor = $user && $user->role === 'Auditor';
+        $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
+        if (! ($isAuditor || $hasKelola)) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk menyetujui dokumen ini.'], 403);
+        }
+
+        $stockDocument->update([
+            'approver_user_id' => $authId,
+            'approved_at' => now(),
+            'decision_note' => $request->input('decision_note'),
+        ]);
+
+        try {
+            $document = $this->service->post($stockDocument->fresh());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return new StockDocumentResource($document->load(['warehouse', 'destination', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack']));
+    }
+
+    public function rejectReview(Request $request, StockDocument $stockDocument)
+    {
+        $request->validate([
+            'decision_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname yang dapat ditolak.'], 422);
+        }
+        if ($stockDocument->status !== 'Menunggu Approval') {
+            return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat ditolak.'], 422);
+        }
+
+        $user = $request->user('sanctum') ?? $request->user();
+        $authId = $user?->id;
+        if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+            return response()->json(['message' => 'Pembuat dokumen tidak boleh menolak laporannya sendiri.'], 422);
+        }
+
+        $isAuditor = $user && $user->role === 'Auditor';
+        $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
+        if (! ($isAuditor || $hasKelola)) {
+            return response()->json(['message' => 'Anda tidak memiliki hak untuk menolak dokumen ini.'], 403);
+        }
+
+        $stockDocument->update([
+            'status' => 'Draft',
+            'approver_user_id' => $authId,
+            'approved_at' => now(),
+            'decision_note' => $request->input('decision_note'),
+            'submitted_at' => null,
+        ]);
+
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'requester', 'approver']));
+    }
 }

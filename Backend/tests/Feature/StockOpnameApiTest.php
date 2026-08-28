@@ -827,4 +827,94 @@ class StockOpnameApiTest extends TestCase
             ->count();
         $this->assertSame(1, $count, 'Hanya 1 Adjustment yang ter-create walau post 2x');
     }
+
+    public function test_submit_review_moves_draft_to_menunggu(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.id');
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 8, 'reason_code' => 'picking_error']],
+        ])->assertOk();
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-review")
+            ->assertOk()->assertJsonPath('data.status', 'Menunggu Approval');
+    }
+
+    public function test_approve_review_by_auditor_succeeds_and_creates_adjustment(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.id');
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 7, 'reason_code' => 'picking_error']],
+        ])->assertOk();
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-review")->assertOk();
+        $auditor = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        \Laravel\Sanctum\Sanctum::actingAs($auditor, ['*'], 'sanctum');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/approve-review")->assertOk()
+            ->assertJsonPath('data.status', 'Selesai');
+        $this->assertSame(1, \App\Models\StockDocument::where('source_document_id', $docId)->where('type', 'Stock Adjustment')->count());
+    }
+
+    public function test_approve_review_fails_if_requester_is_approver(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+        $requester = \App\Models\User::factory()->create(['role' => 'Operator Gudang', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Operator Gudang', 'module' => 'Persediaan'], ['level' => 'Tulis']);
+        \Laravel\Sanctum\Sanctum::actingAs($requester, ['*'], 'sanctum');
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.id');
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 8, 'reason_code' => 'picking_error']],
+        ])->assertOk();
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-review")->assertOk();
+        // same requester tries to approve
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/approve-review")->assertStatus(422);
+    }
+
+    public function test_reject_review_moves_back_to_draft(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10);
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.id');
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id, 'actual_qty' => 9, 'reason_code' => 'other']],
+        ])->assertOk();
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/submit-review")->assertOk();
+        $auditor = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        \Laravel\Sanctum\Sanctum::actingAs($auditor, ['*'], 'sanctum');
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/reject-review", ['decision_note' => 'Hitung ulang'])->assertOk()
+            ->assertJsonPath('data.status', 'Draft');
+        $this->assertSame(0, \App\Models\StockDocument::where('source_document_id', $docId)->count());
+    }
 }
