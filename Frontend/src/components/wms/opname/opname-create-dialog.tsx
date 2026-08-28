@@ -17,9 +17,9 @@ import { FormCombobox } from "@/components/wms/form-combobox";
 import { EmptyState } from "@/components/wms/kit";
 import { useAuth } from "@/hooks/use-auth";
 import { useUsers, useWarehouses } from "@/hooks/use-master";
-import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
+import { useCreateStockDocument, useStockDocuments, useStockRows } from "@/hooks/use-persediaan";
 import { formatNumber } from "@/lib/wms-data";
-import { isApiError } from "@/lib/api";
+import { fieldError, isApiError } from "@/lib/api";
 
 export function OpnameCreateDialog({
   open,
@@ -48,12 +48,31 @@ export function OpnameCreateDialog({
     [stockRows, whId],
   );
 
+  const { data: opnameDocs } = useStockDocuments({ type: "Stock Opname", warehouseId: whId });
+  const [apiErrors, setApiErrors] = useState<Record<string, string[]> | undefined>(undefined);
+
+  const conflict = useMemo(() => {
+    const docs = opnameDocs?.data ?? [];
+    return docs.find((d) => d.document_date.slice(0, 10) === date && d.status !== "Dibatalkan") ?? null;
+  }, [opnameDocs, date]);
+
   const canSubmit =
-    whId != null && date.length > 0 && warehouseRows.length > 0 && !create.isPending && canCreate;
+    whId != null &&
+    date.length > 0 &&
+    warehouseRows.length > 0 &&
+    !create.isPending &&
+    canCreate &&
+    !conflict;
 
   const submit = () => {
     if (!canCreate) return;
+    if (conflict) {
+      toast.error(`Jadwal opname untuk gudang ini pada tanggal ${date} sudah ada (${conflict.no} — ${conflict.status}). Hanya 1 jadwal per gudang per hari.`);
+      return;
+    }
     if (!canSubmit || whId == null) return;
+
+    setApiErrors(undefined);
 
     create.mutate(
       {
@@ -82,7 +101,10 @@ export function OpnameCreateDialog({
           setDate(new Date().toISOString().slice(0, 10));
         },
         onError: (err) => {
-          toast.error(isApiError(err) ? err.message : "Gagal membuat jadwal opname");
+          if (isApiError(err) && err.errors) setApiErrors(err.errors);
+          const msg = isApiError(err) ? err.message : "Gagal membuat jadwal opname";
+          const fe = fieldError(err, "document_date") ?? fieldError(err, "warehouse_id");
+          toast.error(fe ? `${msg}: ${fe}` : msg);
         },
       },
     );
@@ -106,7 +128,10 @@ export function OpnameCreateDialog({
               <Label>Gudang</Label>
               <FormCombobox
                 value={warehouseId}
-                onValueChange={setWarehouseId}
+                onValueChange={(v) => {
+                  setWarehouseId(v);
+                  setApiErrors(undefined);
+                }}
                 options={
                   warehouses?.data.map((w) => ({ value: String(w.id), label: w.name })) ?? []
                 }
@@ -123,9 +148,23 @@ export function OpnameCreateDialog({
               <Input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-xl"
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setApiErrors(undefined);
+                }}
+                className={`rounded-xl ${conflict || fieldError({ errors: apiErrors } as never, "document_date") ? "border-destructive" : ""}`}
               />
+              {conflict && (
+                <p className="text-xs text-destructive">
+                  Jadwal sudah ada ({conflict.no} — {conflict.status}) pada tanggal ini. Hanya 1 jadwal per gudang per hari.
+                </p>
+              )}
+              {fieldError({ errors: apiErrors } as never, "document_date") && (
+                <p className="text-xs text-destructive">{fieldError({ errors: apiErrors } as never, "document_date")}</p>
+              )}
+              {fieldError({ errors: apiErrors } as never, "warehouse_id") && (
+                <p className="text-xs text-destructive">{fieldError({ errors: apiErrors } as never, "warehouse_id")}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>PIC</Label>
@@ -244,7 +283,13 @@ export function OpnameCreateDialog({
               className="rounded-xl"
               onClick={submit}
               disabled={!canSubmit}
-              title={warehouseRows.length === 0 ? "Gudang belum memiliki baris stok" : undefined}
+              title={
+                conflict
+                  ? `Gudang ini sudah punya jadwal ${conflict.no} pada ${date}`
+                  : warehouseRows.length === 0
+                    ? "Gudang belum memiliki baris stok"
+                    : undefined
+              }
             >
               {create.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

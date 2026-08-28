@@ -190,6 +190,20 @@ class StockDocumentController extends Controller
 
                 $authId = $request->user('sanctum')?->id;
 
+                // Guard race-safe: 1 Opname per gudang per hari (kecuali Dibatalkan).
+                if ($isOpname) {
+                    $day = \Carbon\Carbon::parse($data['document_date'])->toDateString();
+                    $conflict = StockDocument::where('type', 'Stock Opname')
+                        ->where('warehouse_id', $data['warehouse_id'])
+                        ->whereDate('document_date', $day)
+                        ->where('status', '!=', 'Dibatalkan')
+                        ->lockForUpdate()
+                        ->exists();
+                    if ($conflict) {
+                        throw new \InvalidArgumentException('Jadwal Stock Opname untuk gudang tersebut pada tanggal '.$day.' sudah ada. Hanya 1 jadwal per gudang per hari.');
+                    }
+                }
+
                 $initialStatus = $data['type'] === 'Stock Adjustment' ? 'Menunggu Approval' : ($data['status'] === 'Selesai' ? 'Draft' : $data['status']);
                 $document = StockDocument::create([
                     'no' => CodeGenerator::nextYearly(StockDocument::class, $prefix, 'no', 5),

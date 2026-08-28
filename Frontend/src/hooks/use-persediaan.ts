@@ -134,7 +134,37 @@ export function useUpdateStockDocument() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: UpdateStockDocumentPayload }) =>
       api.put<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}`, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["persediaan"] }),
+    onMutate: async ({ id, payload }) => {
+      const detailKey = ["persediaan", "stock-documents", "detail", id];
+      await qc.cancelQueries({ queryKey: detailKey });
+      
+      const prev = qc.getQueryData<{ data: StockDocumentApi }>(detailKey);
+      if (prev?.data?.lines) {
+        // Optimistic patch ke detail state
+        qc.setQueryData(detailKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              lines: old.data.lines.map((l: any) => {
+                const pl = payload.lines.find((p) => p.item_id === l.item_id && p.from_bin_id === l.from_bin_id);
+                return pl ? { ...l, actual_qty: pl.actual_qty } : l;
+              }),
+            }
+          };
+        });
+      }
+      return { prev, detailKey };
+    },
+    onError: (err, vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(ctx.detailKey, ctx.prev); // Rollback
+    },
+    onSettled: (data, err, vars) => {
+      // Tidak invalidate "detail" untuk mencegah kedipan fokus dan overwrite input lokal
+      qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
+      qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "summary"] });
+    },
   });
 }
 

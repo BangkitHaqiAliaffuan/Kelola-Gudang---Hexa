@@ -30,17 +30,38 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   const [scan, setScan] = useState("");
   const [records, setRecords] = useState<Record<number, string>>({});
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed || false;
+    } catch {
+      return false;
+    }
+  });
   const [reviewOpen, setReviewOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [autoSaving, setAutoSaving] = useState(false);
+  const toggleRevealed = () => {
+    setRevealed(true);
+    try {
+      if (typeof window !== "undefined") window.localStorage.setItem(`kg-opname-revealed-${docId}`, JSON.stringify({ revealed: true }));
+    } catch {}
+  };
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
 
   const storageKey = `kg-opname-draft-${docId}`;
 
+  // guard hydrate: don't clobber typing, and don't reset blind reveal per autosave
+  const prevLinesRef = useRef<number | null>(null);
+
   useEffect(() => {
-    // restore local draft if exists and fresher than server, else hydrate from server
+    const isDocChange = prevLinesRef.current !== docId;
+    prevLinesRef.current = docId;
+
+    // don't clobber while saving or dirty (user typing)
+    if (!isDocChange && (isSavingRef.current || update.isPending)) return;
+
     let local: Record<number, string> | null = null;
     try {
       if (typeof window !== "undefined") {
@@ -56,17 +77,37 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     const serverRecords = Object.fromEntries(
       lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
     );
-    // if local has any keys and server has no actual_qty yet, prefer local
     const serverHasData = lines.some((l) => l.actual_qty != null);
-    if (local && Object.keys(local).length > 0 && !serverHasData) {
-      setRecords(local);
-      // don't overwrite server—user will be prompted via toast if needed
-      toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
-    } else {
-      setRecords(serverRecords);
+    // if doc just changed, always hydrate server (plus local fallback)
+    if (isDocChange) {
+      if (local && Object.keys(local).length > 0 && !serverHasData) {
+        setRecords(local);
+        toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+      } else {
+        setRecords(serverRecords);
+      }
+      setRevealed(false);
+      try {
+        if (typeof window !== "undefined") window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
+      } catch {}
+      return;
     }
-    setRevealed(false);
-  }, [docId, lines, storageKey]);
+    // for same doc, skip if local dirty editing (preserve typing) or hash already sent
+    const hash = JSON.stringify(serverRecords);
+    if (lastSentRef.current === hash) return;
+    // if user has dirty unsaved typing, don't overwrite (keep local), unless server has newer remote data
+    const hasDirty = lines.some((l) => (records[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""));
+    if (hasDirty) {
+      // stale remote detection: if server actual_qty differs from what we last sent, toast
+      if (serverHasData && hash !== JSON.stringify(records)) {
+        // keep local but hint
+        // don't overwrite
+      }
+      return;
+    }
+    setRecords(serverRecords);
+    // don't reset revealed on same doc
+  }, [docId, lines, storageKey, records]);
 
   const scanQ = scan.trim().toLowerCase();
   const filteredLines = useMemo(
@@ -122,6 +163,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const debounceRef = useRef<number | null>(null);
   const silentSaveRef = useRef<() => void>(() => {});
   const isSavingRef = useRef(false);
+  const needsResaveRef = useRef(false);
 
   // localStorage per-huruf (refresh-safe)
   useEffect(() => {
@@ -136,11 +178,14 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const silentSave = useCallback(() => {
     if (!session || session.status !== "Draft" || !canWrite) return;
     if (!dirty) return;
-    if (isSavingRef.current || update.isPending) return;
+    if (isSavingRef.current || update.isPending) {
+      needsResaveRef.current = true;
+      return;
+    }
     if (hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(payload);
+    const hash = JSON.stringify(payload.map((l) => ({ item_id: l.item_id, from_bin_id: l.from_bin_id, actual_qty: l.actual_qty })));
     if (lastSentRef.current === hash) return;
     isSavingRef.current = true;
     setAutoSaving(true);
@@ -162,10 +207,17 @@ export function OpnameCountPage({ docId }: { docId: number }) {
           try {
             if (typeof window !== "undefined") window.localStorage.removeItem(storageKey);
           } catch {}
+          if (needsResaveRef.current) {
+            needsResaveRef.current = false;
+            // Schedule immediate flush for queued items
+            if (debounceRef.current) window.clearTimeout(debounceRef.current);
+            debounceRef.current = window.setTimeout(() => silentSaveRef.current(), 300);
+          }
         },
         onError: () => {
           setAutoSaving(false);
           isSavingRef.current = false;
+          needsResaveRef.current = false;
         },
       },
     );
@@ -194,7 +246,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (!session || session.status !== "Draft" || !dirty || hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(payload);
+    const hash = JSON.stringify(payload.map((l) => ({ item_id: l.item_id, from_bin_id: l.from_bin_id, actual_qty: l.actual_qty })));
     if (lastSentRef.current === hash) return;
     try {
       const token = getAuthToken();
@@ -361,7 +413,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
                   variant="outline"
                   className="rounded-xl"
                   disabled={mutationsBusy}
-                  onClick={() => setRevealed(true)}
+                  onClick={toggleRevealed}
                 >
                   <Eye className="h-4 w-4" /> Tampilkan Sistem
                 </Button>

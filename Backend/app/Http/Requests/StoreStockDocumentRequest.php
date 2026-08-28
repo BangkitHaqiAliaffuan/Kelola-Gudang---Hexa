@@ -368,6 +368,32 @@ class StoreStockDocumentRequest extends FormRequest
                 }
             },
             function (Validator $validator) {
+                if ($this->input('type') !== 'Stock Opname') {
+                    return;
+                }
+                $warehouseId = (int) $this->input('warehouse_id');
+                $dateRaw = $this->input('document_date');
+                if (! $warehouseId || ! $dateRaw) {
+                    return;
+                }
+                try {
+                    $day = \Carbon\Carbon::parse($dateRaw)->toDateString();
+                } catch (\Throwable) {
+                    return;
+                }
+                $conflict = StockDocument::where('type', 'Stock Opname')
+                    ->where('warehouse_id', $warehouseId)
+                    ->whereDate('document_date', $day)
+                    ->where('status', '!=', 'Dibatalkan')
+                    ->first(['no', 'status', 'document_date', 'warehouse_id']);
+                if ($conflict) {
+                    $whName = \App\Models\Warehouse::find($warehouseId)?->name ?? "Gudang #{$warehouseId}";
+                    $tgl = \Carbon\Carbon::parse($conflict->document_date)->format('d M Y');
+                    $validator->errors()->add('document_date', "Jadwal Stock Opname untuk {$whName} pada tanggal {$tgl} sudah ada ({$conflict->no} — {$conflict->status}). Hanya 1 jadwal per gudang per hari. Pilih tanggal lain, batalkan jadwal tersebut, atau lanjutkan proses opname yang sudah ada.");
+                    $validator->errors()->add('warehouse_id', 'Gudang ini sudah punya jadwal opname di tanggal tersebut.');
+                }
+            },
+            function (Validator $validator) {
                 $type = $this->input('type');
                 $sourceDocumentId = $this->input('source_document_id');
                 $lines = $this->input('lines') ?? [];
