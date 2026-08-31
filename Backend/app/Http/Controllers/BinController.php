@@ -6,6 +6,7 @@ use App\Http\Requests\StoreBinRequest;
 use App\Http\Requests\UpdateBinRequest;
 use App\Http\Resources\BinResource;
 use App\Models\Bin;
+use App\Models\ItemStock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,6 +56,16 @@ class BinController extends Controller
     public function update(UpdateBinRequest $request, Bin $bin): BinResource
     {
         $data = $request->validated();
+
+        if (isset($data['rack_id']) && (int) $data['rack_id'] !== (int) $bin->rack_id) {
+            $hasStock = ItemStock::where('bin_id', $bin->id)->where('stock', '>', 0)->exists();
+            if ($hasStock) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'rack_id' => 'Bin tidak dapat dipindah ke rak lain karena masih terikat riwayat stok.'
+                ]);
+            }
+        }
+
         $data['code'] = $data['level'].'-'.$data['position'];
         $bin->update($data);
 

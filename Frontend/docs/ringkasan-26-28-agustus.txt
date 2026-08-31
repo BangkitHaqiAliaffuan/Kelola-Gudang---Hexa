@@ -1,0 +1,15 @@
+Ringkasan 26-28 Agustus 2026 -- 32 commit (7 + 17 + 8)
+
+=== 26 Agustus 2026 ===
+Membangun fondasi modul persediaan di backend dan mengintegrasikannya ke frontend dan melakukan setup dan developing dashboard agar data stok nyambung antar gudang.
+Menata tampilan kartu stok, mutasi, dan stok minimum supaya siap dipakai.
+
+=== 27 Agustus 2026 ===
+Mengimplementasikan fungsi mutasi stok untuk cek pergerakan di sebuah gudang, dan juga fitur stok minimum untuk melihat stok mana yang hampir habis.
+Serta debugging beberapa fitur terutama untuk didesain ulang seperti filter dan kartu stok.
+
+=== 28 Agustus 2026 ===
+Melanjutkan perbaikan dengan menambah persetujuan untuk opname dan penyesuaian stok agar lebih aman.
+Serta memperbaiki cek stok saat keluar atau transfer dan membuat simpan otomatis di hitungan opname agar tidak hilang.
+
+Lampiran: hash utama 26-28 -- 018aa3a, edcb2b5, e89ec88, 90fa897, d590877, dc7f2fe, aa44ffc, 9f51c12, 9a69c12, c1df1a4 (detail git log --oneline --since="2026-08-26" --until="2026-08-28 23:59").

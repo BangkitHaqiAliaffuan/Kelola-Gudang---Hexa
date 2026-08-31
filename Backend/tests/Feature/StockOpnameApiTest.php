@@ -176,7 +176,7 @@ class StockOpnameApiTest extends TestCase
 
         $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
         $this->assertSame('Stock Adjustment', $adjustment->type);
-        $this->assertSame('Draft', $adjustment->status);
+        $this->assertSame('Menunggu Approval', $adjustment->status);
         $this->assertFalse($adjustment->isPosted());
 
         $row = ItemStock::where('item_id', $item->id)
@@ -188,8 +188,9 @@ class StockOpnameApiTest extends TestCase
 
         $this->assertDatabaseMissing('stock_movements', ['stock_document_id' => $adjustment->id]);
 
-        // Posting ADJ: guard stok & ledger berjalan, stok bergeser ke hasil fisik.
-        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+        // Approve ADJ dengan user lain (SoD: requester != approver).
+        $this->actingAsApprover();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Selesai');
 
@@ -233,7 +234,7 @@ class StockOpnameApiTest extends TestCase
 
         $adjustment = StockDocument::where('source_document_id', $opname->id)->firstOrFail();
         $this->assertSame('Stock Adjustment', $adjustment->type);
-        $this->assertSame('Draft', $adjustment->status);
+        $this->assertSame('Menunggu Approval', $adjustment->status);
         $this->assertFalse($adjustment->isPosted());
 
         $row = ItemStock::where('item_id', $item->id)
@@ -245,8 +246,9 @@ class StockOpnameApiTest extends TestCase
 
         $this->assertDatabaseMissing('stock_movements', ['stock_document_id' => $adjustment->id]);
 
-        // Posting ADJ: koreksi naik masuk ke ledger, stok menjadi hasil fisik.
-        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+        // Approve ADJ dengan user lain (SoD: requester != approver).
+        $this->actingAsApprover();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Selesai');
 
@@ -308,11 +310,11 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.lines.0.system_qty', 0)
             ->assertJsonPath('data.lines.0.variance', 5);
 
-        // Selisih 5 disalurkan lewat Stock Adjustment DRAFT (belum diposting).
+        // Selisih 5 disalurkan lewat Stock Adjustment Menunggu Approval.
         $this->assertDatabaseHas('stock_documents', [
             'source_document_id' => $res->json('data.id'),
             'type' => 'Stock Adjustment',
-            'status' => 'Draft',
+            'status' => 'Menunggu Approval',
         ]);
 
         $row = ItemStock::where('item_id', $item->id)
@@ -323,9 +325,10 @@ class StockOpnameApiTest extends TestCase
         // Belum ada stok fisik sama sekali — belum ada baris item_stock.
         $this->assertNull($row);
 
-        // Posting ADJ: stok muncul sesuai hitung fisik.
+        // Approve ADJ dengan user lain (SoD: requester != approver).
         $adjustment = StockDocument::where('source_document_id', $res->json('data.id'))->firstOrFail();
-        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+        $this->actingAsApprover();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Selesai');
 
@@ -404,11 +407,11 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.variance', -4);
 
-        // Selisih -4 disalurkan lewat Stock Adjustment DRAFT (belum diposting).
+        // Selisih -4 disalurkan lewat Stock Adjustment Menunggu Approval.
         $this->assertDatabaseHas('stock_documents', [
             'source_document_id' => $docId,
             'type' => 'Stock Adjustment',
-            'status' => 'Draft',
+            'status' => 'Menunggu Approval',
         ]);
         $this->assertSame(0, StockDocument::findOrFail($docId)->movements()->count());
 
@@ -419,9 +422,10 @@ class StockOpnameApiTest extends TestCase
 
         $this->assertSame(10, (int) $row->stock);
 
-        // Posting ADJ: stok turun sesuai hasil fisik.
+        // Approve ADJ dengan user lain (SoD: requester != approver).
         $adjustment = StockDocument::where('source_document_id', $docId)->firstOrFail();
-        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/post")
+        $this->actingAsApprover();
+        $this->postJson("/api/persediaan/stock-documents/{$adjustment->id}/approve")
             ->assertOk()
             ->assertJsonPath('data.status', 'Selesai');
 
@@ -713,6 +717,17 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('data.lines.0.counted_by', fn ($v) => is_string($v) && $v !== '')
             ->assertJsonPath('data.lines.0.counted_at', fn ($v) => $v !== null)
             ->assertJsonPath('data.lines.1.counted_at', fn ($v) => $v !== null);
+    }
+
+    /** Create & act as separate approver (Auditor with Persediaan Kelola) for SoD tests. */
+    private function actingAsApprover(): void
+    {
+        $approver = $this->makeUser('Auditor');
+        RolePermission::firstOrCreate(
+            ['role' => 'Auditor', 'module' => 'Persediaan'],
+            ['level' => 'Kelola'],
+        );
+        Sanctum::actingAs($approver, ['*'], 'sanctum');
     }
 
     private function makeUser(string $role): User

@@ -202,7 +202,7 @@ class StoreStockDocumentRequest extends FormRequest
                     return;
                 }
 
-                $bins = Bin::with('rack')->whereIn('id', $binIds)->get()->keyBy('id');
+                $bins = Bin::with('rack.warehouse')->whereIn('id', $binIds)->get()->keyBy('id');
 
                 foreach ($lines as $index => $line) {
                     foreach (['to_bin_id', 'from_bin_id'] as $field) {
@@ -226,9 +226,10 @@ class StoreStockDocumentRequest extends FormRequest
                             : (int) $warehouseId;
 
                         if ($bin->rack->warehouse_id !== $expected) {
+                            $actualWh = $bin->rack->warehouse?->name ?? "Gudang ID {$bin->rack->warehouse_id}";
                             $validator->errors()->add(
                                 "lines.{$index}.{$field}",
-                                'Bin harus berada di gudang yang dipilih.'
+                                "Bin {$bin->code} ({$bin->rack->name}) berada di {$actualWh}, bukan di gudang yang dipilih."
                             );
                         }
                     }

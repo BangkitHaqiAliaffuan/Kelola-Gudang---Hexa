@@ -269,31 +269,30 @@ class StockDocumentSeeder extends Seeder
                 ];
             }
 
-            while ($lines !== []) {
-                $groupSize = min($int(3, 6), count($lines));
-                if ($groupSize < 2) {
-                    break;
-                }
-
-                $group = array_splice($lines, 0, $groupSize);
-
-                foreach ($group as $line) {
-                    $finalBalance[$line['item']->id] = $line['actual_qty'];
-                    $opnamedItems[$line['item']->id] = true;
-                }
-
-                $documents[] = [
-                    'type' => 'Stock Opname',
-                    'day' => $opnameDate->startOfDay()->toDateTimeString(),
-                    'warehouse_id' => $warehouse->id,
-                    'destination_warehouse_id' => null,
-                    'date' => $opnameDate,
-                    'partner' => null,
-                    'pic' => $pick(self::PICS),
-                    'note' => 'Opname stok (hitung fisik)',
-                    'lines' => $group,
-                ];
+            if (empty($lines)) {
+                continue;
             }
+
+            // One SO doc per warehouse per day (1 Opname/Gudang/Hari constraint).
+            // Cap at MAX_LINES_PER_DOCUMENT to keep docs human-readable.
+            $group = array_splice($lines, 0, self::MAX_LINES_PER_DOCUMENT);
+
+            foreach ($group as $line) {
+                $finalBalance[$line['item']->id] = $line['actual_qty'];
+                $opnamedItems[$line['item']->id] = true;
+            }
+
+            $documents[] = [
+                'type' => 'Stock Opname',
+                'day' => $opnameDate->startOfDay()->toDateTimeString(),
+                'warehouse_id' => $warehouse->id,
+                'destination_warehouse_id' => null,
+                'date' => $opnameDate,
+                'partner' => null,
+                'pic' => $pick(self::PICS),
+                'note' => 'Opname stok (hitung fisik)',
+                'lines' => $group,
+            ];
         }
 
         // ---- Phase 5: bring a subset of items below their minimum (consumption),

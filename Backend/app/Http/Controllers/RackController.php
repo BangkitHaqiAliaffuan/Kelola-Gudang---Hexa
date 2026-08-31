@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreRackRequest;
 use App\Http\Requests\UpdateRackRequest;
 use App\Http\Resources\RackResource;
+use App\Models\ItemStock;
 use App\Models\Rack;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,6 +57,17 @@ class RackController extends Controller
     public function update(UpdateRackRequest $request, Rack $rack): RackResource
     {
         $data = $request->validated();
+        
+        if (isset($data['warehouse_id']) && (int) $data['warehouse_id'] !== (int) $rack->warehouse_id) {
+            $binIds = $rack->bins()->pluck('id');
+            $hasStock = $binIds->isNotEmpty() && ItemStock::whereIn('bin_id', $binIds)->where('stock', '>', 0)->exists();
+            if ($hasStock) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'warehouse_id' => 'Rak tidak dapat dipindah ke gudang lain karena masih terikat riwayat stok.'
+                ]);
+            }
+        }
+
         $data['code'] = $data['aisle'].'-'.$data['bay'];
         $data['name'] = $this->resolveName($data['name'] ?? null, $data['code']);
         $rack->update($data);

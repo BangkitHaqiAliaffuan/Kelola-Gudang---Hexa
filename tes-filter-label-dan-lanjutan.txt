@@ -9,12 +9,13 @@ Cakupan: 12 commit 27 Aug 2026 — dari fix(kartu-stock): Filter Periode Transak
 File: Frontend/src/routes/persediaan.kartu-stock.tsx:627
 
 Tes:
-  [ ] Buka /persediaan/kartu-stock, pilih barang -> panel filter terlihat label Filter Periode Transaksi (text-xs muted) di atas 2 input date, dalam 1 container rounded-xl border dengan separator - di tengah.
+  [V] Buka /persediaan/kartu-stock, pilih barang -> panel filter terlihat label Filter Periode Transaksi (text-xs muted) di atas 2 input date, dalam 1 container rounded-xl border dengan separator - di tengah.
   [ ] Cek aria-label="Dari tanggal" & Sampai tanggal masih ada (aksesibilitas), placeholder tidak ada (type=date).
   [ ] Isi Dari=2026-07-01 Sampai=2026-08-01 -> Network GET /api/persediaan/stock-card?item_id=X&from=2026-07-01&to=2026-08-01 param from/to benar.
   [ ] Tabel: baris 2026-07-15 muncul, 2026-06-15 tidak muncul.
   [ ] Responsive: md (768px) container full-width, xl (1280px) 2 kolom, tidak pecah, gap rapat gap-1.
 
+done
 ----------------------------------------------------------------------
 2) e89ec88 Clear Filter — Grup Persediaan (6 file)
 ----------------------------------------------------------------------
