@@ -182,9 +182,8 @@ export function ReturPenjualanForm() {
   // `from_bin_id`, jadi retur kembali ke bin yang sama.
   const sourceLineBin = (s: StockDocumentLineApi): number | null => s.from_bin_id;
 
-  // Baris sumber untuk sebuah barang (dari dokumen Pengeluaran terpilih). Bin
-  // tujuan retur wajib bin asal baris sumber; qty maksimum = qty dikeluarkan
-  // baris sumber (abs dari qty bertanda negatif).
+  // Baris sumber untuk sebuah barang (dari dokumen Pengeluaran terpilih).
+  // qty maksimum = sisa yang belum diretur (remaining_qty) bila tersedia, fallback qty asal.
   const lineSource = (l: FormLine) => {
     if (!sourceLines.length || !l.itemId) return undefined;
     const lineBin = l.binId ? Number(l.binId) : null;
@@ -192,6 +191,11 @@ export function ReturPenjualanForm() {
       sourceLines.find((s) => s.item_id === Number(l.itemId) && sourceLineBin(s) === lineBin) ??
       sourceLines.find((s) => s.item_id === Number(l.itemId))
     );
+  };
+
+  const maxForSource = (s: StockDocumentLineApi | undefined): number | null => {
+    if (!s) return null;
+    return s.remaining_qty ?? Math.abs(s.qty ?? 0);
   };
 
   const lineItemOptions = (l: FormLine): ComboboxOption[] => {
@@ -312,13 +316,29 @@ export function ReturPenjualanForm() {
       return;
     }
 
+    // Agregasi per source_line_id — 2 baris ke sumber sama harus di-sum, bukan per-row.
+    const requestedBySource = new Map<number, number>();
+    for (const l of lines) {
+      const src = lineSource(l);
+      if (!src || !l.qty) continue;
+      requestedBySource.set(src.id, (requestedBySource.get(src.id) ?? 0) + (Number(l.qty) || 0));
+    }
     const overSourceLine = lines.find((l) => {
       if (!l.itemId || !l.binId || !l.qty) return false;
       const src = lineSource(l);
-      return src != null && Number(l.qty) > Math.abs(src.qty ?? 0);
+      if (!src) return false;
+      const max = maxForSource(src);
+      const requested = src ? (requestedBySource.get(src.id) ?? 0) : 0;
+      return max != null && requested > max;
     });
     if (overSourceLine) {
-      toast.error("Ada baris dengan qty melebihi jumlah barang pada dokumen sumber.");
+      const src = lineSource(overSourceLine);
+      const max = src ? maxForSource(src) : null;
+      toast.error(
+        max != null
+          ? `Ada baris dengan qty melebihi sisa retur dari dokumen sumber (maks ${formatNumber(max)}).`
+          : "Ada baris dengan qty melebihi jumlah barang pada dokumen sumber.",
+      );
       return;
     }
 
@@ -498,7 +518,11 @@ export function ReturPenjualanForm() {
             <tbody>
               {lines.map((l, i) => {
                 const src = lineSource(l);
-                const overSource = src != null && (Number(l.qty) || 0) > Math.abs(src.qty ?? 0);
+                const max = maxForSource(src);
+                const requestedForSrc = src
+                  ? lines.reduce((s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s), 0)
+                  : 0;
+                const overSource = src != null && max != null && requestedForSrc > max;
                 return (
                   <tr key={l.key} className="border-b border-border/60">
                     <td className="w-[320px] px-3 py-2 align-top">
@@ -558,18 +582,19 @@ export function ReturPenjualanForm() {
                       )}
                       {overSource && (
                         <p className="mt-1 text-xs text-destructive">
-                          Melebihi jumlah dari dokumen sumber (maks{" "}
-                          {formatNumber(Math.abs(src?.qty ?? 0))})
+                          Melebihi sisa retur dari dokumen sumber (maks {formatNumber(max ?? 0)}
+                          {src?.remaining_qty != null ? `, sisa ${formatNumber(src.remaining_qty)}` : ""})
                         </p>
                       )}
-                      {src && !overSource && sourceDocId && (
+                      {src && !overSource && sourceDocId && max != null && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Maks {formatNumber(Math.abs(src.qty ?? 0))} dari {sourceDetail?.data.no}
+                          Maks {formatNumber(max)} dari {sourceDetail?.data.no}
+                          {src.remaining_qty != null ? ` (sisa ${formatNumber(src.remaining_qty)})` : ""}
                         </p>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
-                      {src ? formatNumber(Math.abs(src.qty ?? 0)) : "—"}
+                      {src && max != null ? formatNumber(max) : "—"}
                     </td>
                     <td className="px-3 py-2 align-top">
                       {canCreate && (
@@ -595,7 +620,11 @@ export function ReturPenjualanForm() {
         <div className="space-y-3 p-3 md:hidden">
           {lines.map((l, i) => {
             const src = lineSource(l);
-            const overSource = src != null && (Number(l.qty) || 0) > Math.abs(src.qty ?? 0);
+            const max = maxForSource(src);
+            const requestedForSrc = src
+              ? lines.reduce((s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s), 0)
+              : 0;
+            const overSource = src != null && max != null && requestedForSrc > max;
             return (
               <div key={l.key} className="rounded-xl border border-border p-3">
                 <div className="space-y-1.5">
@@ -640,18 +669,19 @@ export function ReturPenjualanForm() {
                       className={`h-9 w-24 rounded-lg ${overSource ? "border-destructive" : ""}`}
                     />
                     <span className="ml-auto text-sm text-muted-foreground">
-                      Maks {src ? formatNumber(Math.abs(src.qty ?? 0)) : "—"}
+                      Maks {src && max != null ? formatNumber(max) : "—"}
                     </span>
                   </div>
                   {overSource && (
                     <p className="text-xs text-destructive">
-                      Melebihi jumlah dari dokumen sumber (maks{" "}
-                      {formatNumber(Math.abs(src?.qty ?? 0))}).
+                      Melebihi sisa retur dari dokumen sumber (maks {formatNumber(max ?? 0)}
+                      {src?.remaining_qty != null ? `, sisa ${formatNumber(src.remaining_qty)}` : ""}).
                     </p>
                   )}
-                  {src && !overSource && sourceDocId && (
+                  {src && !overSource && sourceDocId && max != null && (
                     <p className="text-xs text-muted-foreground">
-                      Maks {formatNumber(Math.abs(src.qty ?? 0))} dari {sourceDetail?.data.no}
+                      Maks {formatNumber(max)} dari {sourceDetail?.data.no}
+                      {src.remaining_qty != null ? ` (sisa ${formatNumber(src.remaining_qty)})` : ""}
                     </p>
                   )}
                   {lineError(i, "to_bin_id") && (

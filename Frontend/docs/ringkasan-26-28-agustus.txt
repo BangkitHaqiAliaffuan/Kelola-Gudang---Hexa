@@ -1,15 +1,12 @@
-Ringkasan 26-28 Agustus 2026 -- 32 commit (7 + 17 + 8)
+Ringkasan 26-28 Agustus 2026 -- Melanjutkan dari 6-24 Agu (fondasi master → stock saat ini → mutasi/minimum → opname/barcode/scan)
 
 === 26 Agustus 2026 ===
-Membangun fondasi modul persediaan di backend dan mengintegrasikannya ke frontend dan melakukan setup dan developing dashboard agar data stok nyambung antar gudang.
-Menata tampilan kartu stok, mutasi, dan stok minimum supaya siap dipakai.
+Melanjutkan fondasi persediaan 12 Agu, mengimplementasikan saldo sekarang dan kartu stock jangka panjang agar saldo tidak loncat, serta debugging opname lantai. Menyelesaikan laporan kartu-stock/stock-minimum dan terverifikasi stock-card from/to.
 
 === 27 Agustus 2026 ===
-Mengimplementasikan fungsi mutasi stok untuk cek pergerakan di sebuah gudang, dan juga fitur stok minimum untuk melihat stok mana yang hampir habis.
-Serta debugging beberapa fitur terutama untuk didesain ulang seperti filter dan kartu stok.
+Melanjutkan koreksi ADJ 20 Agu dan scanner 24 Agu, finishing persediaan: ADJ manual & opname konsisten Menunggu Approval (tutup bypass post/reason) dan memperbaiki cek stok keluar/transfer pakai available.
 
 === 28 Agustus 2026 ===
-Melanjutkan perbaikan dengan menambah persetujuan untuk opname dan penyesuaian stok agar lebih aman.
-Serta memperbaiki cek stok saat keluar atau transfer dan membuat simpan otomatis di hitungan opname agar tidak hilang.
+Melanjutkan opname 14 Agu, menambahkan autosave hybrid (local+onBlur 1,5s+keepalive) agar hitungan tidak hilang, membatasi 1 jadwal/gudang/hari dengan pesan informatif dan memperbaiki guard opname lantai.
 
-Lampiran: hash utama 26-28 -- 018aa3a, edcb2b5, e89ec88, 90fa897, d590877, dc7f2fe, aa44ffc, 9f51c12, 9a69c12, c1df1a4 (detail git log --oneline --since="2026-08-26" --until="2026-08-28 23:59").
+Lampiran: melanjutkan progress 6-24 Agu → 26-28 Agu; hash utama 26-28 -- 9f51c12, 9a69c12, c1df1a4 (detail git log --oneline --since="2026-08-26" --until="2026-08-28 23:59"). Spreadsheet Hari 98 terisi 26 Agu, 99-101 kosong — 27-28 diisi dari lanjutan fungsi sebelumnya.

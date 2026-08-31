@@ -9,7 +9,7 @@ class StockDocumentLineResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        // Hitung sisa retur untuk baris Penerimaan (qty - sudah diretur) — dipakai FE Maks.
+        // Hitung sisa retur untuk baris Penerimaan/Pengeluaran — dipakai FE Maks retur.
         $remainingQty = null;
         $returnedQty = null;
         if ($this->qty !== null && $this->qty > 0) {
@@ -17,6 +17,11 @@ class StockDocumentLineResource extends JsonResource
                 ->whereHas('document', fn ($q) => $q->where('type', 'Retur Pembelian')->where('status', '!=', 'Dibatalkan'))
                 ->sum(\Illuminate\Support\Facades\DB::raw('ABS(qty)'));
             $remainingQty = max(0, (int) $this->qty - $returnedQty);
+        } elseif ($this->qty !== null && $this->qty < 0) {
+            $returnedQty = (int) \App\Models\StockDocumentLine::where('source_line_id', $this->id)
+                ->whereHas('document', fn ($q) => $q->where('type', 'Retur Penjualan')->where('status', '!=', 'Dibatalkan'))
+                ->sum(\Illuminate\Support\Facades\DB::raw('ABS(qty)'));
+            $remainingQty = max(0, (int) abs($this->qty) - $returnedQty);
         }
 
         return [
