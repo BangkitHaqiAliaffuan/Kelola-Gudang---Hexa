@@ -120,7 +120,7 @@ export function ReturPenjualanForm() {
   );
 
   const customerOptions: ComboboxOption[] = useMemo(
-    () => (customers?.data ?? []).map((c) => ({ value: c.name, label: c.name })),
+    () => (customers?.data ?? []).map((c) => ({ value: String(c.id), label: c.name, keywords: c.name })),
     [customers],
   );
 
@@ -259,16 +259,14 @@ export function ReturPenjualanForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  // Pilih dokumen Pengeluaran sumber: customer ikut terisi dari partner dokumen
-  // (tersinkron penuh saat pindah ke dokumen lain), daftar barang dibatasi ke
-  // baris dokumen itu.
+  // Pilih dokumen Pengeluaran sumber: customer ikut terisi dari customer_id dokumen
   const pickSourceDoc = (id: string) => {
     setSourceDocId(id);
     const doc =
       (outboundDocs?.data ?? []).find((d) => String(d.id) === id) ??
       (selectedSourceDoc && String(selectedSourceDoc.id) === id ? selectedSourceDoc : null);
     setSelectedSourceDoc(doc);
-    setCustomer(doc?.partner ?? "");
+    setCustomer(doc?.customer_id ? String(doc.customer_id) : "");
     setLines([newLine()]);
   };
 
@@ -280,13 +278,17 @@ export function ReturPenjualanForm() {
     return parts.length ? parts.join("\n") : null;
   };
 
-  const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
-    type: "Retur Penjualan",
-    status,
-    document_date: date || today(),
-    warehouse_id: Number(warehouseId),
-    source_document_id: sourceDocId ? Number(sourceDocId) : null,
-    partner: customer || null,
+  const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
+    const cid = customer ? Number(customer) : null;
+    const cname = cid ? (customers?.data.find((c) => c.id === cid)?.name ?? null) : null;
+    return {
+      type: "Retur Penjualan",
+      status,
+      document_date: date || today(),
+      warehouse_id: Number(warehouseId),
+      source_document_id: sourceDocId ? Number(sourceDocId) : null,
+      customer_id: cid,
+      partner: cname,
     reference_no: reference.trim() || null,
     pic: pic.trim() || null,
     note: buildNote(),
@@ -298,7 +300,8 @@ export function ReturPenjualanForm() {
         to_bin_id: l.binId ? Number(l.binId) : null,
         source_line_id: sourceDocId ? (lineSource(l)?.id ?? null) : null,
       })),
-  });
+    };
+  };
 
   const submit = async (status: "Draft" | "Selesai") => {
     setApiErrors(undefined);

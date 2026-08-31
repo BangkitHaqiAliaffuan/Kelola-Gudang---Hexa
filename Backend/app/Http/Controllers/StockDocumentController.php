@@ -36,7 +36,7 @@ class StockDocumentController extends Controller
         ]);
 
         $query = StockDocument::query()
-            ->with(['warehouse', 'destination', 'sourceDocument'])
+            ->with(['warehouse', 'destination', 'sourceDocument', 'customer'])
             ->withCount('lines')
             ->withCount(['lines as checked_count' => fn ($q) => $q->whereNotNull('actual_qty')])
             ->withSum('lines as qty_total', 'qty')
@@ -218,7 +218,8 @@ class StockDocumentController extends Controller
                     'warehouse_id' => $data['warehouse_id'],
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
                     'source_document_id' => in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true) ? ($data['source_document_id'] ?? null) : null,
-                    'partner' => $data['partner'] ?? null,
+                    'customer_id' => $data['customer_id'] ?? null,
+                    'partner' => $data['customer_id'] ? (\App\Models\Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null) : ($data['partner'] ?? null),
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
                     'note' => $data['note'] ?? null,

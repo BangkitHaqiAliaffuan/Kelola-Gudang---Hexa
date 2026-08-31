@@ -63,6 +63,11 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): JsonResponse
     {
+        if (\App\Models\StockDocument::where('customer_id', $customer->id)->exists()
+            || \App\Models\StockDocument::where('partner', $customer->name)->exists()) {
+            return response()->json(['message' => 'Customer tidak dapat dihapus karena masih memiliki riwayat transaksi (mutasi/retur). Nonaktifkan saja (is_active).'], 422);
+        }
+
         $customer->delete();
 
         return response()->json(['message' => 'Customer berhasil dihapus.'], 200);

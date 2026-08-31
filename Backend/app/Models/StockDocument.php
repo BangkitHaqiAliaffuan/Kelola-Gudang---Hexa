@@ -39,6 +39,7 @@ class StockDocument extends Model
         'warehouse_id',
         'destination_warehouse_id',
         'source_document_id',
+        'customer_id',
         'partner',
         'reference_no',
         'pic',
@@ -99,6 +100,11 @@ class StockDocument extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approver_user_id');
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function isPosted(): bool

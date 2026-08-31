@@ -262,12 +262,15 @@ export function BarangKeluarForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
-    type: "Pengeluaran",
-    status,
-    document_date: date || today(),
-    warehouse_id: Number(warehouseId),
-    partner: purpose || null,
+  const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
+    const cid = purpose ? customers?.data.find((c) => c.name === purpose)?.id ?? null : null;
+    return {
+      type: "Pengeluaran",
+      status,
+      document_date: date || today(),
+      warehouse_id: Number(warehouseId),
+      customer_id: cid,
+      partner: purpose || null,
     reference_no: reference.trim() || null,
     pic: pic.trim() || null,
     note: note.trim() || null,
@@ -278,7 +281,8 @@ export function BarangKeluarForm() {
         qty: Number(l.qty),
         from_bin_id: l.binId ? Number(l.binId) : null,
       })),
-  });
+    };
+  };
 
   const submit = async (status: "Draft" | "Selesai") => {
     setApiErrors(undefined);

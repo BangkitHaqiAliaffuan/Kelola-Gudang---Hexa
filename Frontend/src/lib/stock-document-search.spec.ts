@@ -14,6 +14,8 @@ const doc: StockDocumentApi = {
   destination: null,
   source_document_id: null,
   source_document: null,
+  customer_id: null,
+  customer: null,
   partner: "PT Sumber Jaya",
   reference_no: "PO-00123",
   pic: "Rudi Hartono",

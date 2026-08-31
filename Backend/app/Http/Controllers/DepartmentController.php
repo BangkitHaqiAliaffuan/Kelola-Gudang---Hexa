@@ -60,6 +60,10 @@ class DepartmentController extends Controller
 
     public function destroy(Department $department): JsonResponse
     {
+        if (\App\Models\ProcDoc::where('department_id', $department->id)->exists()) {
+            return response()->json(['message' => 'Departemen tidak dapat dihapus karena masih digunakan oleh dokumen pengadaan (PR/PO).'], 422);
+        }
+
         $department->delete();
 
         return response()->json(['message' => 'Departemen berhasil dihapus.'], 200);

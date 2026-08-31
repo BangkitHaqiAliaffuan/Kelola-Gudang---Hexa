@@ -212,6 +212,8 @@ export type StockDocumentApi = {
   destination: string | null;
   source_document_id: number | null;
   source_document: string | null;
+  customer_id: number | null;
+  customer: string | null;
   partner: string | null;
   reference_no: string | null;
   pic: string | null;
@@ -296,6 +298,7 @@ export type StockDocumentPayload = {
   warehouse_id: number;
   destination_warehouse_id?: number | null;
   source_document_id?: number | null;
+  customer_id?: number | null;
   partner: string | null;
   reference_no: string | null;
   pic?: string | null;

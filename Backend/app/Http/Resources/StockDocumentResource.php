@@ -23,6 +23,8 @@ class StockDocumentResource extends JsonResource
             'destination' => $this->whenLoaded('destination', fn () => $this->destination?->name),
             'source_document_id' => $this->source_document_id,
             'source_document' => $this->whenLoaded('sourceDocument', fn () => $this->sourceDocument?->no),
+            'customer_id' => $this->customer_id,
+            'customer' => $this->whenLoaded('customer', fn () => $this->customer?->name),
             'partner' => $this->partner,
             'reference_no' => $this->reference_no,
             'pic' => $this->pic,
