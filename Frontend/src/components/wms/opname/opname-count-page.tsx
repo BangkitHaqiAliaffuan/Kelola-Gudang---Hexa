@@ -51,38 +51,76 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
 
   const storageKey = `kg-opname-draft-${docId}`;
+  const lastSentStorageKey = `kg-opname-lastSent-${docId}`;
 
   // guard hydrate: don't clobber typing, and don't reset blind reveal per autosave
   const prevLinesRef = useRef<number | null>(null);
+  const recordsRef = useRef(records);
+  useEffect(() => {
+    recordsRef.current = records;
+  }, [records]);
+
+  // hydrate lastSent from storage (survive refresh)
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(lastSentStorageKey);
+      if (raw) lastSentRef.current = JSON.parse(raw) as string | null;
+    } catch {}
+  }, [lastSentStorageKey]);
 
   useEffect(() => {
     const isDocChange = prevLinesRef.current !== docId;
     prevLinesRef.current = docId;
 
-    // don't clobber while saving or dirty (user typing)
+    // don't clobber while saving
     if (!isDocChange && (isSavingRef.current || update.isPending)) return;
 
     let local: Record<number, string> | null = null;
+    let localSavedAt: number | null = null;
     try {
       if (typeof window !== "undefined") {
         const raw = window.localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
-          if (parsed.records) local = parsed.records;
+          if (parsed.records) {
+            // TTL 24h
+            if (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+              local = parsed.records;
+              localSavedAt = parsed.savedAt ?? null;
+            } else {
+              window.localStorage.removeItem(storageKey);
+            }
+          }
         }
       }
     } catch {
       // ignore
     }
+    // clear draft if session not Draft
+    if (session && session.status !== "Draft") {
+      try {
+        window.localStorage.removeItem(storageKey);
+        window.localStorage.removeItem(lastSentStorageKey);
+      } catch {}
+      local = null;
+    }
     const serverRecords = Object.fromEntries(
       lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
     );
-    const serverHasData = lines.some((l) => l.actual_qty != null);
-    // if doc just changed, always hydrate server (plus local fallback)
+    // if doc just changed, merge local over server (local wins per-line)
     if (isDocChange) {
-      if (local && Object.keys(local).length > 0 && !serverHasData) {
-        setRecords(local);
-        toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+      if (local && Object.keys(local).length > 0) {
+        const merged: Record<number, string> = { ...serverRecords };
+        for (const [k, v] of Object.entries(local)) {
+          if (v !== "" && v != null) merged[Number(k)] = v;
+        }
+        // if merged differs from server, show toast
+        if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
+          setRecords(merged);
+          toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+        } else {
+          setRecords(serverRecords);
+        }
       } else {
         setRecords(serverRecords);
       }
@@ -92,22 +130,19 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       } catch {}
       return;
     }
-    // for same doc, skip if local dirty editing (preserve typing) or hash already sent
+    // for same doc, skip if hash already sent
     const hash = JSON.stringify(serverRecords);
     if (lastSentRef.current === hash) return;
-    // if user has dirty unsaved typing, don't overwrite (keep local), unless server has newer remote data
-    const hasDirty = lines.some((l) => (records[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""));
+    const hasDirty = lines.some((l) => (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""));
     if (hasDirty) {
-      // stale remote detection: if server actual_qty differs from what we last sent, toast
-      if (serverHasData && hash !== JSON.stringify(records)) {
-        // keep local but hint
-        // don't overwrite
+      if (lines.some((l) => l.actual_qty != null) && hash !== JSON.stringify(recordsRef.current)) {
+        toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?");
       }
       return;
     }
     setRecords(serverRecords);
     // don't reset revealed on same doc
-  }, [docId, lines, storageKey, records]);
+  }, [docId, lines, storageKey, lastSentStorageKey, session?.status]);
 
   const scanQ = scan.trim().toLowerCase();
   const filteredLines = useMemo(
@@ -201,6 +236,9 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       {
         onSuccess: () => {
           lastSentRef.current = hash;
+          try {
+            if (typeof window !== "undefined") window.localStorage.setItem(lastSentStorageKey, JSON.stringify(hash));
+          } catch {}
           setLastSavedAt(Date.now());
           setAutoSaving(false);
           isSavingRef.current = false;
@@ -268,6 +306,10 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         keepalive: true,
       } as RequestInit);
       lastSentRef.current = hash;
+      try {
+        window.localStorage.setItem(lastSentStorageKey, JSON.stringify(hash));
+        // keep local draft for safety; will be cleared on next successful silentSave
+      } catch {}
     } catch {
       // best effort
     }
@@ -328,7 +370,10 @@ export function OpnameCountPage({ docId }: { docId: number }) {
           toast.success("Draft opname disimpan");
           setLastSavedAt(Date.now());
           try {
-            if (typeof window !== "undefined") window.localStorage.removeItem(storageKey);
+            if (typeof window !== "undefined") {
+              window.localStorage.removeItem(storageKey);
+              window.localStorage.removeItem(lastSentStorageKey);
+            }
           } catch {}
         },
         onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal menyimpan draft"),

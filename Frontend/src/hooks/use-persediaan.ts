@@ -115,6 +115,10 @@ export function useStockDocument(id: number | undefined) {
     queryKey: ["persediaan", "stock-documents", "detail", id],
     queryFn: () => api.get<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}`),
     enabled: id != null && typeof window !== "undefined",
+    staleTime: 30_000,
+    gcTime: 300_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -159,6 +163,10 @@ export function useUpdateStockDocument() {
     },
     onError: (err, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(ctx.detailKey, ctx.prev); // Rollback
+    },
+    onSuccess: (data) => {
+      const detailKey = ["persediaan", "stock-documents", "detail", data.data.id];
+      qc.setQueryData(detailKey, data);
     },
     onSettled: (data, err, vars) => {
       // Tidak invalidate "detail" untuk mencegah kedipan fokus dan overwrite input lokal
