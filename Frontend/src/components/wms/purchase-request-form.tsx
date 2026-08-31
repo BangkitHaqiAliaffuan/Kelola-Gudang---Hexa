@@ -463,9 +463,8 @@ export function PurchaseRequestForm({
                         min={0}
                         step="any"
                         value={l.price}
-                        onChange={(e) => patchLine(l.key, { price: e.target.value })}
-                        placeholder={item ? String(item.cost) : "0"}
-                        className={`h-9 w-32 rounded-lg ${Number(l.price) < 0 ? "border-destructive" : ""}`}
+                        readOnly
+                        className={`h-9 w-32 rounded-lg bg-muted text-muted-foreground ${Number(l.price) < 0 ? "border-destructive" : ""}`}
                       />
                       {lineError(i, "price") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "price")}</p>
@@ -539,9 +538,8 @@ export function PurchaseRequestForm({
                       min={0}
                       step="any"
                       value={l.price}
-                      onChange={(e) => patchLine(l.key, { price: e.target.value })}
-                      placeholder="Harga"
-                      className="h-9 w-28 rounded-lg"
+                      readOnly
+                      className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
                     />
                   </div>
                   <div className="flex items-center justify-between text-sm">

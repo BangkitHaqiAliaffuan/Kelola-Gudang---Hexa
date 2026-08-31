@@ -36,7 +36,7 @@ class StockDocumentController extends Controller
         ]);
 
         $query = StockDocument::query()
-            ->with(['warehouse', 'destination'])
+            ->with(['warehouse', 'destination', 'sourceDocument'])
             ->withCount('lines')
             ->withCount(['lines as checked_count' => fn ($q) => $q->whereNotNull('actual_qty')])
             ->withSum('lines as qty_total', 'qty')

@@ -519,9 +519,8 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                           min={0}
                           step="any"
                           value={l.price}
-                          onChange={(e) => patchLine(l.key, { price: e.target.value })}
-                          placeholder="0"
-                          className="h-9 w-32 rounded-lg"
+                          readOnly
+                          className="h-9 w-32 rounded-lg bg-muted text-muted-foreground"
                         />
                         {lineError(i, "price") && (
                           <p className="mt-1 text-xs text-destructive">{lineError(i, "price")}</p>
@@ -591,9 +590,9 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
                     min={0}
                     step="any"
                     value={l.price}
-                    onChange={(e) => patchLine(l.key, { price: e.target.value })}
+                    readOnly
                     placeholder="Harga"
-                    className="mt-2 h-9 rounded-lg"
+                    className="mt-2 h-9 rounded-lg bg-muted text-muted-foreground"
                   />
                   <div className="mt-1 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Subtotal</span>

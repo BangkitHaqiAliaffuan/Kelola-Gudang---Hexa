@@ -505,8 +505,8 @@ export function BarangMasukForm({
                         type="number"
                         min={0}
                         value={l.cost}
-                        onChange={(e) => patchLine(l.key, { cost: e.target.value })}
-                        className="h-9 w-28 rounded-lg"
+                        readOnly
+                        className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
                       />
                       {lineError(i, "unit_cost") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "unit_cost")}</p>
@@ -593,8 +593,8 @@ export function BarangMasukForm({
                       type="number"
                       min={0}
                       value={l.cost}
-                      onChange={(e) => patchLine(l.key, { cost: e.target.value })}
-                      className="h-9 w-28 rounded-lg"
+                      readOnly
+                      className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
                     />
                     <span className="ml-auto text-sm font-semibold">
                       {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}

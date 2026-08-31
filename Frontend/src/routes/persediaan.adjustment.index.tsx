@@ -160,8 +160,8 @@ function StockAdjustment() {
       className: "w-[160px] whitespace-nowrap",
       sortable: true,
       render: (r) =>
-        r.source_document ? (
-          <Pill tone="brand">{r.source_document}</Pill>
+        r.source_document_id ? (
+          <Pill tone="brand">{r.source_document ?? `SO#${r.source_document_id}`}</Pill>
         ) : (
           <Pill tone="neutral">Manual</Pill>
         ),
@@ -306,8 +306,8 @@ function StockAdjustment() {
               </p>
               <div className="flex items-center gap-2">
                 <p className="text-xs">{formatNumber(r.line_count)} baris</p>
-                {r.source_document ? (
-                  <Pill tone="brand">{r.source_document}</Pill>
+                {r.source_document_id ? (
+                  <Pill tone="brand">{r.source_document ?? `SO#${r.source_document_id}`}</Pill>
                 ) : (
                   <Pill tone="neutral">Manual</Pill>
                 )}
