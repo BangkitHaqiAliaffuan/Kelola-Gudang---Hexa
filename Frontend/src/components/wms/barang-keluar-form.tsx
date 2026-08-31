@@ -628,6 +628,19 @@ export function BarangKeluarForm() {
                       Qty melebihi stok tersedia di bin ini.
                     </p>
                   )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Harga</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={l.cost}
+                      readOnly
+                      className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
+                    />
+                    <span className="ml-auto text-sm font-semibold">
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
+                    </span>
+                  </div>
                   {lineError(i, "from_bin_id") && (
                     <p className="text-xs text-destructive">{lineError(i, "from_bin_id")}</p>
                   )}
@@ -650,9 +663,15 @@ export function BarangKeluarForm() {
           })}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border bg-muted/40 px-4 py-3">
-          <span className="text-sm font-medium">Total Qty</span>
-          <span className="text-lg font-bold">{formatNumber(totalQty)}</span>
+        <div className="flex flex-col gap-1 border-t border-border bg-muted/40 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Total Qty</span>
+            <span className="text-sm font-bold">{formatNumber(totalQty)} PCS</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Grand Total Nilai</span>
+            <span className="text-lg font-bold">{formatIDR(totalNilai)}</span>
+          </div>
         </div>
       </Panel>
 
