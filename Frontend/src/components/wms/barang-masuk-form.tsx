@@ -493,7 +493,8 @@ export function BarangMasukForm({
                         min={1}
                         value={l.qty}
                         onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                        className="h-9 w-24 rounded-lg"
+                        readOnly={!!(referenceCombobox && selectedPoId)}
+                        className={`h-9 w-24 rounded-lg ${referenceCombobox && selectedPoId ? "bg-muted text-muted-foreground" : ""}`}
                       />
                       {lineError(i, "qty") && (
                         <p className="mt-1 text-xs text-destructive">{lineError(i, "qty")}</p>
@@ -585,7 +586,8 @@ export function BarangMasukForm({
                       min={1}
                       value={l.qty}
                       onChange={(e) => patchLine(l.key, { qty: e.target.value })}
-                      className="h-9 w-24 rounded-lg"
+                      readOnly={!!(referenceCombobox && selectedPoId)}
+                      className={`h-9 w-24 rounded-lg ${referenceCombobox && selectedPoId ? "bg-muted text-muted-foreground" : ""}`}
                     />
                     <Input
                       type="number"
