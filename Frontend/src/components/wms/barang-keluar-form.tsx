@@ -104,12 +104,17 @@ export function BarangKeluarForm() {
     [warehouses],
   );
 
+  // Tujuan: gabung 3 master tapi hindari collision nama — value di-prefix dengan tipe,
+  // label dibedakan. customer:12 vs department:5 dengan nama sama tidak tabrakan.
   const purposeOptions: ComboboxOption[] = useMemo(() => {
-    const names = new Set<string>();
-    for (const c of customers?.data ?? []) names.add(c.name);
-    for (const d of departments?.data ?? []) names.add(d.name);
-    for (const p of projects?.data ?? []) names.add(p.name);
-    return [...names].sort().map((n) => ({ value: n, label: n }));
+    const opts: ComboboxOption[] = [];
+    for (const c of customers?.data ?? [])
+      opts.push({ value: `customer:${c.id}`, label: `${c.name} — Customer`, keywords: c.name });
+    for (const d of departments?.data ?? [])
+      opts.push({ value: `department:${d.id}`, label: `${d.name} — Departemen`, keywords: d.name });
+    for (const p of projects?.data ?? [])
+      opts.push({ value: `project:${p.id}`, label: `${p.name} — Proyek`, keywords: p.name });
+    return opts.sort((a, b) => a.label.localeCompare(b.label));
   }, [customers, departments, projects]);
 
   const itemOptions: ComboboxOption[] = useMemo(
@@ -242,7 +247,8 @@ export function BarangKeluarForm() {
       const costVal = item ? String(item.cost ?? 0) : "";
       // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan bin tapi update cost
       if (line.binId !== "" && currentValid) return { itemId, cost: costVal };
-      if (line.binId === "" && candidates.some((c) => c.bin_id === null)) return { itemId, cost: costVal };
+      if (line.binId === "" && candidates.some((c) => c.bin_id === null))
+        return { itemId, cost: costVal };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
@@ -263,24 +269,41 @@ export function BarangKeluarForm() {
   };
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
-    const cid = purpose ? customers?.data.find((c) => c.name === purpose)?.id ?? null : null;
+    let cid: number | null = null;
+    let partnerName: string | null = null;
+    if (purpose) {
+      if (purpose.startsWith("customer:")) {
+        cid = Number(purpose.split(":")[1] ?? "");
+        partnerName = customers?.data.find((c) => String(c.id) === String(cid))?.name ?? null;
+      } else if (purpose.startsWith("department:")) {
+        const did = purpose.split(":")[1];
+        partnerName = departments?.data.find((d) => String(d.id) === did)?.name ?? null;
+      } else if (purpose.startsWith("project:")) {
+        const pid = purpose.split(":")[1];
+        partnerName = projects?.data.find((p) => String(p.id) === pid)?.name ?? null;
+      } else {
+        // fallback legacy string (seharusnya tidak terjadi)
+        partnerName = purpose;
+        cid = customers?.data.find((c) => c.name === purpose)?.id ?? null;
+      }
+    }
     return {
       type: "Pengeluaran",
       status,
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       customer_id: cid,
-      partner: purpose || null,
-    reference_no: reference.trim() || null,
-    pic: pic.trim() || null,
-    note: note.trim() || null,
-    lines: lines
-      .filter((l) => l.itemId && l.qty)
-      .map((l) => ({
-        item_id: Number(l.itemId),
-        qty: Number(l.qty),
-        from_bin_id: l.binId ? Number(l.binId) : null,
-      })),
+      partner: partnerName,
+      reference_no: reference.trim() || null,
+      pic: pic.trim() || null,
+      note: note.trim() || null,
+      lines: lines
+        .filter((l) => l.itemId && l.qty)
+        .map((l) => ({
+          item_id: Number(l.itemId),
+          qty: Number(l.qty),
+          from_bin_id: l.binId ? Number(l.binId) : null,
+        })),
     };
   };
 

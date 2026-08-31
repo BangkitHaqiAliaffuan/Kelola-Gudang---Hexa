@@ -6,6 +6,7 @@ use App\Http\Requests\StoreStockDocumentRequest;
 use App\Http\Requests\UpdateStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
 use App\Models\Bin;
+use App\Models\Customer;
 use App\Models\ItemStock;
 use App\Models\RolePermission;
 use App\Models\StockDocument;
@@ -46,7 +47,8 @@ class StockDocumentController extends Controller
             $query->where(function ($q) use ($needle) {
                 $q->whereRaw('LOWER(no) LIKE ?', ["%{$needle}%"])
                     ->orWhereRaw('LOWER(partner) LIKE ?', ["%{$needle}%"])
-                    ->orWhereRaw('LOWER(note) LIKE ?', ["%{$needle}%"]);
+                    ->orWhereRaw('LOWER(note) LIKE ?', ["%{$needle}%"])
+                    ->orWhereHas('customer', fn ($cq) => $cq->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"]));
             });
         }
 
@@ -122,6 +124,15 @@ class StockDocumentController extends Controller
     public function store(StoreStockDocumentRequest $request)
     {
         $data = $request->validated();
+
+        // Backwards compatibility: Retur Penjualan lama kirim partner string tanpa customer_id.
+        // Coba resolve customer_id dari partner name jika kosong.
+        if (($data['type'] ?? null) === 'Retur Penjualan' && empty($data['customer_id'] ?? null) && ! empty($data['partner'] ?? null)) {
+            $found = Customer::where('name', $data['partner'])->first();
+            if ($found) {
+                $data['customer_id'] = $found->id;
+            }
+        }
 
         // Guard: Manual & Opname ADJ selalu Menunggu Approval → reason_code wajib sejak create (tutup bypass Draft tanpa alasan).
         if (($data['type'] ?? null) === 'Stock Adjustment') {
@@ -219,7 +230,7 @@ class StockDocumentController extends Controller
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
                     'source_document_id' => in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true) ? ($data['source_document_id'] ?? null) : null,
                     'customer_id' => $data['customer_id'] ?? null,
-                    'partner' => $data['customer_id'] ? (\App\Models\Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null) : ($data['partner'] ?? null),
+                    'partner' => ! empty($data['customer_id'] ?? null) ? (\App\Models\Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null) : ($data['partner'] ?? null),
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
                     'note' => $data['note'] ?? null,
@@ -284,7 +295,7 @@ class StockDocumentController extends Controller
         }
 
         return (new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
+            'warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines')))->response()->setStatusCode(201);
     }
 
@@ -328,6 +339,7 @@ class StockDocumentController extends Controller
         $stockDocument->load([
             'warehouse',
             'destination',
+            'customer',
             'creator',
             'sourceDocument',
             'lines.item.unit',

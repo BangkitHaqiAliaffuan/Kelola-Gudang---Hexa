@@ -18,6 +18,18 @@ class StoreStockDocumentRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        // Backwards compatibility: Retur Penjualan lama kirim partner string tanpa customer_id.
+        // Auto-resolve customer_id dari partner name sebelum validasi required.
+        if ($this->input('type') === 'Retur Penjualan' && empty($this->input('customer_id')) && ! empty($this->input('partner'))) {
+            $found = \App\Models\Customer::where('name', $this->input('partner'))->first();
+            if ($found) {
+                $this->merge(['customer_id' => $found->id]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -210,6 +222,10 @@ class StoreStockDocumentRequest extends FormRequest
                 }
 
                 $bins = Bin::with('rack.warehouse')->whereIn('id', $binIds)->get()->keyBy('id');
+                $itemIds = collect($lines)->pluck('item_id')->filter()->unique()->values();
+                $items = \App\Models\Item::whereIn('id', $itemIds)->get()->keyBy('id');
+                $headerWh = \App\Models\Warehouse::find($warehouseId);
+                $expectedWhName = $headerWh?->name ?? "Gudang ID {$warehouseId}";
 
                 foreach ($lines as $index => $line) {
                     foreach (['to_bin_id', 'from_bin_id'] as $field) {
@@ -234,9 +250,15 @@ class StoreStockDocumentRequest extends FormRequest
 
                         if ($bin->rack->warehouse_id !== $expected) {
                             $actualWh = $bin->rack->warehouse?->name ?? "Gudang ID {$bin->rack->warehouse_id}";
+                            $expectedName = ($type === 'Transfer Gudang' && $field === 'to_bin_id')
+                                ? (\App\Models\Warehouse::find($destinationId)?->name ?? "Gudang ID {$destinationId}")
+                                : $expectedWhName;
+                                
+                            $item = $items->get((int) ($line['item_id'] ?? 0));
+                            $skuLabel = $item ? " — SKU {$item->sku}" : '';
                             $validator->errors()->add(
                                 "lines.{$index}.{$field}",
-                                "Bin {$bin->code} ({$bin->rack->name}) berada di {$actualWh}, bukan di gudang yang dipilih."
+                                "Bin {$bin->code} (Rak {$bin->rack->code}) berada di {$actualWh}, bukan {$expectedName} (baris " . ($index + 1) . "{$skuLabel})."
                             );
                         }
                     }

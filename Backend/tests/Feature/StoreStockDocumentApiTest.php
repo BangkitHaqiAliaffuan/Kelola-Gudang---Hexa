@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Bin;
+use App\Models\Customer;
 use App\Models\Item;
 use App\Models\Rack;
 use App\Models\StockDocument;
@@ -945,12 +946,14 @@ class StoreStockDocumentApiTest extends TestCase
     {
         $item = $this->makeItem();
         [$wh, , $bin] = $this->makeLocation();
+        $customer = Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => $customer->id,
             'partner' => 'PT Aneka Mandiri',
             'reference_no' => 'SJ-00456',
             'note' => 'Alasan: Salah Barang',
@@ -983,12 +986,14 @@ class StoreStockDocumentApiTest extends TestCase
     {
         $item = $this->makeItem();
         [$wh, $rack, $bin] = $this->makeLocation();
+        $customer = Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Selesai',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => $customer->id,
             'partner' => 'PT Aneka Mandiri',
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 3, 'unit_cost' => 1800, 'to_bin_id' => $bin->id],
@@ -1028,12 +1033,14 @@ class StoreStockDocumentApiTest extends TestCase
         // Opsi A: Retur Penjualan boleh tanpa bin (lantai).
         $item = $this->makeItem();
         [$wh] = $this->makeLocation();
+        $customer = Customer::factory()->create();
 
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => $customer->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1],
             ],
@@ -1048,12 +1055,14 @@ class StoreStockDocumentApiTest extends TestCase
         [$wh] = $this->makeLocation();
         [, , $otherBin] = $this->makeLocation();
         $before = StockDocument::count();
+        $customer = Customer::factory()->create();
 
         $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => $customer->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'unit_cost' => 1000, 'to_bin_id' => $otherBin->id],
             ],
@@ -1353,6 +1362,7 @@ class StoreStockDocumentApiTest extends TestCase
     {
         $item = $this->makeItem();
         [$wh, $rack, $bin] = $this->makeLocation();
+        Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         // Stok masuk (harga beli 1500) → BK keluar 5 (moving average 1500) →
         // retur ter-link memakai harga baris sumber BK dan stok kembali ke bin asal.
@@ -1487,15 +1497,18 @@ class StoreStockDocumentApiTest extends TestCase
         $item = $this->makeItem();
         [$wh, $rack, $binA] = $this->makeLocation();
         $binB = Bin::factory()->create(['rack_id' => $rack->id]);
+        Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         $this->makePostedPenerimaan($item->id, $binA->id, 10, 1500);
         [$source, $sourceLine] = $this->makePostedPengeluaran($item->id, $binA->id, 5);
 
+        $customer = Customer::where('name', 'PT Aneka Mandiri')->first() ?? Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
         $res = $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Retur Penjualan',
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => $customer->id,
             'source_document_id' => $source->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $binB->id, 'source_line_id' => $sourceLine->id],
@@ -1509,6 +1522,7 @@ class StoreStockDocumentApiTest extends TestCase
     {
         $item = $this->makeItem();
         [$wh, , $bin] = $this->makeLocation();
+        Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         $this->makePostedPenerimaan($item->id, $bin->id, 10, 1500);
         [$source, $sourceLine] = $this->makePostedPengeluaran($item->id, $bin->id, 5);
@@ -1534,6 +1548,7 @@ class StoreStockDocumentApiTest extends TestCase
     {
         $item = $this->makeItem();
         [$wh, , $bin] = $this->makeLocation();
+        Customer::factory()->create(['name' => 'PT Aneka Mandiri']);
 
         $this->makePostedPenerimaan($item->id, $bin->id, 10, 1500);
         [$source, $sourceLine] = $this->makePostedPengeluaran($item->id, $bin->id, 5);
@@ -1544,6 +1559,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => Customer::where('name', 'PT Aneka Mandiri')->first()->id,
             'source_document_id' => $source->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],
@@ -1558,6 +1574,7 @@ class StoreStockDocumentApiTest extends TestCase
             'status' => 'Draft',
             'document_date' => '2026-08-12',
             'warehouse_id' => $wh->id,
+            'customer_id' => Customer::where('name', 'PT Aneka Mandiri')->first()->id,
             'source_document_id' => $source->id,
             'lines' => [
                 ['item_id' => $item->id, 'qty' => 3, 'to_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id],

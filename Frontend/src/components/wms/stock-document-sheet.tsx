@@ -231,7 +231,7 @@ export function StockDocumentSheet({
                           ? "Customer"
                           : "Partner / Tujuan"
                   }
-                  value={doc.destination ?? doc.partner ?? "—"}
+                  value={doc.destination ?? doc.customer ?? doc.partner ?? "—"}
                 />
                 <Field label="Referensi" value={doc.reference_no ?? "—"} />
                 <Field label="Dibuat oleh" value={doc.created_by ?? doc.pic ?? "—"} />
@@ -405,11 +405,7 @@ export function StockDocumentSheet({
                     </Button>
                   )}
                   {canSubmit && onSubmit && (
-                    <Button
-                      className="rounded-xl"
-                      onClick={onSubmit}
-                      disabled={busy}
-                    >
+                    <Button className="rounded-xl" onClick={onSubmit} disabled={busy}>
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
@@ -443,7 +439,9 @@ export function StockDocumentSheet({
                       className="rounded-xl"
                       onClick={onApprove}
                       disabled={busy || isApproveBlocked}
-                      title={isApproveBlocked ? "Pembuat tidak boleh menyetujui sendiri" : undefined}
+                      title={
+                        isApproveBlocked ? "Pembuat tidak boleh menyetujui sendiri" : undefined
+                      }
                     >
                       {busy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

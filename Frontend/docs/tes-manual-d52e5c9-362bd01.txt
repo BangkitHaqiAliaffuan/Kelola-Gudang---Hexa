@@ -1,0 +1,133 @@
+======================================================================
+DOKUMEN TES MANUAL — 2 COMMIT 31 AGU 2026 d52e5c9 + 362bd01
+Cakupan: Proyek link Vendor opsional (prime) + Barang Keluar Harga/Subtotal
+Tanggal: 2026-08-31 11:15:35 (d52e5c9) & 11:16:09 (362bd01) — 12 file unik (13 hitung duplikat: barang-keluar-form.tsx muncul di kedua commit)
+Format: Teks Biasa (TXT) - Bukan Markdown
+======================================================================
+
+Ringkasan commit:
+  d52e5c9 feat(master): proyek link vendor opsional (prime, nullable FK nullOnDelete) + form combobox + barang-keluar harga/subtotal
+    12 file: Backend ProjectController, Store/UpdateProjectRequest, ProjectResource, Project, Vendor, migration 2026_08_31_add_vendor_id, Frontend barang-keluar-form, master-forms, use-master, master-types, schemas
+  362bd01 fix(barang-keluar): Harga readOnly + Subtotal & Grand Total Nilai (IDR) di daftar barang
+    1 file: Frontend barang-keluar-form.tsx (overlap dengan d52e5c9, jadi 12 unik)
+  Urutan: b62fa53 (GR readOnly) -> d52e5c9 -> 362bd01
+
+======================================================================
+DAFTAR FILE TERDAMPAK (12 unik)
+======================================================================
+  Backend/app/Http/Controllers/ProjectController.php
+  Backend/app/Http/Requests/StoreProjectRequest.php
+  Backend/app/Http/Requests/UpdateProjectRequest.php
+  Backend/app/Http/Resources/ProjectResource.php
+  Backend/app/Models/Project.php
+  Backend/app/Models/Vendor.php
+  Backend/database/migrations/2026_08_31_000001_add_vendor_id_to_projects_table.php  (A)
+  Frontend/src/components/wms/barang-keluar-form.tsx  * muncul di d52e5c9 dan 362bd01 (13 hitung)
+  Frontend/src/components/wms/master-forms.tsx
+  Frontend/src/hooks/use-master.ts
+  Frontend/src/lib/master-types.ts
+  Frontend/src/lib/schemas.ts
+
+Prasyarat:
+  Backend: composer dev (8000) + psql kelolagudang migrate (php artisan migrate) .env DEMO_PASSWORD set. Frontend: bun + npm run dev (8080) proxy /api.
+  Role: user dengan Master Data Tulis + Persediaan Tulis (Bearer kg-token).
+  Seed: minimal 2 Vendor, 1 Proyek existing, Items dengan cost + default_bin, stock di item_stock.
+
+----------------------------------------------------------------------
+A. PROYEK VENDOR OPSIONAL (d52e5c9 — 11 file)
+----------------------------------------------------------------------
+File: Backend/database/migrations/2026_08_31_000001_add_vendor_id_to_projects_table.php
+  Migrasi: add vendor_id nullable constrained vendors nullOnDelete after pic_user_id
+
+Tes:
+  [ ] Cek php artisan migrate:status — migration 2026_08_31_000001 applied
+  [ ] Rollback test: php artisan migrate:rollback --step=1 -> dropConstrainedForeignId, lalu migrate lagi
+
+File: Backend/app/Models/Project.php + Vendor.php
+  Project fillable vendor_id + belongsTo Vendor, Vendor hasMany Project
+
+Tes:
+  [ ] Model Project create dengan vendor_id null -> tidak error, $project->vendor null
+
+File: Backend/app/Http/Controllers/ProjectController.php
+  index with ['pic','vendor'], store/show/update with vendor, search orWhereHas vendor name
+
+Tes:
+  [ ] GET /api/master/projects?search=NamaVendor -> proyek dengan vendor tersebut ter-filter (orWhereHas LOWER(vendor.name) LIKE)
+
+File: Backend/app/Http/Requests/StoreProjectRequest.php + UpdateProjectRequest.php
+  vendor_id nullable integer exists:vendors,id
+
+Tes:
+  [ ] A1 Create tanpa vendor: Master > Proyek > Tambah -> isi code auto PRJ, name, PIC -> vendor kosong -> Simpan -> 201, GET show vendor_id null vendor null
+  [ ] A2 Create dengan vendor: pilih Vendor combobox (ketik code/service_type) -> Simpan -> vendor_id persist, list tampil vendor name, search vendor ter-filter
+  [ ] A3 Edit: ganti vendor -> Simpan -> PATCH vendor berubah. Kosongkan (allowEmpty -> "") -> vendor_id null
+  [ ] A4 Validasi: vendor_id=99999 -> 422 exists:vendors,id. vendor_id="abc" -> 422 integer
+  [ ] A5 nullOnDelete: DELETE /api/master/vendors/{id} yang dipakai proyek -> proyek tetap ada, vendor_id jadi null (cek DB projects.vendor_id, UI tampil "-" bukan error)
+  [ ] A6 Resource: GET list includes vendor field, withCount workOrders masih
+
+File: Backend/app/Http/Resources/ProjectResource.php
+  vendor_id + vendor whenLoaded
+
+Tes:
+  [ ] GET /api/master/projects includes vendor_id dan vendor name bila ada
+
+File: Frontend/src/lib/master-types.ts + schemas.ts + hooks/use-master.ts
+  Project vendor_id:number|null + vendor:string|null, schemas vendor_id nullableFk, ProjectPayload vendor_id?
+
+Tes:
+  [ ] Type check npx tsc --noEmit tidak error vendor_id
+
+File: Frontend/src/components/wms/master-forms.tsx (ProjectFormDialog)
+  vendor_id combobox (vendors?.data -> label name keywords code+service_type) allowEmpty, error handling rowField vendor_id
+
+Tes:
+  [ ] Buka Proyek Form -> combobox vendor muncul, ketik filter code/service_type -> opsi ter-filter, pilih -> Simpan berhasil, error vendor_id 422 tampil di FormMessage bila invalid
+  [ ] Kosongkan vendor -> Simpan -> vendor_id null, tidak error
+
+----------------------------------------------------------------------
+B. BARANG KELUAR HARGA/SUBTOTAL/GRAND TOTAL (d52e5c9 + 362bd01 — 1 file, 2 sentuhan)
+----------------------------------------------------------------------
+File: Frontend/src/components/wms/barang-keluar-form.tsx
+  d52e5c9: import formatIDR, FormLine cost:string, newLine cost "0", totalNilai reduce qty*cost, pickItem cost Val, header min-w 960, columns Harga/Subtotal
+  362bd01: mobile Harga readOnly + Subtotal & footer Grand Total Nilai
+
+Tes:
+  [ ] B1 New line: Tambah Transaksi Keluar -> pilih Barang -> Harga auto-terisi String(item.cost ??0) readOnly bg-muted, Subtotal = formatIDR(qty*cost), Grand Total Nilai di footer = sum qty*cost . Default qty 1 cost 0 -> Subtotal 0
+  [ ] B2 Qty change: ubah Qty 1->3 -> Subtotal & Grand Total recalc live (useMemo totalNilai). Qty 0 -> Subtotal 0, Grand Total 0
+  [ ] B3 Ganti barang: pilih barang lain -> cost update otomatis, bin logic preserved (if current bin still valid keep else preferredBin default_bin_id / first / "") + costVal. Bin "" (lantai) tetap cost dari item.cost
+  [ ] B4 Mobile responsive (<640px): card shows Harga readOnly input + Subtotal di kanan, footer shows Total Qty PCS + Grand Total Nilai IDR. Desktop table shows kolom Harga (w-28 readOnly), Subtotal (font-semibold), Tersedia
+  [ ] B5 ReadOnly guard: inspect Harga input -> attribute readOnly, class bg-muted text-muted-foreground, cannot edit manual (attempt type -> blocked, onChange tidak ter-trigger karena readOnly)
+  [ ] B6 Format: IDR formatting formatIDR konsisten desktop & mobile, Grand Total == sum manual calc (qty*cost per baris)
+  [ ] B7 Submit: Simpan tetap hanya kirim warehouse_id, lines qty/bin, cost display-only tidak dikirim (verify payload tidak ada unit_cost, controller backfill averageCost). Tidak 422 karena cost readOnly
+
+----------------------------------------------------------------------
+C. REGRESSION
+----------------------------------------------------------------------
+  [ ] C1 Project tanpa vendor tetap backward compatible (old records vendor_id null, UI "-" , search tidak error)
+  [ ] C2 WorkOrders count, PIC relation unaffected (Project work_orders_count whenCounted tetap)
+  [ ] C3 Barang-keluar submit stock document still only sends warehouse_id, lines qty/bin, cost display-only (payload not broken, server backfill costAt)
+  [ ] C4 Scan barcode tetap jalan (pickItem costVal) tidak regresi
+
+----------------------------------------------------------------------
+CARA JALANKAN & VERIFIKASI
+----------------------------------------------------------------------
+  BE
+    C:/tools/php83/php.exe artisan migrate --pretend --step  (cek migration vendor_id)
+    C:/tools/php83/php.exe vendor/bin/phpunit --filter ProjectApiTest
+    C:/tools/php83/php.exe vendor/bin/phpunit --filter ItemApiTest
+  FE
+    cd Frontend && npx tsc --noEmit
+    npm run lint
+    Manual: buka Master > Proyek (vendor combobox), Transaksi > Barang Keluar (Harga/Subtotal), cek mobile 375px
+
+ENV CLEANUP:
+  php artisan migrate:status confirms 2026_08_31_000001 applied; down rollback test dropConstrainedForeignId
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (Lulus/Gagal per bagian A/B/C): A: ......  B: ......  C: ......
+Catatan:
