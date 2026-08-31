@@ -15,6 +15,7 @@ class Project extends Model
         'code',
         'name',
         'pic_user_id',
+        'vendor_id',
         'start_date',
         'end_date',
         'status',
@@ -30,6 +31,11 @@ class Project extends Model
     public function pic(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pic_user_id');
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function workOrders(): HasMany

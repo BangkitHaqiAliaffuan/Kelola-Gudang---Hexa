@@ -15,14 +15,15 @@ class ProjectController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Project::query()->with('pic')->withCount('workOrders');
+        $query = Project::query()->with(['pic', 'vendor'])->withCount('workOrders');
 
         if ($search = $request->query('search')) {
             $needle = strtolower($search);
             $query->where(function ($q) use ($needle) {
                 $q->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"])
                     ->orWhereRaw('LOWER(code) LIKE ?', ["%{$needle}%"])
-                    ->orWhereHas('pic', fn ($pic) => $pic->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"]));
+                    ->orWhereHas('pic', fn ($pic) => $pic->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"]))
+                    ->orWhereHas('vendor', fn ($v) => $v->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"]));
             });
         }
 
@@ -48,19 +49,19 @@ class ProjectController extends Controller
             return Project::create($data);
         });
 
-        return new ProjectResource($project->load('pic')->loadCount('workOrders'));
+        return new ProjectResource($project->load(['pic', 'vendor'])->loadCount('workOrders'));
     }
 
     public function show(Project $project): ProjectResource
     {
-        return new ProjectResource($project->load('pic')->loadCount('workOrders'));
+        return new ProjectResource($project->load(['pic', 'vendor'])->loadCount('workOrders'));
     }
 
     public function update(UpdateProjectRequest $request, Project $project): ProjectResource
     {
         $project->update($request->validated());
 
-        return new ProjectResource($project->fresh()->load('pic')->loadCount('workOrders'));
+        return new ProjectResource($project->fresh()->load(['pic', 'vendor'])->loadCount('workOrders'));
     }
 
     public function destroy(Project $project): JsonResponse

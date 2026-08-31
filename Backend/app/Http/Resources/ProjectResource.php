@@ -15,6 +15,8 @@ class ProjectResource extends JsonResource
             'name' => $this->name,
             'pic_user_id' => $this->pic_user_id,
             'pic' => $this->whenLoaded('pic', fn () => $this->pic?->name),
+            'vendor_id' => $this->vendor_id,
+            'vendor' => $this->whenLoaded('vendor', fn () => $this->vendor?->name),
             'start_date' => $this->start_date?->format('Y-m-d'),
             'end_date' => $this->end_date?->format('Y-m-d'),
             'status' => $this->status,

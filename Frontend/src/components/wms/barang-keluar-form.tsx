@@ -37,7 +37,7 @@ import {
 } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
-import { formatNumber } from "@/lib/wms-data";
+import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockDocumentPayload } from "@/lib/persediaan-types";
 
 type FormLine = {
@@ -45,12 +45,13 @@ type FormLine = {
   itemId: string;
   binId: string;
   qty: string;
+  cost: string;
 };
 
 let lineSeq = 0;
 const newLine = (): FormLine => {
   lineSeq += 1;
-  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1" };
+  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1", cost: "0" };
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -213,6 +214,10 @@ export function BarangKeluarForm() {
     !l.itemId || (binCandidatesByItem.get(l.itemId)?.length ?? 0) > 0;
 
   const totalQty = useMemo(() => lines.reduce((sum, l) => sum + (Number(l.qty) || 0), 0), [lines]);
+  const totalNilai = useMemo(
+    () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.cost) || 0), 0),
+    [lines],
+  );
 
   const patchLine = (
     key: string,
@@ -234,9 +239,10 @@ export function BarangKeluarForm() {
           (c) => String(c.bin_id ?? "NULL") === (line.binId === "" ? "NULL" : line.binId),
         ),
       );
-      // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan
-      if (line.binId !== "" && currentValid) return { itemId };
-      if (line.binId === "" && candidates.some((c) => c.bin_id === null)) return { itemId };
+      const costVal = item ? String(item.cost ?? 0) : "";
+      // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan bin tapi update cost
+      if (line.binId !== "" && currentValid) return { itemId, cost: costVal };
+      if (line.binId === "" && candidates.some((c) => c.bin_id === null)) return { itemId, cost: costVal };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
@@ -245,7 +251,7 @@ export function BarangKeluarForm() {
               ? ""
               : String(candidates[0].bin_id)
             : "";
-      return { itemId, binId: preferredBin };
+      return { itemId, binId: preferredBin, cost: costVal };
     });
   };
 
@@ -431,10 +437,10 @@ export function BarangKeluarForm() {
         bodyClassName="p-0"
       >
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Tersedia", ""].map((h) => (
+                {["Barang", "Asal Bin", "Qty", "Harga", "Subtotal", "Tersedia", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -519,6 +525,18 @@ export function BarangKeluarForm() {
                           Melebihi tersedia ({formatNumber(available)})
                         </p>
                       )}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={l.cost}
+                        readOnly
+                        className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-sm font-semibold">
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
                       {available !== undefined ? formatNumber(available) : "—"}

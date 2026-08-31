@@ -3259,6 +3259,7 @@ export function ProjectFormDialog({
   const update = useUpdateProject();
   const { data: projects } = useProjects();
   const { data: users, isLoading: usersLoading } = useUsers();
+  const { data: vendors, isLoading: vendorsLoading } = useVendors();
   const previewCode = nextCode(
     (projects?.data ?? []).map((p) => p.code),
     "PRJ",
@@ -3278,6 +3279,7 @@ export function ProjectFormDialog({
               code: initial.code,
               name: initial.name,
               pic_user_id: initial.pic_user_id ?? "",
+              vendor_id: initial.vendor_id ?? "",
               start_date: initial.start_date ?? "",
               end_date: initial.end_date ?? "",
               status: initial.status as ProjectInput["status"],
@@ -3287,6 +3289,7 @@ export function ProjectFormDialog({
               code: "",
               name: "",
               pic_user_id: "",
+              vendor_id: "",
               start_date: "",
               end_date: "",
               status: "Perencanaan",
@@ -3301,6 +3304,7 @@ export function ProjectFormDialog({
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
         if (values.pic_user_id) payload.pic_user_id = values.pic_user_id;
+        if (values.vendor_id) payload.vendor_id = values.vendor_id as number;
         if (values.start_date) payload.start_date = values.start_date;
         if (values.end_date) payload.end_date = values.end_date;
         if (values.budget != null) payload.budget = values.budget;
@@ -3317,11 +3321,13 @@ export function ProjectFormDialog({
           rowField(form as never, err, "code");
           rowField(form as never, err, "name");
           rowField(form as never, err, "pic_user_id");
+          rowField(form as never, err, "vendor_id");
           rowField(form as never, err, "budget");
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "pic_user_id") &&
+            !fieldError(err, "vendor_id") &&
             !fieldError(err, "budget")
           )
             toast.error((err as Error).message);
@@ -3383,6 +3389,37 @@ export function ProjectFormDialog({
                         placeholder="Pilih PIC"
                         allowEmpty
                         loading={usersLoading}
+                        side="bottom"
+                        avoidCollisions={false}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+            <FormField
+              control={form.control}
+              name="vendor_id"
+              render={({ field }) => {
+                const vendorOptions: ComboboxOption[] = (vendors?.data ?? []).map((v) => ({
+                  value: String(v.id),
+                  label: v.name,
+                  keywords: `${v.code} ${v.service_type ?? ""}`,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      Vendor <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <FormCombobox
+                        value={String(field.value ?? "")}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={vendorOptions}
+                        placeholder="Pilih vendor (prime)"
+                        allowEmpty
+                        loading={vendorsLoading}
                         side="bottom"
                         avoidCollisions={false}
                       />

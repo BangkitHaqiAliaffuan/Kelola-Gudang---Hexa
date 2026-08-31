@@ -240,6 +240,7 @@ export const projectSchema = z.object({
   code,
   name,
   pic_user_id: nullableFk,
+  vendor_id: nullableFk,
   start_date: dateInput,
   end_date: dateInput,
   status: z.enum(["Perencanaan", "Berjalan", "Selesai"]).default("Perencanaan"),

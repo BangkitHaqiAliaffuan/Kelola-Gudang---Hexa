@@ -319,6 +319,7 @@ export type ProjectPayload = {
   code?: string;
   name: string;
   pic_user_id?: number;
+  vendor_id?: number | null;
   start_date?: string;
   end_date?: string;
   status?: string;

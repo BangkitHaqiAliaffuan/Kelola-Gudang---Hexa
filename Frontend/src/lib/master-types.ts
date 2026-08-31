@@ -229,6 +229,8 @@ export type Project = {
   name: string;
   pic_user_id: number | null;
   pic: string | null;
+  vendor_id: number | null;
+  vendor: string | null;
   start_date: string | null;
   end_date: string | null;
   status: string;
