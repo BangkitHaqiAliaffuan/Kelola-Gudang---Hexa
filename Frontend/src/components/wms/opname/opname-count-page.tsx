@@ -119,13 +119,48 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         local = null;
       }
       if (local && Object.keys(local).length > 0) {
-        const merged: Record<number, string> = { ...serverRecords };
-        for (const [k, v] of Object.entries(local)) {
-          if (v !== "" && v != null) merged[Number(k)] = v;
-        }
-        if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
-          setRecords(merged);
-          toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+        const localHash = JSON.stringify(local);
+        const lastSent = lastSentRef.current;
+        if (lastSent && localHash === lastSent && localHash !== hash) {
+          // Draft sudah tersinkron sebelumnya, server lebih baru (Browser B sudah simpan 11)
+          // Prefer server, hapus draft stale
+          setRecords(serverRecords);
+          try {
+            window.localStorage.removeItem(storageKey);
+            window.localStorage.removeItem(lastSentStorageKey);
+          } catch {}
+          toast.info("Data terbaru dari server dimuat");
+        } else if (localHash !== hash) {
+          // Local vs server beda — cek apakah local unsynced
+          if (lastSent && localHash !== lastSent) {
+            // Local ada perubahan belum terkirim vs server baru -> konflik, keep local
+            setRecords(local);
+            toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
+              id: `opname-conflict-${docId}`,
+              action: {
+                label: "Muat ulang",
+                onClick: () => {
+                  setRecords(serverRecords);
+                  try {
+                    window.localStorage.removeItem(storageKey);
+                  } catch {}
+                },
+              },
+              duration: 8000,
+            });
+          } else {
+            // Draft lama yang belum sync tapi tidak konflik critical -> merge per-line (local win)
+            const merged: Record<number, string> = { ...serverRecords };
+            for (const [k, v] of Object.entries(local)) {
+              if (v !== "" && v != null) merged[Number(k)] = v;
+            }
+            if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
+              setRecords(merged);
+              toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+            } else {
+              setRecords(serverRecords);
+            }
+          }
         } else {
           setRecords(serverRecords);
         }
@@ -159,6 +194,16 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
       toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
         id: `opname-conflict-${docId}`,
+        action: {
+          label: "Muat ulang",
+          onClick: () => {
+            setRecords(serverRecords);
+            try {
+              window.localStorage.removeItem(storageKey);
+            } catch {}
+          },
+        },
+        duration: 8000,
       });
       return;
     }
@@ -246,13 +291,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(
-      payload.map((l) => ({
-        item_id: l.item_id,
-        from_bin_id: l.from_bin_id,
-        actual_qty: l.actual_qty,
-      })),
-    );
+    // Hash dari records (shape sama dengan serverRecords: line.id -> qty) untuk dedup yang konsisten
+    const hash = JSON.stringify(records);
     if (lastSentRef.current === hash) return;
     isSavingRef.current = true;
     setAutoSaving(true);
@@ -292,7 +332,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         },
       },
     );
-  }, [session, canWrite, dirty, update, hasValidationError, buildLines, storageKey]);
+  }, [session, canWrite, dirty, update, hasValidationError, buildLines, storageKey, records]);
 
   // keep ref fresh for keepalive flush without re-registering listeners
   useEffect(() => {
@@ -317,13 +357,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (!session || session.status !== "Draft" || !dirty || hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(
-      payload.map((l) => ({
-        item_id: l.item_id,
-        from_bin_id: l.from_bin_id,
-        actual_qty: l.actual_qty,
-      })),
-    );
+    const hash = JSON.stringify(records);
     if (lastSentRef.current === hash) return;
     try {
       const token = getAuthToken();
@@ -344,15 +378,12 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         body,
         keepalive: true,
       } as RequestInit);
-      lastSentRef.current = hash;
-      try {
-        window.localStorage.setItem(lastSentStorageKey, JSON.stringify(hash));
-        // keep local draft for safety; will be cleared on next successful silentSave
-      } catch {}
+      // Jangan update lastSent di keepalive — fire-and-forget tanpa ack, biar next silentSave yang ack
+      // keep local draft for safety; will be cleared on next successful silentSave
     } catch {
       // best effort
     }
-  }, [session, dirty, hasValidationError, buildLines]);
+  }, [session, dirty, hasValidationError, buildLines, records]);
 
   // online/offline + visibility/pagehide listeners (stable, not per-keystroke)
   useEffect(() => {

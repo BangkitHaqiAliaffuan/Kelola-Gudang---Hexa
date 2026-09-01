@@ -119,6 +119,7 @@ export function useStockDocument(id: number | undefined) {
     gcTime: 300_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    refetchOnMount: "always",
   });
 }
 
@@ -171,9 +172,15 @@ export function useUpdateStockDocument() {
       qc.setQueryData(detailKey, data);
     },
     onSettled: (data, err, vars) => {
-      // Tidak invalidate "detail" untuk mencegah kedipan fokus dan overwrite input lokal
       qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
       qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "summary"] });
+      // Invalidate detail juga agar tab lain dapat refetch saat mount, tapi
+      // refetchOnWindowFocus tetap false untuk cegah kedipan saat fokus
+      if (data?.data?.id) {
+        qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", data.data.id] });
+      } else if (vars?.id) {
+        qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", vars.id] });
+      }
     },
   });
 }

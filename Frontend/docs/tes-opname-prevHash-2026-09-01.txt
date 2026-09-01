@@ -1,0 +1,112 @@
+======================================================================
+DOKUMEN TES — fix(opname) prevHash stale 2026-09-01
+Cegah false positive warning saat autosave hybrid (prevHash stale)
+Commit : fix(opname): cegah false positive warning saat autosave hybrid
+File   : Frontend/src/components/wms/opname/opname-count-page.tsx (refactor effect L80-170)
+Format : TXT rapih — Page + Fungsi wajib retest
+======================================================================
+Ringkasan fix:
+  Bug: guard isSavingRef return sebelum update prevServerHashRef (L85),
+       optimistic onMutate setQueryData picu effect saat saving -> stale H0
+       -> t4 warn false positive meski hanya ketik lanjutan lokal.
+  Fix : hitung serverRecords/hash di atas, update prevHash sebelum guard
+        isSavingRef, konsolidasi single hash. Tidak ada perubahan use-persediaan.ts.
+  Commit sebelumnya: 2e2e67f (prevHash) + af84912 (staleTime/lastSent)
+
+======================================================================
+DAFTAR FILE TERDAMPAK (1 file)
+======================================================================
+  Frontend/src/components/wms/opname/opname-count-page.tsx
+    Effect L80-170: pindah kalkulasi serverRecords/hash dan assignment
+    prevServerHashRef ke sebelum guard isSavingRef. Guard sederhana
+    if (isSavingRef.current || update.isPending) return.
+
+Prasyarat:
+  Backend: composer dev (8000) tidak perlu untuk tes ini (opname mutasi via API persediaan).
+  Frontend: npm run dev (8080) proxy /api -> 8000, Bearer kg-token Persediaan Tulis.
+  Data: 1 dokumen Stock Opname status Draft dengan 5-10 baris, blind_count true/false bebas.
+  Role: Test Admin atau role dengan Persediaan Tulis (buat) + Kelola/Auditor (approve).
+  Browser: Chrome, localStorage enabled, 1 tab utama + 1 tab kedua untuk skenario remote.
+
+----------------------------------------------------------------------
+A. KETIK CEPAT SAAT AUTOSAVE (false positive utama)
+----------------------------------------------------------------------
+File: opname-count-page.tsx L259 isSavingRef=true sebelum mutate, L148 onMutate setQueryData
+Skenario wajib:
+  [ ] A1 Buka /opname/proses/{docId} Draft -> tunggu lines resolve (actual_qty null)
+  [ ] A2 Ketik "5" di baris 1 -> tunggu 0.3s (belum 1.5s idle) -> isSavingRef true (silentSave)
+  [ ] A3 Selama saving (autoSaving pill muncul) ketik "6" (hapus 5 -> ketik 6) di baris yang sama
+  [ ] A4 Tunggu onSuccess -> setQueryData server=5, isSavingRef false, records=6
+        Expected: TIDAK ada toast warning "Data diperbarui di perangkat lain" (sebelum fix: WARN false)
+  [ ] A5 Idle 1.5s -> autosave kedua -> lastSent update ke hash 6, localStorage lastSent persist
+        Expected: tidak ada warning kedua.
+
+----------------------------------------------------------------------
+B. REFRESH DENGAN DRAFT LOKAL (hydrate + merge)
+----------------------------------------------------------------------
+File: opname-count-page.tsx L73 lastSent hydrate, L120 isDocChange merge local over server
+Skenario:
+  [ ] B1 Ketik 3 baris (isi 2, kosong 1) -> refresh F5 langsung (sebelum autosave selesai)
+        Expected: toast.info "Draft lokal dipulihkan — simpan untuk sinkron" (1x), 3 baris terisi kembali dari localStorage kg-opname-draft-{docId}
+  [ ] B2 Refresh lagi tanpa ubah -> Expected: tidak ada toast info lagi (merged == serverRecords), tidak ada warning
+  [ ] B3 Cek localStorage: key kg-opname-draft-{docId} JSON {records:{id:"5"}, savedAt: timestamp} masih ada, TTL 24h
+  [ ] B4 Ubah status dokumen jadi Selesai (via API approve) -> buka sesi lagi -> localStorage draft terhapus (session.status != Draft)
+
+----------------------------------------------------------------------
+C. FOCUS TAB TIDAK OVERWRITE KETIKAN (refetchOnWindowFocus OFF)
+----------------------------------------------------------------------
+File: use-persediaan.ts L113 staleTime 30s, opname-count-page L68 recordsRef
+Skenario:
+  [ ] C1 Ketik "8" tanpa blur -> pindah tab (visibility hidden -> flushKeepalive) -> kembali tab
+        Expected: tidak ada toast warning, recordsRef "8" tetap, tidak di-overwrite server H0
+  [ ] C2 Biarkan hasDirty true (records 8 vs server 5) -> server hash tidak berubah -> effect return hasDirty -> setRecords tidak dipanggil
+        Expected: input tetap "8"
+
+----------------------------------------------------------------------
+D. REMOTE EDIT BENAR-BENAR WARN 1x (dedup)
+----------------------------------------------------------------------
+File: opname-count-page.tsx L160 prevHash !== hash && hasDirty
+Skenario (2 tab/device):
+  [ ] D1 Tab A: buka Draft, ketik "5" (dirty true, hash H1)
+  [ ] D2 Tab B: buka doc sama, ubah via API PUT /api/persediaan/stock-documents/{id} lines actual_qty 7 (hash H2) -> tutup Tab B
+  [ ] D3 Tab A: reload (atau tunggu invalidate) -> lines H2, prevHash H1 != H2 && hasDirty true -> toast.warning "Data diperbarui di perangkat lain — muat ulang untuk lihat?" id opname-conflict-{docId} muncul 1x
+        Expected: warn muncul, local preserved (records 5 tetap), tidak spam meski effect fire berulang
+  [ ] D4 Klik muat ulang di toast (atau F5) -> records sync ke H2 -> hasDirty false -> warn hilang di run berikutnya
+
+----------------------------------------------------------------------
+E. DOC CHANGE RESET BASELINE
+----------------------------------------------------------------------
+File: opname-count-page.tsx L121 prevServerHashRef = null saat isDocChange
+Skenario:
+  [ ] E1 Buka docId 101 Draft -> ketik -> pindah ke docId 102 (router navigate) -> isDocChange true -> prev null, setRecords serverRecords doc 102
+        Expected: tidak ada warning sisa dari doc 101
+  [ ] E2 Kembali ke docId 101 -> merge local doc 101 jika ada, tidak warn
+
+----------------------------------------------------------------------
+F. REGRESSION
+----------------------------------------------------------------------
+  [ ] F1 npx tsc --noEmit -> No errors (hash dipindah ke atas tidak ubah deps)
+  [ ] F2 npm run lint -> pass
+  [ ] F3 Blind count reveal: isDocChange re-hydrate kg-opname-revealed-{docId} tetap, tidak reset saat autosave
+  [ ] F4 lastSent persist kg-opname-lastSent-{docId} TTL 24h -> refresh tidak hilangkan silentSave dedup
+
+----------------------------------------------------------------------
+CARA JALANKAN & VERIFIKASI
+----------------------------------------------------------------------
+  FE
+    cd Frontend && npx tsc --noEmit
+    npm run dev -> buka http://localhost:8080/opname/proses/{id}
+    Manual: ikuti A1-A5, B1-B4, C1-C2, D1-D3
+  BE (jika perlu remote edit simulasi)
+    curl -X PUT http://127.0.0.1:8000/api/persediaan/stock-documents/{id} -H "Authorization: Bearer $TOKEN" -d '{"lines":[...]}'
+
+ENV CLEANUP:
+  localStorage remove kg-opname-draft-{docId} dan kg-opname-lastSent-{docId} setelah test selesai.
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (Lulus/Gagal per A-F): A: ...... B: ...... C: ...... D: ...... E: ...... F: ......
+Catatan:
