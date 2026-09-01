@@ -67,7 +67,7 @@ class StockDocument extends Model
 
     public function lines(): HasMany
     {
-        return $this->hasMany(StockDocumentLine::class, 'document_id');
+        return $this->hasMany(StockDocumentLine::class, 'document_id')->orderBy('line_no');
     }
 
     public function movements(): HasMany

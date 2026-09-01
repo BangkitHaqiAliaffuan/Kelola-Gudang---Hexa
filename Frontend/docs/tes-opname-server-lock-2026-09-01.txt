@@ -1,0 +1,128 @@
+======================================================================
+DOKUMEN TES — Opname Server-Draft Only + Lock Per Dokumen 2026-09-01
+Sumber : Frontend/src/components/wms/opname/opname-count-page.tsx
+         Frontend/src/hooks/use-persediaan.ts
+         Backend lock per dokumen 10 menit (heartbeat 30 detik)
+Format : TXT rapih — Panduan manual browser (Bahasa awam plain)
+======================================================================
+Prasyarat:
+  - 2 server jalan: Backend (composer dev 8000) + Frontend (npm run dev 8080)
+  - Akun 1: Persediaan Tulis (untuk isi opname)
+  - Akun 2: Persediaan Kelola atau Auditor (untuk Ambil alih paksa)
+  - Akun 3: Persediaan Tulis kedua (untuk cek terkunci)
+  - Data: 1 gudang aktif, 1 dokumen Stock Opname Draft (buat dulu)
+  Cara buat Draft:
+    Buka menu Opname -> Buat Jadwal -> Pilih Gudang + Tanggal hari ini
+    -> Simpan -> Muncul di daftar Proses dengan status Draft
+
+----------------------------------------------------------------------
+A. BUKA PROSES — DAPAT KUNCI EDIT
+----------------------------------------------------------------------
+Langkah:
+  [ ] A1 Browser A (akun Tulis): Buka menu Opname -> Proses -> Klik dokumen Draft
+  [ ] A2 Cek di atas Panel: muncul tulisan "akses edit aktif" dan kotak angka bisa diketik
+  [ ] A3 Cek tidak ada tulisan "Sedang diisi oleh..."
+
+Harap:
+  - Kotak Fisik bisa diketik, tombol Simpan Draft / Selesaikan aktif
+  - Tidak ada Pill "Membuka akses edit..." lama (hanya sebentar saat loading)
+
+  [LULUS/GAGAL] A: .......
+
+----------------------------------------------------------------------
+B. KUNCI EKSKLUSIF — BROWSER KEDUA TERKUNCI
+----------------------------------------------------------------------
+Langkah:
+  [ ] B1 Browser B (akun Tulis kedua, device/browser beda): Buka dokumen SAMA di /opname/proses/{id}
+  [ ] B2 Cek banner di atas Panel
+  [ ] B3 Coba ketik angka di kotak Fisik
+  [ ] B4 Cek tombol Simpan Draft / Selesaikan
+
+Harap:
+  - Banner kuning "Sedang diisi oleh {Nama A}. Halaman ini hanya dapat dilihat."
+  - Kotak Fisik jadi teks biasa (tidak bisa ketik), Scan tidak bisa
+  - Tombol Simpan / Selesaikan tidak aktif (disabled)
+  - Tidak ada tombol "Ambil alih paksa" (karena akun Tulis biasa)
+
+  [LULUS/GAGAL] B: .......
+
+----------------------------------------------------------------------
+C. AMBIL ALIH PAKSA — HANYA KELOLA/AUDITOR
+----------------------------------------------------------------------
+Langkah:
+  [ ] C1 Browser C (akun Kelola/Auditor): Buka dokumen SAMA yang sedang dikunci A
+  [ ] C2 Cek banner kuning + tombol "Ambil alih paksa" muncul di kanan banner
+  [ ] C3 Klik "Ambil alih paksa" -> muncul dialog "Ambil alih paksa" + kolom Alasan (opsional)
+  [ ] C4 Isi Alasan: "pemilik terputus" -> Klik "Ambil alih"
+  [ ] C5 Cek hasil di Browser C
+
+Harap:
+  - Toast "Akses berhasil diambil alih"
+  - Banner hilang, muncul "akses edit aktif", kotak bisa diketik lagi
+  - Di Browser A (yang tadi pegang kunci): muncul toast "Akses diambil alih" dan kotak jadi tidak bisa diketik
+
+  [LULUS/GAGAL] C: .......
+
+----------------------------------------------------------------------
+D. ISI ANGKA — OTOMATIS SIMPAN KE SERVER (TANPA DRAFT LOKAL)
+----------------------------------------------------------------------
+Langkah:
+  [ ] D1 Browser A (yang pegang kunci): Ketik angka 11 di 1 baris -> diam 1,5 detik
+  [ ] D2 Cek di Panel: muncul "Menyimpan..." lalu "tersimpan 10:30" (jam)
+  [ ] D3 Tanpa ketik lagi, langsung tekan F5 (refresh)
+  [ ] D4 Cek angka setelah refresh
+
+Harap:
+  - Setelah F5 angka tetap 11 (tidak balik ke 10)
+  - Tidak ada toast "Draft lokal dipulihkan" (karena sudah server-draft only)
+  - Jika ketik 12 lalu tutup tab sebelum 1,5 detik -> angka 12 hilang (expected, karena belum tersimpan ke server)
+
+  [LULUS/GAGAL] D: .......
+
+----------------------------------------------------------------------
+E. HEARTBEAT 30 DETIK & EXPIRE 10 MENIT
+----------------------------------------------------------------------
+Langkah:
+  [ ] E1 Browser A pegang kunci -> diam 40 detik (tidak ketik)
+  [ ] E2 Browser B coba buka dokumen sama
+  Harap: tetap terkunci (karena heartbeat tiap 30 detik perpanjang kunci)
+
+  Langkah expire:
+  [ ] E3 Browser A tutup tab (tanpa klik Batal) -> tunggu 10 menit + 10 detik
+  [ ] E4 Browser B buka lagi dokumen sama
+  Harap: sekarang bisa dapat kunci (tidak ada banner), karena sudah lewat 10 menit
+
+  [LULUS/GAGAL] E: .......
+
+----------------------------------------------------------------------
+F. KONFLIK SERVER — TOMBOL MUAT ULANG
+----------------------------------------------------------------------
+Langkah:
+  [ ] F1 Browser A: ketik 15 (belum simpan, masih dirty)
+  [ ] F2 Browser B (paksa ambil alih dulu jika perlu): ketik 20 dan tunggu tersimpan
+  [ ] F3 Browser A: diam sampai ada perubahan server (atau tunggu 5 detik lalu ketik lagi)
+  Harap:
+  - Muncul toast kuning "Data diperbarui di perangkat lain — muat ulang untuk lihat?" dengan tombol "Muat ulang"
+  - Kotak A tetap 15 (tidak otomatis jadi 20)
+  [ ] F4 Klik "Muat ulang" di toast
+  Harap: angka jadi 20, toast hilang
+
+  [LULUS/GAGAL] F: .......
+
+----------------------------------------------------------------------
+G. TUTUP TAB — KUNCI LEPAS
+----------------------------------------------------------------------
+Langkah:
+  [ ] G1 Browser A pegang kunci -> tutup tab / klik Daftar Sesi (back)
+  [ ] G2 Browser B buka dokumen sama (sebelum 10 menit)
+  Harap: langsung bisa dapat kunci (tidak perlu tunggu 10 menit, karena unlock keepalive)
+
+  [LULUS/GAGAL] G: .......
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (Lulus/Gagal per A-G): A: ...... B: ...... C: ...... D: ...... E: ...... F: ...... G: ......
+Catatan:
