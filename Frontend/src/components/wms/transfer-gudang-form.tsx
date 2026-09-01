@@ -261,7 +261,7 @@ export function TransferGudangForm() {
               ? ""
               : String(candidates[0].bin_id)
             : "";
-      
+
       return { itemId, fromBinId: preferredBin };
     });
   };

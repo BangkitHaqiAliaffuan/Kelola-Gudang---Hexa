@@ -60,10 +60,13 @@ class RackController extends Controller
         
         if (isset($data['warehouse_id']) && (int) $data['warehouse_id'] !== (int) $rack->warehouse_id) {
             $binIds = $rack->bins()->pluck('id');
-            $hasStock = $binIds->isNotEmpty() && ItemStock::whereIn('bin_id', $binIds)->where('stock', '>', 0)->exists();
+            $hasStock = $binIds->isNotEmpty() && (
+                ItemStock::whereIn('bin_id', $binIds)->where('stock', '>', 0)->exists() ||
+                \App\Models\StockMovement::whereIn('bin_id', $binIds)->exists()
+            );
             if ($hasStock) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'warehouse_id' => 'Rak tidak dapat dipindah ke gudang lain karena masih terikat riwayat stok.'
+                    'warehouse_id' => 'Rak tidak dapat dipindah karena bin di dalamnya masih memiliki riwayat transaksi stok. Lakukan Transfer Gudang terlebih dahulu.'
                 ]);
             }
         }

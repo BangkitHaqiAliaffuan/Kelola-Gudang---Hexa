@@ -120,7 +120,12 @@ export function ReturPenjualanForm() {
   );
 
   const customerOptions: ComboboxOption[] = useMemo(
-    () => (customers?.data ?? []).map((c) => ({ value: String(c.id), label: c.name, keywords: c.name })),
+    () =>
+      (customers?.data ?? []).map((c) => ({
+        value: String(c.id),
+        label: c.name,
+        keywords: c.name,
+      })),
     [customers],
   );
 
@@ -289,17 +294,17 @@ export function ReturPenjualanForm() {
       source_document_id: sourceDocId ? Number(sourceDocId) : null,
       customer_id: cid,
       partner: cname,
-    reference_no: reference.trim() || null,
-    pic: pic.trim() || null,
-    note: buildNote(),
-    lines: lines
-      .filter((l) => l.itemId && l.qty)
-      .map((l) => ({
-        item_id: Number(l.itemId),
-        qty: Number(l.qty),
-        to_bin_id: l.binId ? Number(l.binId) : null,
-        source_line_id: sourceDocId ? (lineSource(l)?.id ?? null) : null,
-      })),
+      reference_no: reference.trim() || null,
+      pic: pic.trim() || null,
+      note: buildNote(),
+      lines: lines
+        .filter((l) => l.itemId && l.qty)
+        .map((l) => ({
+          item_id: Number(l.itemId),
+          qty: Number(l.qty),
+          to_bin_id: l.binId ? Number(l.binId) : null,
+          source_line_id: sourceDocId ? (lineSource(l)?.id ?? null) : null,
+        })),
     };
   };
 
@@ -523,7 +528,10 @@ export function ReturPenjualanForm() {
                 const src = lineSource(l);
                 const max = maxForSource(src);
                 const requestedForSrc = src
-                  ? lines.reduce((s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s), 0)
+                  ? lines.reduce(
+                      (s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s),
+                      0,
+                    )
                   : 0;
                 const overSource = src != null && max != null && requestedForSrc > max;
                 return (
@@ -586,13 +594,18 @@ export function ReturPenjualanForm() {
                       {overSource && (
                         <p className="mt-1 text-xs text-destructive">
                           Melebihi sisa retur dari dokumen sumber (maks {formatNumber(max ?? 0)}
-                          {src?.remaining_qty != null ? `, sisa ${formatNumber(src.remaining_qty)}` : ""})
+                          {src?.remaining_qty != null
+                            ? `, sisa ${formatNumber(src.remaining_qty)}`
+                            : ""}
+                          )
                         </p>
                       )}
                       {src && !overSource && sourceDocId && max != null && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Maks {formatNumber(max)} dari {sourceDetail?.data.no}
-                          {src.remaining_qty != null ? ` (sisa ${formatNumber(src.remaining_qty)})` : ""}
+                          {src.remaining_qty != null
+                            ? ` (sisa ${formatNumber(src.remaining_qty)})`
+                            : ""}
                         </p>
                       )}
                     </td>
@@ -625,7 +638,10 @@ export function ReturPenjualanForm() {
             const src = lineSource(l);
             const max = maxForSource(src);
             const requestedForSrc = src
-              ? lines.reduce((s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s), 0)
+              ? lines.reduce(
+                  (s, c) => (lineSource(c)?.id === src.id ? s + (Number(c.qty) || 0) : s),
+                  0,
+                )
               : 0;
             const overSource = src != null && max != null && requestedForSrc > max;
             return (
@@ -678,13 +694,18 @@ export function ReturPenjualanForm() {
                   {overSource && (
                     <p className="text-xs text-destructive">
                       Melebihi sisa retur dari dokumen sumber (maks {formatNumber(max ?? 0)}
-                      {src?.remaining_qty != null ? `, sisa ${formatNumber(src.remaining_qty)}` : ""}).
+                      {src?.remaining_qty != null
+                        ? `, sisa ${formatNumber(src.remaining_qty)}`
+                        : ""}
+                      ).
                     </p>
                   )}
                   {src && !overSource && sourceDocId && max != null && (
                     <p className="text-xs text-muted-foreground">
                       Maks {formatNumber(max)} dari {sourceDetail?.data.no}
-                      {src.remaining_qty != null ? ` (sisa ${formatNumber(src.remaining_qty)})` : ""}
+                      {src.remaining_qty != null
+                        ? ` (sisa ${formatNumber(src.remaining_qty)})`
+                        : ""}
                     </p>
                   )}
                   {lineError(i, "to_bin_id") && (

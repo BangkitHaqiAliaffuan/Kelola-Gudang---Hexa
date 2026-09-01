@@ -2,7 +2,16 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Download, Plus, Search, ShoppingCart, UserCheck } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { PurchaseOrderSheet } from "./purchase-order-sheet";
 import { Button } from "@/components/ui/button";

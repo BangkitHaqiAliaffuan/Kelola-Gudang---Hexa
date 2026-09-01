@@ -33,7 +33,10 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const [revealed, setRevealed] = useState(() => {
     if (typeof window === "undefined") return false;
     try {
-      return JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed || false;
+      return (
+        JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed ||
+        false
+      );
     } catch {
       return false;
     }
@@ -45,10 +48,16 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const toggleRevealed = () => {
     setRevealed(true);
     try {
-      if (typeof window !== "undefined") window.localStorage.setItem(`kg-opname-revealed-${docId}`, JSON.stringify({ revealed: true }));
+      if (typeof window !== "undefined")
+        window.localStorage.setItem(
+          `kg-opname-revealed-${docId}`,
+          JSON.stringify({ revealed: true }),
+        );
     } catch {}
   };
-  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
 
   const storageKey = `kg-opname-draft-${docId}`;
   const lastSentStorageKey = `kg-opname-lastSent-${docId}`;
@@ -126,14 +135,18 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       }
       setRevealed(false);
       try {
-        if (typeof window !== "undefined") window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
+        if (typeof window !== "undefined")
+          window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
       } catch {}
       return;
     }
     // for same doc, skip if hash already sent
     const hash = JSON.stringify(serverRecords);
     if (lastSentRef.current === hash) return;
-    const hasDirty = lines.some((l) => (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""));
+    const hasDirty = lines.some(
+      (l) =>
+        (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
+    );
     if (hasDirty) {
       if (lines.some((l) => l.actual_qty != null) && hash !== JSON.stringify(recordsRef.current)) {
         toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?");
@@ -188,7 +201,9 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   const hasValidationError = useCallback(() => {
     const bl = buildLines();
-    return bl.some((l) => l.actual_qty != null && (!Number.isInteger(l.actual_qty) || l.actual_qty < 0));
+    return bl.some(
+      (l) => l.actual_qty != null && (!Number.isInteger(l.actual_qty) || l.actual_qty < 0),
+    );
   }, [buildLines]);
 
   const goBack = () => router.navigate({ to: "/opname/$section", params: { section: "proses" } });
@@ -220,7 +235,13 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(payload.map((l) => ({ item_id: l.item_id, from_bin_id: l.from_bin_id, actual_qty: l.actual_qty })));
+    const hash = JSON.stringify(
+      payload.map((l) => ({
+        item_id: l.item_id,
+        from_bin_id: l.from_bin_id,
+        actual_qty: l.actual_qty,
+      })),
+    );
     if (lastSentRef.current === hash) return;
     isSavingRef.current = true;
     setAutoSaving(true);
@@ -237,7 +258,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         onSuccess: () => {
           lastSentRef.current = hash;
           try {
-            if (typeof window !== "undefined") window.localStorage.setItem(lastSentStorageKey, JSON.stringify(hash));
+            if (typeof window !== "undefined")
+              window.localStorage.setItem(lastSentStorageKey, JSON.stringify(hash));
           } catch {}
           setLastSavedAt(Date.now());
           setAutoSaving(false);
@@ -284,7 +306,13 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (!session || session.status !== "Draft" || !dirty || hasValidationError()) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
-    const hash = JSON.stringify(payload.map((l) => ({ item_id: l.item_id, from_bin_id: l.from_bin_id, actual_qty: l.actual_qty })));
+    const hash = JSON.stringify(
+      payload.map((l) => ({
+        item_id: l.item_id,
+        from_bin_id: l.from_bin_id,
+        actual_qty: l.actual_qty,
+      })),
+    );
     if (lastSentRef.current === hash) return;
     try {
       const token = getAuthToken();

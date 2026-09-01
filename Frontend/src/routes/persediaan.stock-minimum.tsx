@@ -86,7 +86,8 @@ function StockMinimum() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const hasActiveFilters = useMemo(
-    () => q !== "" || wh !== ALL || cat !== ALL || days !== String(DEFAULT_DAYS) || severity !== ALL,
+    () =>
+      q !== "" || wh !== ALL || cat !== ALL || days !== String(DEFAULT_DAYS) || severity !== ALL,
     [q, wh, cat, days, severity],
   );
   const handleClearFilters = useCallback(() => {

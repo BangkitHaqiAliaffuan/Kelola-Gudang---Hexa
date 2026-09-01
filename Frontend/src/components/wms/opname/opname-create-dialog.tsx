@@ -44,7 +44,13 @@ export function OpnameCreateDialog({
   const whId = warehouseId ? Number(warehouseId) : null;
 
   const warehouseRows = useMemo(
-    () => (stockRows?.data ?? []).filter((r) => whId != null && r.warehouse_id === whId),
+    () =>
+      (stockRows?.data ?? []).filter(
+        (r) =>
+          whId != null &&
+          r.warehouse_id === whId &&
+          (r.bin_rack_warehouse_id == null || r.bin_rack_warehouse_id === whId),
+      ),
     [stockRows, whId],
   );
 
@@ -53,7 +59,9 @@ export function OpnameCreateDialog({
 
   const conflict = useMemo(() => {
     const docs = opnameDocs?.data ?? [];
-    return docs.find((d) => d.document_date.slice(0, 10) === date && d.status !== "Dibatalkan") ?? null;
+    return (
+      docs.find((d) => d.document_date.slice(0, 10) === date && d.status !== "Dibatalkan") ?? null
+    );
   }, [opnameDocs, date]);
 
   const canSubmit =
@@ -67,7 +75,9 @@ export function OpnameCreateDialog({
   const submit = () => {
     if (!canCreate) return;
     if (conflict) {
-      toast.error(`Jadwal opname untuk gudang ini pada tanggal ${date} sudah ada (${conflict.no} — ${conflict.status}). Hanya 1 jadwal per gudang per hari.`);
+      toast.error(
+        `Jadwal opname untuk gudang ini pada tanggal ${date} sudah ada (${conflict.no} — ${conflict.status}). Hanya 1 jadwal per gudang per hari.`,
+      );
       return;
     }
     if (!canSubmit || whId == null) return;
@@ -156,14 +166,19 @@ export function OpnameCreateDialog({
               />
               {conflict && (
                 <p className="text-xs text-destructive">
-                  Jadwal sudah ada ({conflict.no} — {conflict.status}) pada tanggal ini. Hanya 1 jadwal per gudang per hari.
+                  Jadwal sudah ada ({conflict.no} — {conflict.status}) pada tanggal ini. Hanya 1
+                  jadwal per gudang per hari.
                 </p>
               )}
               {fieldError({ errors: apiErrors } as never, "document_date") && (
-                <p className="text-xs text-destructive">{fieldError({ errors: apiErrors } as never, "document_date")}</p>
+                <p className="text-xs text-destructive">
+                  {fieldError({ errors: apiErrors } as never, "document_date")}
+                </p>
               )}
               {fieldError({ errors: apiErrors } as never, "warehouse_id") && (
-                <p className="text-xs text-destructive">{fieldError({ errors: apiErrors } as never, "warehouse_id")}</p>
+                <p className="text-xs text-destructive">
+                  {fieldError({ errors: apiErrors } as never, "warehouse_id")}
+                </p>
               )}
             </div>
             <div className="space-y-1.5">

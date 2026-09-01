@@ -2,7 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -324,7 +332,9 @@ function StockAdjustment() {
         onPost={canWrite ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
         onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
         onSubmit={canWrite ? () => detail?.data && setConfirmSubmitId(detail.data.id) : undefined}
-        onApprove={canCancel ? () => detail?.data && setConfirmApproveId(detail.data.id) : undefined}
+        onApprove={
+          canCancel ? () => detail?.data && setConfirmApproveId(detail.data.id) : undefined
+        }
         onReject={canCancel ? () => detail?.data && setConfirmRejectId(detail.data.id) : undefined}
         busy={busy}
       />
@@ -394,12 +404,16 @@ function StockAdjustment() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmSubmitId != null} onOpenChange={(o) => !o && setConfirmSubmitId(null)}>
+      <AlertDialog
+        open={confirmSubmitId != null}
+        onOpenChange={(o) => !o && setConfirmSubmitId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Ajukan untuk approval?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dokumen akan berstatus Menunggu Approval dan menunggu persetujuan Auditor/Kelola Persediaan.
+              Dokumen akan berstatus Menunggu Approval dan menunggu persetujuan Auditor/Kelola
+              Persediaan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -413,8 +427,7 @@ function StockAdjustment() {
                     setConfirmSubmitId(null);
                     setSelectedId(null);
                   },
-                  onError: (err) =>
-                    toast.error(isApiError(err) ? err.message : "Gagal mengajukan"),
+                  onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal mengajukan"),
                 });
               }}
             >
@@ -424,12 +437,16 @@ function StockAdjustment() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmApproveId != null} onOpenChange={(o) => !o && setConfirmApproveId(null)}>
+      <AlertDialog
+        open={confirmApproveId != null}
+        onOpenChange={(o) => !o && setConfirmApproveId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Setujui koreksi ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              Menyetujui akan memposting koreksi ke ledger dan mengubah saldo stok. Pastikan sudah ditinjau.
+              Menyetujui akan memposting koreksi ke ledger dan mengubah saldo stok. Pastikan sudah
+              ditinjau.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -457,12 +474,16 @@ function StockAdjustment() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmRejectId != null} onOpenChange={(o) => !o && setConfirmRejectId(null)}>
+      <AlertDialog
+        open={confirmRejectId != null}
+        onOpenChange={(o) => !o && setConfirmRejectId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tolak koreksi ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              Dokumen akan berstatus Dibatalkan dan tidak diposting. Masukkan alasan penolakan jika perlu.
+              Dokumen akan berstatus Dibatalkan dan tidak diposting. Masukkan alasan penolakan jika
+              perlu.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -478,8 +499,7 @@ function StockAdjustment() {
                       setConfirmRejectId(null);
                       setSelectedId(null);
                     },
-                    onError: (err) =>
-                      toast.error(isApiError(err) ? err.message : "Gagal menolak"),
+                    onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal menolak"),
                   },
                 );
               }}

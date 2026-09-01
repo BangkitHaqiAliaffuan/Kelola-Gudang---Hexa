@@ -10,7 +10,16 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";

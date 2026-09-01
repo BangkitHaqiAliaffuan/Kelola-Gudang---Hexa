@@ -2,7 +2,15 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Code2, Download, History, Search, Settings2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +74,10 @@ function AuditTrails() {
   const debouncedQ = useDebouncedValue(q);
   const [action, setAction] = useState(ALL);
   const [module, setModule] = useState(ALL);
-  const hasActiveFilters = useMemo(() => q !== "" || action !== ALL || module !== ALL, [q, action, module]);
+  const hasActiveFilters = useMemo(
+    () => q !== "" || action !== ALL || module !== ALL,
+    [q, action, module],
+  );
   const handleClearFilters = useCallback(() => {
     setQ("");
     setAction(ALL);

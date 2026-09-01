@@ -2,15 +2,15 @@
 
 Dokumen uji manual faktual untuk 7 commit 2026-08-26 (bukan 8 — hash `81de7c4/02b644c/02d72fb` tidak ada di `git log`).
 
-| Commit | Ringkasan faktual |
-|--------|-------------------|
+| Commit    | Ringkasan faktual                                                                                                                                                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `018aa3a` | Opsi B retur & kartu-stock: `StockController` skip `IN` mirror Transfer global, `StoreStockDocumentRequest` hapus cek `bin==source`, cap `min(sisa,total gudang)` → pesan `di gudang`, `retur-*-form` header `Tersedia di Gudang` + `globalAvailableByKey`, `DataTable` reset halaman |
-| `def969f` | Hapus 4 baris `service->post` di `StockDocumentController::store` — `store Selesai` jadi Draft-only (intermediate, dibatalkan `d7546be`) |
-| `637b221` | Docs `testing-2026-08-26-opsiB-SoD.md` (klaim SoD `Draft-only` **stale** setelah `d7546be`, tetap dibiarkan sebagai histori) |
-| `d7546be` | Restore posting: `initialStatus=Draft` + `service->post` bila `Selesai` di `store` (Draft-first, langsung `Selesai`), test `Penerimaan Selesai creates movements` |
-| `edcb2b5` | Sync 42 file Frontend (kartu-stock/mutasi/stock-minimum/nilai, master-forms, transaction-form, vercel.json, AGENTS.md, README, docs) |
-| `cb519e1` | Kartu-stock: label `Saldo Awal` → `Saldo Sekarang` (`current_stock ?? saldo_akhir`) |
-| `9abffce` | Kartu-stock ledger windowed: `dateFrom/dateTo` dikirim ke `GET /persediaan/stock-card?from&to` (server recompute `saldo_awal/akhir`), sort `asc`, `sortable:false` masuk/keluar/saldo/nilai |
+| `def969f` | Hapus 4 baris `service->post` di `StockDocumentController::store` — `store Selesai` jadi Draft-only (intermediate, dibatalkan `d7546be`)                                                                                                                                              |
+| `637b221` | Docs `testing-2026-08-26-opsiB-SoD.md` (klaim SoD `Draft-only` **stale** setelah `d7546be`, tetap dibiarkan sebagai histori)                                                                                                                                                          |
+| `d7546be` | Restore posting: `initialStatus=Draft` + `service->post` bila `Selesai` di `store` (Draft-first, langsung `Selesai`), test `Penerimaan Selesai creates movements`                                                                                                                     |
+| `edcb2b5` | Sync 42 file Frontend (kartu-stock/mutasi/stock-minimum/nilai, master-forms, transaction-form, vercel.json, AGENTS.md, README, docs)                                                                                                                                                  |
+| `cb519e1` | Kartu-stock: label `Saldo Awal` → `Saldo Sekarang` (`current_stock ?? saldo_akhir`)                                                                                                                                                                                                   |
+| `9abffce` | Kartu-stock ledger windowed: `dateFrom/dateTo` dikirim ke `GET /persediaan/stock-card?from&to` (server recompute `saldo_awal/akhir`), sort `asc`, `sortable:false` masuk/keluar/saldo/nilai                                                                                           |
 
 > **Koreksi SoD vs docs lama:** `testing-2026-08-26-opsiB-SoD.md` lampiran "store Selesai = Draft-only, posting via `/post` terpisah" menggambarkan `def969f` (10:00) dan **tidak berlaku** di HEAD (`d7546be`+). Di HEAD, `POST /api/persediaan/stock-documents {status:Selesai}` **langsung 201 `Selesai` + `posted_at!=null`** via `service->post` dalam transaksi yang sama (SoD tetap di `POST /{id}/post` & `POST /{id}/cancel`: `requester_user_id !== auth` → 422).
 
@@ -28,7 +28,13 @@ Dokumen uji manual faktual untuk 7 commit 2026-08-26 (bukan 8 — hash `81de7c4/
 1. Login **USR-001**.
 2. Via UI **Transaksi → Barang Masuk** (`/transaksi/masuk`) klik **Buat**, atau langsung `POST /api/persediaan/stock-documents` (Bearer) — `use-persediaan.ts:121-129`:
    ```json
-   {"type":"Penerimaan","status":"Selesai","document_date":"2026-08-26","warehouse_id":1,"lines":[{"item_id":1,"qty":10,"to_bin_id":1,"unit_cost":1500}]}
+   {
+     "type": "Penerimaan",
+     "status": "Selesai",
+     "document_date": "2026-08-26",
+     "warehouse_id": 1,
+     "lines": [{ "item_id": 1, "qty": 10, "to_bin_id": 1, "unit_cost": 1500 }]
+   }
    ```
 3. Harap **201** `data.status=Selesai`, `data.posted_at!=null`, nomor `BM/2026/#####` (server `CodeGenerator`).
 4. Cek **Persediaan → Stock Saat Ini** (`/persediaan/stock`, `useStockRows:22-27` `GET /persediaan/stock?per_page=500`) — stok item +10; atau `SELECT stock FROM item_stock WHERE item_id=1 AND warehouse_id=1 AND bin_id=1` =10.

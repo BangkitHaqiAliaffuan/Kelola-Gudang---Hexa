@@ -276,7 +276,9 @@ export function StockAdjustmentForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  const buildPayload = (status: "Draft" | "Selesai" | "Menunggu Approval"): StockDocumentPayload => ({
+  const buildPayload = (
+    status: "Draft" | "Selesai" | "Menunggu Approval",
+  ): StockDocumentPayload => ({
     type: "Stock Adjustment",
     status,
     document_date: date || today(),

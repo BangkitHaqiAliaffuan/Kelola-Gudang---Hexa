@@ -2,7 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "@/components/wms/kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  type Tone,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

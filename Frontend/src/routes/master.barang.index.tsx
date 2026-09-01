@@ -11,7 +11,15 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader, Panel, Pill, ItemThumb, FilterSelect, ALL, ClearFiltersButton } from "@/components/wms/kit";
+import {
+  PageHeader,
+  Panel,
+  Pill,
+  ItemThumb,
+  FilterSelect,
+  ALL,
+  ClearFiltersButton,
+} from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { ItemFormDialog } from "@/components/wms/master-forms";
 import {
@@ -92,7 +100,13 @@ function MasterBarang() {
   const [status, setStatus] = useState(ALL);
   const [selected, setSelected] = useState<number[]>([]);
   const hasActiveFilters = useMemo(
-    () => q !== "" || cat !== ALL || subCat !== ALL || brand !== ALL || stockF !== ALL || status !== ALL,
+    () =>
+      q !== "" ||
+      cat !== ALL ||
+      subCat !== ALL ||
+      brand !== ALL ||
+      stockF !== ALL ||
+      status !== ALL,
     [q, cat, subCat, brand, stockF, status],
   );
   const handleClearFilters = useCallback(() => {

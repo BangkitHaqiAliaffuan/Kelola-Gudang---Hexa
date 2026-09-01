@@ -611,7 +611,10 @@ export function SupplierPage() {
   const [cityFilter, setCityFilter] = useState(ALL);
   const [termsFilter, setTermsFilter] = useState(ALL);
   const del = useDeleteSupplier();
-  const slotHasActive = useMemo(() => cityFilter !== ALL || termsFilter !== ALL, [cityFilter, termsFilter]);
+  const slotHasActive = useMemo(
+    () => cityFilter !== ALL || termsFilter !== ALL,
+    [cityFilter, termsFilter],
+  );
   const handleClearSlot = useCallback(() => {
     setCityFilter(ALL);
     setTermsFilter(ALL);
@@ -752,7 +755,10 @@ export function CustomerPage() {
   const [cityFilter, setCityFilter] = useState(ALL);
   const [segmentFilter, setSegmentFilter] = useState(ALL);
   const del = useDeleteCustomer();
-  const slotHasActive = useMemo(() => cityFilter !== ALL || segmentFilter !== ALL, [cityFilter, segmentFilter]);
+  const slotHasActive = useMemo(
+    () => cityFilter !== ALL || segmentFilter !== ALL,
+    [cityFilter, segmentFilter],
+  );
   const handleClearSlot = useCallback(() => {
     setCityFilter(ALL);
     setSegmentFilter(ALL);
@@ -1261,7 +1267,10 @@ export function WorkOrderPage() {
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [projectFilter, setProjectFilter] = useState(ALL);
   const del = useDeleteWorkOrder();
-  const slotHasActive = useMemo(() => statusFilter !== ALL || projectFilter !== ALL, [statusFilter, projectFilter]);
+  const slotHasActive = useMemo(
+    () => statusFilter !== ALL || projectFilter !== ALL,
+    [statusFilter, projectFilter],
+  );
   const handleClearSlot = useCallback(() => {
     setStatusFilter(ALL);
     setProjectFilter(ALL);
@@ -1393,7 +1402,10 @@ export function UserPage() {
   const [statusFilter, setStatusFilter] = useState(ALL);
   const [roleFilter, setRoleFilter] = useState(ALL);
   const del = useDeleteUser();
-  const slotHasActive = useMemo(() => statusFilter !== ALL || roleFilter !== ALL, [statusFilter, roleFilter]);
+  const slotHasActive = useMemo(
+    () => statusFilter !== ALL || roleFilter !== ALL,
+    [statusFilter, roleFilter],
+  );
   const handleClearSlot = useCallback(() => {
     setStatusFilter(ALL);
     setRoleFilter(ALL);

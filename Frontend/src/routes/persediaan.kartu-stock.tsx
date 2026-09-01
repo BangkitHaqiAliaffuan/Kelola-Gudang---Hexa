@@ -223,9 +223,27 @@ function KartuStock() {
   const [dateTo, setDateTo] = useState("");
 
   // Jangka panjang: kirim rentang tanggal ke server agar saldo_awal/saldo_akhir dan saldo baris di-recompute ledger (bukan hanya hide client)
-  const cardFifo = useStockCard(activeIdForFetch, "FIFO", whIdForFetch, dateFrom || null, dateTo || null);
-  const cardAvg = useStockCard(activeIdForFetch, "Average", whIdForFetch, dateFrom || null, dateTo || null);
-  const cardMax = useStockCard(activeIdForFetch, "Maximum Cost", whIdForFetch, dateFrom || null, dateTo || null);
+  const cardFifo = useStockCard(
+    activeIdForFetch,
+    "FIFO",
+    whIdForFetch,
+    dateFrom || null,
+    dateTo || null,
+  );
+  const cardAvg = useStockCard(
+    activeIdForFetch,
+    "Average",
+    whIdForFetch,
+    dateFrom || null,
+    dateTo || null,
+  );
+  const cardMax = useStockCard(
+    activeIdForFetch,
+    "Maximum Cost",
+    whIdForFetch,
+    dateFrom || null,
+    dateTo || null,
+  );
   const card = method === "FIFO" ? cardFifo : method === "Average" ? cardAvg : cardMax;
   const methodCards: Record<ValuationMethod, typeof card> = {
     FIFO: cardFifo,
@@ -250,7 +268,8 @@ function KartuStock() {
   const [jenis, setJenis] = useState(ALL);
   const [pic, setPic] = useState(ALL);
   const hasActiveFilters = useMemo(
-    () => q !== "" || jenis !== ALL || pic !== ALL || wh !== ALL || dateFrom !== "" || dateTo !== "",
+    () =>
+      q !== "" || jenis !== ALL || pic !== ALL || wh !== ALL || dateFrom !== "" || dateTo !== "",
     [q, jenis, pic, wh, dateFrom, dateTo],
   );
   const handleClearFilters = useCallback(() => {
@@ -672,7 +691,9 @@ function KartuStock() {
             loading={warehousesLoading}
           />
           <div className="flex w-full flex-col gap-1 col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2">
-            <label className="text-xs text-muted-foreground mb-1 block">Filter Periode Transaksi</label>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Filter Periode Transaksi
+            </label>
             <div className="flex w-full items-center justify-start gap-1 rounded-xl border border-input bg-card p-1.5">
               <Input
                 type="date"

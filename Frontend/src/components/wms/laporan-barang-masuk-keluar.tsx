@@ -10,7 +10,17 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, EmptyState, FilterSelect, PageHeader, Panel, Pill, StatCard, type Tone } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  EmptyState,
+  FilterSelect,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
@@ -62,9 +72,18 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
   const [to, setTo] = useState(() => toISODate(new Date()));
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const hasActiveFilters = useMemo(() => {
-    const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1));
+    const defaultFrom = toISODate(
+      new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1),
+    );
     const defaultTo = toISODate(new Date());
-    return q !== "" || wh !== ALL || partner !== ALL || status !== ALL || from !== defaultFrom || to !== defaultTo;
+    return (
+      q !== "" ||
+      wh !== ALL ||
+      partner !== ALL ||
+      status !== ALL ||
+      from !== defaultFrom ||
+      to !== defaultTo
+    );
   }, [q, wh, partner, status, from, to]);
   const handleClearFilters = useCallback(() => {
     setQ("");

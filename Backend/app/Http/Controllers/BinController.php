@@ -58,10 +58,11 @@ class BinController extends Controller
         $data = $request->validated();
 
         if (isset($data['rack_id']) && (int) $data['rack_id'] !== (int) $bin->rack_id) {
-            $hasStock = ItemStock::where('bin_id', $bin->id)->where('stock', '>', 0)->exists();
+            $hasStock = ItemStock::where('bin_id', $bin->id)->where('stock', '>', 0)->exists()
+                || \App\Models\StockMovement::where('bin_id', $bin->id)->exists();
             if ($hasStock) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'rack_id' => 'Bin tidak dapat dipindah ke rak lain karena masih terikat riwayat stok.'
+                    'rack_id' => 'Bin tidak dapat dipindah ke rak lain karena memiliki riwayat pergerakan stok. Lakukan Transfer Gudang terlebih dahulu.'
                 ]);
             }
         }

@@ -28,7 +28,13 @@ export function ClearFiltersButton({
   const isVisible = visible ?? show ?? false;
   if (!isVisible) return null;
   return (
-    <Button variant="ghost" size="sm" onClick={onClick} className="h-9 rounded-xl gap-1.5" aria-label={label}>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      className="h-9 rounded-xl gap-1.5"
+      aria-label={label}
+    >
       <FilterX className="h-4 w-4" />
       {label}
     </Button>

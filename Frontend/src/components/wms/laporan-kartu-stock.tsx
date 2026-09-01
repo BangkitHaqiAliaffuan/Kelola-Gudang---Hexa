@@ -92,9 +92,18 @@ export function LaporanKartuStock() {
   const debouncedQ = useDebouncedValue(q);
   const [jenis, setJenis] = useState(ALL);
   const hasActiveFilters = useMemo(() => {
-    const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1));
+    const defaultFrom = toISODate(
+      new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1),
+    );
     const defaultTo = toISODate(new Date());
-    return id !== null || q !== "" || jenis !== ALL || wh !== ALL || from !== defaultFrom || to !== defaultTo;
+    return (
+      id !== null ||
+      q !== "" ||
+      jenis !== ALL ||
+      wh !== ALL ||
+      from !== defaultFrom ||
+      to !== defaultTo
+    );
   }, [id, q, jenis, wh, from, to]);
   const handleClearFilters = useCallback(() => {
     setId(null);
