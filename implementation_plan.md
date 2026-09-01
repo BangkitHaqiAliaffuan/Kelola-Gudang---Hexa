@@ -1,44 +1,141 @@
-# Final Plan Implementasi `customer_id` Backwards Compatibility (Terkoreksi)
+# Fix: Guard Toast "Data diperbarui di perangkat lain" Loop Selamanya
 
-Penyempurnaan codebase dari penambahan kolom FK `customer_id` pada entitas [StockDocument](file:///d:/Kelola-Gudang---Hexa/Backend/app/Models/StockDocument.php#10-115) untuk mengatasi isu duplikasi penamaan, tanpa merusak kompatibilitas data lawas/frontend.
+Perbaikan bug di [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx) di mana toast konflik remote muncul secara terus-menerus
+(loop F5) akibat inkonsistensi format hash antara *reader* dan *writer*, serta logic `hasDirty`
+yang tidak membedakan *local-unsynced* dari *remote-edit*.
 
-## Kebijakan Inti
+## Akar Masalah
 
-*   **Aturan Validasi Konsisten (Q1 & Q4):** `customer_id` *nullable* untuk type 'Pengeluaran', `customer_id` *required* HANYA untuk type 'Retur Penjualan', dan *prohibited* (dilarang ada) di type selain keduanya, sesuai dengan aturan eksisting di [Backend/app/Http/Requests/StoreStockDocumentRequest.php](file:///d:/Kelola-Gudang---Hexa/Backend/app/Http/Requests/StoreStockDocumentRequest.php) baris 52.
-*   **Snapshot vs Live (Q2):** Kolom `partner` pada [StockDocument](file:///d:/Kelola-Gudang---Hexa/Backend/app/Models/StockDocument.php#10-115) di-preserve sebagai **snapshot string historis**. UI akan menggunakan dynamic fallback (`doc.customer ?? doc.partner` — `customer` adalah string nama dari `StockDocumentResource.php:27`, bukan objek) dan check controller penghapusan [Backend/app/Http/Controllers/CustomerController.php](file:///d:/Kelola-Gudang---Hexa/Backend/app/Http/Controllers/CustomerController.php) baris 66 (`where customer_id OR where partner`) tetap relevan.
-*   **Data Anomali (Q3):** Historical `partner` = `Departemen Produksi` dibiarkan apa adanya dan `customer_id` akan bernilai `NULL`. Tidak perlu membuat data Customer palsu.
+| Masalah | Lokasi | Dampak |
+|---|---|---|
+| **Hash mismatch**: reader pakai `JSON.stringify(serverRecords)` (object), writer pakai `JSON.stringify(payload.map(...))` (array) | L144 vs L238–244 | `lastSentRef === hash` aldrich never true → dedup mati |
+| **`hasDirty` false positive**: `hash !== JSON.stringify(recordsRef.current)` deteksi lokal-unsynced bukan remote-edit | L151 | toast warn meski server tidak berubah |
+| **`prevServerHashRef` tidak ada**: tidak ada baseline "hash server sebelumnya" → mustahil bedakan apakah server berubah antar render | — | loop sampai `silentSave.onSuccess` clear draft |
+| **`setRevealed(false)` di `isDocChange`**: reset blind-reveal tiap F5 ke dokumen yang sama | L136 | user kehilangan state "Tampilkan Sistem" tiap reload |
 
-## 5-Phase Plan (Revisi Terkoreksi)
+## Proposed Changes
 
-*   **Fase 0: Audit Dry-Run Script**
-    *   Menggunakan Tinker script yang secara eksplisit memfilter **berdasarkan `type IN ('Pengeluaran', 'Retur Penjualan')`** saja untuk mencegah audit data Penerimaan/Transfer/SO/ADJ (karena wajar jika partner kosong/berformat lain).
-    *   Hitung jumlah dokumen `customer_id IS NULL` pada 'Pengeluaran' vs 'Retur Penjualan'.
-    *   Mengidentifikasi distinct `partner` yang tidak ada di master.
-*   **Fase 1: Backfill SQL Migration**
-    *   Pembuatan class migration anonim (`Backend/database/migrations/xxxx_xx_xx_xxxxxx_backfill_customer_id_to_stock_documents.php`).
-    *   Script: `UPDATE stock_documents s SET customer_id = c.id FROM customers c WHERE s.customer_id IS NULL AND s.partner IS NOT NULL AND s.partner = c.name AND s.type IN ('Pengeluaran', 'Retur Penjualan')`
-    *   Membiarkan nilai `partner` utuh. Untuk seeder dev DB `Departemen Produksi`, statement di atas diharapkan me-return 0 affected rows secara natural.
-*   **Fase 2: Perbaikan Seeder Dummy Data**
-    *   File: [Backend/database/seeders/StockDocumentSeeder.php](file:///d:/Kelola-Gudang---Hexa/Backend/database/seeders/StockDocumentSeeder.php)
-    *   Ubah iterasi Pengeluaran (sekitar baris 107 dan 357) dengan probabilitas *per dokumen* (misal via `fake()->boolean(30)`): 70% di-set statis `partner` = `Departemen Produksi` dengan `customer_id = NULL`; 30% lookup random [Customer](file:///d:/Kelola-Gudang---Hexa/Backend/app/Http/Controllers/CustomerController.php#14-76) via DB, isi `customer_id = $c->id` dan `partner = $c->name`.
-    *   Pastikan dokumen 'Penerimaan', 'Transfer' (baris 196), dan 'Opname' (baris 291) tidak ikut mematuhi `customer_id`.
-*   **Fase 3: Update Search Backend**
-    *   File: [Backend/app/Http/Controllers/StockDocumentController.php](file:///d:/Kelola-Gudang---Hexa/Backend/app/Http/Controllers/StockDocumentController.php) baris 47.
-    *   Tambahkan filter `orWhereHas('customer', fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ["%{$needle}%"]))` di query `search`.
-*   **Fase 4: Update Visual & Komponen Frontend**
-    *   **Sheet Detail:** Di [Frontend/src/components/wms/stock-document-sheet.tsx](file:///d:/Kelola-Gudang---Hexa/Frontend/src/components/wms/stock-document-sheet.tsx) (baris 234), refactor display logic variabel destination dari sekadar menggunakan `partner` menjadi mendahulukan `doc.customer ?? doc.partner`.
-    *   **Search Box:** Di [Frontend/src/lib/stock-document-search.ts](file:///d:/Kelola-Gudang---Hexa/Frontend/src/lib/stock-document-search.ts) (baris 12), ubah agar memuat kata kunci lookup relasi live `doc.customer`.
-    *   **Entri Keluar:** Di [Frontend/src/components/wms/barang-keluar-form.tsx](file:///d:/Kelola-Gudang---Hexa/Frontend/src/components/wms/barang-keluar-form.tsx) (baris 107), restrukturisasi pemilahan/pembentukan initial options agar `find(c => c.name === ...)` menjadi *by ID* atau pemisahan jelas tanpa gabungan `Set({customer, dept, project})` yang collision.
-    *   **Entri Retur Penjualan:** Di [Frontend/src/components/wms/retur-penjualan-form.tsx](file:///d:/Kelola-Gudang---Hexa/Frontend/src/components/wms/retur-penjualan-form.tsx) (baris 269), pastikan setting fallback customer menangkap form state dengan ID secara kuat.
-*   **Fase 5: Test Integrity Verification**
-    *   File: [Backend/tests/Feature/StoreStockDocumentApiTest.php](file:///d:/Kelola-Gudang---Hexa/Backend/tests/Feature/StoreStockDocumentApiTest.php)
-    *   Test case baru: Validasi 422 Required bila `customer_id` kosong untuk 'Retur Penjualan'.
-    *   Test case baru: Validasi 422 Prohibited bila mencoba inject `customer_id` pada type 'Penerimaan', 'Transfer Gudang', 'Stock Opname', 'Stock Adjustment'.
-    *   Pastikan test lama "Pengeluaran dengan field `partner` 'PT Sumber Jaya' tanpa `customer_id`" bisa sukses tanpa required error.
+### [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx)
 
-## Verifikasi Mandiri
+#### [MODIFY] [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx)
 
-Setelah implementasi akan disimulasikan:
-*   `php artisan migrate --pretend`
-*   `php artisan test --filter=StockDocument`
-*   `npm run dev` pada Frontend dan pengetesan mutasi UI secara live.
+**Perubahan 1 — Tambah `prevServerHashRef` (L212, setelah `lastSentRef`)**
+
+```diff
+  const lastSentRef = useRef<string | null>(null);
++ const prevServerHashRef = useRef<string | null>(null);
+```
+
+`lastSentRef` tetap dipakai *hanya* oleh Writer (dedup PUT). `prevServerHashRef` adalah baseline
+baru khusus untuk Reader agar bisa deteksi "server hash berubah antar render" (= remote edit).
+
+---
+
+**Perubahan 2 — Reset baseline saat doc berganti (L120, dalam blok `isDocChange`)**
+
+```diff
+  if (isDocChange) {
++   prevServerHashRef.current = null; // reset baseline untuk doc baru
+    if (local && Object.keys(local).length > 0) {
+```
+
+Tanpa ini, baseline doc lama dipakai untuk doc baru → false detect.
+
+---
+
+**Perubahan 3 — Hapus `setRevealed(false)` + `removeItem revealed` di blok `isDocChange` (L136–140)**
+
+```diff
+      setRecords(merged);
+      toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+    } else {
+      setRecords(serverRecords);
+    }
+-   setRevealed(false);
+-   try {
+-     if (typeof window !== "undefined")
+-       window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
+-   } catch {}
+    return;
+```
+
+`revealed` sudah hydrate dari `kg-opname-revealed-${docId}` di `useState` initializer (L33–43).
+Reset manual tidak diperlukan dan merusak persistensi blind-reveal saat hard reload ke doc yang sama.
+
+---
+
+**Perubahan 4 — Ganti guard "same doc" (L143–155) dengan logik `prevServerHashRef`**
+
+```diff
+- const hash = JSON.stringify(serverRecords);
+- if (lastSentRef.current === hash) return;
+- const hasDirty = lines.some(
+-   (l) =>
+-     (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
+- );
+- if (hasDirty) {
+-   if (lines.some((l) => l.actual_qty != null) && hash !== JSON.stringify(recordsRef.current)) {
+-     toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?");
+-   }
+-   return;
+- }
+
++ const hash = JSON.stringify(serverRecords);
++ const prevHash = prevServerHashRef.current;
++ prevServerHashRef.current = hash; // selalu update setelah baca
++
++ if (!prevHash) return; // render pertama sejak mount/doc-change — belum ada baseline
++
++ const hasDirty = lines.some(
++   (l) =>
++     (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
++ );
++
++ // Remote edit: server hash berubah DAN user ada input local belum sinkron
++ if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
++   toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
++     id: `opname-conflict-${docId}`, // sonner dedup — tidak spam meski effect fire berulang
++   });
++   return; // preserve local
++ }
++
++ if (hasDirty) return; // local-unsynced tapi server TIDAK berubah — jangan overwrite, jangan warn
+```
+
+**Mengapa lebih baik**: kondisi `prevHash !== hash` hanya true bila server benar-benar mengirim
+data berbeda antar dua render cycle. F5 ke dokumen yang sama = server hash sama = `prevHash === hash`
+→ tidak warn.
+
+---
+
+### [use-persediaan.ts](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts) — Tidak ada perubahan
+
+[useUpdateStockDocument](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#136-180) (L136–178) sudah benar:
+- [onMutate](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#141-166): optimistic `setQueryData` ✅
+- [onError](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx#430-431): rollback ✅
+- [onSuccess](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#195-196): `setQueryData(data)` tanpa invalidate detail ✅ (cegah kedipan)
+- [onSettled](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#173-178): hanya invalidate `list` + `summary` ✅
+
+## Skenario Test
+
+| Skenario | Sebelum fix | Setelah fix |
+|---|---|---|
+| Ketik "5" → F5 sebelum debounce 1.5s fire | Loop toast warning selamanya | `prevHash=null` → `return`, tidak warn ✅ |
+| F5 lagi (draft masih ada, server masih `""`) | Loop berlanjut | `prevHash=serverHash=hash` → equal → tidak warn ✅ |
+| `onBlur` → `silentSave` berhasil → `setQueryData` | Warn lagi karena hash !== lastSent | `prevHash === newHash` (server akui nilai) → tidak warn ✅ |
+| Perangkat lain ubah ke "7" → staleTime expire → refetch | (sama: loop) | `prevHash≠hash` + `hasDirty` → warn 1x (sonner dedup by id) ✅ |
+| Non-Draft (Selesai) | Warn false positive | `local=null` (cleared L109–114) → `!hasDirty` → `setRecords(serverRecords)` ✅ |
+| Blind count → F5 | Revealed reset ke false | `setRevealed(false)` dihapus → localStorage hydrate benar ✅ |
+
+## Verification Plan
+
+### Automated
+- `npx tsc --noEmit` di `Frontend/` — tidak boleh ada error baru
+- `npm test` — single spec `src/routes/index.spec.tsx` harus pass
+
+### Manual
+1. Buka halaman opname count, ketik angka pada satu baris
+2. Hard reload sebelum debounce 1.5s → harus muncul **"Draft lokal dipulihkan"** tapi **TIDAK** muncul "Data diperbarui di perangkat lain"
+3. F5 lagi → tidak ada toast sama sekali
+4. Biarkan debounce fire (atau klik field lain untuk trigger onBlur) → silentSave berhasil → F5 → tidak ada toast
+5. *(Simulasi remote edit)* Lewat API langsung update actual_qty → tunggu 30s staleTime expire / window focus refetch → harus muncul **1 toast** warning, tidak lebih

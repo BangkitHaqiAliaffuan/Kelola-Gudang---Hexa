@@ -118,6 +118,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     );
     // if doc just changed, merge local over server (local wins per-line)
     if (isDocChange) {
+      prevServerHashRef.current = null; // reset baseline untuk doc baru
       if (local && Object.keys(local).length > 0) {
         const merged: Record<number, string> = { ...serverRecords };
         for (const [k, v] of Object.entries(local)) {
@@ -133,26 +134,37 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       } else {
         setRecords(serverRecords);
       }
-      setRevealed(false);
+      // re-hydrate revealed per-doc instead of reset
       try {
-        if (typeof window !== "undefined")
-          window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
-      } catch {}
+        if (typeof window !== "undefined") {
+          const v = JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed;
+          setRevealed(!!v);
+        }
+      } catch {
+        setRevealed(false);
+      }
       return;
     }
-    // for same doc, skip if hash already sent
     const hash = JSON.stringify(serverRecords);
-    if (lastSentRef.current === hash) return;
+    const prevHash = prevServerHashRef.current;
+    prevServerHashRef.current = hash; // selalu update setelah baca
+
+    if (!prevHash) return; // render pertama sejak mount/doc-change — belum ada baseline
+
     const hasDirty = lines.some(
       (l) =>
         (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
     );
-    if (hasDirty) {
-      if (lines.some((l) => l.actual_qty != null) && hash !== JSON.stringify(recordsRef.current)) {
-        toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?");
-      }
-      return;
+
+    // Remote edit: server hash berubah DAN user ada input local belum sinkron
+    if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
+      toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
+        id: `opname-conflict-${docId}`, // sonner dedup — tidak spam meski effect fire berulang
+      });
+      return; // preserve local
     }
+
+    if (hasDirty) return; // local-unsynced tapi server TIDAK berubah — jangan overwrite, jangan warn
     setRecords(serverRecords);
     // don't reset revealed on same doc
   }, [docId, lines, storageKey, lastSentStorageKey, session?.status]);
@@ -210,6 +222,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   // hybrid autosave: local per-huruf, server per jeda antar input (onBlur + 1.5s idle + keepalive)
   const lastSentRef = useRef<string | null>(null);
+  const prevServerHashRef = useRef<string | null>(null);
   const debounceRef = useRef<number | null>(null);
   const silentSaveRef = useRef<() => void>(() => {});
   const isSavingRef = useRef(false);

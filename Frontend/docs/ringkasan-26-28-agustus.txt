@@ -9,4 +9,7 @@ Melanjutkan koreksi ADJ 20 Agu dan scanner 24 Agu, finishing persediaan: ADJ man
 === 28 Agustus 2026 ===
 Melanjutkan opname 14 Agu, menambahkan autosave hybrid (local+onBlur 1,5s+keepalive) agar hitungan tidak hilang, membatasi 1 jadwal/gudang/hari dengan pesan informatif dan memperbaiki guard opname lantai.
 
-Lampiran: melanjutkan progress 6-24 Agu → 26-28 Agu; hash utama 26-28 -- 9f51c12, 9a69c12, c1df1a4 (detail git log --oneline --since="2026-08-26" --until="2026-08-28 23:59"). Spreadsheet Hari 98 terisi 26 Agu, 99-101 kosong — 27-28 diisi dari lanjutan fungsi sebelumnya.
+=== 31 Agustus 2026 ===
+Memperbaiki retur penjualan (sisa retur) dan kaitan customer di dokumen keluar/retur, menambah guard hapus Customer/Departemen dan opsi vendor di proyek. Membuat harga readOnly + subtotal/GR, mempercepat buka opname dan menjaga draft tetap tersimpan, serta membatasi 1 jadwal per gudang per hari.
+
+Lampiran: melanjutkan progress 6-24 Agu → 26-28 Agu; hash utama 26-28 -- 9f51c12, 9a69c12, c1df1a4 (detail git log --oneline --since="2026-08-26" --until="2026-08-28 23:59"). Spreadsheet Hari 98 terisi 26 Agu, 99-101 kosong — 27-28 diisi dari lanjutan fungsi sebelumnya. 31 Agu -- 457d0bb, e44594e, b62fa53, d52e5c9, 362bd01, b56151b, e972c0c, af84912 (Hari 102 kosong di sheet, diisi dari 8 commit 31 Agu).
