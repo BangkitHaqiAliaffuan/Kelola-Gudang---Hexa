@@ -66,6 +66,15 @@ class StockLedger
             $cost = $costIn[$key] ?? null;
             $average = $cost && $cost['qty'] > 0 ? $cost['cost'] / $cost['qty'] : null;
 
+            // Guard: jangan tulis item_stock dengan warehouse yang tidak cocok dengan bin.rack.warehouse (drift)
+            if ($binId !== null) {
+                $rackWh = \App\Models\Bin::with('rack')->find($binId)?->rack?->warehouse_id;
+                if ($rackWh !== null && (int) $warehouseId !== (int) $rackWh) {
+                    \Illuminate\Support\Facades\Log::warning('StockLedger: warehouse mismatch, skip write', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
+                    continue;
+                }
+            }
+
             if ($binId === null) {
                 DB::table('item_stock')->updateOrInsert(
                     ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => null],
