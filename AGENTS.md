@@ -28,6 +28,10 @@ WMS monorepo — **no root manifest** (ignore stray `package-lock.json` at root)
 ### Never run `migrate:fresh` — SANGAT PENTING
 `migrate:fresh` / `migrate:fresh --seed` / any DB-wiping command on dev DB `kelolagudang` is **FORBIDDEN** without explicit user instruction. Wipes users/master/stock/`role_permissions` and breaks login ("Kredensial tidak cocok"). Use new migration + `php artisan migrate`. If dev DB empty, `php artisan db:seed` (non-idempotent, only on empty DB). `UserSeeder` requires `DEMO_PASSWORD` from `Backend/.env` (exception if empty; never commit literal passwords — see `Frontend/docs/akun-login.md` + `.env.example`). `composer setup` fails on seeded DB.
 
+## Dokumentasi
+
+- Dokumen teks/tes/retest/manual selalu format `.txt` di `Frontend/docs/` (`retest-*.txt`, `tes-*.txt`, `testing-*.txt`, `ringkasan-*.txt`); spesifikasi/ERD/login tetap `*.md` (`erd-*.md`, `akun-login.md`). File perencanaan di root (`implementation_plan.md`, `crosscheck_report.md`) exempt — bukan dokumen `Frontend/docs`.
+
 ## Git rules
 
 - Never `git add`/`commit`/`push`/rewrite history (rebase/merge/amend/force-push) without explicit user instruction. When asked, stage only relevant files — never `git add .`/`-A`.
