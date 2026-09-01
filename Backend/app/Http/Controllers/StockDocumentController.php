@@ -760,7 +760,7 @@ class StockDocumentController extends Controller
                 return $this->lockedResponse($locked);
             }
             $locked->update(['locked_by_user_id' => $authId, 'locked_at' => now()]);
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'locker', 'requester', 'approver']));
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         });
     }
 
@@ -777,20 +777,20 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Lock sudah expired, silakan lock ulang.'], 423);
         }
         $stockDocument->update(['locked_at' => now()]);
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function unlock(Request $request, StockDocument $stockDocument)
     {
         $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
         if (empty($stockDocument->locked_by_user_id)) {
-            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         }
         if ((int) $stockDocument->locked_by_user_id !== (int) $authId) {
             return response()->json(['message' => 'Hanya pemilik lock yang bisa unlock.'], 423);
         }
         $stockDocument->update(['locked_by_user_id' => null, 'locked_at' => null]);
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function forceUnlock(Request $request, StockDocument $stockDocument)
@@ -808,7 +808,7 @@ class StockDocumentController extends Controller
             $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
             $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note . "\n" : '') . "Force unlock dari {$oldLocker} oleh {$user->name}" . ($reason ? ": {$reason}" : ''))]);
             // langsung acquire untuk forcer
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'locker']));
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         });
     }
 }

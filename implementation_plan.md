@@ -1,141 +1,144 @@
-# Fix: Guard Toast "Data diperbarui di perangkat lain" Loop Selamanya
+# Fix v2: Remaining Bugs di Guard pasca Commit `2e2e67f`
 
-Perbaikan bug di [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx) di mana toast konflik remote muncul secara terus-menerus
-(loop F5) akibat inkonsistensi format hash antara *reader* dan *writer*, serta logic `hasDirty`
-yang tidak membedakan *local-unsynced* dari *remote-edit*.
+Commit `2e2e67f` benar secara struktural, namun ada **2 remaining bug path** yang mengakibatkan
+warning masih bisa muncul sebagai false positive.
 
-## Akar Masalah
+## Akar Masalah Tersisa
 
-| Masalah | Lokasi | Dampak |
-|---|---|---|
-| **Hash mismatch**: reader pakai `JSON.stringify(serverRecords)` (object), writer pakai `JSON.stringify(payload.map(...))` (array) | L144 vs L238–244 | `lastSentRef === hash` aldrich never true → dedup mati |
-| **`hasDirty` false positive**: `hash !== JSON.stringify(recordsRef.current)` deteksi lokal-unsynced bukan remote-edit | L151 | toast warn meski server tidak berubah |
-| **`prevServerHashRef` tidak ada**: tidak ada baseline "hash server sebelumnya" → mustahil bedakan apakah server berubah antar render | — | loop sampai `silentSave.onSuccess` clear draft |
-| **`setRevealed(false)` di `isDocChange`**: reset blind-reveal tiap F5 ke dokumen yang sama | L136 | user kehilangan state "Tampilkan Sistem" tiap reload |
+### Bug 1 — `isSavingRef` guard return SEBELUM update `prevServerHashRef` (L85)
 
-## Proposed Changes
+```ts
+// L85 — guard ini return TERLALU DINI
+if (!isDocChange && (isSavingRef.current || update.isPending)) return;
+// prevServerHashRef TIDAK DIUPDATE saat guard ini aktif
+```
 
-### [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx)
+**Timeline yang menyebabkan false positive:**
+
+| Step | Event | prevServerHashRef | Efek |
+|---|---|---|---|
+| t0 | Lines resolve (actual_qty=null) | `null` | effect: `!prevHash → return`, set prevHash=`H0`=`{"101":""}` |
+| t1 | User ketik "5" → silentSave → `isSavingRef=true` | `H0` | — |
+| t2 | onMutate → optimistic setQueryData → lines berubah | `H0` | effect: `isSavingRef=true → return EARLY` (prevHash TIDAK diupdate) |
+| t3 | User ketik "6" | `H0` (stale!) | records={101:"6"} |
+| t4 | onSuccess → setQueryData(server response: actual=5) → lines berubah, isSavingRef=false | `H0` (stale!) | effect fires: `prevHash=H0 ≠ hash=H1={"101":"5"}` → **hasDirty=true** (records="6"≠"5") → **WARN! 🔥** |
+
+### Bug 2 — [onMutate](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#141-166) optimistic setQueryData tidak memajukan prevServerHashRef (terkait Bug 1)
+
+`isSavingRef` di-set `true` di L259 (sebelum `update.mutate()`), tapi [onMutate](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#141-166) dalam hook juga
+memanggil `setQueryData` secara optimistic yang memicu re-render. Karena `isSavingRef=true`, effect
+return early → prevServerHashRef tetap stale.
+
+## Fix
+
+**Satu patch kecil di L85**: update prevServerHashRef bahkan saat guard aktif.
+
+```diff
+  // don't clobber while saving
++ // Selalu update prevServerHashRef agar tidak stale saat guard dilewati
++ if (!isDocChange) {
++   const _sr = Object.fromEntries(
++     lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
++   );
++   prevServerHashRef.current = JSON.stringify(_sr);
++ }
+  if (!isDocChange && (isSavingRef.current || update.isPending)) return;
+```
+
+Atau alternatif yang **lebih hemat** — cukup track hash di awal, sebelum guard:
+
+```diff
+  useEffect(() => {
+    const isDocChange = prevLinesRef.current !== docId;
+    prevLinesRef.current = docId;
+
++   // Selalu majukan prevServerHashRef, bahkan saat guard aktif — cegah stale hash
++   if (!isDocChange) {
++     const earlyServerRecords = Object.fromEntries(
++       lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
++     );
++     prevServerHashRef.current = JSON.stringify(earlyServerRecords);
++   }
+
+    // don't clobber while saving
+    if (!isDocChange && (isSavingRef.current || update.isPending)) return;
+```
+
+### Mengapa ini benar?
+
+Update `prevServerHashRef` **sebelum** guard early-return memastikan:
+- Saat guard aktif (saving), baseline hash tetap up-to-date dengan server
+- Saat guard false (save selesai) → effect lanjut ke path normal, tapi `prevServerHashRef` sudah set
+  ke hash terbaru di awal → `prevHash === hash` (sama) → tidak warn ✅
+- Jika server benar-benar berubah (remote edit), hash akan berbeda di run berikutnya setelah guard
+  tidak aktif → warn muncul dengan benar ✅
+
+> **Catatan:** `prevServerHashRef` sekarang di-set di DUA tempat:
+> 1. Atas effect (sebelum guard) — untuk menjaga baseline tetap segar
+> 2. L150 (path normal) — untuk set baseline pertama kali dan update di-path normal
+>
+> Ini duplikat tapi tidak berbahaya. Bisa dikonsolidasi: hapus L150 assignment,
+> cukup set di atas saja, dan di blok `isDocChange` reset ke `null`.
+
+### Alternatif bersih (konsolidasi penuh):
+
+```ts
+useEffect(() => {
+  const isDocChange = prevLinesRef.current !== docId;
+  prevLinesRef.current = docId;
+
+  // Hitung hash server sekarang
+  const serverRecords = Object.fromEntries(
+    lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
+  );
+  const hash = JSON.stringify(serverRecords);
+
+  if (isDocChange) {
+    prevServerHashRef.current = null; // reset baseline
+    // ... merge local, toast.info, setRevealed, return
+  }
+
+  // Untuk same-doc: SELALU update prevHash, bahkan sebelum guard
+  const prevHash = prevServerHashRef.current;
+  prevServerHashRef.current = hash; // update di sini, sebelum guard
+
+  // don't clobber while saving
+  if (isSavingRef.current || update.isPending) return;
+
+  if (!prevHash) return;
+
+  const hasDirty = lines.some(
+    (l) => (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
+  );
+
+  if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
+    toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
+      id: `opname-conflict-${docId}`,
+    });
+    return;
+  }
+
+  if (hasDirty) return;
+  setRecords(serverRecords);
+}, [docId, lines, storageKey, lastSentStorageKey, session?.status]);
+```
+
+Perbedaan kunci dari commit `2e2e67f`:
+- `serverRecords` + `hash` dihitung **di bagian atas** effect, sebelum guard
+- `prevServerHashRef.current = hash` juga di atas, sebelum guard
+- Guard `isSavingRef` tidak lagi perlu `!isDocChange` prefix (isDocChange path sudah `return` di atasnya)
+
+## File yang Diubah
 
 #### [MODIFY] [opname-count-page.tsx](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx)
 
-**Perubahan 1 — Tambah `prevServerHashRef` (L212, setelah `lastSentRef`)**
-
-```diff
-  const lastSentRef = useRef<string | null>(null);
-+ const prevServerHashRef = useRef<string | null>(null);
-```
-
-`lastSentRef` tetap dipakai *hanya* oleh Writer (dedup PUT). `prevServerHashRef` adalah baseline
-baru khusus untuk Reader agar bisa deteksi "server hash berubah antar render" (= remote edit).
-
----
-
-**Perubahan 2 — Reset baseline saat doc berganti (L120, dalam blok `isDocChange`)**
-
-```diff
-  if (isDocChange) {
-+   prevServerHashRef.current = null; // reset baseline untuk doc baru
-    if (local && Object.keys(local).length > 0) {
-```
-
-Tanpa ini, baseline doc lama dipakai untuk doc baru → false detect.
-
----
-
-**Perubahan 3 — Hapus `setRevealed(false)` + `removeItem revealed` di blok `isDocChange` (L136–140)**
-
-```diff
-      setRecords(merged);
-      toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
-    } else {
-      setRecords(serverRecords);
-    }
--   setRevealed(false);
--   try {
--     if (typeof window !== "undefined")
--       window.localStorage.removeItem(`kg-opname-revealed-${docId}`);
--   } catch {}
-    return;
-```
-
-`revealed` sudah hydrate dari `kg-opname-revealed-${docId}` di `useState` initializer (L33–43).
-Reset manual tidak diperlukan dan merusak persistensi blind-reveal saat hard reload ke doc yang sama.
-
----
-
-**Perubahan 4 — Ganti guard "same doc" (L143–155) dengan logik `prevServerHashRef`**
-
-```diff
-- const hash = JSON.stringify(serverRecords);
-- if (lastSentRef.current === hash) return;
-- const hasDirty = lines.some(
--   (l) =>
--     (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
-- );
-- if (hasDirty) {
--   if (lines.some((l) => l.actual_qty != null) && hash !== JSON.stringify(recordsRef.current)) {
--     toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?");
--   }
--   return;
-- }
-
-+ const hash = JSON.stringify(serverRecords);
-+ const prevHash = prevServerHashRef.current;
-+ prevServerHashRef.current = hash; // selalu update setelah baca
-+
-+ if (!prevHash) return; // render pertama sejak mount/doc-change — belum ada baseline
-+
-+ const hasDirty = lines.some(
-+   (l) =>
-+     (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
-+ );
-+
-+ // Remote edit: server hash berubah DAN user ada input local belum sinkron
-+ if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
-+   toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
-+     id: `opname-conflict-${docId}`, // sonner dedup — tidak spam meski effect fire berulang
-+   });
-+   return; // preserve local
-+ }
-+
-+ if (hasDirty) return; // local-unsynced tapi server TIDAK berubah — jangan overwrite, jangan warn
-```
-
-**Mengapa lebih baik**: kondisi `prevHash !== hash` hanya true bila server benar-benar mengirim
-data berbeda antar dua render cycle. F5 ke dokumen yang sama = server hash sama = `prevHash === hash`
-→ tidak warn.
-
----
-
-### [use-persediaan.ts](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts) — Tidak ada perubahan
-
-[useUpdateStockDocument](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#136-180) (L136–178) sudah benar:
-- [onMutate](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#141-166): optimistic `setQueryData` ✅
-- [onError](file:///D:/Kelola-Gudang---Hexa/Frontend/src/components/wms/opname/opname-count-page.tsx#430-431): rollback ✅
-- [onSuccess](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#195-196): `setQueryData(data)` tanpa invalidate detail ✅ (cegah kedipan)
-- [onSettled](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts#173-178): hanya invalidate `list` + `summary` ✅
-
-## Skenario Test
-
-| Skenario | Sebelum fix | Setelah fix |
-|---|---|---|
-| Ketik "5" → F5 sebelum debounce 1.5s fire | Loop toast warning selamanya | `prevHash=null` → `return`, tidak warn ✅ |
-| F5 lagi (draft masih ada, server masih `""`) | Loop berlanjut | `prevHash=serverHash=hash` → equal → tidak warn ✅ |
-| `onBlur` → `silentSave` berhasil → `setQueryData` | Warn lagi karena hash !== lastSent | `prevHash === newHash` (server akui nilai) → tidak warn ✅ |
-| Perangkat lain ubah ke "7" → staleTime expire → refetch | (sama: loop) | `prevHash≠hash` + `hasDirty` → warn 1x (sonner dedup by id) ✅ |
-| Non-Draft (Selesai) | Warn false positive | `local=null` (cleared L109–114) → `!hasDirty` → `setRecords(serverRecords)` ✅ |
-| Blind count → F5 | Revealed reset ke false | `setRevealed(false)` dihapus → localStorage hydrate benar ✅ |
+Refactor effect L80–170: pindahkan kalkulasi `serverRecords`/`hash` dan assignment `prevServerHashRef`
+ke **sebelum** guard `isSavingRef`. Tidak ada perubahan di [use-persediaan.ts](file:///D:/Kelola-Gudang---Hexa/Frontend/src/hooks/use-persediaan.ts).
 
 ## Verification Plan
 
-### Automated
-- `npx tsc --noEmit` di `Frontend/` — tidak boleh ada error baru
-- `npm test` — single spec `src/routes/index.spec.tsx` harus pass
-
-### Manual
-1. Buka halaman opname count, ketik angka pada satu baris
-2. Hard reload sebelum debounce 1.5s → harus muncul **"Draft lokal dipulihkan"** tapi **TIDAK** muncul "Data diperbarui di perangkat lain"
-3. F5 lagi → tidak ada toast sama sekali
-4. Biarkan debounce fire (atau klik field lain untuk trigger onBlur) → silentSave berhasil → F5 → tidak ada toast
-5. *(Simulasi remote edit)* Lewat API langsung update actual_qty → tunggu 30s staleTime expire / window focus refetch → harus muncul **1 toast** warning, tidak lebih
+### Skenario wajib test manual:
+1. Ketik "5" → onBlur trigger silentSave → selama saving ketik "6" → save selesai → **tidak ada warning** ✅
+2. F5 dengan draft → query resolve → **hanya toast.info draft dipulihkan**, tidak ada toast warning ✅
+3. F5 lagi → **tidak ada toast sama sekali** ✅
+4. *(Opsional)* Simulasi: buka tab baru → update via API → reload tab pertama → **warning muncul 1x** ✅

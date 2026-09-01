@@ -72,3 +72,11 @@ npm run format     # prettier --write .
 - Buttons/inputs use `rounded-xl`; semantic tones are `success` / `warning` / `info` / `danger` / `brand` / `neutral`. Don't invent new color tokens.
 - Theming: 8 pastel themes via `data-theme` attribute + localStorage key `kg-theme` (`src/components/wms/theme.tsx`). Colors are defined in `src/styles.css` (Tailwind v4 `@theme inline` + oklch only — new colors MUST be oklch). No `tailwind.config.*` file; CSS is the source of truth.
 - Prettier: 100 print width, semicolons, double quotes, trailing commas. ESLint disallows importing Next.js's `server-only`; use `*.server.ts` naming instead.
+
+## Dokumentasi
+
+Mengikuti root `AGENTS.md##Dokumentasi`: `Frontend/docs/` hanya `.txt` untuk tes (`tes-*.txt`, `retest-*.txt`, `testing-*.txt`, `ringkasan-*.txt`), `.md` hanya untuk spec/ERD/login. Dokumen tes wajib browser-manual awam (http://localhost:8080 + http://127.0.0.1:8000, Bahasa Indonesia plain, langkah `Buka menu → Klik → Isi → Simpan → Cek toast/tabel` + `[LULUS/GAGAL]`, **DILARANG** `psql`/`SELECT`/`query`/`php artisan migrate:fresh --seed`/`db:seed`/`seeder`/`curl`/`GET /api` — hanya via UI browser). Lihat root `## Dokumentasi` & `## Git rules` untuk template & larangan commit.
+
+## Git rules
+
+Lihat root `AGENTS.md##Git rules` & `## Multi-session protocol`: Never `git add`/`commit`/`push` tanpa eksplisit, never `git add .`/`-A`/`git commit -a`, **DILARANG** commit `seluruh perubahan walau dari sesi lain` kecuali `commit all` eksplisit, stage hanya `<explicit-path>` milik task-mu; `implementasikan` ≠ izin commit.
