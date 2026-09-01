@@ -185,6 +185,48 @@ export function useUpdateStockDocument() {
   });
 }
 
+export function useLockStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/lock`, null),
+    onSuccess: (data) => {
+      qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
+      qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
+    },
+  });
+}
+
+export function useHeartbeatStockDocument() {
+  return useMutation({
+    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/heartbeat`, null),
+  });
+}
+
+export function useUnlockStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/unlock`, null),
+    onSuccess: (data) => {
+      qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
+    },
+  });
+}
+
+export function useForceUnlockStockDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      api.post<{ data: StockDocumentApi }>(
+        `/persediaan/stock-documents/${id}/force-unlock`,
+        reason ? { reason } : null,
+      ),
+    onSuccess: (data) => {
+      qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
+      qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
+    },
+  });
+}
+
 export function usePostStockDocument() {
   const qc = useQueryClient();
   return useMutation({

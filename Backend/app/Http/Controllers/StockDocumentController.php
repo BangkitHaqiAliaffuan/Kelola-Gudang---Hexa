@@ -371,9 +371,22 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Hanya dokumen Stock Opname berstatus Draft yang dapat diperbarui.'], 422);
         }
 
+        $authIdForLock = $request->user('sanctum')?->id ?? $request->user()?->id;
+        if ($this->isLockedByOther($stockDocument, $authIdForLock)) {
+            return $this->lockedResponse($stockDocument);
+        }
+
         $data = $request->validated();
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $stockDocument, $request) {
+            $authIdForLockInner = $request->user('sanctum')?->id ?? $request->user()?->id;
+            // Auto-acquire / refresh lock on successful update
+            if (empty($stockDocument->locked_by_user_id) || $this->isLockExpired($stockDocument)) {
+                $stockDocument->update(['locked_by_user_id' => $authIdForLockInner, 'locked_at' => now()]);
+            } elseif ((int) $stockDocument->locked_by_user_id === (int) $authIdForLockInner) {
+                $stockDocument->update(['locked_at' => now()]);
+            }
+
             $stockDocument->update([
                 'document_date' => $data['document_date'] ?? $stockDocument->document_date,
                 'pic' => $data['pic'] ?? $stockDocument->pic,
@@ -700,5 +713,102 @@ class StockDocumentController extends Controller
         ]);
 
         return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'requester', 'approver']));
+    }
+
+    // ---- Opname lock (server-draft only, 10 menit) ----
+
+    private function isLockExpired(StockDocument $doc): bool
+    {
+        if (empty($doc->locked_at)) return true;
+        return $doc->locked_at->lt(now()->subMinutes(10));
+    }
+
+    private function isLockedByOther(StockDocument $doc, ?int $authId): bool
+    {
+        if (empty($doc->locked_by_user_id) || $this->isLockExpired($doc)) return false;
+        return (int) $doc->locked_by_user_id !== (int) $authId;
+    }
+
+    private function lockedResponse(StockDocument $doc)
+    {
+        $doc->loadMissing('locker');
+        $name = $doc->locker?->name ?? 'User lain';
+        return response()->json(['message' => "Dokumen sedang diisi oleh {$name}. Hanya 1 user yang bisa mengedit. Coba lagi setelah 10 menit atau minta force unlock."], 423);
+    }
+
+    private function canForceUnlock($user): bool
+    {
+        if (! $user) return false;
+        if ($user->role === 'Auditor') return true;
+        return RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
+    }
+
+    public function lock(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname yang bisa di-lock.'], 422);
+        }
+        if ($stockDocument->status !== 'Draft') {
+            return response()->json(['message' => 'Hanya dokumen Draft yang bisa di-lock.'], 422);
+        }
+        $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
+        $user = $request->user('sanctum') ?? $request->user();
+
+        return DB::transaction(function () use ($stockDocument, $authId, $user) {
+            $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
+            if ($locked->locked_by_user_id && (int) $locked->locked_by_user_id !== (int) $authId && ! $this->isLockExpired($locked)) {
+                return $this->lockedResponse($locked);
+            }
+            $locked->update(['locked_by_user_id' => $authId, 'locked_at' => now()]);
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'locker', 'requester', 'approver']));
+        });
+    }
+
+    public function heartbeat(Request $request, StockDocument $stockDocument)
+    {
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname.'], 422);
+        }
+        $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
+        if ((int) $stockDocument->locked_by_user_id !== (int) $authId) {
+            return response()->json(['message' => 'Lock bukan milik Anda.'], 423);
+        }
+        if ($this->isLockExpired($stockDocument)) {
+            return response()->json(['message' => 'Lock sudah expired, silakan lock ulang.'], 423);
+        }
+        $stockDocument->update(['locked_at' => now()]);
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+    }
+
+    public function unlock(Request $request, StockDocument $stockDocument)
+    {
+        $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
+        if (empty($stockDocument->locked_by_user_id)) {
+            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+        }
+        if ((int) $stockDocument->locked_by_user_id !== (int) $authId) {
+            return response()->json(['message' => 'Hanya pemilik lock yang bisa unlock.'], 423);
+        }
+        $stockDocument->update(['locked_by_user_id' => null, 'locked_at' => null]);
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'locker']));
+    }
+
+    public function forceUnlock(Request $request, StockDocument $stockDocument)
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        if (! $this->canForceUnlock($user)) {
+            return response()->json(['message' => 'Hanya user dengan hak Persediaan Kelola atau Auditor yang bisa force unlock.'], 403);
+        }
+        if ($stockDocument->type !== 'Stock Opname') {
+            return response()->json(['message' => 'Hanya dokumen Stock Opname.'], 422);
+        }
+        $oldLocker = $stockDocument->locker?->name ?? (string) ($stockDocument->locked_by_user_id ?? 'unknown');
+        $reason = $request->input('reason');
+        return DB::transaction(function () use ($stockDocument, $user, $oldLocker, $reason) {
+            $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
+            $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note . "\n" : '') . "Force unlock dari {$oldLocker} oleh {$user->name}" . ($reason ? ": {$reason}" : ''))]);
+            // langsung acquire untuk forcer
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'locker']));
+        });
     }
 }

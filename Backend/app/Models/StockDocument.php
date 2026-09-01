@@ -51,6 +51,8 @@ class StockDocument extends Model
         'approver_user_id',
         'approved_at',
         'decision_note',
+        'locked_by_user_id',
+        'locked_at',
     ];
 
     protected $casts = [
@@ -59,6 +61,7 @@ class StockDocument extends Model
         'posted_at' => 'datetime',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
+        'locked_at' => 'datetime',
         'blind_count' => 'boolean',
     ];
 
@@ -105,6 +108,11 @@ class StockDocument extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function locker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by_user_id');
     }
 
     public function isPosted(): bool

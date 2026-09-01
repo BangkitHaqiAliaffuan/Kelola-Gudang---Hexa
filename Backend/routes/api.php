@@ -65,6 +65,9 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::post('stock-documents/{stockDocument}/cancel', [StockDocumentController::class, 'cancel']);
     Route::post('stock-documents/{stockDocument}/submit-approval', [StockDocumentController::class, 'submitApproval']);
     Route::post('stock-documents/{stockDocument}/submit-review', [StockDocumentController::class, 'submitReview']);
+    Route::post('stock-documents/{stockDocument}/lock', [StockDocumentController::class, 'lock']);
+    Route::post('stock-documents/{stockDocument}/heartbeat', [StockDocumentController::class, 'heartbeat']);
+    Route::post('stock-documents/{stockDocument}/unlock', [StockDocumentController::class, 'unlock']);
 });
 
 Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
@@ -72,6 +75,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('stock-documents/{stockDocument}/reject', [StockDocumentController::class, 'reject']);
     Route::post('stock-documents/{stockDocument}/approve-review', [StockDocumentController::class, 'approveReview']);
     Route::post('stock-documents/{stockDocument}/reject-review', [StockDocumentController::class, 'rejectReview']);
+    Route::post('stock-documents/{stockDocument}/force-unlock', [StockDocumentController::class, 'forceUnlock']);
 });
 
 Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan'])->group(function () {

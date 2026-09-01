@@ -1,0 +1,123 @@
+======================================================================
+DOKUMEN TES — Sync Opname Dual-Browser 10 vs 11 2026-09-01
+Data Nggak Sinkron Antar Browser Setelah Simpan
+Commit : fix(opname): sinkron antar browser setelah simpan + hash shape unified
+File   : Frontend/src/components/wms/opname/opname-count-page.tsx (isDocChange merge)
+         Frontend/src/hooks/use-persediaan.ts (refetchOnMount + invalidate detail)
+Format : TXT rapih — Page + Fungsi wajib retest
+======================================================================
+Ringkasan bug laporan:
+  Buka dokumen opname sama di 2 browser (A dan B). A = 10, B ganti 11 dan simpan
+  (toast hilang = sukses). A F5 refresh tetap 10 (harusnya 11), B F5 benar 11.
+  Akar: isDocChange merge blind local 10 over server 11 + lastSent hash shape mismatch
+        + staleTime 30s + tidak invalidate detail.
+
+======================================================================
+DAFTAR FILE TERDAMPAK (2 code)
+======================================================================
+  Frontend/src/components/wms/opname/opname-count-page.tsx
+    L80 isDocChange: hash records unified, 3-way check local/lastSent/server,
+    prefer server jika local==lastSent, konflik warning dengan action Muat ulang,
+    keepalive tanpa lastSent乐观, same-doc warning dengan action.
+  Frontend/src/hooks/use-persediaan.ts
+    useStockDocument staleTime 30s + refetchOnMount always,
+    onSettled invalidate detail (list/summary/detail).
+
+Prasyarat:
+  Backend: composer dev (8000) + psql kelolagudang migrate, .env DEMO_PASSWORD set.
+  Frontend: npm run dev (8080) proxy /api, Bearer kg-token Persediaan Tulis.
+  Data: 1 dokumen Stock Opname Draft dengan 3 baris, actual_qty awal 10 di 1 baris.
+  Role: Persediaan Tulis untuk simpan, bisa 2 browser berbeda (atau 2 profile).
+  Browser: Chrome profile A + profile B, localStorage enabled, buka DevTools > Application > Local Storage.
+
+----------------------------------------------------------------------
+A. REPRODUKSI BUG ASLI (sebelum fix = gagal, setelah fix = lulus)
+----------------------------------------------------------------------
+  Prasyarat: Buat opname Draft baru, isi 1 baris = 10, simpan Draft (silentSave), pastikan server 10.
+
+  Langkah:
+  [ ] A1 Browser A: buka /opname/proses/{id} -> cek baris target = 10
+  [ ] A2 Browser B: buka /opname/proses/{id} yang sama -> cek = 10
+  [ ] A3 Browser B: ganti jadi 11 -> tunggu toast "Menyimpan..." hilang (silentSave onSuccess, lastSent=hash(11), draft terhapus)
+  [ ] A4 Browser B: F5 -> Harap 11 (B benar) [LULUS/GAGAL]
+  [ ] A5 Browser A: tanpa ketik apapun, langsung F5 (hard refresh)
+        Sebelum fix: tetap 10 (draft 10 menimpa 11) [GAGAL]
+        Setelah fix: jadi 11 (draft 10 == lastSent 10 && server 11 -> prefer server, draft dihapus) [LULUS/GAGAL]
+  [ ] A6 Browser A: cek toast "Data terbaru dari server dimuat" (atau tidak ada toast) -> bukan "Draft dipulihkan" [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+B. DRAFT BELUM SINKRON HARUS KONFLIK (jangan hilang)
+----------------------------------------------------------------------
+  Skenario: A ketik 10 offline (belum sempat silentSave), B 11 sudah di server, A F5.
+
+  Langkah:
+  [ ] B1 Browser A: ketik 10 -> langsung disconnect wifi (offline) sebelum 1.5s autosave -> localStorage kg-opname-draft = {10}, lastSent masih hash lama (mis 0)
+  [ ] B2 Browser B: ganti 11 -> simpan sukses -> server 11
+  [ ] B3 Browser A: online kembali -> F5
+        Harap: toast.warning "Data diperbarui di perangkat lain — muat ulang untuk lihat?" dengan tombol "Muat ulang" id opname-conflict-{id} [LULUS/GAGAL]
+        Records tetap 10 (local preserved), tidak auto jadi 11 [LULUS/GAGAL]
+  [ ] B4 Klik "Muat ulang" di toast -> Harap jadi 11 dan draft terhapus [LULUS/GAGAL]
+  [ ] B5 Jika klik x (close) tanpa Muat ulang -> tetap 10, next F5 masih warning [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+C. FOCUS TAB TIDAK OVERWRITE KETIKAN (hasDirty guard)
+----------------------------------------------------------------------
+  File: opname-count-page.tsx L155 hasDirty, L151 isSavingRef guard
+
+  Langkah:
+  [ ] C1 Browser A: ketik 8 (belum save) -> pindah tab (visibility hidden -> flushKeepalive fire-and-forget, tidak update lastSent)
+  [ ] C2 Kembali tab (focus) -> Harap tidak refetch overwrite 8, tidak ada warning (karena refetchOnWindowFocus false tetap) [LULUS/GAGAL]
+  [ ] C3 Ketik 9 -> idle 1.5s -> silentSave -> Harap lastSent jadi hash(9), tidak ada warning [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+D. KEEPALIVE TIDAK ATOMIC (lastSent tidak optimis)
+----------------------------------------------------------------------
+  File: flushKeepalive L359 hash dari records, tidak set lastSent setelah fetch
+
+  Langkah:
+  [ ] D1 Ketik 12 -> langsung tutup tab (beforeunload -> flushKeepalive keepalive:true)
+        Harap: network tab DevTools terlihat PUT /api/persediaan/stock-documents/{id} keepalive, tapi localStorage lastSent tetap hash lama (bukan 12) [LULUS/GAGAL]
+  [ ] D2 Buka kembali tab -> F5 -> jika server belum terima 12 (timeout), Harap masih 12 local dengan warning konflik (bukan dianggap sudah sync) [LULUS/GAGAL]
+  [ ] D3 Jika server sudah terima 12, B F5 -> Harap 12 (server win) setelah next silentSave ack [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+E. REFETCH ON MOUNT + INVALIDATE DETAIL (cross-tab mount fresh)
+----------------------------------------------------------------------
+  File: use-persediaan.ts L122 refetchOnMount always, L174 invalidate detail
+
+  Langkah:
+  [ ] E1 Browser B: simpan 13 -> sukses -> cek Network: tidak ada invalidate detail sebelumnya (hanya list/summary), sekarang ada invalidate detail/{id}
+  [ ] E2 Browser A: tanpa F5, hanya navigate away (ke /opname/proses) lalu balik ke doc yang sama (mount baru) -> Harap fetch GET /api/persediaan/stock-documents/{id} selalu (refetchOnMount always) dan dapat 13 [LULUS/GAGAL]
+  [ ] E3 Browser A: sudah mount, B simpan 14, A tidak F5 tapi tetap di halaman -> Harap tidak otomatis 14 sampai A mount ulang atau F5 (karena refetchOnWindowFocus tetap false) -> hanya warning jika hasDirty [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+F. REGRESSION HASH SHAPE UNIFIED
+----------------------------------------------------------------------
+  File: silentSave L250 hash = JSON.stringify(records) (sebelum payload array), flushKeepalive L359 hash records, lastSent hydrate L73 string
+
+  Langkah:
+  [ ] F1 Ketik 15 -> cek Application > Local Storage kg-opname-lastSent-{id} = "\"{\\\"123\\\":\\\"15\\\"}\"" (object shape, bukan array payload) [LULUS/GAGAL]
+  [ ] F2 Refresh -> localHash === lastSent (jika sudah sync) -> next save dedup benar (tidak double save) [LULUS/GAGAL]
+  [ ] F3 npx tsc --noEmit -> No errors [LULUS/GAGAL]
+
+----------------------------------------------------------------------
+CARA JALANKAN & VERIFIKASI
+----------------------------------------------------------------------
+  FE
+    cd Frontend && npx tsc --noEmit
+    npm run dev -> 2 browser profile beda
+    Ikuti A1-A6, B1-B5, C1-C3, D1-D3, E1-E3
+  BE
+    php artisan test --filter=StockOpname (jika ada)
+    Cek GET /api/persediaan/stock-documents/{id} langsung return 11 setelah B simpan
+
+ENV CLEANUP:
+  Hapus localStorage kg-opname-draft-{id}, kg-opname-lastSent-{id}, kg-opname-revealed-{id} setelah tes.
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (Lulus/Gagal per A-F): A: ...... B: ...... C: ...... D: ...... E: ...... F: ......
+Catatan:

@@ -235,6 +235,10 @@ export type StockDocumentApi = {
   qty_total?: number;
   value_total?: number;
   lines?: StockDocumentLineApi[];
+  locked_by_user_id?: number | null;
+  locked_by?: string | null;
+  locked_at?: string | null;
+  is_locked_by_me?: boolean;
 };
 
 export type StockDocumentSummaryApi = {
