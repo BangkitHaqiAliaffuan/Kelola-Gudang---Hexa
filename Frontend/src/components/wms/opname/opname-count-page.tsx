@@ -81,50 +81,48 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     const isDocChange = prevLinesRef.current !== docId;
     prevLinesRef.current = docId;
 
-    // don't clobber while saving
-    if (!isDocChange && (isSavingRef.current || update.isPending)) return;
-
-    let local: Record<number, string> | null = null;
-    let localSavedAt: number | null = null;
-    try {
-      if (typeof window !== "undefined") {
-        const raw = window.localStorage.getItem(storageKey);
-        if (raw) {
-          const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
-          if (parsed.records) {
-            // TTL 24h
-            if (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
-              local = parsed.records;
-              localSavedAt = parsed.savedAt ?? null;
-            } else {
-              window.localStorage.removeItem(storageKey);
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-    // clear draft if session not Draft
-    if (session && session.status !== "Draft") {
-      try {
-        window.localStorage.removeItem(storageKey);
-        window.localStorage.removeItem(lastSentStorageKey);
-      } catch {}
-      local = null;
-    }
+    // Hitung hash server sekarang — selalu, sebelum guard
     const serverRecords = Object.fromEntries(
       lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
     );
-    // if doc just changed, merge local over server (local wins per-line)
+    const hash = JSON.stringify(serverRecords);
+
     if (isDocChange) {
       prevServerHashRef.current = null; // reset baseline untuk doc baru
+
+      let local: Record<number, string> | null = null;
+      let localSavedAt: number | null = null;
+      try {
+        if (typeof window !== "undefined") {
+          const raw = window.localStorage.getItem(storageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
+            if (parsed.records) {
+              if (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000) {
+                local = parsed.records;
+                localSavedAt = parsed.savedAt ?? null;
+              } else {
+                window.localStorage.removeItem(storageKey);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+      // clear draft if session not Draft
+      if (session && session.status !== "Draft") {
+        try {
+          window.localStorage.removeItem(storageKey);
+          window.localStorage.removeItem(lastSentStorageKey);
+        } catch {}
+        local = null;
+      }
       if (local && Object.keys(local).length > 0) {
         const merged: Record<number, string> = { ...serverRecords };
         for (const [k, v] of Object.entries(local)) {
           if (v !== "" && v != null) merged[Number(k)] = v;
         }
-        // if merged differs from server, show toast
         if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
           setRecords(merged);
           toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
@@ -134,7 +132,6 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       } else {
         setRecords(serverRecords);
       }
-      // re-hydrate revealed per-doc instead of reset
       try {
         if (typeof window !== "undefined") {
           const v = JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed;
@@ -145,28 +142,29 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       }
       return;
     }
-    const hash = JSON.stringify(serverRecords);
-    const prevHash = prevServerHashRef.current;
-    prevServerHashRef.current = hash; // selalu update setelah baca
 
-    if (!prevHash) return; // render pertama sejak mount/doc-change — belum ada baseline
+    // Untuk same-doc: SELALU update prevHash, bahkan sebelum guard — cegah stale hash
+    const prevHash = prevServerHashRef.current;
+    prevServerHashRef.current = hash;
+
+    // don't clobber while saving
+    if (isSavingRef.current || update.isPending) return;
+
+    if (!prevHash) return;
 
     const hasDirty = lines.some(
-      (l) =>
-        (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
+      (l) => (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
     );
 
-    // Remote edit: server hash berubah DAN user ada input local belum sinkron
     if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
       toast.warning("Data diperbarui di perangkat lain — muat ulang untuk lihat?", {
-        id: `opname-conflict-${docId}`, // sonner dedup — tidak spam meski effect fire berulang
+        id: `opname-conflict-${docId}`,
       });
-      return; // preserve local
+      return;
     }
 
-    if (hasDirty) return; // local-unsynced tapi server TIDAK berubah — jangan overwrite, jangan warn
+    if (hasDirty) return;
     setRecords(serverRecords);
-    // don't reset revealed on same doc
   }, [docId, lines, storageKey, lastSentStorageKey, session?.status]);
 
   const scanQ = scan.trim().toLowerCase();
