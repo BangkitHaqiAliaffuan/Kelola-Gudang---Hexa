@@ -71,6 +71,11 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
 
+  const storageKey = `kg-opname-draft-${docId}`;
+  const lastSentStorageKey = `kg-opname-lastSent-${docId}`;
+
+  // local per-huruf sync (refresh-safe) -- hydrate via effect below, write via records effect
+
   // Lock eksklusif per dokumen (server-draft only)
   const lock = useLockStockDocument();
   const heartbeat = useHeartbeatStockDocument();
@@ -93,7 +98,6 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     const isDocChange = prevLinesRef.current !== docId;
     prevLinesRef.current = docId;
 
-    // Server truth — tidak ada draft lokal lagi
     const serverRecords = Object.fromEntries(
       lines.map((l) => [l.id, l.actual_qty != null ? String(l.actual_qty) : ""]),
     );
@@ -101,7 +105,59 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
     if (isDocChange) {
       prevServerHashRef.current = null;
-      setRecords(serverRecords);
+      // hydrate local draft per-huruf (TTL 24h) -- 3-way merge
+      let local: Record<number, string> | null = null;
+      let localSavedAt: number | null = null;
+      try {
+        if (typeof window !== "undefined") {
+          const raw = window.localStorage.getItem(storageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
+            if (parsed.records && (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000)) {
+              local = parsed.records;
+              localSavedAt = parsed.savedAt ?? null;
+            } else if (parsed.savedAt) {
+              window.localStorage.removeItem(storageKey);
+            }
+          }
+        }
+      } catch {}
+      if (session && session.status !== "Draft") {
+        try {
+          window.localStorage.removeItem(storageKey);
+          window.localStorage.removeItem(lastSentStorageKey);
+        } catch {}
+        local = null;
+      }
+      const serverHasData = lines.some((l) => l.actual_qty != null);
+      if (local && Object.keys(local).length > 0) {
+        const lastSent = (() => {
+          try {
+            const raw = window.localStorage.getItem(lastSentStorageKey);
+            return raw ? (JSON.parse(raw) as string | null) : null;
+          } catch {
+            return null;
+          }
+        })();
+        const localHash = JSON.stringify(local);
+        // already synced before, server newer -> prefer server
+        if (localHash === lastSent && hash !== localHash) {
+          window.localStorage.removeItem(storageKey);
+          setRecords(serverRecords);
+        } else if (localHash !== lastSent) {
+          // unsynced draft -> preserve local
+          const merged: Record<number, string> = { ...serverRecords };
+          for (const [k, v] of Object.entries(local)) if (v !== "" && v != null) merged[Number(k)] = v;
+          if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
+            setRecords(merged);
+            toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
+          } else setRecords(serverRecords);
+        } else {
+          setRecords(serverRecords);
+        }
+      } else {
+        setRecords(serverRecords);
+      }
       try {
         if (typeof window !== "undefined") {
           const v = JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed;
@@ -192,9 +248,28 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   const goBack = () => router.navigate({ to: "/opname/$section", params: { section: "proses" } });
 
+  // hydrate lastSent synchronously for dedup lintas refresh
+  const lastSentInit = (() => {
+    try {
+      if (typeof window === "undefined") return null;
+      const raw = window.localStorage.getItem(lastSentStorageKey);
+      return raw ? (JSON.parse(raw) as string | null) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   // hybrid autosave: local per-huruf, server per jeda antar input (onBlur + 1.5s idle + keepalive)
-  const lastSentRef = useRef<string | null>(null);
+  const lastSentRef = useRef<string | null>(lastSentInit);
   const prevServerHashRef = useRef<string | null>(null);
+
+  // local per-huruf sync (refresh-safe, sync)
+  useEffect(() => {
+    if (typeof window === "undefined" || !docId) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({ records, savedAt: Date.now() }));
+    } catch {}
+  }, [records, storageKey, docId]);
   const debounceRef = useRef<number | null>(null);
   const silentSaveRef = useRef<() => void>(() => {});
   const isSavingRef = useRef(false);
