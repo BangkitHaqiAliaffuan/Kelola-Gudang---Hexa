@@ -166,6 +166,7 @@ function MasterBarang() {
 
   const allFilteredIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.includes(id));
+  const someSelected = selected.length > 0 && !allSelected;
   const toggleSelectAll = () =>
     setSelected((p) => (allSelected ? [] : allFilteredIds));
 
@@ -280,6 +281,18 @@ function MasterBarang() {
           {
             key: "check",
             label: "",
+            header:
+              rows.length > 0 ? (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? ("indeterminate" as const) : false}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Pilih semua"
+                  />
+                </span>
+              ) : (
+                ""
+              ),
             className: "w-10",
             render: (r: ItemApi) => (
               <span onClick={(e) => e.stopPropagation()}>
@@ -487,16 +500,7 @@ function MasterBarang() {
             placeholder="Semua Status"
             options={["Aktif", "Nonaktif"]}
           />
-          <div className="ml-auto flex shrink-0 items-end gap-2">
-            {(canWrite || canDelete) && rows.length > 0 && (
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleSelectAll}
-                />
-                Pilih semua ({rows.length})
-              </label>
-            )}
+          <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
