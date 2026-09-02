@@ -681,7 +681,7 @@ export type BulkImportItem = {
   weight?: number | null;
   dimension?: string | null;
   status: "Aktif" | "Nonaktif";
-  action: "create" | "update";
+  action: "create";
 };
 
 export type BulkImportPayload = {

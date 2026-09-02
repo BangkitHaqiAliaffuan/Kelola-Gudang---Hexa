@@ -166,7 +166,7 @@ class ItemController extends Controller
     {
         $data = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.sku' => ['required', 'string', 'max:30'],
+            'items.*.sku' => ['nullable', 'string', 'max:30'],
             'items.*.barcode' => ['nullable', 'string', 'max:30'],
             'items.*.name' => ['required', 'string', 'max:200'],
             'items.*.category_id' => ['nullable', 'integer'],
@@ -188,10 +188,42 @@ class ItemController extends Controller
             'items.*.weight' => ['nullable', 'numeric', 'min:0'],
             'items.*.dimension' => ['nullable', 'string', 'max:60'],
             'items.*.status' => ['required', 'string', 'in:Aktif,Nonaktif'],
-            'items.*.action' => ['required', 'string', 'in:create,update'],
+            'items.*.action' => ['required', 'string', 'in:create'],
         ]);
 
-        // Row-level: at least one of id or name must exist for category/brand/unit
+        // Auto-generate SKU kosong (format A SKU-10001-001 series) + block duplikat intra-file
+        \Illuminate\Support\Facades\DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ['code:items:sku:SKU']);
+        $allSeen = [];
+        foreach (\App\Models\Item::pluck('sku') as $s) {
+            $allSeen[strtoupper(trim($s))] = true;
+        }
+        $firstOcc = [];
+        foreach (array_keys($allSeen) as $k) {
+            $firstOcc[$k] = ['idx' => -1, 'name' => 'database'];
+        }
+        $rowErrors = [];
+        foreach ($data['items'] as $idx => &$row) {
+            $sku = trim($row['sku'] ?? '');
+            $name = trim($row['name'] ?? 'tanpa nama');
+            if ($sku === '') {
+                $sku = $this->nextSkuSeries($allSeen);
+                $row['sku'] = $sku;
+            }
+            $upper = strtoupper($sku);
+            if (isset($allSeen[$upper])) {
+                $first = $firstOcc[$upper];
+                $firstLabel = $first['idx'] >= 0 ? "baris ".($first['idx']+1)." ('{$first['name']}')" : "database";
+                $rowErrors[$idx] = "SKU '{$sku}' duplikat di file dengan {$firstLabel} — barang '{$name}' baris ".($idx+1);
+            }
+            if (!isset($firstOcc[$upper])) {
+                $firstOcc[$upper] = ['idx' => $idx, 'name' => $name];
+            }
+            $allSeen[$upper] = true;
+        }
+        unset($row);
+        if (!empty($rowErrors)) {
+            return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
+        }
         $rowErrors = [];
         foreach ($data['items'] as $index => $row) {
             if (empty($row['category_id']) && empty($row['category_name'])) {
@@ -314,24 +346,14 @@ class ItemController extends Controller
                 if ($unitId) $payload['unit_id'] = $unitId;
 
                 try {
-                    if ($action === 'update') {
-                        $existing = Item::where('sku', $sku)->first();
-                        if (!$existing) {
-                            $errors[$index] = "SKU '{$sku}' tidak ditemukan untuk update.";
-                            continue;
-                        }
-                        $existing->update($payload);
-                        $updated++;
-                    } else {
-                        if (Item::where('sku', $sku)->exists()) {
-                            $errors[$index] = "SKU '{$sku}' sudah ada.";
-                            continue;
-                        }
-                        $payload['internal_barcode'] = $payload['internal_barcode']
-                            ?? \App\Support\CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
-                        Item::create($payload);
-                        $created++;
+                    if (Item::where('sku', $sku)->exists()) {
+                        $errors[$index] = "SKU '{$sku}' sudah ada.";
+                        continue;
                     }
+                    $payload['internal_barcode'] = $payload['internal_barcode']
+                        ?? \App\Support\CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
+                    Item::create($payload);
+                    $created++;
                 } catch (\Exception $e) {
                     $errors[$index] = "Baris " . ($index + 1) . ": " . $e->getMessage();
                 }
@@ -349,5 +371,23 @@ class ItemController extends Controller
             DB::rollBack();
             throw $e;
         }
+    }
+
+    private function nextSkuSeries(array $allSeen): string
+    {
+        $bestSeries = 10000;
+        $bestSeq = 0;
+        foreach (array_keys($allSeen) as $code) {
+            if (!preg_match('/^SKU-(\d+)-(\d{3})$/', $code, $m)) continue;
+            $series = (int) $m[1];
+            $seq = (int) $m[2];
+            if ($series > $bestSeries || ($series === $bestSeries && $seq > $bestSeq)) {
+                $bestSeries = $series;
+                $bestSeq = $seq;
+            }
+        }
+        if ($bestSeries === 10000 && $bestSeq === 0) return 'SKU-10001-001';
+        if ($bestSeq >= 999) return 'SKU-'.($bestSeries + 1).'-001';
+        return 'SKU-'.$bestSeries.'-'.str_pad((string)($bestSeq + 1), 3, '0', STR_PAD_LEFT);
     }
 }

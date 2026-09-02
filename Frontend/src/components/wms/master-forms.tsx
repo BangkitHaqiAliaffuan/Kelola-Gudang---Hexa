@@ -72,6 +72,7 @@ import {
   type WorkOrderInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
+import { nextSku } from "@/lib/sku";
 import {
   useBins,
   useCategories,
@@ -170,24 +171,6 @@ function nextCode(codes: string[], prefix: string): string {
     if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
   }
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
-}
-
-function nextSku(codes: string[]): string {
-  let bestSeries = 10000;
-  let bestSeq = 0;
-  for (const c of codes) {
-    const m = /^SKU-(\d+)-(\d{3})$/.exec(c);
-    if (!m) continue;
-    const series = Number(m[1]);
-    const seq = Number(m[2]);
-    if (series > bestSeries || (series === bestSeries && seq > bestSeq)) {
-      bestSeries = series;
-      bestSeq = seq;
-    }
-  }
-  if (bestSeries === 10000 && bestSeq === 0) return "SKU-10001-001";
-  if (bestSeq >= 999) return `SKU-${bestSeries + 1}-001`;
-  return `SKU-${bestSeries}-${String(bestSeq + 1).padStart(3, "0")}`;
 }
 
 function nextYearlyCode(codes: string[], prefix: string, year = new Date().getFullYear()): string {
