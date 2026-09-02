@@ -161,4 +161,193 @@ class ItemController extends Controller
             'updated' => $updated,
         ], 200);
     }
+
+    public function bulkImport(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.sku' => ['required', 'string', 'max:30'],
+            'items.*.barcode' => ['nullable', 'string', 'max:30'],
+            'items.*.name' => ['required', 'string', 'max:200'],
+            'items.*.category_id' => ['nullable', 'integer'],
+            'items.*.category_name' => ['nullable', 'string', 'max:150'],
+            'items.*.sub_category_id' => ['nullable', 'integer', 'exists:sub_categories,id'],
+            'items.*.brand_id' => ['nullable', 'integer'],
+            'items.*.brand_name' => ['nullable', 'string', 'max:150'],
+            'items.*.unit_id' => ['nullable', 'integer'],
+            'items.*.unit_name' => ['nullable', 'string', 'max:50'],
+            'items.*.preferred_supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
+            'items.*.default_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
+            'items.*.default_rack_id' => ['nullable', 'integer', 'exists:racks,id'],
+            'items.*.default_bin_id' => ['nullable', 'integer', 'exists:bins,id'],
+            'items.*.cost' => ['required', 'numeric', 'min:100'],
+            'items.*.price' => ['required', 'numeric', 'min:100'],
+            'items.*.min_stock' => ['required', 'integer', 'min:0'],
+            'items.*.max_stock' => ['nullable', 'integer', 'min:0'],
+            'items.*.lead_time' => ['nullable', 'integer', 'min:0'],
+            'items.*.weight' => ['nullable', 'numeric', 'min:0'],
+            'items.*.dimension' => ['nullable', 'string', 'max:60'],
+            'items.*.status' => ['required', 'string', 'in:Aktif,Nonaktif'],
+            'items.*.action' => ['required', 'string', 'in:create,update'],
+        ]);
+
+        // Row-level: at least one of id or name must exist for category/brand/unit
+        $rowErrors = [];
+        foreach ($data['items'] as $index => $row) {
+            if (empty($row['category_id']) && empty($row['category_name'])) {
+                $rowErrors[$index] = 'Kategori wajib diisi (category_id atau category_name).';
+            }
+        }
+        if (!empty($rowErrors)) {
+            return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
+        }
+
+        // Resolve name→id maps (dedupe + create in one pass per entity type)
+        $catMap = [];
+        $merkMap = [];
+        $unitMap = [];
+        $created = 0;
+        $updated = 0;
+        $errors = [];
+
+        DB::beginTransaction();
+
+        try {
+            // Resolve categories
+            foreach ($data['items'] as $row) {
+                $id = $row['category_id'] ?? null;
+                $name = trim($row['category_name'] ?? '');
+                if ($id) {
+                    $catMap[(string) $id] = (int) $id;
+                } elseif ($name !== '' && !isset($catMap[strtolower($name)])) {
+                    $existing = \App\Models\Category::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                    if ($existing) {
+                        $catMap[strtolower($name)] = $existing->id;
+                    } else {
+                        $cat = \App\Models\Category::create([
+                            'code' => \App\Support\CodeGenerator::next(\App\Models\Category::class, 'KAT'),
+                            'name' => $name,
+                            'is_active' => true,
+                        ]);
+                        $catMap[strtolower($name)] = $cat->id;
+                    }
+                }
+            }
+
+            // Resolve merks
+            foreach ($data['items'] as $row) {
+                $id = $row['brand_id'] ?? null;
+                $name = trim($row['brand_name'] ?? '');
+                if ($id) {
+                    $merkMap[(string) $id] = (int) $id;
+                } elseif ($name !== '' && !isset($merkMap[strtolower($name)])) {
+                    $existing = \App\Models\Merk::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                    if ($existing) {
+                        $merkMap[strtolower($name)] = $existing->id;
+                    } else {
+                        $merk = \App\Models\Merk::create([
+                            'code' => \App\Support\CodeGenerator::next(\App\Models\Merk::class, 'MRK'),
+                            'name' => $name,
+                            'is_active' => true,
+                        ]);
+                        $merkMap[strtolower($name)] = $merk->id;
+                    }
+                }
+            }
+
+            // Resolve units
+            foreach ($data['items'] as $row) {
+                $id = $row['unit_id'] ?? null;
+                $name = trim($row['unit_name'] ?? '');
+                if ($id) {
+                    $unitMap[(string) $id] = (int) $id;
+                } elseif ($name !== '' && !isset($unitMap[strtolower($name)])) {
+                    $existing = \App\Models\Unit::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                    if ($existing) {
+                        $unitMap[strtolower($name)] = $existing->id;
+                    } else {
+                        $unit = \App\Models\Unit::create([
+                            'code' => \App\Support\CodeGenerator::next(\App\Models\Unit::class, 'UNT'),
+                            'name' => $name,
+                            'is_active' => true,
+                        ]);
+                        $unitMap[strtolower($name)] = $unit->id;
+                    }
+                }
+            }
+
+            // Process items
+            foreach ($data['items'] as $index => $row) {
+                $action = $row['action'];
+                $sku = $row['sku'];
+
+                // Resolve category_id
+                $catId = $row['category_id'] ?? null;
+                if (!$catId && !empty($row['category_name'])) {
+                    $catId = $catMap[strtolower(trim($row['category_name']))] ?? null;
+                }
+
+                // Resolve brand_id
+                $brandId = $row['brand_id'] ?? null;
+                if (!$brandId && !empty($row['brand_name'])) {
+                    $brandId = $merkMap[strtolower(trim($row['brand_name']))] ?? null;
+                }
+
+                // Resolve unit_id
+                $unitId = $row['unit_id'] ?? null;
+                if (!$unitId && !empty($row['unit_name'])) {
+                    $unitId = $unitMap[strtolower(trim($row['unit_name']))] ?? null;
+                }
+
+                // Row-level: category must resolve
+                if (!$catId) {
+                    $errors[$index] = "Kategori '" . ($row['category_name'] ?? '') . "' tidak ditemukan.";
+                    continue;
+                }
+
+                $payload = collect($row)
+                    ->except(['action', 'category_name', 'brand_name', 'unit_name'])
+                    ->filter()
+                    ->toArray();
+                $payload['category_id'] = $catId;
+                if ($brandId) $payload['brand_id'] = $brandId;
+                if ($unitId) $payload['unit_id'] = $unitId;
+
+                try {
+                    if ($action === 'update') {
+                        $existing = Item::where('sku', $sku)->first();
+                        if (!$existing) {
+                            $errors[$index] = "SKU '{$sku}' tidak ditemukan untuk update.";
+                            continue;
+                        }
+                        $existing->update($payload);
+                        $updated++;
+                    } else {
+                        if (Item::where('sku', $sku)->exists()) {
+                            $errors[$index] = "SKU '{$sku}' sudah ada.";
+                            continue;
+                        }
+                        $payload['internal_barcode'] = $payload['internal_barcode']
+                            ?? \App\Support\CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
+                        Item::create($payload);
+                        $created++;
+                    }
+                } catch (\Exception $e) {
+                    $errors[$index] = "Baris " . ($index + 1) . ": " . $e->getMessage();
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => "{$created} barang ditambahkan, {$updated} barang diperbarui.",
+                'created' => $created,
+                'updated' => $updated,
+                'errors' => $errors,
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
 }

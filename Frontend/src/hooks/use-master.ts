@@ -658,6 +658,57 @@ export function useBulkUpdateItemStatus() {
   });
 }
 
+export type BulkImportItem = {
+  sku: string;
+  barcode?: string | null;
+  name: string;
+  category_id?: number | null;
+  category_name?: string | null;
+  sub_category_id?: number | null;
+  brand_id?: number | null;
+  brand_name?: string | null;
+  unit_id?: number | null;
+  unit_name?: string | null;
+  preferred_supplier_id?: number | null;
+  default_warehouse_id?: number | null;
+  default_rack_id?: number | null;
+  default_bin_id?: number | null;
+  cost: number;
+  price: number;
+  min_stock: number;
+  max_stock?: number | null;
+  lead_time?: number | null;
+  weight?: number | null;
+  dimension?: string | null;
+  status: "Aktif" | "Nonaktif";
+  action: "create" | "update";
+};
+
+export type BulkImportPayload = {
+  items: BulkImportItem[];
+};
+
+export type BulkImportResponse = {
+  message: string;
+  created: number;
+  updated: number;
+  errors: Record<number, string>;
+};
+
+export function useBulkImportItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: BulkImportPayload) =>
+      api.post<BulkImportResponse>("/master/items/bulk-import", payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.items });
+      qc.invalidateQueries({ queryKey: keys.categories });
+      qc.invalidateQueries({ queryKey: keys.merks });
+      qc.invalidateQueries({ queryKey: keys.units });
+    },
+  });
+}
+
 export function useCreateDepartment() {
   const qc = useQueryClient();
   return useMutation({

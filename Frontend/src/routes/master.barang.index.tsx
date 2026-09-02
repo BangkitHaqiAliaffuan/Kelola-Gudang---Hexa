@@ -22,6 +22,7 @@ import {
 } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { ItemFormDialog } from "@/components/wms/master-forms";
+import { ImportBarangDialog } from "@/components/wms/import-barang-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import {
   useBulkDeleteItems,
@@ -124,6 +126,7 @@ function MasterBarang() {
   const [deleting, setDeleting] = useState(false);
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [statusValue, setStatusValue] = useState<"Aktif" | "Nonaktif">("Aktif");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const deleteItem = useDeleteItem();
   const bulkDelete = useBulkDeleteItems();
@@ -160,6 +163,69 @@ function MasterBarang() {
 
   const toggle = (id: number) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  const allFilteredIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.includes(id));
+  const toggleSelectAll = () =>
+    setSelected((p) => (allSelected ? [] : allFilteredIds));
+
+  const exportHeaders = [
+    { key: "sku", label: "SKU" },
+    { key: "barcode", label: "Barcode" },
+    { key: "name", label: "Nama Barang" },
+    { key: "category", label: "Kategori" },
+    { key: "subCategory", label: "Sub Kategori" },
+    { key: "brand", label: "Merk" },
+    { key: "supplier", label: "Supplier" },
+    { key: "unit", label: "Satuan" },
+    { key: "warehouse", label: "Gudang Default" },
+    { key: "rack", label: "Rak Default" },
+    { key: "bin", label: "Bin Default" },
+    { key: "cost", label: "Harga Pokok" },
+    { key: "price", label: "Harga Jual" },
+    { key: "min", label: "Stock Minimum" },
+    { key: "max", label: "Stock Maksimum" },
+    { key: "leadTime", label: "Lead Hari" },
+    { key: "weight", label: "Berat" },
+    { key: "dimension", label: "Dimensi" },
+    { key: "status", label: "Status" },
+  ] as const;
+
+  const mapRowForExport = (r: ItemApi) => ({
+    sku: r.sku,
+    barcode: r.barcode ?? "",
+    name: r.name,
+    category: r.category ?? "",
+    subCategory: r.subCategory ?? "",
+    brand: r.brand ?? "",
+    supplier: r.supplier ?? "",
+    unit: r.unit ?? "",
+    warehouse: r.warehouse ?? "",
+    rack: r.rack ?? "",
+    bin: r.bin ?? "",
+    cost: r.cost,
+    price: r.price,
+    min: r.min,
+    max: r.max ?? "",
+    leadTime: r.leadTime,
+    weight: r.weight ?? "",
+    dimension: r.dimension ?? "",
+    status: r.status,
+  });
+
+  const handleExportAll = () => {
+    const content = toCsv(rows.map(mapRowForExport), [...exportHeaders]);
+    downloadCsv(`master-barang-${new Date().toISOString().slice(0, 10)}.csv`, content);
+    toast.success(`Export ${formatNumber(rows.length)} barang`);
+  };
+
+  const handleExportSelected = () => {
+    const selectedRows = rows.filter((r) => selected.includes(r.id));
+    if (selectedRows.length === 0) return;
+    const content = toCsv(selectedRows.map(mapRowForExport), [...exportHeaders]);
+    downloadCsv(`master-barang-terpilih-${new Date().toISOString().slice(0, 10)}.csv`, content);
+    toast.success(`Export ${formatNumber(selectedRows.length)} barang terpilih`);
+  };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -322,18 +388,35 @@ function MasterBarang() {
               <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => toast.success("Import template diunduh")}
+                onClick={() => setImportDialogOpen(true)}
               >
                 <Upload className="h-4 w-4" /> Import
               </Button>
             )}
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => toast.success("Export Excel diproses")}
-            >
-              <Download className="h-4 w-4" /> Export
-            </Button>
+            {canWrite && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="rounded-xl">
+                    <Download className="h-4 w-4" /> Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleExportAll}>
+                    <Download className="h-4 w-4" /> Export Semua Barang
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={selected.length === 0}
+                    onClick={handleExportSelected}
+                  >
+                    <Download className="h-4 w-4" /> Export Barang Terpilih
+                    {selected.length > 0 && (
+                      <span className="ml-auto text-xs text-muted-foreground">({selected.length})</span>
+                    )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {canWrite && (
               <Button
                 className="rounded-xl"
@@ -404,7 +487,16 @@ function MasterBarang() {
             placeholder="Semua Status"
             options={["Aktif", "Nonaktif"]}
           />
-          <div className="ml-auto flex shrink-0 items-end">
+          <div className="ml-auto flex shrink-0 items-end gap-2">
+            {(canWrite || canDelete) && rows.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                />
+                Pilih semua ({rows.length})
+              </label>
+            )}
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
@@ -638,6 +730,8 @@ function MasterBarang() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportBarangDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </>
   );
 }

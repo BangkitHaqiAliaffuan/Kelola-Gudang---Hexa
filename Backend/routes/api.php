@@ -48,6 +48,7 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('work-orders', WorkOrderController::class);
     Route::post('items/bulk-delete', [ItemController::class, 'bulkDestroy']);
     Route::post('items/bulk-status', [ItemController::class, 'bulkUpdateStatus']);
+    Route::post('items/bulk-import', [ItemController::class, 'bulkImport']);
     Route::apiResource('items', ItemController::class);
 });
 
