@@ -379,7 +379,7 @@ function Dashboard() {
               key={a.label}
               to={a.to}
               params={a.params as never}
-              className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lift"
+              className="group flex max-w-[150px] flex-col items-center gap-2 rounded-xl border border-border bg-card p-4 text-center text-xs font-semibold transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lift"
             >
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                 <a.icon className="h-5 w-5" />
