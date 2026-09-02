@@ -1,0 +1,281 @@
+======================================================================
+DOKUMEN TES — Import/Export Master Barang (7e4ffa2)
+Commit : 7e4ffa2 feat(master barang): import/export with auto-create
+======================================================================
+Ringkasan commit:
+  7e4ffa2 — 7 files, 1281 ins:
+    Backend/app/Http/Controllers/ItemController.php (+189)
+      bulkImport(): auto-create Kategori/Merk/Satuan via category_name/
+      brand_name/unit_name, dedupe, single transaction, row-level validasi
+    Backend/routes/api.php (+1)
+      POST /api/master/items/bulk-import
+    Frontend/src/components/wms/import-barang-dialog.tsx (NEW 882)
+      Dialog import CSV: upload, PapaParse, FK resolve, preview table,
+      auto-create checkbox, warning Sub Kategori, lucide icons
+    Frontend/src/hooks/use-master.ts (+51)
+      BulkImportItem/Payload/Response types, useBulkImportItems hook
+    Frontend/src/routes/master.barang.index.tsx (+112 -28)
+      Export DropdownMenu, select-all checkbox, Import dialog trigger
+
+Prasyarat:
+  Backend : composer dev (port 8000), DB kelolagudang seeded, minimal
+            ada beberapa Kategori/Merk/Satuan/Gudang di DB.
+  Frontend: npm run dev (port 8080), proxy /api → 8000.
+  Akun    : Administrator (USR-001) untuk full akses.
+            Supervisor (USR-002) untuk tes RBAC (Master Data Baca).
+  Data    : minimal 3-5 item di DB (agar export ada isi).
+
+======================================================================
+A. EXPORT — DROPDOWN MENU
+======================================================================
+File: Frontend/src/routes/master.barang.index.tsx, baris 396-418
+  DropdownMenu: "Export Semua Barang" + "Export Barang Terpilih"
+
+Tes:
+  [ ] A1 Buka Master Data → Barang → klik tombol "Export" (Download icon)
+      → dropdown muncul dengan 2 opsi
+  [ ] A2 Klik "Export Semua Barang" → file CSV terunduh
+      → nama file: master-barang-YYYY-MM-DD.csv
+  [ ] A3 Buka file CSV → header: SKU, Barcode, Nama Barang, Kategori,
+      Sub Kategori, Merk, Supplier, Satuan, Gudang Default, Rak Default,
+      Bin Default, Harga Pokok, Harga Jual, Stock Minimum, Stock Maksimum,
+      Lead Hari, Berat, Dimensi, Status
+  [ ] A4 Isi CSV: semua item di DB ter-export, data benar (nama kategori
+      resolved, bukan ID)
+  [ ] A5 Pilih 2-3 item di tabel (checkbox per baris) → klik Export
+      → "Export Barang Terpilih" aktif (tidak disabled)
+  [ ] A6 Klik "Export Barang Terpilih" → CSV hanya berisi baris terpilih
+  [ ] A7 Tanpa pilihan → "Export Barang Terpilih" disabled (opacity gray)
+
+======================================================================
+B. EXPORT — RBAC
+======================================================================
+File: Frontend/src/routes/master.barang.index.tsx, baris 396
+  Gate: {canWrite && (...)} — canWrite = hasModuleLevel("Master Data", "Tulis")
+
+Tes:
+  [ ] B1 Login Administrator → tombol Export muncul
+  [ ] B2 Login Supervisor (Master Data Baca) → tombol Export TIDAK muncul
+  [ ] B3 Login Auditor (Master Data Baca) → tombol Export TIDAK muncul
+
+======================================================================
+C. SELECT ALL CHECKBOX
+======================================================================
+File: Frontend/src/routes/master.barang.index.tsx, baris 491-498
+  Checkbox "Pilih semua (N)" di area filter
+
+Tes:
+  [ ] C1 Centang "Pilih semua" → semua baris di tabel tercentang
+      → count di toolbar sesuai jumlah total
+  [ ] C2 Uncheck "Pilih semua" → semua baris uncheck
+  [ ] C3 Filter aktif (misal Kategori = "Elektronik") → "Pilih semua"
+      hanya pilih baris yang lolos filter (bukan semua item di DB)
+  [ ] C4 Centang "Pilih semua" → uncheck 1 baris manual → checkbox
+      "Pilih semua" jadi indeterminate (bukan checked penuh)
+  [ ] C5 Tombol Bulk Action (Delete/Status) muncul saat selected.length > 0
+
+======================================================================
+D. IMPORT — DIALOG OPEN
+======================================================================
+File: Frontend/src/routes/master.barang.index.tsx, baris 387-394
+  Tombol Import → setImportDialogOpen(true)
+
+Tes:
+  [ ] D1 Klik tombol "Import" → dialog "Import Barang" terbuka
+  [ ] D2 Dialog ada: judul, deskripsi, tombol Download Template,
+      tombol Pilih File CSV, area preview (kosong awalnya)
+  [ ] D3 Klik X atau tombol Batal → dialog tertutup
+
+======================================================================
+E. IMPORT — DOWNLOAD TEMPLATE
+======================================================================
+File: Frontend/src/components/wms/import-barang-dialog.tsx, baris 182-186
+  Template: 2 baris contoh (SKU-CONTOH-001, SKU-CONTOH-002)
+
+Tes:
+  [ ] E1 Klik "Download Template" → file template-import-barang.csv terunduh
+  [ ] E2 Buka file → header: SKU, Barcode, Nama Barang, ..., Status
+      (19 kolom, sama dengan CSV_HEADERS)
+  [ ] E3 Isi: 2 baris contoh dengan data realistis
+      (Elektronik/Handphone/Samsung/PT Maju Jaya/Pcs, ATK/Snowman/Box)
+
+======================================================================
+F. IMPORT — CSV UPLOAD + VALIDASI
+======================================================================
+File: Frontend/src/components/wms/import-barang-dialog.tsx, baris 188-292
+
+Tes:
+  [ ] F1 Upload CSV valid 3 baris → preview table muncul, stats bar muncul
+      (X Valid / X Duplikat / X Error / X total)
+  [ ] F2 Baris valid → status "✓ Valid" (icon CheckCircle2, hijau)
+  [ ] F3 Baris SKU duplikat (sudah ada di DB) → status "⚠ Duplikat"
+      (icon TriangleAlert, kuning), ada tombol toggle "Skip →" / "Update →"
+  [ ] F4 Baris error (SKU kosong, Nama kosong, Harga < 100) →
+      status "✗ Error" (icon XCircle, merah), catatan merah
+  [ ] F5 Toggle "Skip →" pada baris duplikat → berubah jadi "Update →"
+      dan status berubah ke "✓ Valid"
+  [ ] F6 Upload CSV dengan Sub Kategori tidak ada di DB →
+      baris tetap "✓ Valid", catatan kuning:
+      "⚠ Sub Kategori 'X' tidak ditemukan, item akan dibuat tanpa sub kategori"
+  [ ] F7 Upload CSV tanpa kolom Kategori (atau Kategori kosong) →
+      baris "✗ Error", catatan: "Kategori wajib diisi"
+
+======================================================================
+G. IMPORT — AUTO-CREATE (Kategori/Merk/Satuan Baru)
+======================================================================
+File: Frontend/src/components/wms/import-barang-dialog.tsx
+  Pre-pass: collect unique names, resolve via isAutoCreatable()
+
+Scenario: CSV 3 baris:
+  SKU-10200-001 | Alumunium Foil  | Kategori: Bahan Kemasan (baru)
+                                    | Sub Kategori: Kemasan Aluminium (gak ada)
+                                    | Satuan: Roll (baru)
+  SKU-10200-002 | Paralon 3 inch  | Kategori: Bahan Kemasan (sama)
+                                    | Satuan: Roll (sama)
+  SKU-10200-003 | Lakban Bench    | Kategori: Alat Kebersihan (baru)
+
+Tes:
+  [ ] G1 Upload CSV → preview: semua baris "Akan dibuat baru" (icon Sparkles)
+      atau "✓ Valid" (tergantung ada duplikat atau tidak)
+  [ ] G2 Summary bar: "🆕 3 Akan dibuat baru" (atau 2+1 duplikat)
+  [ ] G3 Panel "Entity baru yang akan dibuat otomatis":
+      - Kategori: ☑ Bahan Kemasan ☑ Alat Kebersihan
+      - Satuan: ☑ Roll
+      (checkbox tercentang semua default)
+  [ ] G4 Uncheck "Bahan Kemasan" → baris 1 & 2 yang pakai Bahan Kemasan
+      berubah status (skip, tidak diimport)
+  [ ] G5 Catatan baris auto-create: "🆕 Akan dibuat baru: Kategori 'Bahan Kemasan'
+      Satuan 'Roll'" (text info, icon Sparkles + TriangleAlert untuk warning)
+  [ ] G6 Klik "Import 3 Barang" → toast sukses, item terbuat,
+      Kategori "Bahan Kemasan" dibuat 1x (dedupe), "Roll" dibuat 1x
+  [ ] G7 Cek di tabel Master Barang: item muncul dengan Kategori resolved
+      (bukan ID, tapi nama "Bahan Kemasan"), Satuan "Roll"
+
+======================================================================
+H. IMPORT — SUB CATEGORY WARNING (BUKAN ERROR)
+======================================================================
+File: Frontend/src/components/wms/import-barang-dialog.tsx, baris 265-269
+  warnings.push(...) bukan errors.push(...)
+
+Tes:
+  [ ] H1 CSV: Kategori "ATK" (ada di DB), Sub Kategori "Nonexistent" →
+      baris "✓ Valid" (bukan Error), catatan kuning warning
+  [ ] H2 Import berhasil → item terbuat, sub_category_id = null di DB
+  [ ] H3 CSV: Sub Kategori kosong (kolom kosong) → baris tetap "✓ Valid",
+      tidak ada warning (sub category optional)
+  [ ] H4 CSV: Sub Kategori ada di DB → sub_category_id terisi benar,
+      tidak ada warning
+
+======================================================================
+I. IMPORT — BACKEND BULK IMPORT
+======================================================================
+File: Backend/app/Http/Controllers/ItemController.php, baris 165-353
+  POST /api/master/items/bulk-import
+  Validation: items.*.category_id nullable, items.*.category_name nullable
+  Row-level: minimal category_id ATAU category_name ada
+
+Tes (via UI):
+  [ ] I1 Import 3 baris → backend return "3 barang ditambahkan"
+  [ ] I2 2 baris refer Kategori sama "ATK" → Kategori dibuat 1x,
+      kedua item punya category_id sama
+  [ ] I3 Baris tanpa category_id DAN category_name → 422 error
+      "Kategori wajib diisi (category_id atau category_name)"
+  [ ] I4 Item terbuat dengan internal_barcode auto-generate
+  [ ] I5 Item terbuat dengan stock=0, reserved=0 (default)
+
+======================================================================
+J. IMPORT — RBAC
+======================================================================
+File: Frontend/src/routes/master.barang.index.tsx, baris 387
+  Gate: {canWrite && (...)} — sama dengan Export
+
+Tes:
+  [ ] J1 Login Administrator → tombol Import muncul
+  [ ] J2 Login Supervisor (Master Data Baca) → tombol Import TIDAK muncul
+
+======================================================================
+K. IMPORT — EDGE CASES
+======================================================================
+Tes:
+  [ ] K1 Upload CSV kosong (0 baris) → toast error "Tidak ada baris valid"
+  [ ] K2 Upload file bukan CSV → toast error "Gagal membaca file CSV"
+  [ ] K3 Upload CSV semua baris error → tombol Import disabled
+  [ ] K4 Upload CSV ada baris valid + error → hanya baris valid diimport,
+      baris error di-skip, response errors berisi index baris yang gagal
+  [ ] K5 Import sukses → dialog tertutup, tabel Master Barang refresh
+      (data terbaru muncul)
+  [ ] K6 Import duplicate SKU dengan action "update" → item di-update
+      (bukan create baru)
+
+======================================================================
+L. CSV COLUMN MAPPING (Export ↔ Import)
+======================================================================
+Export headers (master.barang.index.tsx) dan CSV_HEADERS (import dialog)
+harus konsisten agar file export bisa di-import ulang.
+
+Tes:
+  [ ] L1 Export semua item → buka CSV → jadikan template (hapus semua
+      baris kecuali header + 1 data) → import CSV tersebut
+  [ ] L2 Import berhasil, data sesuai export (round-trip test)
+  [ ] L3 Kolom Export: r.category (resolved name), r.unit, r.brand, dll
+      → bukan category_id (angka)
+
+======================================================================
+REGRESSION CHECK
+======================================================================
+  [ ] R1 Tabel Master Barang tetap tampil normal (pagination, filter, search)
+  [ ] R2 Tombol Tambah Barang tetap jalan (form dialog)
+  [ ] R3 Tombol Edit per baris (⋯ menu) tetap jalan
+  [ ] R4 Tombol Delete per baris tetap jalan
+  [ ] R5 Bulk Action (Delete/Status) tetap jalan
+  [ ] R6 Filter Kategori/Sub Kategori/Merk/Satuan/Gudang/Rak/Bin/Status
+      tetap jalan
+  [ ] R7 Clear Filters tetap jalan
+  [ ] R8 npx tsc --noEmit pass
+  [ ] R9 npm run build pass
+
+======================================================================
+CARA JALANKAN
+======================================================================
+  Backend:
+    cd Backend && composer dev
+    (pastikan port 8000 aktif, DB ter-migrate, ter-seed)
+
+  Frontend:
+    cd Frontend && npm run dev
+    (pastikan port 8080 aktif, proxy /api → 8000)
+
+  Login:
+    Administrator: rudi.hartono@kelolagudang.id / (DEMO_PASSWORD)
+
+  Untuk tes import, siapkan CSV test:
+    Buat file test-import.csv dengan isi:
+      SKU,Barcode,Nama Barang,Kategori,Sub Kategori,Merk,Supplier,Satuan,
+      Gudang Default,Rak Default,Bin Default,Harga Pokok,Harga Jual,
+      Stock Minimum,Stock Maksimum,Lead Hari,Berat,Dimensi,Status
+      IMP-001,,Barang Test 1,ATK,,Snowman,,Box,Gudang Pusat,,,500,800,10,,,500,0.5,,Aktif
+      IMP-002,,Barang Test 2,Bahan Kemasan (baru),Kemasan Aluminium (gak ada),,PT Maju,Roll,Gudang Utama,,,15000,22000,5,,,1000,1.2,,Aktif
+      IMP-003,,Barang Test 3,ATK,,Snowman,,Box,Gudang Pusat,,,300,500,50,,,300,,Aktif
+
+  Atau gunakan template dari dialog, edit sesuai kebutuhan.
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (LULUS/GAGAL per section):
+  A (Export dropdown): ......
+  B (Export RBAC): ......
+  C (Select all): ......
+  D (Import dialog): ......
+  E (Download template): ......
+  F (CSV upload + validasi): ......
+  G (Auto-create): ......
+  H (Sub Category warning): ......
+  I (Backend bulk import): ......
+  J (Import RBAC): ......
+  K (Edge cases): ......
+  L (CSV round-trip): ......
+  R (Regression): ......
+Catatan:
