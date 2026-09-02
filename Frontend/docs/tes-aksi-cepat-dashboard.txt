@@ -1,0 +1,196 @@
+======================================================================
+DOKUMEN TES — Aksi Cepat Dashboard (794cfa8, 78d7fb4, 53c3303)
+Commit : 794cfa8 feat(dashboard): tambah card Stock ke Aksi Cepat
+         78d7fb4 fix(dashboard): grid Aksi Cepat dinamis
+         53c3303 fix(dashboard): max-width card 150px
+======================================================================
+Ringkasan commit:
+  794cfa8 — 1 file, 2 ins: tambah card "Stock" (icon Archive) ke
+            quickActions, route /persediaan/kartu-stock
+  78d7fb4 — 1 file, 3 ins 1 del: grid lg-cols dinamis berdasarkan
+            visibleQuickActions.length (1-7), bukan fixed lg-cols-6
+  53c3303 — 1 file, 1 ins 1 del: tambah max-w-[150px] di Link card
+            supaya gak stretch saat 1-2 card
+
+Prasyarat:
+  Backend : composer dev (port 8000), DB kelolagudang seeded.
+  Frontend: npm run dev (port 8080), proxy /api → 8000.
+  Akun    : 4 role berbeda untuk tes RBAC filtering:
+            - Administrator (USR-001) → semua module Tulis/Kelola
+            - Supervisor    (USR-002) → Persediaan Tulis, Master Data Baca
+            - Operator Gudang (USR-003) → Persediaan Tulis, Master Data Baca
+            - Auditor       (USR-004) → semua module Baca saja
+
+======================================================================
+A. QUICK ACTIONS — 7 CARD (Administrator)
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 81-119 (quickActions array)
+  7 card: Barang Masuk, Barang Keluar, Transfer, Stock Opname,
+          Cetak Barcode, Tambah Barang, Stock
+  Filter: hasModuleLevel(a.module, "Tulis")
+
+Tes:
+  [ ] A1 Login sebagai Administrator → buka Dashboard
+      → section "Aksi Cepat" muncul dengan 7 card
+  [ ] A2 Semua 7 card terlihat: Barang Masuk, Barang Keluar, Transfer,
+      Stock Opname, Cetak Barcode, Tambah Barang, Stock
+  [ ] A3 Grid layout: 7 kolom di desktop (lg:), 3 kolom di tablet (sm:),
+      2 kolom di mobile — card rapat sampai pojok kanan
+  [ ] A4 Setiap card: icon (h-5 w-5) di dalam bulatan bg-primary-soft,
+      label text di bawah, hover efek translate-y + border primary
+  [ ] A5 Klik card "Stock" → navigasi ke /persediaan/kartu-stock
+  [ ] A6 Klik card "Barang Masuk" → navigasi ke /transaksi/entri/masuk
+  [ ] A7 Card ukuran konsisten ~150px lebarnya, gak ada yang stretch
+
+======================================================================
+B. QUICK ACTIONS — 6 CARD (Supervisor / Operator Gudang)
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 185-187 (visibleQuickActions)
+  Supervisor punya: Persediaan Tulis, Master Data Baca, Stock Opname Baca
+  Filter requires Tulis → lolos: Barang Masuk, Barang Keluar, Transfer,
+    Stock (Persediaan), Cetak Barcode (module=undefined → lolos)
+  Tidak lolos: Stock Opname (Stock Opname Baca, butuh Tulis),
+    Tambah Barang (Master Data Baca, butuh Tulis)
+  -> 5 card untuk Supervisor
+
+  Operator Gudang: Persediaan Tulis, Master Data Baca, Stock Opname Tulis
+  Lolos: Barang Masuk, Barang Keluar, Transfer, Stock Opname, Cetak Barcode, Stock
+  Tidak lolos: Tambah Barang (Master Data Baca)
+  -> 6 card untuk Operator
+
+Tes:
+  [ ] B1 Login sebagai Supervisor (siti.aminah@kelolagudang.id) → Dashboard
+      → Aksi Cepat muncul 5 card (bukan 7, bukan 1)
+  [ ] B2 Card yang muncul: Barang Masuk, Barang Keluar, Transfer,
+      Cetak Barcode, Stock (TANPA Stock Opname, TANPA Tambah Barang)
+  [ ] B3 Grid: 5 kolom di desktop, card rapat, gak stretch
+  [ ] B4 Login sebagai Operator Gudang (bayu.pratama@kelolagudang.id)
+      → Aksi Cepat muncul 6 card
+  [ ] B5 Card Operator: termasuk Stock Opname (karena Stock Opname Tulis),
+      TANPA Tambah Barang (Master Data Baca)
+  [ ] B6 Grid: 6 kolom di desktop, card konsisten
+
+======================================================================
+C. QUICK ACTIONS — 1 CARD (Auditor)
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 110
+  Cetak Barcode: module=undefined → selalu lolos filter (selalu tampil)
+
+Tes:
+  [ ] C1 Login sebagai Auditor (dewi.lestari@kelolagudang.id) → Dashboard
+      → Aksi Cepat muncul HANYA 1 card: "Cetak Barcode"
+  [ ] C2 Card ukuran wajar (~150px), align ke kiri (bukan stretch
+      selebar container). Ini yang di-fix di 53c3303.
+  [ ] C3 Grid: lg:grid-cols-1, card max-w-[150px], sisa ruang kosong
+      di sebelah kanan (wajar, bukan bug)
+  [ ] C4 Klik "Cetak Barcode" → navigasi ke /barcode
+
+======================================================================
+D. GRID DINAMIS (78d7fb4)
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 375
+  Grid className: ... ${{ 1: "lg:grid-cols-1", ..., 7: "lg:grid-cols-7" }
+  [Math.min(visibleQuickActions.length, 7)] ?? "lg:grid-cols-6" }
+
+Tes:
+  [ ] D1 Administrator (7 card) → grid lg:grid-cols-7 → card rapat
+  [ ] D2 Operator (6 card) → grid lg:grid-cols-6 → card rapat
+  [ ] D3 Supervisor (5 card) → grid lg:grid-cols-5 → card rapat
+  [ ] D4 Mobile (< sm) → grid-cols-2 → card 2 kolom, wrap ke bawah
+  [ ] D5 Tablet (sm-lg) → sm:grid-cols-3 → card 3 kolom
+  [ ] D6 Jika visibleQuickActions.length > 7 (hypothetical) → capped
+      di lg:grid-cols-7, tidak error
+
+======================================================================
+E. MAX-WIDTH CARD (53c3303)
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 382
+  Link className: ... max-w-[150px] ...
+
+Tes:
+  [ ] E1 Auditor (1 card) → card lebar max 150px, tidak stretch
+  [ ] E2 Administrator (7 card) → card tetap ~150px, tidak berubah
+      dari kondisi sebelum fix (regresi check)
+  [ ] E3 Hover efek tetap jalan: border primary, shadow lift,
+      translate-y -0.5px
+  [ ] E4 Icon bulatan tetap center, label tetap di bawah icon
+  [ ] E5 Mobile: card di grid-cols-2 tetap responsif, max-w tidak
+      mempengaruhi layout mobile (karena cell sudah < 150px)
+
+======================================================================
+F. CARD STOCK — ROUTE VALIDATION
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 118
+  { label: "Stock", to: "/persediaan/kartu-stock", icon: Archive }
+
+  Route file: Frontend/src/routes/persediaan.kartu-stock.tsx
+
+Tes:
+  [ ] F1 Klik card "Stock" → halaman Kartu Stock terbuka
+  [ ] F2 Tidak ada error 404 atau blank page
+  [ ] F3 Data Kartu Stock loaded (minimal tabel muncul, ada/s kosong)
+  [ ] F4 Breadcrumb / navigation path benar: Persediaan → Kartu Stock
+
+======================================================================
+G. ICON lucide-react CONSISTENCY
+======================================================================
+File: Frontend/src/routes/index.tsx, baris 4-19 (imports)
+  Icons: ArrowDownToLine, ArrowUpFromLine, ArrowLeftRight,
+         ClipboardCheck, QrCode, Package, Archive
+
+Tes:
+  [ ] G1 Semua icon muncul (bukan placeholder/broken image)
+  [ ] G2 Icon ukuran konsisten h-5 w-5 di dalam bulatan h-11 w-11
+  [ ] G3 Icon warna text-primary, bulatan bg-primary-soft
+  [ ] G4 Hover: icon bulatan jadi bg-primary, icon jadi text-primary-foreground
+
+======================================================================
+REGRESSION CHECK
+======================================================================
+  [ ] R1 Dashboard statistik (Total SKU, Gudang, Nilai Persediaan)
+      tetap tampil di atas Aksi Cepat
+  [ ] R2 Chart "Barang Masuk & Keluar per Bulan" tetap render
+  [ ] R3 Aktivitas Terkini tetap tampil
+  [ ] R4 Persetujuan Pending tetap tampil (jika ada)
+  [ ] R5 Sidebar navigation tetap berfungsi
+  [ ] R6 npx tsc --noEmit pass
+  [ ] R7 npm run build pass
+
+======================================================================
+CARA JALANKAN
+======================================================================
+  Backend:
+    cd Backend && composer dev
+    (pastikan port 8000 aktif, DB ter-migrate, ter-seed)
+
+  Frontend:
+    cd Frontend && npm run dev
+    (pastikan port 8080 aktif, proxy /api → 8000)
+
+  Login 4 role (buka tab/incognito berbeda):
+    Administrator : rudi.hartono@kelolagudang.id / (DEMO_PASSWORD)
+    Supervisor    : siti.aminah@kelolagudang.id / (DEMO_PASSWORD)
+    Operator      : bayu.pratama@kelolagudang.id / (DEMO_PASSWORD)
+    Auditor       : dewi.lestari@kelolagudang.id / (DEMO_PASSWORD)
+
+  Untuk setiap role, buka Dashboard (/) dan periksa:
+    1. Jumlah card di section "Aksi Cepat"
+    2. Layout grid (rapat, gak stretch)
+    3. Card ukuran konsisten ~150px
+    4. Klik 1 card → navigasi benar
+
+======================================================================
+AKHIR DOKUMEN
+======================================================================
+Tanggal tes: ....................
+Penguji: ....................
+Hasil (LULUS/GAGAL per section):
+  A (7 card Admin): ......
+  B (5-6 card Supervisor/Operator): ......
+  C (1 card Auditor): ......
+  D (Grid dinamis): ......
+  E (Max-width): ......
+  F (Stock route): ......
+  G (Icon consistency): ......
+  R (Regression): ......
+Catatan:
