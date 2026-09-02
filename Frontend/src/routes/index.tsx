@@ -13,6 +13,7 @@ import {
   QrCode,
   CheckCheck,
   Lock,
+  Archive,
 } from "lucide-react";
 import {
   Area,
@@ -114,6 +115,7 @@ const quickActions = [
     icon: Package,
     module: "Master Data",
   },
+  { label: "Stock", to: "/persediaan/kartu-stock", params: undefined, icon: Archive, module: "Persediaan" },
 ] as const;
 
 const chartTooltip = {
