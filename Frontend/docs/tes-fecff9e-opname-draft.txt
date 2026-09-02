@@ -1,0 +1,126 @@
+Tes Manual -- fecff9e Opname Draft Lokal (kg-opname-draft + keepalive)
+Commit: fecff9e fix(opname): draft lokal per-huruf + lastSent persist + 3-way merge TTL 24h
+Tanggal Uji: 02 Sep 2026
+
+PRASYARAT
+  - Dua server jalan: Backend composer dev http://127.0.0.1:8000 + Frontend npm run dev http://localhost:8080
+  - Login akun dari Frontend/docs/akun-login.md (DEMO_PASSWORD di Backend/.env)
+    USR-003 Bayu Pratama (Operator Gudang, Persediaan Tulis) untuk isi opname
+    USR-004 / Supervisor atau Auditor untuk lock kedua (uji konflik)
+  - Siapkan 1 jadwal opname Draft: Opname -> Jadwal -> Buat Jadwal -> pilih Gudang Bandung -> tanggal hari ini -> Simpan. Catat nomor SO/... dan minimal 5 baris barang.
+
+======================================================================
+A. Simpan Per-Huruf (draft tidak hilang saat ketik)
+----------------------------------------------------------------------
+Langkah:
+  1. Login USR-003, buka Opname -> Proses -> klik sesi SO Draft yang dibuat
+  2. Klik Tampilkan Sistem (blind), lalu isi Fisik baris Aki Kering ketik 4
+  3. Tanpa klik luar, diam 1 detik (belum 1.5 detik idle)
+  4. Lihat deskripsi Panel Pencatatan Fisik
+Harap:
+  - Deskripsi tidak berubah jadi menyimpan... dulu (masih menunggu jeda), tapi buka DevTools -> Application -> Local Storage -> http://localhost:8080 -> key kg-opname-draft-<id> sudah ada dengan records {"<lineId>":"4"}
+  [LULUS/GAGAL] __________
+
+======================================================================
+B. Jeda / Unfocus -> 1 Simpan ke Server
+----------------------------------------------------------------------
+Langkah:
+  1. Lanjut ketik 5 sehingga menjadi 45 (Aki Kering), lalu klik di luar input (unfocus) atau diam 2 detik
+  2. Lihat pill di kiri tombol Tampilkan Sistem
+Harap:
+  - Muncul pill Menyimpan... sesaat lalu hilang, deskripsi berubah menjadi tersimpan HH:MM:SS, toast tidak spam (hanya pill)
+  - Buka Network tab -> ada PUT /api/persediaan/stock-documents/<id> dengan payload lines actual_qty 45 untuk baris Aki Kering
+  [LULUS/GAGAL] __________
+
+Langkah lanjutan (tidak ulang berulang):
+  3. Tanpa ubah input lagi, diam 5 detik
+Harap:
+  - Tidak ada PUT lagi di Network (lastSent dedup). Deskripsi tetap tersimpan HH:MM:SS
+  [LULUS/GAGAL] __________
+
+======================================================================
+C. F5 Sebelum 1.5 Detik (draft lokal dipulihkan) -- Kasus Utama Bug
+----------------------------------------------------------------------
+Langkah:
+  1. Isi Fisik baris Baterai Kering ketik 7 (jangan unfocus)
+  2. Dalam 1 detik langsung tekan F5 (refresh browser)
+  3. Setelah reload, lihat nilai Fisik baris Baterai Kering
+Harap:
+  - Nilai 7 masih ada di input (tidak hilang)
+  - Muncul toast info Draft lokal dipulihkan -- simpan untuk sinkron ke server (di pojok kanan atas, 3 detik)
+  - Diam 2 detik -> pill Menyimpan... -> PUT terkirim -> pill hilang, deskripsi tersimpan HH:MM:SS, toast Draft lokal tidak muncul lagi
+  [LULUS/GAGAL] __________
+
+Langkah kedua (F5 lagi tanpa ubah):
+  4. Tekan F5 lagi tanpa ketik apa-apa
+Harap:
+  - Nilai 7 tetap ada, Tampilkan Sistem tetap terbuka bila sebelumnya dibuka (revealed persist), tidak ada toast Data diperbarui di perangkat lain
+  [LULUS/GAGAL] __________
+
+======================================================================
+D. Tutup Tab (keepalive) sebelum simpan
+----------------------------------------------------------------------
+Langkah:
+  1. Isi Fisik baris Cat Dasar ketik 12
+  2. Dalam 1 detik langsung tutup tab (Ctrl+W) atau klik back browser
+  3. Buka kembali Opname -> Proses -> sesi SO yang sama
+Harap:
+  - Nilai 12 masih ada (terselamatkan via keepalive + draft lokal), toast Draft lokal dipulihkan muncul, lalu autosave 1.5 detik mengirim PUT
+  [LULUS/GAGAL] __________
+
+======================================================================
+E. Offline -> Online
+----------------------------------------------------------------------
+Langkah:
+  1. Buka DevTools -> Application -> buka tab offline: di Chrome DevTools -> Network -> centang Offline, atau cabut wifi
+  2. Isi Fisik baris lain ketik 20
+  3. Lihat deskripsi Panel
+Harap:
+  - Deskripsi menunjukkan offline -- draft lokal + pill Offline (kuning), tidak ada PUT di Network
+  4. Kembalikan Online (uncheck Offline)
+Harap:
+  - Toast Kembali online -- menyinkron draft... muncul, lalu PUT terkirim, pill Offline hilang -> tersimpan HH:MM:SS
+  [LULUS/GAGAL] __________
+
+======================================================================
+F. Konflik Perangkat Lain (muncul hanya bila server benar berubah)
+----------------------------------------------------------------------
+Langkah:
+  1. Di Tab A (USR-003) isi Fisik baris X = 10 (jangan simpan manual), biarkan dirty
+  2. Di Tab B / perangkat lain login USR-003 buka SO yang sama, isi baris Y = 30 dan tunggu autosave 2 detik sampai tersimpan HH:MM:SS (atau klik Simpan Draft)
+  3. Kembali ke Tab A, tunggu 30 detik atau refresh ringan (tanpa F5 hard) hingga fetch detail terbaru
+Harap:
+  - Di Tab A muncul 1 toast kuning Data diperbarui di perangkat lain -- muat ulang untuk lihat? dengan tombol Muat ulang (sonner id opname-conflict, tidak spam berulang)
+  - Klik Muat ulang -> nilai Y jadi 30 terlihat, nilai X 10 tetap di input (tidak tertimpa)
+  - Jika tidak ada perangkat lain ubah, mengisi 10 lalu F5 tidak memunculkan toast perangkat lain
+  [LULUS/GAGAL] __________
+
+======================================================================
+G. Input Selama Menyimpan (queue, tidak hilang)
+----------------------------------------------------------------------
+Langkah:
+  1. Isi Fisik baris A = 5, tunggu pill Menyimpan... muncul (sedang PUT)
+  2. Saat Menyimpan... masih terlihat, langsung ketik baris B = 9 (tanpa tunggu)
+Harap:
+  - Ketikan 9 di baris B tidak hilang saat Menyimpan... hilang
+  - Setelah Menyimpan... pertama selesai (tersimpan HH:MM:SS), ada jeda 0.3 detik lalu pill Menyimpan... kedua muncul dan mengirim 9 -> tersimpan HH:MM:SS baru
+  [LULUS/GAGAL] __________
+
+======================================================================
+H. Batas Waktu Draft (TTL) & Session Selesai
+----------------------------------------------------------------------
+Langkah:
+  1. (Simulasi TTL) Kosongkan draft manual via DevTools Local Storage -> hapus key kg-opname-draft-<id> atau biarkan 24 jam lewat -> F5
+Harap:
+  - Tidak ada toast Draft lokal dipulihkan, nilai mengikuti server (kosong atau last saved)
+  2. Selesaikan opname (isi semua Fisik + Simpan Draft -> Selesaikan Opname -> Ajukan Review -> Auditor Setujui) hingga SO jadi Selesai
+  3. Refresh halaman SO Selesai
+Harap:
+  - Draft lokal otomatis terhapus (status bukan Draft), input Fisik read-only, tidak ada draft tersisa di Local Storage
+  [LULUS/GAGAL] __________
+
+======================================================================
+Footer
+Tanggal Penguji: ____ / ____ / 2026
+Penguji: ______________________  Tanda: __________
+Catatan: Jika ada [GAGAL] cek Network tab PUT /persediaan/stock-documents/<id> status 201/422 dan lihat isLocked (hasEditLock) di deskripsi akses edit aktif / terkunci.
