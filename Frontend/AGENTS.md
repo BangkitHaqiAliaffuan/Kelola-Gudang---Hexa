@@ -44,7 +44,7 @@ npm run format     # prettier --write .
 
 **Dev loop needs TWO servers** now: the Laravel API (`composer dev` in `Backend/` → `http://127.0.0.1:8000`) plus this frontend (`npm run dev` → `http://localhost:8080` — the 8080 default is injected by `@lovable.dev/vite-tanstack-config`, not set here). Vite proxies `/api` → `http://127.0.0.1:8000` (defined in `vite.config.ts`). If the master pages show the "Tidak dapat terhubung ke server backend" error, the Laravel server isn't running.
 
-- No test suite, no CI, no typecheck script. Use `npx tsc --noEmit` to type-check.
+- Tests: `npm test` (`vitest run`, 4 specs: `src/routes/index.spec.tsx`, `src/lib/wms-data.spec.ts`, `barcode-label.spec.ts`, `stock-document-search.spec.ts`). Playwright (`playwright.config.ts`, auto-starts both servers) has only `e2e/auth.setup.ts` (needs `DEMO_PASSWORD` env from `Backend/.env`) + read-only GET-only `e2e/screenshots/read-only.spec.ts`. No CI, no typecheck script — use `npx tsc --noEmit`.
 - Package manager: **bun** (`bun.lock`, `bunfig.toml`). `package-lock.json` also exists — keep both lockfiles in sync if changing deps.
 - `bunfig.toml` has a 24h `minimumReleaseAge` guard on installs. New deps published <24h ago fail until added to `minimumReleaseAgeExcludes` — confirm with the user before adding to that list.
 

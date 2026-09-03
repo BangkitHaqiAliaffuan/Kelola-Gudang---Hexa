@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://c73b-182-8-89-7.ngrok-free.app/api/:path*"
+      "destination": "https://cd73-2404-c0-b201-cdde-ab2a-9068-c03a-3de7.ngrok-free.app/api/:path*"
     },
     {
       "source": "/sanctum/:path*",
-      "destination": "https://c73b-182-8-89-7.ngrok-free.app/sanctum/:path*"
+      "destination": "https://cd73-2404-c0-b201-cdde-ab2a-9068-c03a-3de7.ngrok-free.app/sanctum/:path*"
     },
     {
       "source": "/(.*)",

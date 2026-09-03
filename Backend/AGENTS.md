@@ -1,6 +1,6 @@
 # Backend — Kelola Gudang Pro
 
-Laravel 13 API (`/api`) powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang, Departemen, Proyek, Work Order) and the Persediaan module (Stock Saat Ini, Kartu Stock, Mutasi Stock). The frontend (`Frontend/`) calls this API for those pages; the rest of the app is still UI-only dummy data.
+Laravel 13 API (`/api`) powering the master data module (Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang, Departemen, Proyek, Work Order), the Persediaan module (Stock Saat Ini, Kartu Stock, Mutasi Stock, Stock Minimum, Nilai Persediaan, Adjustment/Opname), the Transaksi stock-document forms (Masuk/Keluar/Transfer/Retur), Pengadaan (`proc-docs`), and Laporan (`GET /laporan/mutasi`). The frontend (`Frontend/`) calls this API for those pages; the rest of the app is still UI-only dummy data.
 
 ## Stack & environment
 
