@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   CheckCircle2,
@@ -45,13 +45,20 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 const isPoReceipt = (d: StockDocumentApi) => /^po[-/]/i.test((d.reference_no ?? "").trim());
 
 export function ReceiveGoodsPage() {
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, user } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);

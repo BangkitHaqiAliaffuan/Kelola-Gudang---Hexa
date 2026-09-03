@@ -199,6 +199,8 @@ export type MasterUser = {
   name: string;
   email: string | null;
   role: string;
+  default_warehouse_id: number | null;
+  warehouse: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

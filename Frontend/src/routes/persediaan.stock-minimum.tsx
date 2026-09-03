@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Download,
   Maximize2,
@@ -24,6 +24,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockMinimumSheet } from "@/components/wms/stock-minimum-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
@@ -100,6 +101,14 @@ function StockMinimum() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
+  const { user } = useAuth();
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
 
   const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);

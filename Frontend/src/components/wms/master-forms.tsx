@@ -3845,6 +3845,7 @@ export function UserFormDialog({
   const create = useCreateUser();
   const update = useUpdateUser();
   const { data: users } = useUsers();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const previewCode = nextCode(
     (users?.data ?? []).map((u) => u.code),
     "USR",
@@ -3867,6 +3868,7 @@ export function UserFormDialog({
               name: initial.name,
               email: initial.email ?? "",
               role: initial.role as UserInput["role"],
+              default_warehouse_id: initial.default_warehouse_id ?? "",
               password: "",
               password_confirmation: "",
               is_active: initial.is_active,
@@ -3876,6 +3878,7 @@ export function UserFormDialog({
               name: "",
               email: "",
               role: "Operator Gudang",
+              default_warehouse_id: "",
               password: "",
               password_confirmation: "",
               is_active: true,
@@ -3888,6 +3891,9 @@ export function UserFormDialog({
           role: values.role,
           is_active: values.is_active,
         };
+        const whId = values.default_warehouse_id;
+        if (whId !== "" && whId != null) payload.default_warehouse_id = Number(whId);
+        else if (initial) payload.default_warehouse_id = null;
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
         if (values.password) payload.password = values.password;
@@ -3908,12 +3914,14 @@ export function UserFormDialog({
           rowField(form as never, err, "name");
           rowField(form as never, err, "email");
           rowField(form as never, err, "role");
+          rowField(form as never, err, "default_warehouse_id");
           rowField(form as never, err, "password");
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
             !fieldError(err, "role") &&
+            !fieldError(err, "default_warehouse_id") &&
             !fieldError(err, "password")
           )
             toast.error((err as Error).message);
@@ -3994,6 +4002,38 @@ export function UserFormDialog({
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <FormField
+              control={form.control}
+              name="default_warehouse_id"
+              render={({ field }) => {
+                const options: ComboboxOption[] = (warehouses?.data ?? []).map((w) => ({
+                  value: String(w.id),
+                  label: w.name,
+                  keywords: w.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      Gudang Default{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <FormCombobox
+                        value={field.value == null || field.value === "" ? "" : String(field.value)}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={options}
+                        placeholder="Tanpa default — Semua Gudang"
+                        loading={warehousesLoading}
+                        allowEmpty
+                        side="bottom"
+                        avoidCollisions={false}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <div className="space-y-2">
               <Label>Password</Label>

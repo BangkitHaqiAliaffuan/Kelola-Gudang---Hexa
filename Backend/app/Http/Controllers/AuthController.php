@@ -33,6 +33,7 @@ class AuthController extends Controller
             ]);
         }
 
+        $user->load('defaultWarehouse');
         $token = $user->createToken('kg-session')->plainTextToken;
 
         return response()->json([
@@ -51,7 +52,7 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $request->user()->load('defaultWarehouse');
 
         return response()->json([
             'data' => (new UserResource($user))->resolve(),

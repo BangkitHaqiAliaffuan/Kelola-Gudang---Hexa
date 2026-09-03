@@ -85,6 +85,16 @@ export function PurchaseRequestForm({
   const [requesterId, setRequesterId] = useState(user?.id ? String(user.id) : "");
   const [supplierId, setSupplierId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
+  useEffect(() => {
+    if (warehousesLoading || isEdit || doc) return;
+    const def = user?.default_warehouse_id;
+    if (!def || warehouseId) return;
+    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
+    // Jangan timpa restock param yang sudah isi dari URL
+    const hasRestock = new URLSearchParams(window.location.search).has("restock");
+    if (hasRestock) return;
+    setWarehouseId(String(def));
+  }, [warehousesLoading, warehouses, user, warehouseId, isEdit, doc]);
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<FormLine[]>(() => {

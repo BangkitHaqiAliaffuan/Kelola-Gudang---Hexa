@@ -325,6 +325,7 @@ const baseUserSchema = z.object({
   name,
   email: emailRequired,
   role: z.enum(USER_ROLES),
+  default_warehouse_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
   is_active: z.boolean().default(true),
 });
 

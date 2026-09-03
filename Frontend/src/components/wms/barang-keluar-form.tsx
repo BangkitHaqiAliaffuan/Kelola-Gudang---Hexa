@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Save, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -71,6 +71,13 @@ export function BarangKeluarForm() {
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || warehouseId) return;
+    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
+    setWarehouseId(String(def));
+  }, [warehousesLoading, warehouses, user, warehouseId]);
   const [purpose, setPurpose] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");

@@ -163,6 +163,15 @@ export function BarangMasukForm({
     );
   }, [referenceCombobox, poIdNum, poDetail?.data]);
 
+  // Auto-fill gudang dari default milik user (jika belum memilih & bukan mode PO).
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || warehouseId || selectedPoId) return;
+    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
+    setWarehouseId(String(def));
+  }, [warehousesLoading, warehouses, user, warehouseId, selectedPoId]);
+
   const itemOptions: ComboboxOption[] = useMemo(
     () =>
       (items?.data ?? []).map((it) => ({

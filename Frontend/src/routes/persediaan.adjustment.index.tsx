@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -72,7 +72,7 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 function StockAdjustment() {
   const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, user } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const canWrite = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
@@ -80,6 +80,13 @@ function StockAdjustment() {
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
   const [wh, setWh] = useState(ALL);
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);

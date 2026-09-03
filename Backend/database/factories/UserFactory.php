@@ -29,6 +29,7 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'role' => fake()->randomElement(['Administrator', 'Supervisor', 'Operator Gudang', 'Auditor']),
+            'default_warehouse_id' => null,
             'is_active' => true,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make(Str::password(16)),

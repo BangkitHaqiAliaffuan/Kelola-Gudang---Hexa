@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::query();
+        $query = User::query()->with('defaultWarehouse');
 
         if ($search = $request->query('search')) {
             $needle = strtolower($search);
@@ -44,11 +44,15 @@ class UserController extends Controller
             return User::create($data);
         });
 
+        $user->load('defaultWarehouse');
+
         return new UserResource($user);
     }
 
     public function show(User $user): UserResource
     {
+        $user->load('defaultWarehouse');
+
         return new UserResource($user);
     }
 
@@ -62,7 +66,7 @@ class UserController extends Controller
 
         $user->update($data);
 
-        return new UserResource($user->fresh());
+        return new UserResource($user->fresh()->load('defaultWarehouse'));
     }
 
     public function destroy(User $user): JsonResponse

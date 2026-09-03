@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
@@ -25,13 +25,20 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function BarangKeluarPage() {
-  const { hasModuleLevel } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Pengeluaran" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
   const [purpose, setPurpose] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);

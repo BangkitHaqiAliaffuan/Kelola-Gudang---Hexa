@@ -60,7 +60,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: number }) {
   const navigate = useNavigate();
-  const { hasModuleLevel } = useAuth();
+  const { user, hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
 
   const create = useCreateProcDocPo();
@@ -148,6 +148,16 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePrId, prDetail?.data]);
+
+  // Auto-fill gudang dari default user saat new tanpa PR sumber & bukan edit.
+  useEffect(() => {
+    if (warehousesLoading) return;
+    if (mode !== "new" || sourcePrId || sourcedFromPr || doc) return;
+    const def = user?.default_warehouse_id;
+    if (!def || warehouseId) return;
+    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
+    setWarehouseId(String(def));
+  }, [warehousesLoading, warehouses, user, warehouseId, mode, sourcePrId, sourcedFromPr, doc]);
 
   const warehouseOptions: ComboboxOption[] = useMemo(
     () => (warehouses?.data ?? []).map((w) => ({ value: String(w.id), label: w.name })),

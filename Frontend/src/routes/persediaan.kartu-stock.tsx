@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { useAuth } from "@/hooks/use-auth";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
@@ -96,6 +97,14 @@ function KartuStock() {
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [wh, setWh] = useState(ALL);
+  const { user } = useAuth();
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);

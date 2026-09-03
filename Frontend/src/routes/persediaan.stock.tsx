@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,14 @@ function StockSaatIni() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
+  const { user } = useAuth();
+  useEffect(() => {
+    if (warehousesLoading) return;
+    const def = user?.default_warehouse_id;
+    if (!def || wh !== ALL) return;
+    const name = warehouses?.data.find((w) => w.id === def)?.name;
+    if (name) setWh(name);
+  }, [warehousesLoading, warehouses, user, wh]);
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
   const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);

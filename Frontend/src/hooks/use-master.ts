@@ -792,7 +792,9 @@ export type UserPayload = {
   name: string;
   email: string;
   role: string;
+  default_warehouse_id?: number | null;
   password?: string;
+  password_confirmation?: string;
   is_active: boolean;
 };
 
