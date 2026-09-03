@@ -61,7 +61,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: number }) {
   const navigate = useNavigate();
-  const { user, hasModuleLevel } = useAuth();
+  const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("Pengadaan", "Tulis");
 
   const create = useCreateProcDocPo();
