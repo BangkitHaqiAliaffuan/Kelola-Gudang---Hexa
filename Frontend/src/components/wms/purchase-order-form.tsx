@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDepartments, useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import {
   useApprovedProcDocsPr,
@@ -149,15 +150,14 @@ export function PurchaseOrderForm({ mode, id }: { mode: "new" | "edit"; id?: num
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePrId, prDetail?.data]);
 
-  // Auto-fill gudang dari default user saat new tanpa PR sumber & bukan edit.
+  // Inisialisasi Gudang dari rantai session saat new tanpa PR sumber & bukan edit
+  // (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
   useEffect(() => {
-    if (warehousesLoading) return;
     if (mode !== "new" || sourcePrId || sourcedFromPr || doc) return;
-    const def = user?.default_warehouse_id;
-    if (!def || warehouseId) return;
-    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
-    setWarehouseId(String(def));
-  }, [warehousesLoading, warehouses, user, warehouseId, mode, sourcePrId, sourcedFromPr, doc]);
+    if (whDefaultId == null || warehouseId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId, mode, sourcePrId, sourcedFromPr, doc]);
 
   const warehouseOptions: ComboboxOption[] = useMemo(
     () => (warehouses?.data ?? []).map((w) => ({ value: String(w.id), label: w.name })),

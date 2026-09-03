@@ -73,3 +73,5 @@ Dokumen teks/tes/retest/manual `.txt` di `Frontend/docs/` mengikuti root `AGENTS
 ## Git rules
 
 Lihat root `AGENTS.md##Git rules` & `## Multi-session protocol`: Never `git add`/`commit`/`push` tanpa eksplisit, never `git add .`/`-A`, **DILARANG** commit `seluruh perubahan walau dari sesi lain` kecuali `commit all` eksplisit, stage hanya `<explicit-path>` milik task-mu.
+
+**Klaim sesi (wajib):** sebelum edit apa pun, baca `.dev/claims.md` di root repo (gitignored — buat bila belum ada). Klaim path-mu: `| <path> | <role> | claimed |`, selesai → `done`. Jangan sentuh path berstatus `claimed` milik sesi lain. `./dev.sh` / `composer test` / `migrate`: satu sesi dalam satu waktu.

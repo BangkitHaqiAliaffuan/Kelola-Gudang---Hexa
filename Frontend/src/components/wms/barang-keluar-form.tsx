@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import {
   useBins,
   useCustomers,
@@ -71,13 +72,12 @@ export function BarangKeluarForm() {
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
+  // Inisialisasi Gudang dari rantai session (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
   useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || warehouseId) return;
-    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
-    setWarehouseId(String(def));
-  }, [warehousesLoading, warehouses, user, warehouseId]);
+    if (whDefaultId == null || warehouseId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId]);
   const [purpose, setPurpose] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");

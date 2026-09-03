@@ -1431,6 +1431,7 @@ export function UserPage() {
     },
     { key: "email", label: "Email", render: (r) => r.email ?? "—" },
     { key: "role", label: "Role", render: (r) => <Pill tone="info">{r.role}</Pill> },
+    { key: "warehouse", label: "Gudang", render: (r) => r.warehouse ?? "—" },
     { key: "status", label: "Status", render: (r) => <ActivePill active={r.is_active} /> },
   ];
 
@@ -1442,6 +1443,7 @@ export function UserPage() {
         { key: "name", label: "Nama User" },
         { key: "email", label: "Email" },
         { key: "role", label: "Role" },
+        { key: "warehouse", label: "Gudang" },
         { key: "is_active", label: "Status" },
       ]),
     );
@@ -1453,7 +1455,7 @@ export function UserPage() {
         title="User"
         description="Pengguna aplikasi gudang"
         searchPlaceholder="Cari user..."
-        searchText={(r) => `${r.code} ${r.name} ${r.email ?? ""} ${r.role}`}
+        searchText={(r) => `${r.code} ${r.name} ${r.email ?? ""} ${r.role} ${r.warehouse ?? ""}`}
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
@@ -1498,7 +1500,7 @@ export function UserPage() {
               <p className="truncate text-sm font-semibold">{r.name}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">{r.code}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {r.email ?? "—"} • {r.role}
+                {r.email ?? "—"} • {r.role} • {r.warehouse ?? "—"}
               </p>
             </div>
             <ActivePill active={r.is_active} />

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import {
   useApproveStockDocument,
@@ -72,21 +73,16 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 function StockAdjustment() {
   const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { hasModuleLevel, user } = useAuth();
+  const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const canWrite = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
-  const [wh, setWh] = useState(ALL);
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || wh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setWh(name);
-  }, [warehousesLoading, warehouses, user, wh]);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -97,10 +93,10 @@ function StockAdjustment() {
   const handleClearFilters = useCallback(() => {
     setQ("");
     setStatus(ALL);
-    setWh(ALL);
+    whFilter.reset();
     setDateFrom("");
     setDateTo("");
-  }, []);
+  }, [whFilter]);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const postDoc = usePostStockDocument();
   const cancelDoc = useCancelStockDocument();
@@ -269,7 +265,7 @@ function StockAdjustment() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

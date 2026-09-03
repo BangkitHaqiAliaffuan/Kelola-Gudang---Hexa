@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
@@ -24,20 +25,16 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function TransferGudangPage() {
-  const { user, hasModuleLevel } = useAuth();
+  const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Transfer Gudang" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [fromWh, setFromWh] = useState(ALL);
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || fromWh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setFromWh(name);
-  }, [warehousesLoading, warehouses, user, fromWh]);
+  // Filter gudang asal: pilihan tersimpan per user → default user → Semua.
+  // (Gudang tujuan tetap manual.)
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const fromWh = whFilter.value;
   const [toWh, setToWh] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -48,10 +45,10 @@ export function TransferGudangPage() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setFromWh(ALL);
+    whFilter.reset();
     setToWh(ALL);
     setStatus(ALL);
-  }, []);
+  }, [whFilter]);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -170,7 +167,7 @@ export function TransferGudangPage() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={fromWh}
-            onChange={setFromWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang Asal"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

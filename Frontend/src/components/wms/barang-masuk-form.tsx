@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useBins, useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useCreateStockDocument } from "@/hooks/use-persediaan";
 import { useProcDocPo, useProcDocsPo } from "@/hooks/use-purchase-order";
@@ -163,14 +164,12 @@ export function BarangMasukForm({
     );
   }, [referenceCombobox, poIdNum, poDetail?.data]);
 
-  // Auto-fill gudang dari default milik user (jika belum memilih & bukan mode PO).
+  // Inisialisasi Gudang dari rantai session (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
   useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || warehouseId || selectedPoId) return;
-    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
-    setWarehouseId(String(def));
-  }, [warehousesLoading, warehouses, user, warehouseId, selectedPoId]);
+    if (whDefaultId == null || warehouseId || selectedPoId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId, selectedPoId]);
 
   const itemOptions: ComboboxOption[] = useMemo(
     () =>

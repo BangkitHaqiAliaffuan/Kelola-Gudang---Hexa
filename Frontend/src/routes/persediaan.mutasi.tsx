@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
@@ -68,15 +68,9 @@ function MutasiStock() {
   const debouncedQ = useDebouncedValue(q);
   const [type, setType] = useState(ALL);
   const [status, setStatus] = useState(ALL);
-  const [wh, setWh] = useState(ALL);
-  const { user } = useAuth();
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || wh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setWh(name);
-  }, [warehousesLoading, warehouses, user, wh]);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const hasActiveFilters = useMemo(
@@ -87,8 +81,8 @@ function MutasiStock() {
     setQ("");
     setType(ALL);
     setStatus(ALL);
-    setWh(ALL);
-  }, []);
+    whFilter.reset();
+  }, [whFilter]);
 
   const rows = useMemo(
     () =>
@@ -194,7 +188,7 @@ function MutasiStock() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

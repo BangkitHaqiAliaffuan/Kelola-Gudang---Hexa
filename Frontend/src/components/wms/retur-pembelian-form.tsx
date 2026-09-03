@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useBins, useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import {
@@ -77,13 +78,12 @@ export function ReturPembelianForm() {
   const [sourceDocId, setSourceDocId] = useState("");
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceDoc, setSelectedSourceDoc] = useState<StockDocumentApi | null>(null);
+  // Inisialisasi Gudang dari rantai session (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
   useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || warehouseId || sourceDocId) return;
-    if (!(warehouses?.data ?? []).some((w) => w.id === def)) return;
-    setWarehouseId(String(def));
-  }, [warehousesLoading, warehouses, user, warehouseId, sourceDocId]);
+    if (whDefaultId == null || warehouseId || sourceDocId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId, sourceDocId]);
   const [reason, setReason] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");

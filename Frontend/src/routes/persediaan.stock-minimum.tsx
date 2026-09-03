@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Download,
   Maximize2,
@@ -24,7 +24,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { StockMinimumSheet } from "@/components/wms/stock-minimum-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
@@ -80,12 +80,18 @@ const statusLabel: Record<StockMinimumStatus, string> = {
 function StockMinimum() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
   const [days, setDays] = useState(String(DEFAULT_DAYS));
   const [severity, setSeverity] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: cats, isLoading: catsLoading } = useCategories();
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
+
   const hasActiveFilters = useMemo(
     () =>
       q !== "" || wh !== ALL || cat !== ALL || days !== String(DEFAULT_DAYS) || severity !== ALL,
@@ -93,29 +99,18 @@ function StockMinimum() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setCat(ALL);
     setDays(String(DEFAULT_DAYS));
     setSeverity(ALL);
-  }, []);
+  }, [whFilter]);
 
-  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { data: cats, isLoading: catsLoading } = useCategories();
-  const { user } = useAuth();
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || wh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setWh(name);
-  }, [warehousesLoading, warehouses, user, wh]);
-
-  const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
+  const whId = whFilter.warehouseId;
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
 
   const { data, isLoading } = useStockMinimum({
     days: days === ALL ? DEFAULT_DAYS : Number(days),
-    warehouseId: wh === ALL ? null : (whId ?? null),
+    warehouseId: whId,
     categoryId: cat === ALL ? null : (catId ?? null),
   });
 
@@ -369,7 +364,7 @@ function StockMinimum() {
             <FilterSelect
               className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={wh}
-              onChange={setWh}
+              onChange={whFilter.onChange}
               placeholder="Semua Gudang"
               options={warehouseNames}
               loading={warehousesLoading}

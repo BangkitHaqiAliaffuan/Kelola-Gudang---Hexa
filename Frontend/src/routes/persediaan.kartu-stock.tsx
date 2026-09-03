@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
-import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
@@ -96,15 +96,9 @@ function KartuStock() {
   const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
-  const [wh, setWh] = useState(ALL);
-  const { user } = useAuth();
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || wh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setWh(name);
-  }, [warehousesLoading, warehouses, user, wh]);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -135,10 +129,7 @@ function KartuStock() {
   useBarcodeScanner({ onScan: handleHardwareScan, enabled: !scanOpen });
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
   const activeId = id ?? options[0]?.id;
-  const whId = useMemo(
-    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
-    [warehouses, wh],
-  );
+  const whId = whFilter.warehouseId;
   const isWarehouseReady = wh === ALL || !warehousesLoading;
   const whIdForFetch = isWarehouseReady ? whId : null;
   const activeIdForFetch = isWarehouseReady ? activeId : undefined;
@@ -285,10 +276,10 @@ function KartuStock() {
     setQ("");
     setJenis(ALL);
     setPic(ALL);
-    setWh(ALL);
+    whFilter.reset();
     setDateFrom("");
     setDateTo("");
-  }, []);
+  }, [whFilter]);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
   const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
@@ -694,7 +685,7 @@ function KartuStock() {
           <FilterSelect
             className="w-full"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

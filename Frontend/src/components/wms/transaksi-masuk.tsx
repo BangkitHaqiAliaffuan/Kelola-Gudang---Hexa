@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
@@ -24,20 +25,15 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function BarangMasukPage() {
-  const { user, hasModuleLevel } = useAuth();
+  const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
   const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
-  useEffect(() => {
-    if (warehousesLoading) return;
-    const def = user?.default_warehouse_id;
-    if (!def || wh !== ALL) return;
-    const name = warehouses?.data.find((w) => w.id === def)?.name;
-    if (name) setWh(name);
-  }, [warehousesLoading, warehouses, user, wh]);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -48,10 +44,10 @@ export function BarangMasukPage() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setPartner(ALL);
     setStatus(ALL);
-  }, []);
+  }, [whFilter]);
 
   const suppliers = useMemo(
     () =>
@@ -178,7 +174,7 @@ export function BarangMasukPage() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

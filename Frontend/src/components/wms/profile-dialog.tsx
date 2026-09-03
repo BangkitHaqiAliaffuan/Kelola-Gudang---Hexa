@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, LogOut, Mail, ShieldCheck, Building2 } from "lucide-react";
+import { Check, LogOut, Mail, ShieldCheck, Building2, Warehouse } from "lucide-react";
 import { toast } from "sonner";
 import { Pill } from "./kit";
 import { themes, useTheme } from "./theme";
@@ -139,6 +139,7 @@ export function ProfileHelpDialog({
               <div className="grid gap-2.5 sm:grid-cols-2">
                 <Row icon={Mail} label="Email" value={email} />
                 <Row icon={ShieldCheck} label="Role" value={role} />
+                <Row icon={Warehouse} label="Gudang Default" value={user?.warehouse ?? "—"} />
                 <Row icon={Building2} label="Perusahaan" value="PT Kelola Nusantara" />
               </div>
               <div className="rounded-xl border border-border p-3">
