@@ -17,6 +17,10 @@ class ItemSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Item::where('sku', 'SKU-10001-001')->exists()) {
+            return;
+        }
+
         // Deterministic LCG PRNG (analog to the seeded approach in the frontend
         // wms-data.ts, but with different data and seed; PHP-safe 64-bit LCG).
         $state = 20260214;

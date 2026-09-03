@@ -13,6 +13,10 @@ class WorkOrderSeeder extends Seeder
 {
     public function run(): void
     {
+        if (WorkOrder::where('no', 'WO/2026/0001')->exists()) {
+            return;
+        }
+
         $projects = Project::orderBy('id')->get();
         $items = Item::orderBy('id')->get();
         $units = Unit::orderBy('id')->get();

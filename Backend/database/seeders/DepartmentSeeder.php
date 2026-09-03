@@ -10,6 +10,10 @@ class DepartmentSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Department::where('code', 'DEP-001')->exists()) {
+            return;
+        }
+
         $departments = [
             'Produksi',
             'Maintenance',

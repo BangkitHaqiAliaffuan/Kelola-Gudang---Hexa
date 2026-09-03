@@ -10,6 +10,10 @@ class SubCategorySeeder extends Seeder
 {
     public function run(): void
     {
+        if (SubCategory::where('code', 'SUB-001')->exists()) {
+            return;
+        }
+
         $subCategories = [
             'Komponen Elektronik' => ['Sirkuit', 'Sensor', 'Catu Daya', 'Modul Kontrol'],
             'Perkakas Mesin' => ['Mata Bor', 'Gerinda', 'Perkakas Tangan'],

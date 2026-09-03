@@ -39,6 +39,10 @@ class StockDocumentSeeder extends Seeder
 
     public function run(): void
     {
+        if (StockDocument::where('no', 'BM/2026/00001')->exists()) {
+            return;
+        }
+
         // Deterministic LCG PRNG so the seeded ledger is reproducible.
         $state = 20260801;
         $rnd = static function () use (&$state): float {
@@ -279,7 +283,7 @@ class StockDocumentSeeder extends Seeder
                     'from_bin_id' => $item->default_bin_id,
                     'to_bin_id' => null,
                     'from_warehouse_id' => $item->default_warehouse_id,
-                    'direction' => $delta > 0 ? 'IN' : ($delta < 0 ? 'OUT' : null),
+                    'direction' => $actual > $system ? 'IN' : ($actual < $system ? 'OUT' : null),
                 ];
             }
 

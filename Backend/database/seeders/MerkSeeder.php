@@ -9,6 +9,10 @@ class MerkSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Merk::where('code', 'MRK-001')->exists()) {
+            return;
+        }
+
         $merks = [
             ['code' => 'MRK-001', 'name' => 'Nachi', 'country' => 'Jepang'],
             ['code' => 'MRK-002', 'name' => 'Philips', 'country' => 'Belanda'],

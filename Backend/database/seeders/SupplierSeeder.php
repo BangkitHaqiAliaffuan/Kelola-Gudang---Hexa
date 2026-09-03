@@ -10,6 +10,10 @@ class SupplierSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Supplier::where('code', 'SUP-001')->exists()) {
+            return;
+        }
+
         $suppliers = [
             ['name' => 'PT Sumber Makmur Sentosa', 'city' => 'Jakarta Timur', 'payment_terms' => 'NET 30'],
             ['name' => 'CV Elektronik Nusantara', 'city' => 'Surabaya', 'payment_terms' => 'NET 14'],

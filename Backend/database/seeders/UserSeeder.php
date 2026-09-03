@@ -12,6 +12,10 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        if (User::where('email', 'rudi.hartono@kelolagudang.id')->exists()) {
+            return;
+        }
+
         $password = (string) env('DEMO_PASSWORD', '');
 
         if ($password === '') {

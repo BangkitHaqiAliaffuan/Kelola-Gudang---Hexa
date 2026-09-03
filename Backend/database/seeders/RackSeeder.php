@@ -10,6 +10,11 @@ class RackSeeder extends Seeder
 {
     public function run(): void
     {
+        // Kode rak hanya unik per gudang (composite), jadi guard memakai A-01 pertama.
+        if (Rack::where('code', 'A-01')->exists()) {
+            return;
+        }
+
         $warehouses = Warehouse::orderBy('id')->get();
 
         foreach ($warehouses as $warehouse) {

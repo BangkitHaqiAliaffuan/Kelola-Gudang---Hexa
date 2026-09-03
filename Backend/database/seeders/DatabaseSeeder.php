@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -11,7 +12,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([
+        // Satu transaksi global: abort di tengah = rollback total, tanpa sisa parsial.
+        DB::transaction(function (): void {
+            $this->call([
             CategorySeeder::class,
             SubCategorySeeder::class,
             MerkSeeder::class,
@@ -30,6 +33,7 @@ class DatabaseSeeder extends Seeder
             StockDocumentSeeder::class,
             ProcDocSeeder::class,
             RolePermissionSeeder::class,
-        ]);
+            ]);
+        });
     }
 }
