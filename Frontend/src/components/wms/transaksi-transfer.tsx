@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
+import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import { cn } from "@/lib/utils";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
@@ -25,8 +26,9 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function TransferGudangPage() {
-  const { hasModuleLevel } = useAuth();
+  const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
+  const canViewLaporan = hasModule("Laporan");
   const { data, isLoading } = useStockDocuments({ type: "Transfer Gudang" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
@@ -38,6 +40,7 @@ export function TransferGudangPage() {
   const [toWh, setToWh] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const hasActiveFilters = useMemo(
     () => q !== "" || fromWh !== ALL || toWh !== ALL || status !== ALL,
@@ -139,61 +142,90 @@ export function TransferGudangPage() {
 
   return (
     <>
-      <PageHeader
-        title="Transfer Gudang"
-        description="Pindahkan stok antar gudang dengan posting otomatis keluar-masuk"
-        actions={
-          canCreate && (
-            <Button asChild className="rounded-xl">
-              <Link to="/transaksi/entri/$section" params={{ section: "transfer" }}>
-                <Plus className="h-4 w-4" /> Buat Transfer Gudang
-              </Link>
-            </Button>
-          )
-        }
-      />
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title="Transfer Gudang"
+          description="Pindahkan stok antar gudang dengan posting otomatis keluar-masuk"
+          actions={
+            canCreate && (
+              <Button asChild className="rounded-xl">
+                <Link to="/transaksi/entri/$section" params={{ section: "transfer" }}>
+                  <Plus className="h-4 w-4" /> Buat Transfer Gudang
+                </Link>
+              </Button>
+            )
+          }
+        />
 
-      <Panel title="Filter">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="relative flex-1 min-w-[220px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, gudang asal/tujuan, PIC, tanggal, referensi, status..."
-              className="rounded-xl pl-9"
+        <Panel title="Filter">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, gudang asal/tujuan, PIC, tanggal, referensi, status..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={fromWh}
+              onChange={whFilter.onChange}
+              placeholder="Semua Gudang Asal"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
             />
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={toWh}
+              onChange={setToWh}
+              placeholder="Semua Gudang Tujuan"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
+            />
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={status}
+              onChange={setStatus}
+              placeholder="Semua Status"
+              options={[...stockDocumentStatuses]}
+            />
+            <div className="ml-auto flex shrink-0 items-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={fromWh}
-            onChange={whFilter.onChange}
-            placeholder="Semua Gudang Asal"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-            loading={warehousesLoading}
-          />
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={toWh}
-            onChange={setToWh}
-            placeholder="Semua Gudang Tujuan"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-            loading={warehousesLoading}
-          />
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={status}
-            onChange={setStatus}
-            placeholder="Semua Status"
-            options={[...stockDocumentStatuses]}
-          />
-          <div className="ml-auto flex shrink-0 items-end">
-            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
-          </div>
-        </div>
-      </Panel>
+        </Panel>
+      </div>
 
-      <Panel title="Daftar Transfer" description={`${formatNumber(rows.length)} dokumen`}>
+      <Panel
+        title="Daftar Transfer"
+        description={`${formatNumber(rows.length)} dokumen`}
+        actions={
+          <>
+            {canViewLaporan && (
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link to="/laporan/$report" params={{ report: "transfer" }}>
+                  <FileBarChart className="h-4 w-4" /> Summary
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}

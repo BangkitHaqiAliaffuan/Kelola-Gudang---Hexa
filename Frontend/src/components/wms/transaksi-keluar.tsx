@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Maximize2, Minimize2, Plus, Search } from "lucide-react";
+import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -26,8 +26,9 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 export function BarangKeluarPage() {
-  const { hasModuleLevel } = useAuth();
+  const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
+  const canViewLaporan = hasModule("Laporan");
   const { data, isLoading } = useStockDocuments({ type: "Pengeluaran" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
@@ -208,17 +209,26 @@ export function BarangKeluarPage() {
         title="Daftar Pengeluaran"
         description={`${formatNumber(rows.length)} dokumen`}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl"
-            aria-pressed={fullscreen}
-            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
-            onClick={() => setFullscreen((f) => !f)}
-          >
-            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            {fullscreen ? "Keluar" : "Fullscreen"}
-          </Button>
+          <>
+            {canViewLaporan && (
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link to="/laporan/$report" params={{ report: "barang-keluar" }}>
+                  <FileBarChart className="h-4 w-4" /> Summary
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
         }
         className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
         bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}

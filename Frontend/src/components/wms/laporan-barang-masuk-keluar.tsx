@@ -51,10 +51,48 @@ const toISODate = (d: Date) =>
  * Scope server: type + rentang tanggal + gudang. Filter client: cari / partner / status.
  * `placeholderData: keepPreviousData` membuat data lama tetap tampil saat ganti scope.
  */
-export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Pengeluaran" }) {
-  const isMasuk = type === "Penerimaan";
-  const title = isMasuk ? "Laporan Barang Masuk" : "Laporan Barang Keluar";
-  const partnerLabel = isMasuk ? "Supplier" : "Tujuan";
+const DOC_META = {
+  Penerimaan: {
+    title: "Laporan Barang Masuk",
+    slug: "barang-masuk",
+    partnerLabel: "Supplier",
+    docLabel: "dokumen Penerimaan",
+  },
+  Pengeluaran: {
+    title: "Laporan Barang Keluar",
+    slug: "barang-keluar",
+    partnerLabel: "Tujuan",
+    docLabel: "dokumen Pengeluaran",
+  },
+  "Transfer Gudang": {
+    title: "Laporan Transfer Gudang",
+    slug: "transfer",
+    partnerLabel: "Gudang Tujuan",
+    docLabel: "dokumen Transfer Gudang",
+  },
+  "Retur Pembelian": {
+    title: "Laporan Retur Pembelian",
+    slug: "retur-pembelian",
+    partnerLabel: "Supplier",
+    docLabel: "dokumen Retur Pembelian",
+  },
+  "Retur Penjualan": {
+    title: "Laporan Retur Penjualan",
+    slug: "retur-penjualan",
+    partnerLabel: "Customer",
+    docLabel: "dokumen Retur Penjualan",
+  },
+} as const;
+
+export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META }) {
+  const meta = DOC_META[type];
+  const title = meta.title;
+  const partnerLabel = meta.partnerLabel;
+  /** Kolom partner untuk Transfer Gudang memakai gudang tujuan, bukan partner. */
+  const partnerOf = useCallback(
+    (d: StockDocumentApi) => (type === "Transfer Gudang" ? d.destination : d.partner),
+    [type],
+  );
 
   const { status: authStatus, hasModuleLevel } = useAuth();
   const canView = hasModuleLevel("Laporan", "Baca");
@@ -119,9 +157,9 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
   const partners = useMemo(
     () =>
       Array.from(
-        new Set((data?.data ?? []).map((d) => d.partner).filter((p): p is string => !!p)),
+        new Set((data?.data ?? []).map((d) => partnerOf(d)).filter((p): p is string => !!p)),
       ).sort(),
-    [data],
+    [data, partnerOf],
   );
 
   const rows = useMemo(
@@ -129,10 +167,10 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
       (data?.data ?? []).filter(
         (d) =>
           (!qn || searchIndex.get(d.id)!.includes(qn)) &&
-          (partner === ALL || d.partner === partner) &&
+          (partner === ALL || partnerOf(d) === partner) &&
           (status === ALL || d.status === status),
       ),
-    [data, qn, searchIndex, partner, status],
+    [data, qn, searchIndex, partner, status, partnerOf],
   );
 
   const stats = useMemo(() => {
@@ -203,7 +241,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
         { key: "pic", label: "PIC" },
         { key: "status", label: "Status" },
       ]);
-    downloadCsv(`laporan-${isMasuk ? "barang-masuk" : "barang-keluar"}-${from}-${to}.csv`, content);
+    downloadCsv(`laporan-${meta.slug}-${from}-${to}.csv`, content);
     toast.success("CSV diunduh");
   };
 
@@ -282,7 +320,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
       label: partnerLabel,
       className: "min-w-[160px] whitespace-nowrap",
       sortable: true,
-      render: (r) => r.partner ?? "—",
+      render: (r) => partnerOf(r) ?? "—",
     },
     {
       key: "reference_no",
@@ -336,7 +374,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: "Penerimaan" | "Penge
     <>
       <PageHeader
         title={title}
-        description="Data dari sistem persediaan (dokumen Penerimaan/Pengeluaran)"
+        description={`Data dari sistem persediaan (${meta.docLabel})`}
         actions={
           <>
             <Button
