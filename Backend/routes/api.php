@@ -103,4 +103,5 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
 Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
+    Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
 });
