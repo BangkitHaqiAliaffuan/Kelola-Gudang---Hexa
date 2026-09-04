@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import { ALL, EmptyState, FilterSelect, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useLaporanKeluarAnalytics } from "@/hooks/use-laporan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type { TujuanJenis } from "@/lib/persediaan-types";
@@ -83,7 +82,7 @@ export function LaporanKeluarAnalytics({
   enabled: boolean;
 }) {
   const [jenis, setJenis] = useState<string>(ALL);
-  const [cari, setCari] = useState("");
+  const [tujuan, setTujuan] = useState<string>(ALL);
 
   const { data, isLoading, isFetching } = useLaporanKeluarAnalytics({
     from,
@@ -95,14 +94,27 @@ export function LaporanKeluarAnalytics({
   const a = data?.data;
   const busy = isLoading || isFetching;
 
-  const qn = cari.trim().toLowerCase();
-  const matchNama = (nama: string) => !qn || nama.toLowerCase().includes(qn);
+  // Satu dropdown untuk seluruh tujuan lintas jenis (cermin dropdown Tujuan di
+  // form Barang Keluar): value `jenis:id-atau-nama` agar nama kembar lintas
+  // jenis tidak tabrakan. Lainnya memakai nama karena tanpa FK.
+  const tujuanKeyOf = (j: string, id: number | null, nama: string) => `${j}:${id ?? nama}`;
+  const matchTujuan = (j: string, id: number | null, nama: string) =>
+    tujuan === ALL || tujuan === tujuanKeyOf(j, id, nama);
+
+  const tujuanOptions = useMemo(
+    () =>
+      (a?.aktivitas ?? []).map((r) => ({
+        value: tujuanKeyOf(r.jenis, r.id, r.nama),
+        label: `${r.nama} — ${JENIS_LABEL[r.jenis]}`,
+      })),
+    [a],
+  );
 
   const chartStack = useMemo(() => {
     if (!a) return [];
     const byBulan = new Map<string, Record<string, number | string>>();
     for (const r of a.per_tujuan_per_bulan) {
-      if (!matchNama(r.nama)) continue;
+      if (!matchTujuan(r.jenis, r.id, r.nama)) continue;
       let row = byBulan.get(r.bulan);
       if (!row) {
         row = { bulan: r.bulan };
@@ -114,17 +126,20 @@ export function LaporanKeluarAnalytics({
       .sort((x, y) => (x[0] < y[0] ? -1 : 1))
       .map(([bulan, row]) => ({ ...row, bulan: formatDate(`${bulan}-01`) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [a, qn]);
+  }, [a, tujuan]);
 
   const atRisk = useMemo(
-    () => (a?.aktivitas ?? []).filter((r) => r.status === "at-risk" && matchNama(r.nama)),
+    () =>
+      (a?.aktivitas ?? []).filter(
+        (r) => r.status === "at-risk" && matchTujuan(r.jenis, r.id, r.nama),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [a, qn],
+    [a, tujuan],
   );
   const topTujuan = useMemo(
-    () => (a?.top_tujuan ?? []).filter((r) => matchNama(r.nama)),
+    () => (a?.top_tujuan ?? []).filter((r) => matchTujuan(r.jenis, r.id, r.nama)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [a, qn],
+    [a, tujuan],
   );
 
   const insight = useMemo(() => {
@@ -214,15 +229,20 @@ export function LaporanKeluarAnalytics({
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={jenis}
-            onChange={setJenis}
+            onChange={(v) => {
+              setJenis(v);
+              setTujuan(ALL);
+            }}
             placeholder="Semua Jenis"
             options={["customer", "departemen", "proyek", "lainnya"]}
           />
-          <Input
-            value={cari}
-            onChange={(e) => setCari(e.target.value)}
-            placeholder="Saring nama tujuan..."
-            className="rounded-xl max-w-[220px]"
+          <FilterSelect
+            className="w-full flex-1 min-w-[180px] max-w-[260px]"
+            value={tujuan}
+            onChange={setTujuan}
+            placeholder="Semua Tujuan"
+            options={tujuanOptions}
+            loading={isLoading}
           />
         </div>
         {insight && <p className="mb-3 text-sm text-muted-foreground">{insight}</p>}
@@ -380,7 +400,7 @@ export function LaporanKeluarAnalytics({
         <DataTable
           columns={marginColumns}
           rows={withRowId(
-            (a?.omzet.top_margin ?? []).filter((r) => matchNama(r.nama)),
+            (a?.omzet.top_margin ?? []).filter((r) => matchTujuan(r.jenis, r.id, r.nama)),
             (r, i) => `margin:${r.id ?? r.nama}:${i}`,
           )}
           pageSize={10}
@@ -407,7 +427,9 @@ export function LaporanKeluarAnalytics({
         <DataTable
           columns={omzetBulanColumns}
           rows={withRowId(
-            (a?.omzet.per_customer_per_bulan ?? []).filter((r) => matchNama(r.nama)),
+            (a?.omzet.per_customer_per_bulan ?? []).filter((r) =>
+              matchTujuan(r.jenis, r.id, r.nama),
+            ),
             (r, i) => `omzet:${r.id ?? r.nama}:${r.bulan}:${i}`,
           )}
           pageSize={12}
@@ -470,10 +492,7 @@ export function LaporanKeluarAnalytics({
               <p className="mb-2 text-sm font-semibold">Top Item Diretur</p>
               <DataTable
                 columns={returItemColumns}
-                rows={withRowId(
-                  a.retur.per_item.filter((r) => matchNama(r.nama)),
-                  (r) => `retur-item:${r.item_id}`,
-                )}
+                rows={withRowId(a.retur.per_item, (r) => `retur-item:${r.item_id}`)}
                 pageSize={5}
                 loading={busy}
                 mobileCard={(r) => (
@@ -525,7 +544,7 @@ export function LaporanKeluarAnalytics({
         >
           <div className="space-y-4">
             {a.proyek
-              .filter((p) => matchNama(p.nama))
+              .filter((p) => matchTujuan("proyek", p.id, p.nama))
               .map((p) => (
                 <div key={p.id ?? p.nama} className="rounded-xl border p-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
