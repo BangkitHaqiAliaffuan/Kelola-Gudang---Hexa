@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Paginated } from "@/lib/api";
 import type { RoleAccessEntry } from "@/lib/schemas";
 import type {
@@ -654,6 +654,39 @@ export function useBulkUpdateItemStatus() {
   return useMutation({
     mutationFn: ({ ids, status }: { ids: number[]; status: "Aktif" | "Nonaktif" }) =>
       api.post<{ message: string; updated: number }>("/master/items/bulk-status", { ids, status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.items }),
+  });
+}
+
+export type CostDriftRow = {
+  item_id: number;
+  sku: string | null;
+  name: string | null;
+  master_cost: number;
+  avg_cost: number;
+  stock: number;
+  drift_pct: number;
+};
+
+export function useCostDrift(thresholdPct: number, enabled = true) {
+  return useQuery({
+    queryKey: [...keys.items, "cost-drift", thresholdPct],
+    queryFn: () =>
+      api.get<{ data: CostDriftRow[] }>(`/master/items/cost-drift?threshold_pct=${thresholdPct}`),
+    enabled: typeof window !== "undefined" && enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export type SyncCostResult = {
+  message: string;
+  applied: { item_id: number; sku: string | null; old_cost: number; new_cost: number }[];
+};
+
+export function useSyncCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: number[]) => api.post<SyncCostResult>("/master/items/sync-cost", { ids }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.items }),
   });
 }

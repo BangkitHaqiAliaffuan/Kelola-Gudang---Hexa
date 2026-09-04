@@ -38,6 +38,7 @@ import {
 } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
+import { buildStockCostMap, lookupBinCost } from "@/lib/stock-cost";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockDocumentPayload } from "@/lib/persediaan-types";
 
@@ -158,6 +159,21 @@ export function BarangKeluarForm() {
     return map;
   }, [stockRows]);
 
+  // HPP berjalan (moving average ledger) per (gudang, barang, bin) — dasar
+  // kolom HPP, peringatan jual-rugi, dan estimasi margin. Bukan Harga Pokok
+  // master (yang bisa basi): HPP final selalu mengikuti rata-rata saat posting.
+  const liveCostMap = useMemo(() => buildStockCostMap(stockRows?.data ?? []), [stockRows]);
+
+  const costFor = (itemId: string, binId: string): string => {
+    if (!itemId) return "";
+    if (warehouseId) {
+      const live = lookupBinCost(liveCostMap, warehouseId, itemId, binId);
+      if (live != null) return String(live);
+    }
+    const item = items?.data.find((x) => String(x.id) === itemId);
+    return item ? String(item.cost ?? 0) : "";
+  };
+
   // Item IDs yang punya stok >0 di gudang terpilih — untuk filter barang per gudang.
   const itemIdsInWarehouse = useMemo(() => {
     const set = new Set<string>();
@@ -256,13 +272,15 @@ export function BarangKeluarForm() {
           (c) => String(c.bin_id ?? "NULL") === (line.binId === "" ? "NULL" : line.binId),
         ),
       );
-      const costVal = item ? String(item.cost ?? 0) : "";
       // Harga Jual prefill dari master, tetap bisa diubah operator (diskon/nego).
       const priceVal = item ? String(item.price ?? 0) : "";
+      // HPP = rata-rata berjalan di bin terpilih (live), fallback master bila
+      // belum ada histori. Bin ikut menentukan angka — ganti bin = HPP baru.
       // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan bin tapi update cost
-      if (line.binId !== "" && currentValid) return { itemId, cost: costVal, price: priceVal };
+      if (line.binId !== "" && currentValid)
+        return { itemId, cost: costFor(itemId, line.binId), price: priceVal };
       if (line.binId === "" && candidates.some((c) => c.bin_id === null))
-        return { itemId, cost: costVal, price: priceVal };
+        return { itemId, cost: costFor(itemId, ""), price: priceVal };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
@@ -271,15 +289,30 @@ export function BarangKeluarForm() {
               ? ""
               : String(candidates[0].bin_id)
             : "";
-      return { itemId, binId: preferredBin, cost: costVal, price: priceVal };
+      return { itemId, binId: preferredBin, cost: costFor(itemId, preferredBin), price: priceVal };
     });
   };
 
-  const pickBin = (key: string, binId: string) => patchLine(key, { binId });
+  const pickBin = (key: string, binId: string) =>
+    patchLine(key, (line) => ({ binId, cost: costFor(line.itemId, binId) }));
 
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
-    setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
+    // Gudang ganti → rata-rata per bin ikut ganti; reset ke lantai + hitung ulang.
+    // (warehouseId state belum update di sini — costFor memakai id baru langsung.)
+    const wid = id;
+    setLines((prev) =>
+      prev.map((l) => {
+        if (!l.itemId) return { ...l, binId: "" };
+        const live = lookupBinCost(liveCostMap, wid, l.itemId, "");
+        const item = items?.data.find((x) => String(x.id) === l.itemId);
+        return {
+          ...l,
+          binId: "",
+          cost: live != null ? String(live) : item ? String(item.cost ?? 0) : "",
+        };
+      }),
+    );
   };
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
@@ -469,6 +502,7 @@ export function BarangKeluarForm() {
 
       <Panel
         title="Daftar Barang"
+        description="HPP = rata-rata berjalan per bin/gudang (estimasi). HPP final mengikuti rata-rata saat dokumen diposting dan dapat berbeda bila ada penerimaan baru."
         actions={
           canCreate && (
             <Button
@@ -490,7 +524,7 @@ export function BarangKeluarForm() {
                   "Barang",
                   "Asal Bin",
                   "Qty",
-                  "HPP (est.)",
+                  "HPP berjalan",
                   "Harga Jual",
                   "Omzet",
                   "Tersedia",
@@ -705,7 +739,7 @@ export function BarangKeluarForm() {
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">HPP (est.)</span>
+                    <span className="text-xs text-muted-foreground">HPP berjalan</span>
                     <Input
                       type="number"
                       min={0}

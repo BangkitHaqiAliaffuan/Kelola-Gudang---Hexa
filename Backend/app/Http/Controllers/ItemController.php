@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\BulkItemDeleteRequest;
 use App\Http\Requests\BulkItemStatusRequest;
+use App\Http\Requests\CostDriftRequest;
 use App\Http\Requests\StoreItemRequest;
 use App\Http\Requests\UpdateItemRequest;
 use App\Http\Resources\ItemResource;
+use App\Models\Category;
 use App\Models\Item;
+use App\Models\Merk;
 use App\Models\ProcDocLine;
 use App\Models\StockDocumentLine;
+use App\Models\Unit;
 use App\Models\WorkOrder;
 use App\Support\CodeGenerator;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +102,7 @@ class ItemController extends Controller
 
         try {
             $item->delete();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if ((int) ($e->getCode()) === 23001 || str_contains($e->getMessage(), 'stock_document_lines')) {
                 return response()->json([
                     'message' => 'Barang tidak dapat dihapus karena masih memiliki riwayat transaksi stock.',
@@ -134,7 +139,7 @@ class ItemController extends Controller
 
         try {
             $deleted = Item::whereIn('id', $ids)->delete();
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if ((int) ($e->getCode()) === 23001 || str_contains($e->getMessage(), 'stock_document_lines')) {
                 return response()->json([
                     'message' => 'Barang tidak dapat dihapus karena memiliki riwayat transaksi stock.',
@@ -159,7 +164,92 @@ class ItemController extends Controller
         return response()->json([
             'message' => "Status {$updated} barang diperbarui.",
             'updated' => $updated,
-        ], 200);
+        ]);
+    }
+
+    /**
+     * Drift Harga Pokok: selisih Harga Pokok master vs rata-rata berjalan
+     * ledger (tertimbang qty lintas gudang+bin, termasuk lantai). Dasar agenda
+     * review periodik agar master tidak basi seperti kasus BK/2026/01852.
+     * Read-only; perubahan dilakukan via syncCost (dicatat old/new per item).
+     */
+    public function costDrift(CostDriftRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $threshold = (float) ($data['threshold_pct'] ?? 10);
+
+        $avgs = DB::table('item_stock')
+            ->join('items', 'items.id', '=', 'item_stock.item_id')
+            ->groupBy('item_stock.item_id', 'items.sku', 'items.name', 'items.cost')
+            ->havingRaw('SUM(item_stock.stock) > 0')
+            ->selectRaw(
+                'item_stock.item_id as item_id,
+                 items.sku as sku,
+                 items.name as name,
+                 items.cost as master_cost,
+                 SUM(item_stock.stock) as stock,
+                 SUM(item_stock.stock * item_stock.unit_cost_avg) / SUM(item_stock.stock) as avg_cost'
+            )
+            ->when(! empty($data['search'] ?? null), function ($q) use ($data) {
+                $needle = strtolower((string) $data['search']);
+                $q->where(function ($w) use ($needle) {
+                    $w->whereRaw('LOWER(items.name) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(items.sku) LIKE ?', ["%{$needle}%"]);
+                });
+            })
+            ->get()
+            ->map(function ($r) {
+                $avg = round((float) $r->avg_cost, 2);
+                $master = (float) $r->master_cost;
+                $drift = $master > 0 ? round(($avg - $master) / $master * 100, 1) : null;
+
+                return [
+                    'item_id' => (int) $r->item_id,
+                    'sku' => $r->sku,
+                    'name' => $r->name,
+                    'master_cost' => $master,
+                    'avg_cost' => $avg,
+                    'stock' => (int) $r->stock,
+                    'drift_pct' => $drift,
+                ];
+            })
+            ->filter(fn ($r) => $r['drift_pct'] !== null && abs($r['drift_pct']) >= $threshold)
+            ->sortByDesc(fn ($r) => abs($r['drift_pct']))
+            ->values();
+
+        return response()->json(['data' => $avgs]);
+    }
+
+    /**
+     * Selaraskan Harga Pokok master ke rata-rata berjalan ledger untuk ids
+     * terpilih. Mengembalikan old/new per item sebagai jejak (siapa/kapan
+     * tercatat di log aplikasi oleh pemanggil bila perlu).
+     */
+    public function syncCost(BulkItemDeleteRequest $request): JsonResponse
+    {
+        $applied = [];
+        $items = Item::whereIn('id', $request->validated('ids'))->get();
+        foreach ($items as $item) {
+            $agg = DB::table('item_stock')
+                ->where('item_id', $item->id)
+                ->selectRaw('SUM(stock) as stock, SUM(stock * unit_cost_avg) as value')
+                ->first();
+            if (! $agg || (int) $agg->stock <= 0) {
+                continue;
+            }
+            $avg = round((float) $agg->value / (int) $agg->stock, 2);
+            if (abs($avg - (float) $item->cost) < 0.01) {
+                continue;
+            }
+            $old = (float) $item->cost;
+            $item->update(['cost' => $avg]);
+            $applied[] = ['item_id' => $item->id, 'sku' => $item->sku, 'old_cost' => $old, 'new_cost' => $avg];
+        }
+
+        return response()->json([
+            'message' => 'Harga Pokok '.count($applied).' barang diselaraskan ke rata-rata berjalan.',
+            'applied' => $applied,
+        ]);
     }
 
     public function bulkImport(Request $request): JsonResponse
@@ -192,9 +282,9 @@ class ItemController extends Controller
         ]);
 
         // Auto-generate SKU kosong (format A SKU-10001-001 series) + block duplikat intra-file
-        \Illuminate\Support\Facades\DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ['code:items:sku:SKU']);
+        DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ['code:items:sku:SKU']);
         $allSeen = [];
-        foreach (\App\Models\Item::pluck('sku') as $s) {
+        foreach (Item::pluck('sku') as $s) {
             $allSeen[strtoupper(trim($s))] = true;
         }
         $firstOcc = [];
@@ -212,16 +302,16 @@ class ItemController extends Controller
             $upper = strtoupper($sku);
             if (isset($allSeen[$upper])) {
                 $first = $firstOcc[$upper];
-                $firstLabel = $first['idx'] >= 0 ? "baris ".($first['idx']+1)." ('{$first['name']}')" : "database";
-                $rowErrors[$idx] = "SKU '{$sku}' duplikat di file dengan {$firstLabel} — barang '{$name}' baris ".($idx+1);
+                $firstLabel = $first['idx'] >= 0 ? 'baris '.($first['idx'] + 1)." ('{$first['name']}')" : 'database';
+                $rowErrors[$idx] = "SKU '{$sku}' duplikat di file dengan {$firstLabel} — barang '{$name}' baris ".($idx + 1);
             }
-            if (!isset($firstOcc[$upper])) {
+            if (! isset($firstOcc[$upper])) {
                 $firstOcc[$upper] = ['idx' => $idx, 'name' => $name];
             }
             $allSeen[$upper] = true;
         }
         unset($row);
-        if (!empty($rowErrors)) {
+        if (! empty($rowErrors)) {
             return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
         }
         $rowErrors = [];
@@ -230,7 +320,7 @@ class ItemController extends Controller
                 $rowErrors[$index] = 'Kategori wajib diisi (category_id atau category_name).';
             }
         }
-        if (!empty($rowErrors)) {
+        if (! empty($rowErrors)) {
             return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
         }
 
@@ -251,13 +341,13 @@ class ItemController extends Controller
                 $name = trim($row['category_name'] ?? '');
                 if ($id) {
                     $catMap[(string) $id] = (int) $id;
-                } elseif ($name !== '' && !isset($catMap[strtolower($name)])) {
-                    $existing = \App\Models\Category::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                } elseif ($name !== '' && ! isset($catMap[strtolower($name)])) {
+                    $existing = Category::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
                     if ($existing) {
                         $catMap[strtolower($name)] = $existing->id;
                     } else {
-                        $cat = \App\Models\Category::create([
-                            'code' => \App\Support\CodeGenerator::next(\App\Models\Category::class, 'KAT'),
+                        $cat = Category::create([
+                            'code' => CodeGenerator::next(Category::class, 'KAT'),
                             'name' => $name,
                             'is_active' => true,
                         ]);
@@ -272,13 +362,13 @@ class ItemController extends Controller
                 $name = trim($row['brand_name'] ?? '');
                 if ($id) {
                     $merkMap[(string) $id] = (int) $id;
-                } elseif ($name !== '' && !isset($merkMap[strtolower($name)])) {
-                    $existing = \App\Models\Merk::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                } elseif ($name !== '' && ! isset($merkMap[strtolower($name)])) {
+                    $existing = Merk::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
                     if ($existing) {
                         $merkMap[strtolower($name)] = $existing->id;
                     } else {
-                        $merk = \App\Models\Merk::create([
-                            'code' => \App\Support\CodeGenerator::next(\App\Models\Merk::class, 'MRK'),
+                        $merk = Merk::create([
+                            'code' => CodeGenerator::next(Merk::class, 'MRK'),
                             'name' => $name,
                             'is_active' => true,
                         ]);
@@ -293,13 +383,13 @@ class ItemController extends Controller
                 $name = trim($row['unit_name'] ?? '');
                 if ($id) {
                     $unitMap[(string) $id] = (int) $id;
-                } elseif ($name !== '' && !isset($unitMap[strtolower($name)])) {
-                    $existing = \App\Models\Unit::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+                } elseif ($name !== '' && ! isset($unitMap[strtolower($name)])) {
+                    $existing = Unit::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
                     if ($existing) {
                         $unitMap[strtolower($name)] = $existing->id;
                     } else {
-                        $unit = \App\Models\Unit::create([
-                            'code' => \App\Support\CodeGenerator::next(\App\Models\Unit::class, 'UNT'),
+                        $unit = Unit::create([
+                            'code' => CodeGenerator::next(Unit::class, 'UNT'),
                             'name' => $name,
                             'is_active' => true,
                         ]);
@@ -315,25 +405,26 @@ class ItemController extends Controller
 
                 // Resolve category_id
                 $catId = $row['category_id'] ?? null;
-                if (!$catId && !empty($row['category_name'])) {
+                if (! $catId && ! empty($row['category_name'])) {
                     $catId = $catMap[strtolower(trim($row['category_name']))] ?? null;
                 }
 
                 // Resolve brand_id
                 $brandId = $row['brand_id'] ?? null;
-                if (!$brandId && !empty($row['brand_name'])) {
+                if (! $brandId && ! empty($row['brand_name'])) {
                     $brandId = $merkMap[strtolower(trim($row['brand_name']))] ?? null;
                 }
 
                 // Resolve unit_id
                 $unitId = $row['unit_id'] ?? null;
-                if (!$unitId && !empty($row['unit_name'])) {
+                if (! $unitId && ! empty($row['unit_name'])) {
                     $unitId = $unitMap[strtolower(trim($row['unit_name']))] ?? null;
                 }
 
                 // Row-level: category must resolve
-                if (!$catId) {
-                    $errors[$index] = "Kategori '" . ($row['category_name'] ?? '') . "' tidak ditemukan.";
+                if (! $catId) {
+                    $errors[$index] = "Kategori '".($row['category_name'] ?? '')."' tidak ditemukan.";
+
                     continue;
                 }
 
@@ -342,20 +433,25 @@ class ItemController extends Controller
                     ->filter()
                     ->toArray();
                 $payload['category_id'] = $catId;
-                if ($brandId) $payload['brand_id'] = $brandId;
-                if ($unitId) $payload['unit_id'] = $unitId;
+                if ($brandId) {
+                    $payload['brand_id'] = $brandId;
+                }
+                if ($unitId) {
+                    $payload['unit_id'] = $unitId;
+                }
 
                 try {
                     if (Item::where('sku', $sku)->exists()) {
                         $errors[$index] = "SKU '{$sku}' sudah ada.";
+
                         continue;
                     }
                     $payload['internal_barcode'] = $payload['internal_barcode']
-                        ?? \App\Support\CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
+                        ?? CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
                     Item::create($payload);
                     $created++;
                 } catch (\Exception $e) {
-                    $errors[$index] = "Baris " . ($index + 1) . ": " . $e->getMessage();
+                    $errors[$index] = 'Baris '.($index + 1).': '.$e->getMessage();
                 }
             }
 
@@ -378,7 +474,9 @@ class ItemController extends Controller
         $bestSeries = 10000;
         $bestSeq = 0;
         foreach (array_keys($allSeen) as $code) {
-            if (!preg_match('/^SKU-(\d+)-(\d{3})$/', $code, $m)) continue;
+            if (! preg_match('/^SKU-(\d+)-(\d{3})$/', $code, $m)) {
+                continue;
+            }
             $series = (int) $m[1];
             $seq = (int) $m[2];
             if ($series > $bestSeries || ($series === $bestSeries && $seq > $bestSeq)) {
@@ -386,8 +484,13 @@ class ItemController extends Controller
                 $bestSeq = $seq;
             }
         }
-        if ($bestSeries === 10000 && $bestSeq === 0) return 'SKU-10001-001';
-        if ($bestSeq >= 999) return 'SKU-'.($bestSeries + 1).'-001';
-        return 'SKU-'.$bestSeries.'-'.str_pad((string)($bestSeq + 1), 3, '0', STR_PAD_LEFT);
+        if ($bestSeries === 10000 && $bestSeq === 0) {
+            return 'SKU-10001-001';
+        }
+        if ($bestSeq >= 999) {
+            return 'SKU-'.($bestSeries + 1).'-001';
+        }
+
+        return 'SKU-'.$bestSeries.'-'.str_pad((string) ($bestSeq + 1), 3, '0', STR_PAD_LEFT);
     }
 }

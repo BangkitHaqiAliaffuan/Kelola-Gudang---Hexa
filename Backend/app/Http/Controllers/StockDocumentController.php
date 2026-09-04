@@ -356,10 +356,10 @@ class StockDocumentController extends Controller
 
     /**
      * Biaya rata-rata (moving average) sebuah item di sebuah bin. Dipakai untuk
-     * mengisi unit_cost baris Pengeluaran & Retur Pembelian sehingga agregat nilai
-     * (qty * unit_cost) dan detail dokumen akurat — posting itu sendiri memakai AVG
-     * yang sama via StockDocumentService::costAt(), jadi dua sumber ini selalu
-     * konsisten.
+     * mengisi unit_cost baris Pengeluaran & Retur Pembelian saat simpan.
+     * Saat posting, StockDocumentService menyegarkan unit_cost baris garis OUT
+     * ke rata-rata posting (lihat post()), sehingga value_total dokumen selalu
+     * sama dengan ledger walau draft diposting lama setelah dibuat.
      */
     private function averageCost(int $itemId, ?int $binId, $bins, ?int $fallbackWarehouseId = null): ?float
     {
@@ -568,7 +568,7 @@ class StockDocumentController extends Controller
 
         return new StockDocumentResource($document->load([
             'warehouse', 'destination', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
-        ]));
+        ])->loadCount('lines')->loadSum('lines as qty_total', 'qty')->loadSum('lines as value_total', DB::raw('qty * unit_cost'))->loadSum('lines as revenue_total', DB::raw('qty * unit_price')));
     }
 
     /**

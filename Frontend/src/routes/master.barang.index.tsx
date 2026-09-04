@@ -5,6 +5,7 @@ import {
   MoreVertical,
   Pencil,
   Plus,
+  Scale,
   Search,
   Trash2,
   Upload,
@@ -49,10 +50,12 @@ import {
   useBulkDeleteItems,
   useBulkUpdateItemStatus,
   useCategories,
+  useCostDrift,
   useDeleteItem,
   useItems,
   useMerks,
   useSubCategories,
+  useSyncCost,
 } from "@/hooks/use-master";
 import type { ItemApi } from "@/lib/master-types";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -127,10 +130,32 @@ function MasterBarang() {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [statusValue, setStatusValue] = useState<"Aktif" | "Nonaktif">("Aktif");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [driftDialogOpen, setDriftDialogOpen] = useState(false);
+  const [driftThreshold, setDriftThreshold] = useState("10");
+  const [driftSelected, setDriftSelected] = useState<number[]>([]);
   const [confirmText, setConfirmText] = useState("");
   const deleteItem = useDeleteItem();
   const bulkDelete = useBulkDeleteItems();
   const bulkStatusMutation = useBulkUpdateItemStatus();
+  const syncCostMutation = useSyncCost();
+  const thresholdNum = Number(driftThreshold) || 0;
+  const { data: driftData, isLoading: driftLoading } = useCostDrift(thresholdNum, driftDialogOpen);
+
+  const confirmSyncCost = async () => {
+    try {
+      const res = await syncCostMutation.mutateAsync(driftSelected);
+      const detail = res.applied
+        .map(
+          (r) => `${r.sku ?? `#${r.item_id}`}: ${formatIDR(r.old_cost)} → ${formatIDR(r.new_cost)}`,
+        )
+        .join("; ");
+      toast.success(res.message + (detail ? ` ${detail}` : ""));
+      setDriftSelected([]);
+      setDriftDialogOpen(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
 
   const rows = useMemo(
     () =>
@@ -165,10 +190,10 @@ function MasterBarang() {
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
   const allFilteredIds = useMemo(() => rows.map((r) => r.id), [rows]);
-  const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.includes(id));
+  const allSelected =
+    allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.includes(id));
   const someSelected = selected.length > 0 && !allSelected;
-  const toggleSelectAll = () =>
-    setSelected((p) => (allSelected ? [] : allFilteredIds));
+  const toggleSelectAll = () => setSelected((p) => (allSelected ? [] : allFilteredIds));
 
   const exportHeaders = [
     { key: "sku", label: "SKU" },
@@ -418,17 +443,28 @@ function MasterBarang() {
                     <Download className="h-4 w-4" /> Export Semua Barang
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    disabled={selected.length === 0}
-                    onClick={handleExportSelected}
-                  >
+                  <DropdownMenuItem disabled={selected.length === 0} onClick={handleExportSelected}>
                     <Download className="h-4 w-4" /> Export Barang Terpilih
                     {selected.length > 0 && (
-                      <span className="ml-auto text-xs text-muted-foreground">({selected.length})</span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        ({selected.length})
+                      </span>
                     )}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {canWrite && (
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => {
+                  setDriftSelected([]);
+                  setDriftDialogOpen(true);
+                }}
+              >
+                <Scale className="h-4 w-4" /> Selisih HPP
+              </Button>
             )}
             {canWrite && (
               <Button
@@ -736,6 +772,107 @@ function MasterBarang() {
       </Dialog>
 
       <ImportBarangDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+
+      <Dialog open={driftDialogOpen} onOpenChange={setDriftDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Selisih Harga Pokok vs Rata-rata Berjalan</DialogTitle>
+            <DialogDescription>
+              Daftar barang yang Harga Pokok masternya menyimpang dari rata-rata berjalan ledger
+              (tertimbang qty lintas gudang). Centang lalu selaraskan — Harga Pokok master
+              diperbarui ke rata-rata berjalan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="drift-threshold" className="text-xs font-medium whitespace-nowrap">
+              Ambang (%)
+            </Label>
+            <Input
+              id="drift-threshold"
+              type="number"
+              min={0}
+              value={driftThreshold}
+              onChange={(e) => {
+                setDriftThreshold(e.target.value);
+                setDriftSelected([]);
+              }}
+              className="h-9 w-24 rounded-lg"
+            />
+          </div>
+          <div className="max-h-[50vh] overflow-auto rounded-xl border border-border">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs text-muted-foreground">
+                  <th className="px-3 py-2 text-left"> </th>
+                  {["Barang", "Master", "Rata-rata", "Selisih"].map((h) => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(driftData?.data ?? []).map((r) => (
+                  <tr key={r.item_id} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-2">
+                      <Checkbox
+                        checked={driftSelected.includes(r.item_id)}
+                        onCheckedChange={(v) =>
+                          setDriftSelected((p) =>
+                            v ? [...p, r.item_id] : p.filter((x) => x !== r.item_id),
+                          )
+                        }
+                        aria-label={`Pilih ${r.name ?? r.sku}`}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="block font-semibold">{r.name ?? "—"}</span>
+                      <span className="block font-mono text-xs text-muted-foreground">
+                        {r.sku ?? "—"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      {formatIDR(r.master_cost)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      {formatIDR(r.avg_cost)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                      {r.drift_pct >= 0 ? "+" : ""}
+                      {r.drift_pct}%
+                    </td>
+                  </tr>
+                ))}
+                {!driftLoading && (driftData?.data ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                      Tidak ada barang menyimpang di atas ambang ini.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setDriftDialogOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl"
+              disabled={driftSelected.length === 0 || syncCostMutation.isPending}
+              onClick={confirmSyncCost}
+            >
+              {syncCostMutation.isPending
+                ? "Menyelaraskan…"
+                : `Selaraskan (${driftSelected.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

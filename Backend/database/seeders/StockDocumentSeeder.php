@@ -426,6 +426,71 @@ class StockDocumentSeeder extends Seeder
             ];
         }
 
+        // ---- Phase 7: floor stock (tanpa bin) — cakupan permanen jalur Opsi A
+        // (bin_id NULL) agar HPP lantai, posting lantai, dan analitik teruji
+        // di data seed. 3 item pertama bersaldo cukup: terima 40 di lantai,
+        // keluarkan 10 dari lantai (net +30 ke finalBalance). ----
+        $floorDate = $ref->setTime(23, 58, 0);
+        $floorItems = [];
+        foreach ($items as $item) {
+            if (count($floorItems) >= 3) {
+                break;
+            }
+            if (($finalBalance[$item->id] ?? 0) >= 20 && ! isset($transferredItems[$item->id])) {
+                $floorItems[] = $item;
+            }
+        }
+        if ($floorItems !== []) {
+            $floorInLines = [];
+            $floorOutLines = [];
+            foreach ($floorItems as $item) {
+                $floorInLines[] = [
+                    'item' => $item,
+                    'qty' => 40,
+                    'unit_cost' => $item->cost,
+                    'from_bin_id' => null,
+                    'to_bin_id' => null,
+                    'from_warehouse_id' => $item->default_warehouse_id,
+                    'bin_id' => null,
+                    'direction' => 'IN',
+                ];
+                $floorOutLines[] = [
+                    'item' => $item,
+                    'qty' => -10,
+                    'unit_cost' => $item->cost,
+                    'from_bin_id' => null,
+                    'to_bin_id' => null,
+                    'from_warehouse_id' => $item->default_warehouse_id,
+                    'bin_id' => null,
+                    'direction' => 'OUT',
+                ];
+                $finalBalance[$item->id] = ($finalBalance[$item->id] ?? 0) + 30;
+            }
+            $floorWh = $floorItems[0]->default_warehouse_id;
+            $documents[] = [
+                'type' => 'Penerimaan',
+                'day' => $floorDate->startOfDay()->toDateTimeString(),
+                'warehouse_id' => $floorWh,
+                'date' => $floorDate,
+                'partner' => $floorItems[0]->supplier?->name ?? 'Supplier',
+                'pic' => $pick(self::PICS),
+                'note' => 'Penerimaan lantai (tanpa bin)',
+                'lines' => $floorInLines,
+            ];
+            $floorCust = ! $customers->isEmpty() ? $customers[0] : null;
+            $documents[] = [
+                'type' => 'Pengeluaran',
+                'day' => $floorDate->startOfDay()->toDateTimeString(),
+                'warehouse_id' => $floorWh,
+                'date' => $floorDate->setTime(23, 59, 0),
+                'partner' => $floorCust?->name ?? 'Departemen Produksi',
+                'customer_id' => $floorCust?->id,
+                'pic' => $pick(self::PICS),
+                'note' => 'Pengeluaran lantai (tanpa bin)',
+                'lines' => $floorOutLines,
+            ];
+        }
+
         // ---- Persist: documents -> lines -> movements, then rebuild balances ----
         $ledger = new StockLedger;
 
