@@ -515,6 +515,37 @@ export function StockDocumentSheet({
                   )}
                 </>
               )}
+              {doc.status === "Draft" &&
+                doc.type !== "Stock Adjustment" &&
+                doc.type !== "Stock Opname" && (
+                  <>
+                    {canCancel && onCancel && (
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={onCancel}
+                        disabled={busy}
+                      >
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Ban className="h-4 w-4" />
+                        )}{" "}
+                        Batalkan
+                      </Button>
+                    )}
+                    {canPost && onPost && (
+                      <Button className="rounded-xl" onClick={onPost} disabled={busy}>
+                        {busy ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCheck className="h-4 w-4" />
+                        )}{" "}
+                        Posting
+                      </Button>
+                    )}
+                  </>
+                )}
             </div>
           </>
         )}

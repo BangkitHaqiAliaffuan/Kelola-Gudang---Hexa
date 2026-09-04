@@ -10,11 +10,27 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
-import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import {
+  useCancelStockDocument,
+  usePostStockDocument,
+  useStockDocument,
+  useStockDocuments,
+} from "@/hooks/use-persediaan";
 import { cn } from "@/lib/utils";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 const statusTone = (s: StockDocumentApi["status"]): Tone =>
   s === "Selesai"
@@ -28,6 +44,8 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
 export function BarangKeluarPage() {
   const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
+  const canPost = hasModuleLevel("Persediaan", "Tulis");
+  const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const canViewLaporan = hasModule("Laporan");
   const { data, isLoading } = useStockDocuments({ type: "Pengeluaran" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
@@ -41,6 +59,34 @@ export function BarangKeluarPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const postDoc = usePostStockDocument();
+  const cancelDoc = useCancelStockDocument();
+  const [confirmPostId, setConfirmPostId] = useState<number | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+
+  const doPost = async () => {
+    if (confirmPostId == null) return;
+    try {
+      const res = await postDoc.mutateAsync(confirmPostId);
+      toast.success(`Dokumen ${res.data.no} berhasil diposting`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setConfirmPostId(null);
+    }
+  };
+
+  const doCancel = async () => {
+    if (confirmCancelId == null) return;
+    try {
+      const res = await cancelDoc.mutateAsync(confirmCancelId);
+      toast.success(`Dokumen ${res.data.no} dibatalkan`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setConfirmCancelId(null);
+    }
+  };
   const hasActiveFilters = useMemo(
     () => q !== "" || wh !== ALL || purpose !== ALL || status !== ALL,
     [q, wh, purpose, status],
@@ -262,7 +308,48 @@ export function BarangKeluarPage() {
         doc={detail?.data ?? null}
         isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
+        onPost={canPost ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
+        onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
+        busy={postDoc.isPending || cancelDoc.isPending}
       />
+
+      <AlertDialog open={confirmPostId != null} onOpenChange={(o) => !o && setConfirmPostId(null)}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Posting dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen akan diposting dan stok langsung ter-update. Tindakan ini tidak dapat
+              dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={() => void doPost()}>
+              Ya, Posting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmCancelId != null}
+        onOpenChange={(o) => !o && setConfirmCancelId(null)}
+      >
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen Draft akan dibatalkan dan tidak dapat diposting lagi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Kembali</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={() => void doCancel()}>
+              Ya, Batalkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
