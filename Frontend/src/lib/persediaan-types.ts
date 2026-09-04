@@ -175,6 +175,8 @@ export type StockDocumentLineApi = {
   to_rack: string | null;
   source_line_id: number | null;
   unit_cost: number;
+  unit_price: number | null;
+  unit_price_estimated: boolean;
   note: string | null;
   reason_code: string | null;
   counted_by: string | null;
@@ -215,6 +217,10 @@ export type StockDocumentApi = {
   source_document: string | null;
   customer_id: number | null;
   customer: string | null;
+  department_id?: number | null;
+  department?: string | null;
+  project_id?: number | null;
+  project?: string | null;
   partner: string | null;
   reference_no: string | null;
   pic: string | null;
@@ -234,6 +240,7 @@ export type StockDocumentApi = {
   checked_count?: number;
   qty_total?: number;
   value_total?: number;
+  revenue_total?: number;
   lines?: StockDocumentLineApi[];
   locked_by_user_id?: number | null;
   locked_by?: string | null;
@@ -289,6 +296,7 @@ export type StockDocumentLinePayload = {
   system_qty?: number | null;
   actual_qty?: number | null;
   unit_cost?: number | null;
+  unit_price?: number | null;
   to_bin_id?: number | null;
   from_bin_id?: number | null;
   source_line_id?: number | null;
@@ -304,6 +312,8 @@ export type StockDocumentPayload = {
   destination_warehouse_id?: number | null;
   source_document_id?: number | null;
   customer_id?: number | null;
+  department_id?: number | null;
+  project_id?: number | null;
   partner: string | null;
   reference_no: string | null;
   pic?: string | null;
@@ -339,6 +349,172 @@ export type LaporanMutasiParams = {
   search?: string | null;
   perPage?: number;
   page?: number;
+};
+
+// ---- Analitik Barang Keluar (GET /api/laporan/keluar-analytics) ----
+// Agregat Pengeluaran per tujuan (Customer/Departemen/Proyek) per bulan.
+// "nilai" = nilai pokok persediaan (qty × unit_cost), BUKAN revenue.
+
+export type TujuanJenis = "customer" | "departemen" | "proyek" | "lainnya";
+
+export type KeluarAnalyticsParams = {
+  from: string;
+  to: string;
+  warehouseId?: number | null;
+  customerId?: number | null;
+  departmentId?: number | null;
+  projectId?: number | null;
+  jenisTujuan?: TujuanJenis | null;
+  atRiskDays?: number | null;
+  varianceBand?: number | null;
+};
+
+export type TujuanBulanRow = {
+  jenis: TujuanJenis;
+  id: number | null;
+  nama: string;
+  bulan: string;
+  qty: number;
+  nilai: number;
+  dokumen: number;
+};
+
+export type TopTujuanRow = {
+  jenis: TujuanJenis;
+  id: number | null;
+  nama: string;
+  qty: number;
+  nilai: number;
+  dokumen: number;
+  share: number;
+  share_kumulatif: number;
+};
+
+export type KeluarAnalyticsApi = {
+  periode: { from: string; to: string };
+  ringkasan: {
+    nilai: number;
+    qty: number;
+    dokumen: number;
+    rata_nilai: number;
+    mom: {
+      bulan: string;
+      bulan_lalu: string;
+      nilai: number;
+      nilai_lalu: number;
+      pct: number | null;
+      qty: number;
+      qty_lalu: number;
+      qty_pct: number | null;
+    } | null;
+  };
+  per_bulan: { bulan: string; qty: number; nilai: number; dokumen: number }[];
+  per_tujuan_per_bulan: TujuanBulanRow[];
+  top_tujuan: TopTujuanRow[];
+  per_jenis: { jenis: TujuanJenis; qty: number; nilai: number; dokumen: number }[];
+  per_segmen: { segmen: string; qty: number; nilai: number; dokumen: number }[];
+  top_items: {
+    item_id: number;
+    sku: string | null;
+    nama: string;
+    satuan: string | null;
+    qty: number;
+    nilai: number;
+  }[];
+  retur: {
+    qty: number;
+    nilai: number;
+    omzet: number;
+    rate_qty: number;
+    rate_nilai: number;
+    per_alasan: { alasan: string; qty: number; nilai: number; dokumen: number }[];
+    per_tujuan: {
+      jenis: TujuanJenis;
+      id: number | null;
+      nama: string;
+      qty: number;
+      nilai: number;
+      dokumen: number;
+    }[];
+    per_item: {
+      item_id: number;
+      sku: string | null;
+      nama: string;
+      satuan: string | null;
+      qty: number;
+      nilai: number;
+    }[];
+  };
+  aktivitas: {
+    jenis: TujuanJenis;
+    id: number | null;
+    nama: string;
+    dokumen: number;
+    nilai: number;
+    terakhir: string | null;
+    hari_sejak_terakhir: number | null;
+    status: "baru" | "aktif" | "at-risk";
+  }[];
+  proses: {
+    lead_median_hari: number | null;
+    lead_avg_hari: number | null;
+    tertahan_dokumen: number;
+    tertahan_nilai: number;
+    aging: { rentang: string; dokumen: number; nilai: number }[];
+  };
+  omzet: {
+    total: number;
+    hpp: number;
+    margin: number;
+    margin_pct: number | null;
+    bersih: number;
+    cakupan: { aktual: number; estimasi: number; tanpa_harga: number };
+    per_customer_per_bulan: {
+      jenis: TujuanJenis;
+      id: number | null;
+      nama: string;
+      bulan: string;
+      qty: number;
+      omzet: number;
+      hpp: number;
+      margin: number;
+      margin_pct: number | null;
+      dokumen: number;
+    }[];
+    top_margin: {
+      jenis: TujuanJenis;
+      id: number | null;
+      nama: string;
+      qty: number;
+      omzet: number;
+      hpp: number;
+      dokumen: number;
+      margin: number;
+      margin_pct: number | null;
+      share_omzet: number;
+    }[];
+  };
+  proyek: {
+    id: number | null;
+    nama: string;
+    nilai_keluar: number;
+    qty_keluar: number;
+    budget: number | null;
+    serapan_budget_pct: number | null;
+    status_proyek: string | null;
+    items: {
+      item_id: number;
+      sku: string | null;
+      nama: string;
+      satuan: string | null;
+      target_qty: number;
+      keluar_qty: number;
+      nilai_keluar: number;
+      varians_pct: number | null;
+      flag: boolean;
+      work_order: string | null;
+    }[];
+  }[];
 };
 
 // ---- Update dokumen Stock Opname draft (PUT /api/persediaan/stock-documents/{id}) ----

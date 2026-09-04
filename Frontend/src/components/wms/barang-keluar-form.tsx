@@ -47,12 +47,13 @@ type FormLine = {
   binId: string;
   qty: string;
   cost: string;
+  price: string;
 };
 
 let lineSeq = 0;
 const newLine = (): FormLine => {
   lineSeq += 1;
-  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1", cost: "0" };
+  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1", cost: "0", price: "0" };
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -230,6 +231,10 @@ export function BarangKeluarForm() {
     () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.cost) || 0), 0),
     [lines],
   );
+  const totalOmzet = useMemo(
+    () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.price) || 0), 0),
+    [lines],
+  );
 
   const patchLine = (
     key: string,
@@ -252,10 +257,12 @@ export function BarangKeluarForm() {
         ),
       );
       const costVal = item ? String(item.cost ?? 0) : "";
+      // Harga Jual prefill dari master, tetap bisa diubah operator (diskon/nego).
+      const priceVal = item ? String(item.price ?? 0) : "";
       // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan bin tapi update cost
-      if (line.binId !== "" && currentValid) return { itemId, cost: costVal };
+      if (line.binId !== "" && currentValid) return { itemId, cost: costVal, price: priceVal };
       if (line.binId === "" && candidates.some((c) => c.bin_id === null))
-        return { itemId, cost: costVal };
+        return { itemId, cost: costVal, price: priceVal };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
@@ -264,7 +271,7 @@ export function BarangKeluarForm() {
               ? ""
               : String(candidates[0].bin_id)
             : "";
-      return { itemId, binId: preferredBin, cost: costVal };
+      return { itemId, binId: preferredBin, cost: costVal, price: priceVal };
     });
   };
 
@@ -277,17 +284,19 @@ export function BarangKeluarForm() {
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
     let cid: number | null = null;
+    let did: number | null = null;
+    let pid: number | null = null;
     let partnerName: string | null = null;
     if (purpose) {
       if (purpose.startsWith("customer:")) {
         cid = Number(purpose.split(":")[1] ?? "");
         partnerName = customers?.data.find((c) => String(c.id) === String(cid))?.name ?? null;
       } else if (purpose.startsWith("department:")) {
-        const did = purpose.split(":")[1];
-        partnerName = departments?.data.find((d) => String(d.id) === did)?.name ?? null;
+        did = Number(purpose.split(":")[1] ?? "");
+        partnerName = departments?.data.find((d) => String(d.id) === String(did))?.name ?? null;
       } else if (purpose.startsWith("project:")) {
-        const pid = purpose.split(":")[1];
-        partnerName = projects?.data.find((p) => String(p.id) === pid)?.name ?? null;
+        pid = Number(purpose.split(":")[1] ?? "");
+        partnerName = projects?.data.find((p) => String(p.id) === String(pid))?.name ?? null;
       } else {
         // fallback legacy string (seharusnya tidak terjadi)
         partnerName = purpose;
@@ -300,6 +309,8 @@ export function BarangKeluarForm() {
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       customer_id: cid,
+      department_id: did,
+      project_id: pid,
       partner: partnerName,
       reference_no: reference.trim() || null,
       pic: pic.trim() || null,
@@ -310,6 +321,7 @@ export function BarangKeluarForm() {
           item_id: Number(l.itemId),
           qty: Number(l.qty),
           from_bin_id: l.binId ? Number(l.binId) : null,
+          unit_price: l.price === "" ? null : Number(l.price),
         })),
     };
   };
@@ -471,10 +483,19 @@ export function BarangKeluarForm() {
         bodyClassName="p-0"
       >
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Harga", "Subtotal", "Tersedia", ""].map((h) => (
+                {[
+                  "Barang",
+                  "Asal Bin",
+                  "Qty",
+                  "HPP (est.)",
+                  "Harga Jual",
+                  "Omzet",
+                  "Tersedia",
+                  "",
+                ].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -566,11 +587,32 @@ export function BarangKeluarForm() {
                         min={0}
                         value={l.cost}
                         readOnly
+                        aria-label="HPP estimasi"
                         className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
                       />
                     </td>
+                    <td className="px-3 py-2 align-top">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={l.price}
+                        onChange={(e) => patchLine(l.key, { price: e.target.value })}
+                        aria-label="Harga jual"
+                        className="h-9 w-28 rounded-lg"
+                      />
+                      {lineError(i, "unit_price") && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {lineError(i, "unit_price")}
+                        </p>
+                      )}
+                      {Number(l.price) > 0 && Number(l.price) < Number(l.cost) && (
+                        <p className="mt-1 text-xs text-amber-600">
+                          Harga di bawah HPP (jual rugi).
+                        </p>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm font-semibold">
-                      {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
                       {available !== undefined ? formatNumber(available) : "—"}
@@ -663,7 +705,7 @@ export function BarangKeluarForm() {
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Harga</span>
+                    <span className="text-xs text-muted-foreground">HPP (est.)</span>
                     <Input
                       type="number"
                       min={0}
@@ -675,11 +717,30 @@ export function BarangKeluarForm() {
                       {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
                     </span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Harga Jual</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={l.price}
+                      onChange={(e) => patchLine(l.key, { price: e.target.value })}
+                      className="h-9 w-28 rounded-lg"
+                    />
+                    <span className="ml-auto text-sm font-semibold">
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
+                    </span>
+                  </div>
+                  {Number(l.price) > 0 && Number(l.price) < Number(l.cost) && (
+                    <p className="text-xs text-amber-600">Harga di bawah HPP (jual rugi).</p>
+                  )}
                   {lineError(i, "from_bin_id") && (
                     <p className="text-xs text-destructive">{lineError(i, "from_bin_id")}</p>
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{lines.length === 1 ? "" : ""}</span>
+                    <span>
+                      HPP {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))} · Omzet{" "}
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
+                    </span>
                     {canCreate && (
                       <button
                         type="button"
@@ -703,8 +764,12 @@ export function BarangKeluarForm() {
             <span className="text-sm font-bold">{formatNumber(totalQty)} PCS</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Grand Total Nilai</span>
+            <span className="text-sm font-medium">Grand Total Nilai (HPP)</span>
             <span className="text-lg font-bold">{formatIDR(totalNilai)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Total Omzet</span>
+            <span className="text-lg font-bold">{formatIDR(totalOmzet)}</span>
           </div>
         </div>
       </Panel>

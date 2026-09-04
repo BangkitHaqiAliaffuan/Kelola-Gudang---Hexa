@@ -36,7 +36,7 @@ import {
   useStockDocuments,
 } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
-import { formatDate, formatNumber } from "@/lib/wms-data";
+import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import type {
   StockDocumentApi,
   StockDocumentLineApi,
@@ -523,7 +523,7 @@ export function ReturPenjualanForm() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Tujuan Bin", "Qty", "Maks", ""].map((h) => (
+                {["Barang", "Tujuan Bin", "Qty", "Maks", "Harga", ""].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -618,6 +618,9 @@ export function ReturPenjualanForm() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
                       {src && max != null ? formatNumber(max) : "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
+                      {src?.unit_price != null ? formatIDR(src.unit_price) : "—"}
                     </td>
                     <td className="px-3 py-2 align-top">
                       {canCreate && (

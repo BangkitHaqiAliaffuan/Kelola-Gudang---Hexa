@@ -40,6 +40,8 @@ class StockDocument extends Model
         'destination_warehouse_id',
         'source_document_id',
         'customer_id',
+        'department_id',
+        'project_id',
         'partner',
         'reference_no',
         'pic',
@@ -108,6 +110,16 @@ class StockDocument extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function locker(): BelongsTo

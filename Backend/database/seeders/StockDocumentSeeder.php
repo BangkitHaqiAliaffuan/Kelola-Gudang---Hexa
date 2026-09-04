@@ -470,6 +470,11 @@ class StockDocumentSeeder extends Seeder
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'to_bin_id' => $line['to_bin_id'] ?? null,
                         'unit_cost' => $line['unit_cost'] ?? 0,
+                        // Snapshot harga jual master untuk garis keluar (sumber omzet);
+                        // tipe lain tidak bermakna revenue → NULL.
+                        'unit_price' => in_array($def['type'], ['Pengeluaran', 'Retur Penjualan'], true)
+                            ? (float) $line['item']->price
+                            : null,
                     ]);
 
                     if (! $posted) {

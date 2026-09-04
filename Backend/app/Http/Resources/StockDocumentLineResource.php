@@ -2,8 +2,10 @@
 
 namespace App\Http\Resources;
 
+use App\Models\StockDocumentLine;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
 
 class StockDocumentLineResource extends JsonResource
 {
@@ -13,14 +15,14 @@ class StockDocumentLineResource extends JsonResource
         $remainingQty = null;
         $returnedQty = null;
         if ($this->qty !== null && $this->qty > 0) {
-            $returnedQty = (int) \App\Models\StockDocumentLine::where('source_line_id', $this->id)
+            $returnedQty = (int) StockDocumentLine::where('source_line_id', $this->id)
                 ->whereHas('document', fn ($q) => $q->where('type', 'Retur Pembelian')->where('status', '!=', 'Dibatalkan'))
-                ->sum(\Illuminate\Support\Facades\DB::raw('ABS(qty)'));
+                ->sum(DB::raw('ABS(qty)'));
             $remainingQty = max(0, (int) $this->qty - $returnedQty);
         } elseif ($this->qty !== null && $this->qty < 0) {
-            $returnedQty = (int) \App\Models\StockDocumentLine::where('source_line_id', $this->id)
+            $returnedQty = (int) StockDocumentLine::where('source_line_id', $this->id)
                 ->whereHas('document', fn ($q) => $q->where('type', 'Retur Penjualan')->where('status', '!=', 'Dibatalkan'))
-                ->sum(\Illuminate\Support\Facades\DB::raw('ABS(qty)'));
+                ->sum(DB::raw('ABS(qty)'));
             $remainingQty = max(0, (int) abs($this->qty) - $returnedQty);
         }
 
@@ -48,6 +50,8 @@ class StockDocumentLineResource extends JsonResource
             'to_rack' => $this->whenLoaded('toBin.rack', fn () => $this->toBin?->rack?->code),
             'source_line_id' => $this->source_line_id,
             'unit_cost' => $this->unit_cost,
+            'unit_price' => $this->unit_price !== null ? (float) $this->unit_price : null,
+            'unit_price_estimated' => (bool) $this->unit_price_estimated,
             'note' => $this->note,
             'reason_code' => $this->reason_code,
             'counted_by' => $this->whenLoaded('countedBy', fn () => $this->countedBy?->name),

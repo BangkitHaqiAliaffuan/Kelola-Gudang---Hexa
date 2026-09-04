@@ -7,12 +7,16 @@ use App\Http\Requests\UpdateStockDocumentRequest;
 use App\Http\Resources\StockDocumentResource;
 use App\Models\Bin;
 use App\Models\Customer;
+use App\Models\Department;
+use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\Project;
 use App\Models\RolePermission;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Services\StockDocumentService;
 use App\Support\CodeGenerator;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -37,11 +41,12 @@ class StockDocumentController extends Controller
         ]);
 
         $query = StockDocument::query()
-            ->with(['warehouse', 'destination', 'sourceDocument', 'customer'])
+            ->with(['warehouse', 'destination', 'sourceDocument', 'customer', 'department', 'project'])
             ->withCount('lines')
             ->withCount(['lines as checked_count' => fn ($q) => $q->whereNotNull('actual_qty')])
             ->withSum('lines as qty_total', 'qty')
-            ->withSum('lines as value_total', DB::raw('qty * unit_cost'));
+            ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
+            ->withSum('lines as revenue_total', DB::raw('qty * unit_price'));
 
         if ($needle = strtolower((string) ($data['search'] ?? ''))) {
             $query->where(function ($q) use ($needle) {
@@ -82,7 +87,8 @@ class StockDocumentController extends Controller
                 'stock_documents.type,
                  COUNT(DISTINCT stock_documents.id) as doc_count,
                  SUM(stock_document_lines.qty) as qty,
-                 SUM(stock_document_lines.qty * stock_document_lines.unit_cost) as value'
+                 SUM(stock_document_lines.qty * stock_document_lines.unit_cost) as value,
+                 SUM(stock_document_lines.qty * stock_document_lines.unit_price) as revenue'
             )
             ->get()
             ->keyBy('type');
@@ -100,6 +106,8 @@ class StockDocumentController extends Controller
                 'keluar' => [
                     'count' => (int) ($keluar->doc_count ?? 0),
                     'qty' => (int) ($keluar->qty ?? 0),
+                    'value' => (float) ($keluar->value ?? 0),
+                    'revenue' => (float) ($keluar->revenue ?? 0),
                 ],
             ],
         ]);
@@ -169,7 +177,9 @@ class StockDocumentController extends Controller
                 $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
                 $q = ItemStock::where('warehouse_id', $data['warehouse_id']);
                 if ($binIds->isNotEmpty() && $hasNull) {
-                    $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
+                    $q->where(function ($w) use ($binIds) {
+                        $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id');
+                    });
                 } elseif ($binIds->isNotEmpty()) {
                     $q->whereIn('bin_id', $binIds);
                 } elseif ($hasNull) {
@@ -177,6 +187,7 @@ class StockDocumentController extends Controller
                 } else {
                     $q->whereRaw('1=0');
                 }
+
                 return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
             })()
             : collect();
@@ -191,8 +202,16 @@ class StockDocumentController extends Controller
                 ->keyBy('id')
             : collect();
 
+        // Harga Jual master untuk backfill unit_price garis keluar baru
+        // (snapshot; histori kekal walau master berubah kemudian).
+        $isRevenueType = in_array($data['type'], ['Pengeluaran', 'Retur Penjualan'], true);
+        $itemPrices = $isRevenueType
+            ? Item::whereIn('id', collect($data['lines'])->pluck('item_id')->filter()->unique()->values())
+                ->pluck('price', 'id')
+            : collect();
+
         try {
-            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $isOpname, $isAdjustment, $fromBins, $sourceLines, $stockRows) {
+            $document = DB::transaction(function () use ($data, $request, $isOutbound, $isTransfer, $isOpname, $isAdjustment, $fromBins, $sourceLines, $stockRows, $itemPrices, $isRevenueType) {
                 $prefix = $isTransfer ? 'TF'
                     : ($isOpname ? 'SO'
                         : ($isAdjustment ? 'ADJ'
@@ -203,7 +222,7 @@ class StockDocumentController extends Controller
 
                 // Guard race-safe: 1 Opname per gudang per hari (kecuali Dibatalkan).
                 if ($isOpname) {
-                    $day = \Carbon\Carbon::parse($data['document_date'])->toDateString();
+                    $day = Carbon::parse($data['document_date'])->toDateString();
                     $conflict = StockDocument::where('type', 'Stock Opname')
                         ->where('warehouse_id', $data['warehouse_id'])
                         ->whereDate('document_date', $day)
@@ -230,7 +249,23 @@ class StockDocumentController extends Controller
                     'destination_warehouse_id' => $isTransfer ? $data['destination_warehouse_id'] : null,
                     'source_document_id' => in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true) ? ($data['source_document_id'] ?? null) : null,
                     'customer_id' => $data['customer_id'] ?? null,
-                    'partner' => ! empty($data['customer_id'] ?? null) ? (\App\Models\Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null) : ($data['partner'] ?? null),
+                    'department_id' => $data['department_id'] ?? null,
+                    'project_id' => $data['project_id'] ?? null,
+                    // Snapshot nama tujuan: dari FK yang terisi (customer /
+                    // departemen / proyek), fallback string partner kiriman.
+                    'partner' => (function () use ($data) {
+                        if (! empty($data['customer_id'] ?? null)) {
+                            return Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null;
+                        }
+                        if (! empty($data['department_id'] ?? null)) {
+                            return Department::find($data['department_id'])?->name ?? $data['partner'] ?? null;
+                        }
+                        if (! empty($data['project_id'] ?? null)) {
+                            return Project::find($data['project_id'])?->name ?? $data['partner'] ?? null;
+                        }
+
+                        return $data['partner'] ?? null;
+                    })(),
                     'reference_no' => $data['reference_no'] ?? null,
                     'pic' => $data['pic'] ?? null,
                     'note' => $data['note'] ?? null,
@@ -242,6 +277,24 @@ class StockDocumentController extends Controller
                     $sourceCost = in_array($data['type'], ['Retur Pembelian', 'Retur Penjualan'], true)
                         ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_cost
                         : null;
+
+                    // Snapshot harga jual: input user menang; RJ ter-link mewarisi
+                    // harga baris sumber; Pengeluaran/RJ-tanpa-sumber fallback ke
+                    // Harga Jual master (> 0); tipe lain NULL (tak bermakna revenue).
+                    $sourcePrice = $data['type'] === 'Retur Penjualan'
+                        ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_price
+                        : null;
+                    $masterPrice = (float) ($itemPrices->get((int) ($line['item_id'] ?? 0)) ?? 0);
+                    $unitPrice = null;
+                    if ($isRevenueType) {
+                        if (array_key_exists('unit_price', $line) && $line['unit_price'] !== null && $line['unit_price'] !== '') {
+                            $unitPrice = (float) $line['unit_price'];
+                        } elseif ($sourcePrice !== null) {
+                            $unitPrice = (float) $sourcePrice;
+                        } elseif ($masterPrice > 0) {
+                            $unitPrice = $masterPrice;
+                        }
+                    }
 
                     $stockKey = $isOpname ? (($line['item_id'] ?? 0).'-'.(($line['from_bin_id'] ?? null) === null ? 'NULL' : $line['from_bin_id'])) : null;
                     $stockRow = $isOpname ? $stockRows->get($stockKey) : null;
@@ -281,6 +334,8 @@ class StockDocumentController extends Controller
                         'source_line_id' => $sourceCost !== null ? $line['source_line_id'] : null,
                         'note' => $line['note'] ?? null,
                         'reason_code' => $line['reason_code'] ?? null,
+                        'unit_price' => $unitPrice,
+                        'unit_price_estimated' => false,
                     ]);
                 }
 
@@ -295,8 +350,8 @@ class StockDocumentController extends Controller
         }
 
         return (new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
-        ])->loadCount('lines')))->response()->setStatusCode(201);
+            'warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
+        ])->loadCount('lines')->loadSum('lines as qty_total', 'qty')->loadSum('lines as value_total', DB::raw('qty * unit_cost'))->loadSum('lines as revenue_total', DB::raw('qty * unit_price'))))->response()->setStatusCode(201);
     }
 
     /**
@@ -340,6 +395,8 @@ class StockDocumentController extends Controller
             'warehouse',
             'destination',
             'customer',
+            'department',
+            'project',
             'creator',
             'sourceDocument',
             'lines.item.unit',
@@ -378,7 +435,7 @@ class StockDocumentController extends Controller
 
         $data = $request->validated();
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $stockDocument, $request) {
+        return DB::transaction(function () use ($data, $stockDocument, $request) {
             $authIdForLockInner = $request->user('sanctum')?->id ?? $request->user()?->id;
             // Auto-acquire / refresh lock on successful update
             if (empty($stockDocument->locked_by_user_id) || $this->isLockExpired($stockDocument)) {
@@ -400,7 +457,9 @@ class StockDocumentController extends Controller
                 $hasNull = $linesColl->contains(fn ($l) => ($l['from_bin_id'] ?? null) === null);
                 $q = ItemStock::where('warehouse_id', $stockDocument->warehouse_id);
                 if ($binIds->isNotEmpty() && $hasNull) {
-                    $q->where(function ($w) use ($binIds) { $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id'); });
+                    $q->where(function ($w) use ($binIds) {
+                        $w->whereIn('bin_id', $binIds)->orWhereNull('bin_id');
+                    });
                 } elseif ($binIds->isNotEmpty()) {
                     $q->whereIn('bin_id', $binIds);
                 } elseif ($hasNull) {
@@ -408,6 +467,7 @@ class StockDocumentController extends Controller
                 } else {
                     $q->whereRaw('1=0');
                 }
+
                 return $q->get()->keyBy(fn ($row) => $row->item_id.'-'.($row->bin_id === null ? 'NULL' : $row->bin_id));
             })();
 
@@ -429,7 +489,7 @@ class StockDocumentController extends Controller
             }
 
             // Geser line_no ke offset aman agar tidak tabrakan saat reorder.
-            $stockDocument->lines()->update(['line_no' => \Illuminate\Support\Facades\DB::raw('line_no + 100000')]);
+            $stockDocument->lines()->update(['line_no' => DB::raw('line_no + 100000')]);
 
             foreach ($data['lines'] as $index => $line) {
                 $key = ($line['item_id'] ?? 0).'-'.((($line['from_bin_id'] ?? null) === null) ? 'NULL' : $line['from_bin_id']);
@@ -719,13 +779,19 @@ class StockDocumentController extends Controller
 
     private function isLockExpired(StockDocument $doc): bool
     {
-        if (empty($doc->locked_at)) return true;
+        if (empty($doc->locked_at)) {
+            return true;
+        }
+
         return $doc->locked_at->lt(now()->subMinutes(10));
     }
 
     private function isLockedByOther(StockDocument $doc, ?int $authId): bool
     {
-        if (empty($doc->locked_by_user_id) || $this->isLockExpired($doc)) return false;
+        if (empty($doc->locked_by_user_id) || $this->isLockExpired($doc)) {
+            return false;
+        }
+
         return (int) $doc->locked_by_user_id !== (int) $authId;
     }
 
@@ -733,13 +799,19 @@ class StockDocumentController extends Controller
     {
         $doc->loadMissing('locker');
         $name = $doc->locker?->name ?? 'User lain';
+
         return response()->json(['message' => "Dokumen sedang diisi oleh {$name}. Hanya 1 user yang bisa mengedit. Coba lagi setelah 10 menit atau minta force unlock."], 423);
     }
 
     private function canForceUnlock($user): bool
     {
-        if (! $user) return false;
-        if ($user->role === 'Auditor') return true;
+        if (! $user) {
+            return false;
+        }
+        if ($user->role === 'Auditor') {
+            return true;
+        }
+
         return RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
     }
 
@@ -754,13 +826,14 @@ class StockDocumentController extends Controller
         $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
         $user = $request->user('sanctum') ?? $request->user();
 
-        return DB::transaction(function () use ($stockDocument, $authId, $user) {
+        return DB::transaction(function () use ($stockDocument, $authId) {
             $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
             if ($locked->locked_by_user_id && (int) $locked->locked_by_user_id !== (int) $authId && ! $this->isLockExpired($locked)) {
                 return $this->lockedResponse($locked);
             }
             $locked->update(['locked_by_user_id' => $authId, 'locked_at' => now()]);
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         });
     }
 
@@ -777,20 +850,22 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Lock sudah expired, silakan lock ulang.'], 423);
         }
         $stockDocument->update(['locked_at' => now()]);
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function unlock(Request $request, StockDocument $stockDocument)
     {
         $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
         if (empty($stockDocument->locked_by_user_id)) {
-            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         }
         if ((int) $stockDocument->locked_by_user_id !== (int) $authId) {
             return response()->json(['message' => 'Hanya pemilik lock yang bisa unlock.'], 423);
         }
         $stockDocument->update(['locked_by_user_id' => null, 'locked_at' => null]);
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function forceUnlock(Request $request, StockDocument $stockDocument)
@@ -804,11 +879,13 @@ class StockDocumentController extends Controller
         }
         $oldLocker = $stockDocument->locker?->name ?? (string) ($stockDocument->locked_by_user_id ?? 'unknown');
         $reason = $request->input('reason');
+
         return DB::transaction(function () use ($stockDocument, $user, $oldLocker, $reason) {
             $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
-            $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note . "\n" : '') . "Force unlock dari {$oldLocker} oleh {$user->name}" . ($reason ? ": {$reason}" : ''))]);
+            $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note."\n" : '')."Force unlock dari {$oldLocker} oleh {$user->name}".($reason ? ": {$reason}" : ''))]);
+
             // langsung acquire untuk forcer
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         });
     }
 }

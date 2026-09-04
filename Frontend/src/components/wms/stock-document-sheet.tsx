@@ -174,6 +174,10 @@ export function StockDocumentSheet({
   const totalDown = downLines.reduce((s, l) => s + Math.abs(l.qty ?? 0), 0);
   const netValue = lines.reduce((s, l) => s + lineSignedQty(l) * l.unit_cost, 0);
   const unit = lines[0]?.unit ?? "";
+  // Omzet & margin hanya bermakna untuk dokumen keluar/retur jual ber-harga jual.
+  const showRevenue = doc?.type === "Pengeluaran" || doc?.type === "Retur Penjualan" ? true : false;
+  const totalOmzet = lines.reduce((s, l) => s + Math.abs(l.qty ?? 0) * (l.unit_price ?? 0), 0);
+  const totalHpp = lines.reduce((s, l) => s + lineValue(l), 0);
 
   if (isLoading && !doc) {
     return (
@@ -259,7 +263,18 @@ export function StockDocumentSheet({
                             ]
                           : mode === "adjustment"
                             ? ["Barang", "SKU", "Arah", "Qty", "Lokasi", "Harga", "Subtotal"]
-                            : ["Barang", "SKU", "Qty", "Lokasi", "Harga", "Subtotal"]
+                            : showRevenue
+                              ? [
+                                  "Barang",
+                                  "SKU",
+                                  "Qty",
+                                  "Lokasi",
+                                  "HPP",
+                                  "Subtotal",
+                                  "Harga Jual",
+                                  "Omzet",
+                                ]
+                              : ["Barang", "SKU", "Qty", "Lokasi", "Harga", "Subtotal"]
                         ).map((h) => (
                           <th
                             key={h}
@@ -293,6 +308,29 @@ export function StockDocumentSheet({
                           <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">
                             {formatIDR(lineValue(l))}
                           </td>
+                          {showRevenue && mode === "plain" && (
+                            <>
+                              <td className="whitespace-nowrap px-3 py-2 text-right">
+                                {l.unit_price != null ? (
+                                  <>
+                                    {formatIDR(l.unit_price)}
+                                    {l.unit_price_estimated && (
+                                      <span className="ml-1 text-xs text-muted-foreground">
+                                        (est.)
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">
+                                {l.unit_price != null
+                                  ? formatIDR(Math.abs(l.qty ?? 0) * l.unit_price)
+                                  : "—"}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -313,6 +351,13 @@ export function StockDocumentSheet({
                         </span>
                         <b>{formatIDR(lineValue(l))}</b>
                       </div>
+                      {showRevenue && mode === "plain" && l.unit_price != null && (
+                        <p className="mt-0.5 text-xs">
+                          Jual {formatIDR(l.unit_price)}
+                          {l.unit_price_estimated ? " (est.)" : ""} · Omzet{" "}
+                          <b>{formatIDR(Math.abs(l.qty ?? 0) * l.unit_price)}</b>
+                        </p>
+                      )}
                       <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                         {lineLocation(l)}
                       </p>
@@ -354,10 +399,27 @@ export function StockDocumentSheet({
                     <>
                       <span className="font-medium">Jumlah Baris</span>
                       <span className="text-right font-semibold">{lines.length}</span>
-                      <span className="font-medium">Total Nilai</span>
+                      <span className="font-medium">Total Nilai (HPP)</span>
                       <span className="text-right text-base font-bold">
                         {formatIDR(lines.reduce((sum, l) => sum + lineValue(l), 0))}
                       </span>
+                      {showRevenue && (
+                        <>
+                          <span className="font-medium">Total Omzet</span>
+                          <span className="text-right text-base font-bold">
+                            {formatIDR(totalOmzet)}
+                          </span>
+                          <span className="font-medium">Margin Kotor</span>
+                          <span className="text-right text-base font-bold">
+                            {formatIDR(totalOmzet - totalHpp)}
+                            {totalOmzet > 0 && (
+                              <span className="ml-1 text-xs font-medium text-muted-foreground">
+                                ({(((totalOmzet - totalHpp) / totalOmzet) * 100).toFixed(1)}%)
+                              </span>
+                            )}
+                          </span>
+                        </>
+                      )}
                     </>
                   )}
                 </div>

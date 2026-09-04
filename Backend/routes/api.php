@@ -6,8 +6,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
-use App\Http\Controllers\MerkController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\MerkController;
 use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
@@ -99,4 +99,5 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
 
 Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
+    Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
 });

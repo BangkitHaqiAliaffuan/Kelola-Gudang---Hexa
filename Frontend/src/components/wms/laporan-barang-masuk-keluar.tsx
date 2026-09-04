@@ -22,6 +22,7 @@ import {
   type Tone,
 } from "./kit";
 import { DataTable, type Column } from "./data-table";
+import { LaporanKeluarAnalytics } from "./laporan-keluar-analytics";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -345,6 +346,20 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
       sortAccessor: (r) => Math.abs(r.value_total ?? 0),
       render: (r) => formatIDR(Math.abs(r.value_total ?? 0)),
     },
+    // Omzet (harga jual) hanya bermakna untuk Barang Keluar.
+    ...(type === "Pengeluaran"
+      ? [
+          {
+            key: "revenue_total",
+            label: "Omzet",
+            className: "text-right w-[130px] whitespace-nowrap",
+            sortable: true,
+            sortAccessor: (r: StockDocumentApi) => Math.abs(r.revenue_total ?? 0),
+            render: (r: StockDocumentApi) =>
+              r.revenue_total != null ? formatIDR(Math.abs(r.revenue_total)) : "—",
+          } satisfies Column<StockDocumentApi>,
+        ]
+      : []),
     {
       key: "pic",
       label: "PIC",
@@ -432,6 +447,15 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
           loading={isLoading || isFetching}
         />
       </div>
+
+      {type === "Pengeluaran" && (
+        <LaporanKeluarAnalytics
+          from={from}
+          to={to}
+          warehouseId={whId}
+          enabled={canView && rangeValid}
+        />
+      )}
 
       <Panel title="Filter">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
