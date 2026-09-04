@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CrudFormDialog } from "./master-crud";
+import { BarcodeCameraDialog } from "./barcode-camera-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Eye, EyeOff, Loader2, ScanLine } from "lucide-react";
+import { Eye, EyeOff, Loader2, ScanLine, Camera } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -2460,6 +2461,7 @@ export function ItemFormDialog({
 }) {
   const create = useCreateItem();
   const update = useUpdateItem();
+  const [cameraOpen, setCameraOpen] = useState(false);
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: subCats, isLoading: subCatsLoading } = useSubCategories();
   const { data: merks, isLoading: merksLoading } = useMerks();
@@ -2640,6 +2642,25 @@ export function ItemFormDialog({
                               {...field}
                             />
                             <BarcodeWedgeFillButton onFill={(code) => field.onChange(code)} />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-10 w-10 shrink-0 rounded-xl"
+                              title="Scan dengan kamera"
+                              aria-label="Scan barcode dengan kamera"
+                              onClick={() => setCameraOpen(true)}
+                            >
+                              <Camera className="h-4 w-4" />
+                            </Button>
+                            <BarcodeCameraDialog
+                              open={cameraOpen}
+                              onOpenChange={setCameraOpen}
+                              onDecode={(code) => {
+                                field.onChange(code);
+                                toast.success(`Barcode terisi: ${code}`);
+                              }}
+                            />
                           </div>
                         </FormControl>
                         <FormMessage />
