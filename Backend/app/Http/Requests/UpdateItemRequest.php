@@ -18,8 +18,17 @@ class UpdateItemRequest extends FormRequest
 
         return [
             'sku' => ['required', 'string', 'max:30', Rule::unique('items', 'sku')->ignore($item)],
-            'barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'barcode')->ignore($item)],
-            'internal_barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'internal_barcode')->ignore($item)],
+            // Barcode produk boleh sama di banyak barang (lihat StoreItemRequest).
+            'barcode' => ['nullable', 'string', 'max:30'],
+            // Kode internal adalah identitas scan milik sistem — tidak boleh diubah
+            // via API (nilai sama dengan saat ini diizinkan agar update idempoten lolos).
+            'internal_barcode' => [
+                'nullable',
+                'string',
+                'max:30',
+                Rule::prohibitedIf(fn () => $this->filled('internal_barcode')
+                    && $this->input('internal_barcode') !== $item?->internal_barcode),
+            ],
             'name' => ['required', 'string', 'max:200'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'sub_category_id' => ['nullable', 'integer', Rule::exists('sub_categories', 'id')->where(

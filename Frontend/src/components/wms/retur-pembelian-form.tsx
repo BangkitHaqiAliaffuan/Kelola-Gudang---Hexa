@@ -4,7 +4,8 @@ import { ArrowLeft, Plus, Save, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
-import { useWmsScanner } from "@/hooks/use-wms-scanner";
+import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
+import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import {
   Dialog,
   DialogContent,
@@ -98,11 +99,13 @@ export function ReturPembelianForm() {
   const [submitted, setSubmitted] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
 
+  const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
     items: (items?.data ?? []) as never,
     onPick: (item) => {
       if (scanTarget) pickItem(scanTarget, String(item.id));
     },
+    onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
   });
 
   // Dokumen Penerimaan (Barang Masuk) Selesai yang bisa jadi sumber retur —
@@ -936,6 +939,16 @@ export function ReturPembelianForm() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ScanDisambiguasiDialog
+        open={ambiguous !== null}
+        code={ambiguous?.code}
+        matches={ambiguous?.matches ?? []}
+        onClose={() => setAmbiguous(null)}
+        onPick={(item) => {
+          if (scanTarget) pickItem(scanTarget, String(item.id));
+          setAmbiguous(null);
+        }}
+      />
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent className="max-w-md rounded-xl">
           <DialogHeader>

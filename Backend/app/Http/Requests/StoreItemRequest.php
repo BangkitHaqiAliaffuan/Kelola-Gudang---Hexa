@@ -16,7 +16,9 @@ class StoreItemRequest extends FormRequest
     {
         return [
             'sku' => ['required', 'string', 'max:30', Rule::unique('items', 'sku')],
-            'barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'barcode')],
+            // Barcode produk (kemasan supplier) boleh sama di banyak barang —
+            // bukan identitas unik (itu peran sku + internal_barcode).
+            'barcode' => ['nullable', 'string', 'max:30'],
             'internal_barcode' => ['nullable', 'string', 'max:30', Rule::unique('items', 'internal_barcode')],
             'name' => ['required', 'string', 'max:200'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],

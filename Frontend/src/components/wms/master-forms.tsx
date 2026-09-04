@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ScanLine } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -73,6 +73,8 @@ import {
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
 import { nextSku } from "@/lib/sku";
+import { eanChecksumOk, normalizeCode } from "@/lib/barcode-label";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import {
   useBins,
   useCategories,
@@ -2413,6 +2415,40 @@ export function VendorFormDialog({
   );
 }
 
+/**
+ * Tombol isi kolom barcode dari scanner fisik (keyboard wedge).
+ * Alur: klik tombol (armed) → scan kemasan supplier → kolom terisi + disarm.
+ * Kamera tidak dipakai di sini agar tidak menduplikasi dialog kamera
+ * useWmsScanner (registrasi barang umumnya di PC + scanner USB).
+ */
+function BarcodeWedgeFillButton({ onFill }: { onFill: (code: string) => void }) {
+  const [armed, setArmed] = useState(false);
+  // useBarcodeScanner menyimpan onScan terbaru via ref — closure inline aman.
+  useBarcodeScanner({
+    enabled: armed,
+    onScan: (code) => {
+      const value = code.trim();
+      if (!value) return;
+      onFill(value);
+      setArmed(false);
+      toast.success(`Barcode terisi: ${value}`);
+    },
+  });
+  return (
+    <Button
+      type="button"
+      variant={armed ? "default" : "outline"}
+      size="icon"
+      className="h-10 w-10 shrink-0 rounded-xl"
+      title={armed ? "Siap — arahkan scanner ke barcode" : "Isi dari scanner fisik"}
+      aria-label="Isi barcode dari scanner fisik"
+      onClick={() => setArmed((a) => !a)}
+    >
+      <ScanLine className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -2581,18 +2617,50 @@ export function ItemFormDialog({
                 <FormField
                   control={form.control}
                   name="barcode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Barcode{" "}
-                        <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="8991..." className="rounded-xl" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const value = field.value ?? "";
+                    const norm = normalizeCode(value);
+                    const peers = norm
+                      ? (items?.data ?? []).filter(
+                          (it) => it.id !== initial?.id && normalizeCode(it.barcode ?? "") === norm,
+                        )
+                      : [];
+                    const checksum = value.trim() === "" ? null : eanChecksumOk(value);
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Barcode{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="8991... / scan kemasan"
+                              className="rounded-xl font-mono"
+                              {...field}
+                            />
+                            <BarcodeWedgeFillButton onFill={(code) => field.onChange(code)} />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        {peers.length > 0 && (
+                          <p className="text-xs text-amber-600">
+                            Barcode dipakai {peers.length} barang lain:{" "}
+                            {peers
+                              .slice(0, 3)
+                              .map((p) => p.name)
+                              .join(", ")}
+                            {peers.length > 3 ? "…" : ""} — pastikan ini disengaja.
+                          </p>
+                        )}
+                        {checksum === false && (
+                          <p className="text-xs text-amber-600">
+                            Digit cek EAN tidak valid — periksa hasil scan.
+                          </p>
+                        )}
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}

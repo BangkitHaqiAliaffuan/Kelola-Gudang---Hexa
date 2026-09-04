@@ -726,6 +726,7 @@ export type BulkImportResponse = {
   created: number;
   updated: number;
   errors: Record<number, string>;
+  warnings?: Record<number, string>;
 };
 
 export function useBulkImportItems() {

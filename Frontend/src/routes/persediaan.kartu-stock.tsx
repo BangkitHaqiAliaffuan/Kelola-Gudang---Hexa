@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -11,7 +11,6 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
 import {
   Area,
   AreaChart,
@@ -45,12 +44,12 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
-import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
+import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
-import { findItemByCode } from "@/lib/barcode-label";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
 import { valuationMethodLabels } from "@/lib/persediaan-types";
 import {
@@ -102,31 +101,13 @@ function KartuStock() {
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [scanOpen, setScanOpen] = useState(false);
-  const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(
-    null,
-  );
-  const scanHandledRef = useRef(false);
-
-  const handleHardwareScan = useCallback(
-    (code: string) => {
-      if (!options.length) {
-        toast.error("Data barang belum siap — coba lagi sesaat");
-        return;
-      }
-      const found = findItemByCode(options, code);
-      if (found) {
-        setId(found.id);
-        toast.success(`Terpilih: ${found.name}`);
-      } else {
-        toast.error(`Barang tidak ditemukan: ${code.trim()}`);
-      }
-    },
-    [options],
-  );
-
-  // Scanner fisik (USB wedge): burst cepat + Enter → otomatis pilih barang.
-  useBarcodeScanner({ onScan: handleHardwareScan, enabled: !scanOpen });
+  const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
+  const { scanOpen, setScanOpen } = useWmsScanner({
+    items: options,
+    onPick: (item) => setId(Number(item.id)),
+    onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
+    readerId: "kartu-stock-reader",
+  });
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
   const activeId = id ?? options[0]?.id;
   const whId = whFilter.warehouseId;
@@ -134,90 +115,7 @@ function KartuStock() {
   const whIdForFetch = isWarehouseReady ? whId : null;
   const activeIdForFetch = isWarehouseReady ? activeId : undefined;
 
-  const stopScanner = useCallback(async () => {
-    const scanner = scannerRef.current;
-    if (!scanner) return;
-    scannerRef.current = null;
-    try {
-      const state = (scanner as unknown as { getState?: () => number }).getState?.();
-      // Html5QrcodeScannerState.SCANNING = 2, NOT_STARTED = 1
-      if (state === undefined || state === 2) {
-        await scanner.stop();
-      }
-    } catch {
-      // ignore: stop saat belum STARTED melempar, tidak perlu bubble
-    }
-    try {
-      if (document.getElementById("kartu-stock-reader")) {
-        await scanner.clear();
-      }
-    } catch {
-      // clear pada DOM yang sudah ter-unmount aman diabaikan
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!scanOpen) {
-      void stopScanner();
-      scanHandledRef.current = false;
-      return;
-    }
-    let cancelled = false;
-    scanHandledRef.current = false;
-    (async () => {
-      try {
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-        if (cancelled || !scanOpen) return;
-        const scanner = new Html5Qrcode("kartu-stock-reader", {
-          verbose: false,
-          useBarCodeDetectorIfSupported: true,
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-          ],
-        });
-        scannerRef.current = scanner;
-        await scanner.start(
-          { facingMode: "environment" },
-          {
-            fps: 15,
-            qrbox: { width: 400, height: 200 },
-            aspectRatio: 1.33,
-            disableFlip: false,
-          },
-          (decodedText) => {
-            if (scanHandledRef.current) return;
-            const found = findItemByCode(options, decodedText);
-            if (found) {
-              scanHandledRef.current = true;
-              setId(found.id);
-              toast.success(`Terpilih: ${found.name}`);
-              setScanOpen(false);
-            } else {
-              toast.error(`Barang tidak ditemukan: ${decodedText.trim()}`);
-            }
-          },
-          () => undefined,
-        );
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("NotAllowedError") || msg.includes("Permission")) {
-          toast.error("Izin kamera ditolak — aktifkan di pengaturan browser");
-        } else if (!msg.includes("not found")) {
-          toast.error(`Gagal membuka kamera: ${msg}`);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-      void stopScanner();
-    };
-  }, [scanOpen, options, stopScanner]);
+  /* Kamera + wedge ditangani useWmsScanner di atas (termasuk disambiguasi). */
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -506,6 +404,16 @@ function KartuStock() {
           </p>
         </Panel>
 
+        <ScanDisambiguasiDialog
+          open={ambiguous !== null}
+          code={ambiguous?.code}
+          matches={ambiguous?.matches ?? []}
+          onClose={() => setAmbiguous(null)}
+          onPick={(item) => {
+            setId(Number(item.id));
+            setAmbiguous(null);
+          }}
+        />
         <Dialog open={scanOpen} onOpenChange={setScanOpen}>
           <DialogContent className="max-w-md rounded-xl">
             <DialogHeader>

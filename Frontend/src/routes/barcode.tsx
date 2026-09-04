@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { FormCombobox, type ComboboxOption } from "@/components/wms/form-combobox";
-import { useWmsScanner } from "@/hooks/use-wms-scanner";
+import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
+import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import { useItems } from "@/hooks/use-master";
 import { formatIDR } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,7 @@ function BarcodePage() {
   }, []);
 
   const [scanTarget, setScanTarget] = useState<number | null>(null);
+  const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
     items: items as never,
     onPick: (item) => {
@@ -128,6 +130,7 @@ function BarcodePage() {
         addRow(pickedId);
       }
     },
+    onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
   });
 
   useEffect(() => {
@@ -418,6 +421,25 @@ function BarcodePage() {
         </Panel>
       </div>
 
+      <ScanDisambiguasiDialog
+        open={ambiguous !== null}
+        code={ambiguous?.code}
+        matches={ambiguous?.matches ?? []}
+        onClose={() => setAmbiguous(null)}
+        onPick={(item) => {
+          const pickedId = Number(item.id);
+          if (scanTarget != null) {
+            setRows((prev) => {
+              if (prev.some((r) => r.itemId === pickedId)) return prev;
+              if (!prev.some((r) => r.id === scanTarget)) return prev;
+              return prev.map((r) => (r.id === scanTarget ? { ...r, itemId: pickedId } : r));
+            });
+          } else {
+            addRow(pickedId);
+          }
+          setAmbiguous(null);
+        }}
+      />
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent className="max-w-md rounded-xl">
           <DialogHeader>

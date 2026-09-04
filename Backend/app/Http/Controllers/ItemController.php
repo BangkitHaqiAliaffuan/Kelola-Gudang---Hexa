@@ -52,6 +52,57 @@ class ItemController extends Controller
         return ItemResource::collection($items);
     }
 
+    /**
+     * Resolusi scan barcode server-side (fallback bila daftar lokal frontend
+     * tidak cocok, mis. katalog > PER_PAGE). Exact match prioritas:
+     * internal_barcode > barcode produk > sku. Barcode produk boleh dipakai
+     * banyak barang → kembalikan array kandidat + match_source per kandidat;
+     * frontend menampilkan dialog disambiguasi bila >1.
+     */
+    public function lookup(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:60']]);
+        $needle = mb_strtolower(trim($data['code']));
+
+        if ($needle === '') {
+            return response()->json(['data' => []]);
+        }
+
+        $items = Item::query()
+            ->with(['category', 'subCategory', 'brand', 'unit', 'warehouse', 'rack', 'bin', 'supplier'])
+            ->where(function ($q) use ($needle) {
+                $q->whereRaw('LOWER(internal_barcode) = ?', [$needle])
+                    ->orWhereRaw('LOWER(barcode) = ?', [$needle])
+                    ->orWhereRaw('LOWER(sku) = ?', [$needle]);
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+
+        $rank = ['internal' => 0, 'produk' => 1, 'sku' => 2];
+        $rows = $items
+            ->map(function (Item $item) use ($needle) {
+                if (mb_strtolower((string) $item->internal_barcode) === $needle) {
+                    $source = 'internal';
+                } elseif (mb_strtolower((string) $item->barcode) === $needle) {
+                    $source = 'produk';
+                } else {
+                    $source = 'sku';
+                }
+
+                return ['item' => $item, 'source' => $source];
+            })
+            ->sortBy(fn ($row) => $rank[$row['source']].'|'.$row['item']->name)
+            ->values();
+
+        return response()->json([
+            'data' => $rows->map(fn ($row) => array_merge(
+                (new ItemResource($row['item']))->toArray($request),
+                ['match_source' => $row['source']]
+            ))->values(),
+        ]);
+    }
+
     public function store(StoreItemRequest $request): ItemResource
     {
         $data = $request->validated();
@@ -332,6 +383,40 @@ class ItemController extends Controller
         $updated = 0;
         $errors = [];
 
+        // Peringatan barcode produk ganda (non-blocking): barcode kemasan boleh
+        // sama di banyak barang — laporkan agar operator sadar, jangan gagalkan.
+        $warnings = [];
+        $fileCodes = [];
+        foreach ($data['items'] as $idx => $row) {
+            $code = trim((string) ($row['barcode'] ?? ''));
+            if ($code !== '') {
+                $fileCodes[mb_strtoupper($code)][] = $idx;
+            }
+        }
+        $dbByUpper = collect();
+        if ($fileCodes !== []) {
+            $uppers = array_keys($fileCodes);
+            $placeholders = implode(',', array_fill(0, count($uppers), '?'));
+            $dbByUpper = Item::whereRaw("UPPER(barcode) IN ({$placeholders})", $uppers)
+                ->get(['id', 'name', 'sku', 'barcode'])
+                ->groupBy(fn ($it) => mb_strtoupper((string) $it->barcode));
+        }
+        foreach ($fileCodes as $upper => $idxs) {
+            $notes = [];
+            if (count($idxs) > 1) {
+                $lines = array_map(fn ($i) => 'baris '.($i + 1), $idxs);
+                $notes[] = 'duplikat di file ('.implode(', ', $lines).')';
+            }
+            foreach ($dbByUpper->get($upper, collect()) as $other) {
+                $notes[] = "{$other->name} ({$other->sku})";
+            }
+            if ($notes !== []) {
+                foreach ($idxs as $i) {
+                    $warnings[$i] = 'Barcode dipakai bersama: '.implode('; ', $notes).'.';
+                }
+            }
+        }
+
         DB::beginTransaction();
 
         try {
@@ -462,6 +547,7 @@ class ItemController extends Controller
                 'created' => $created,
                 'updated' => $updated,
                 'errors' => $errors,
+                'warnings' => $warnings,
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();

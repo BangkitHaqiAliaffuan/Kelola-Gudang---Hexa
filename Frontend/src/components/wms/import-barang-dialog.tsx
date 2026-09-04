@@ -279,7 +279,9 @@ export function ImportBarangDialog({
             const subCatId = findIdByName(subCategories, row["Sub Kategori"]);
             if (row["Sub Kategori"]?.trim() && subCatId) resolved.sub_category_id = subCatId;
             else if (row["Sub Kategori"]?.trim())
-              warnings.push(`Sub Kategori '${row["Sub Kategori"]!.trim()}' tidak ditemukan, item akan dibuat tanpa sub kategori`);
+              warnings.push(
+                `Sub Kategori '${row["Sub Kategori"]!.trim()}' tidak ditemukan, item akan dibuat tanpa sub kategori`,
+              );
 
             // Merk — auto-createable
             const merkName = row["Merk"]?.trim() ?? "";
@@ -358,10 +360,10 @@ export function ImportBarangDialog({
             if (allSeen.has(skuUpper)) {
               const first = firstOcc.get(skuUpper);
               const firstLabel =
-                first && first.idx >= 0
-                  ? `baris ${first.idx + 1} ('${first.name}')`
-                  : "database";
-              errors.push(`SKU '${sku}' duplikat di file dengan ${firstLabel} — barang '${name || "tanpa nama"}' baris ${idx + 1}`);
+                first && first.idx >= 0 ? `baris ${first.idx + 1} ('${first.name}')` : "database";
+              errors.push(
+                `SKU '${sku}' duplikat di file dengan ${firstLabel} — barang '${name || "tanpa nama"}' baris ${idx + 1}`,
+              );
             }
             if (!firstOcc.has(skuUpper)) {
               firstOcc.set(skuUpper, { idx, name: name || sku });
@@ -372,7 +374,7 @@ export function ImportBarangDialog({
             resolved.barcode = row["Barcode"]?.trim() || null;
             resolved.name = name;
 
-            const action: "create" = "create";
+            const action = "create" as const;
 
             // Determine row-level status
             const hasAutoCreate = autoCreateCat || autoCreateMerk || autoCreateUnit;
@@ -429,8 +431,6 @@ export function ImportBarangDialog({
     },
     [processFile],
   );
-
-
 
   const toggleAutoCreate = useCallback(
     (index: number, field: "autoCreateCat" | "autoCreateMerk" | "autoCreateUnit") => {
@@ -551,6 +551,16 @@ export function ImportBarangDialog({
       if (res.errors && Object.keys(res.errors).length > 0) {
         toast.warning(`${Object.keys(res.errors).length} baris gagal diproses`);
       }
+      if (res.warnings && Object.keys(res.warnings).length > 0) {
+        const first = Object.entries(res.warnings)
+          .slice(0, 3)
+          .map(([, w]) => w)
+          .join(" ");
+        toast.warning(
+          `${Object.keys(res.warnings).length} baris barcode dipakai bersama — ${first}`,
+          { duration: 8000 },
+        );
+      }
       setParsedRows(null);
       setFileName(null);
       onOpenChange(false);
@@ -571,7 +581,7 @@ export function ImportBarangDialog({
     };
   }, [parsedRows]);
 
-  const canSubmit = parsedRows && (stats.valid + stats.autoCreate) > 0 && !submitting;
+  const canSubmit = parsedRows && stats.valid + stats.autoCreate > 0 && !submitting;
 
   // Collect unique auto-create names for global toggle display
   const autoCreateSummary = useMemo(() => {
@@ -811,13 +821,17 @@ export function ImportBarangDialog({
                             <span className="text-info">
                               <Sparkles className="mr-1 inline h-3.5 w-3.5" />
                               Akan dibuat baru:
-                              {row.autoCreateCat?.checked && ` Kategori '${row.autoCreateCat.name}'`}
+                              {row.autoCreateCat?.checked &&
+                                ` Kategori '${row.autoCreateCat.name}'`}
                               {row.autoCreateMerk?.checked && ` Merk '${row.autoCreateMerk.name}'`}
                               {row.autoCreateUnit?.checked &&
                                 ` Satuan '${row.autoCreateUnit.name}'`}
                               {row.warnings.length > 0 &&
                                 row.warnings.map((w, wi) => (
-                                  <span key={wi} className="block text-warning flex items-center gap-1">
+                                  <span
+                                    key={wi}
+                                    className="block text-warning flex items-center gap-1"
+                                  >
                                     <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
                                   </span>
                                 ))}
