@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeft, Printer, Pencil, Paperclip } from "lucide-react";
+import { ArrowLeft, Printer, Pencil, Paperclip, QrCode } from "lucide-react";
 import { PageHeader, Panel, Pill, ItemThumb, EmptyState } from "@/components/wms/kit";
 import { Button } from "@/components/ui/button";
+import { buildCodeSvg, buildPrintHtml, printHtml, type BarcodeKind } from "@/lib/barcode-label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
@@ -34,43 +35,74 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BarcodeBars({ code, label }: { code: string; label?: string }) {
+/**
+ * Satu slot kode milik barang: SKU, Barcode Produk, Barcode Internal, QR Code.
+ * Slot kosong TIDAK di-generate otomatis — tampilkan status + tombol
+ * redirect ke halaman Barcode. Slot terisi memakai SVG scannable asli
+ * (buildCodeSvg), bukan visual dekoratif.
+ */
+function CodeSlot({
+  label,
+  value,
+  kind,
+  sku,
+  name,
+}: {
+  label: string;
+  value: string | null;
+  kind: BarcodeKind;
+  sku: string;
+  name: string;
+}) {
+  if (!value) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card p-4 text-center">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-medium">Belum ada {label.toLowerCase()}</p>
+        <Button variant="outline" size="sm" className="mt-3 rounded-lg" asChild>
+          <Link to="/barcode" search={{ sku }}>
+            {kind === "QR Code" ? <QrCode className="h-4 w-4" /> : <Printer className="h-4 w-4" />}{" "}
+            Buat di Halaman Barcode
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+  let svg: string;
+  try {
+    svg = buildCodeSvg(value, kind);
+  } catch {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 text-center">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-medium text-destructive">Kode tidak valid untuk {kind}</p>
+        <p className="mt-1 font-mono text-xs text-muted-foreground">{value}</p>
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-border bg-card p-4 text-center">
-      {label && <p className="mb-2 text-xs text-muted-foreground">{label}</p>}
-      <div className="flex h-20 items-end justify-center gap-[2px]">
-        {code.split("").flatMap((ch, i) =>
-          Array.from({ length: 3 }, (_, j) => (
-            <span
-              key={`${i}-${j}`}
-              className="bg-foreground"
-              style={{
-                width: ((Number(ch) + j) % 3) + 1,
-                height: `${60 + ((Number(ch) * 7 + j * 11) % 40)}%`,
-              }}
-            />
-          )),
-        )}
-      </div>
-      <p className="mt-2 font-mono text-xs tracking-[0.3em] text-muted-foreground">{code}</p>
-    </div>
-  );
-}
-
-function QrPreview({ code, label }: { code: string; label?: string }) {
-  const cells = Array.from({ length: 144 }, (_, i) => (i * 37 + code.length * 13) % 5 !== 0);
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      {label && <p className="mb-2 text-center text-xs text-muted-foreground">{label}</p>}
-      <div className="mx-auto grid w-40 grid-cols-12 gap-[2px]">
-        {cells.map((on, i) => (
-          <span
-            key={i}
-            className={on ? "aspect-square bg-foreground" : "aspect-square bg-transparent"}
-          />
-        ))}
-      </div>
-      <p className="mt-3 text-center font-mono text-xs text-muted-foreground">{code}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{label}</p>
+      <div
+        className="mx-auto max-w-64 [&_svg]:h-auto [&_svg]:w-full"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <p className="mt-2 font-mono text-xs text-muted-foreground">{value}</p>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-2 rounded-lg"
+        onClick={() =>
+          printHtml(
+            buildPrintHtml({
+              size: "50x30",
+              labels: [{ svg, name, meta: value, kind, sku }],
+            }),
+          )
+        }
+      >
+        <Printer className="h-4 w-4" /> Cetak
+      </Button>
     </div>
   );
 }
@@ -280,9 +312,34 @@ function DetailBarang() {
             </TabsContent>
 
             <TabsContent value="barcode" className="m-0 grid gap-4 p-5 sm:grid-cols-2">
-              <BarcodeBars code={item.internal_barcode ?? item.sku} label="Barcode Internal" />
-              {item.barcode && <BarcodeBars code={item.barcode} label="Barcode Produk" />}
-              <QrPreview code={item.sku} label="QR Code SKU" />
+              <CodeSlot
+                label="SKU"
+                value={item.sku}
+                kind="Barcode"
+                sku={item.sku}
+                name={item.name}
+              />
+              <CodeSlot
+                label="Barcode Produk"
+                value={item.barcode}
+                kind="Barcode"
+                sku={item.sku}
+                name={item.name}
+              />
+              <CodeSlot
+                label="Barcode Internal"
+                value={item.internal_barcode}
+                kind="Barcode"
+                sku={item.sku}
+                name={item.name}
+              />
+              <CodeSlot
+                label="QR Code"
+                value={item.barcode ?? item.internal_barcode}
+                kind="QR Code"
+                sku={item.sku}
+                name={item.name}
+              />
             </TabsContent>
 
             <TabsContent value="riwayat" className="m-0 p-5">

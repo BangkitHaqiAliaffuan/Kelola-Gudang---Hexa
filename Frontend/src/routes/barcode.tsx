@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { FormCombobox, type ComboboxOption } from "@/components/wms/form-combobox";
 import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
 import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
-import { useItems } from "@/hooks/use-master";
+import { useItems, useUpdateItem, type ItemPayload } from "@/hooks/use-master";
+import { useAuth } from "@/hooks/use-auth";
+import type { ItemApi } from "@/lib/master-types";
 import { formatIDR } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
 import {
@@ -65,6 +67,9 @@ const CODE_HEIGHT: Record<LabelSize, number> = {
 
 function BarcodePage() {
   const itemsQ = useItems();
+  const { hasModuleLevel } = useAuth();
+  const canWrite = hasModuleLevel("Master Data", "Tulis");
+  const updateItem = useUpdateItem();
   const items = useMemo(() => itemsQ.data?.data ?? [], [itemsQ.data?.data]);
   const { sku } = useSearch({ from: "/barcode" });
 
@@ -141,10 +146,12 @@ function BarcodePage() {
     }
   }, [sku, items, addRow]);
 
+  type PreviewOk = { item: ItemApi; svg: string; key: number; qty: number; value: string };
+  type PreviewErr = { item: ItemApi; error: true; key: number; qty: number };
   const previews = useMemo(
     () =>
       rows
-        .map((r) => {
+        .map((r): PreviewOk | PreviewErr | null => {
           const it = items.find((i) => i.id === r.itemId);
           if (!it) return null;
           let svg: string;
@@ -155,7 +162,7 @@ function BarcodePage() {
           }
           return { item: it, svg, key: r.id, qty: r.qty, value: encodeItem(it) };
         })
-        .filter((p): p is NonNullable<typeof p> => p !== null),
+        .filter((p): p is PreviewOk | PreviewErr => p !== null),
     [rows, items, kind, size],
   );
 
@@ -182,6 +189,44 @@ function BarcodePage() {
   }, [rows, items, kind, size]);
 
   const [downloading, setDownloading] = useState(false);
+
+  // Tetapkan nilai render sebagai barcode produk (satu-satunya kolom kode
+  // yang boleh diubah; internal_barcode dikunci API). Detail barang ikut
+  // ter-update via invalidasi items.
+  const assignBarcode = async (itemId: number, value: string) => {
+    const it = items.find((i) => i.id === itemId);
+    if (!it) return;
+    if (it.barcode === value) return;
+    const payload: ItemPayload = {
+      sku: it.sku,
+      barcode: value,
+      name: it.name,
+      category_id: it.category_id,
+      ...(it.sub_category_id != null ? { sub_category_id: it.sub_category_id } : {}),
+      ...(it.brand_id != null ? { brand_id: it.brand_id } : {}),
+      ...(it.unit_id != null ? { unit_id: it.unit_id } : {}),
+      ...(it.default_warehouse_id != null ? { default_warehouse_id: it.default_warehouse_id } : {}),
+      ...(it.default_rack_id != null ? { default_rack_id: it.default_rack_id } : {}),
+      ...(it.default_bin_id != null ? { default_bin_id: it.default_bin_id } : {}),
+      ...(it.preferred_supplier_id != null
+        ? { preferred_supplier_id: it.preferred_supplier_id }
+        : {}),
+      cost: it.cost,
+      price: it.price,
+      min_stock: it.min,
+      ...(it.max != null ? { max_stock: it.max } : {}),
+      lead_time: it.leadTime,
+      ...(it.weight != null ? { weight: it.weight } : {}),
+      dimension: it.dimension,
+      status: it.status,
+    };
+    try {
+      await updateItem.mutateAsync({ id: it.id, ...payload });
+      toast.success(`Barcode ${value} tersimpan ke ${it.name}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
 
   const handlePrint = () => {
     if (rows.length === 0) {
@@ -400,20 +445,46 @@ function BarcodePage() {
                   )}
                 >
                   {"svg" in p ? (
-                    <div
-                      className="mx-auto max-w-64 [&_svg]:h-auto [&_svg]:w-full"
-                      dangerouslySetInnerHTML={{ __html: p.svg }}
-                    />
+                    <>
+                      <div
+                        className="mx-auto max-w-64 [&_svg]:h-auto [&_svg]:w-full"
+                        dangerouslySetInnerHTML={{ __html: p.svg }}
+                      />
+                      <p className="mt-2 truncate text-xs font-semibold">{p.item.name}</p>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {p.value}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {p.qty} label · {formatIDR(p.item.price)}
+                      </p>
+                      {canWrite && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 w-full rounded-lg"
+                          disabled={updateItem.isPending || p.item.barcode === p.value}
+                          title={
+                            p.item.barcode === p.value
+                              ? "Nilai ini sudah tersimpan sebagai barcode produk"
+                              : "Simpan nilai ini sebagai barcode produk"
+                          }
+                          onClick={() => void assignBarcode(p.item.id, p.value)}
+                        >
+                          {p.item.barcode === p.value ? "Sudah Tersimpan" : "Tetapkan Barcode"}
+                        </Button>
+                      )}
+                    </>
                   ) : (
-                    <p className="py-6 text-xs text-danger">
-                      Barang ini belum punya barcode/SKU yang valid.
-                    </p>
+                    <>
+                      <p className="py-6 text-xs text-danger">
+                        Barang ini belum punya barcode/SKU yang valid.
+                      </p>
+                      <p className="mt-2 truncate text-xs font-semibold">{p.item.name}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {p.qty} label · {formatIDR(p.item.price)}
+                      </p>
+                    </>
                   )}
-                  <p className="mt-2 truncate text-xs font-semibold">{p.item.name}</p>
-                  <p className="truncate font-mono text-[10px] text-muted-foreground">{p.value}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {p.qty} label · {formatIDR(p.item.price)}
-                  </p>
                 </div>
               ))}
             </div>
