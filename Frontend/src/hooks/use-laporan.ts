@@ -5,6 +5,8 @@ import type {
   KeluarAnalyticsParams,
   LaporanMutasiParams,
   LaporanMutasiRowApi,
+  TransaksiAnalyticsApi,
+  TransaksiAnalyticsParams,
 } from "@/lib/persediaan-types";
 
 export function useLaporanMutasi(params: LaporanMutasiParams & { enabled?: boolean }) {
@@ -73,6 +75,42 @@ export function useLaporanKeluarAnalytics(params: KeluarAnalyticsParams & { enab
       if (atRiskDays != null) sp.set("at_risk_days", String(atRiskDays));
       if (varianceBand != null) sp.set("variance_band", String(varianceBand));
       return api.get<{ data: KeluarAnalyticsApi }>(`/laporan/keluar-analytics?${sp.toString()}`);
+    },
+    enabled: typeof window !== "undefined" && enabled,
+  });
+}
+
+export function useTransaksiAnalytics(params: TransaksiAnalyticsParams & { enabled?: boolean }) {
+  const {
+    type,
+    from,
+    to,
+    warehouseId,
+    destinationWarehouseId,
+    atRiskDays,
+    enabled = true,
+  } = params;
+  return useQuery({
+    queryKey: [
+      "laporan",
+      "transaksi-analytics",
+      type,
+      from,
+      to,
+      warehouseId ?? null,
+      destinationWarehouseId ?? null,
+      atRiskDays ?? null,
+    ],
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      const sp = new URLSearchParams({ type, from, to });
+      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
+      if (destinationWarehouseId != null)
+        sp.set("destination_warehouse_id", String(destinationWarehouseId));
+      if (atRiskDays != null) sp.set("at_risk_days", String(atRiskDays));
+      return api.get<{ data: TransaksiAnalyticsApi }>(
+        `/laporan/transaksi-analytics?${sp.toString()}`,
+      );
     },
     enabled: typeof window !== "undefined" && enabled,
   });

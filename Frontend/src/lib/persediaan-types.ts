@@ -517,6 +517,132 @@ export type KeluarAnalyticsApi = {
   }[];
 };
 
+// ---- Analitik Transaksi Generik (GET /api/laporan/transaksi-analytics) ----
+// Melayani Penerimaan, Transfer Gudang, Retur Pembelian, Retur Penjualan.
+// "nilai" selalu = nilai pokok persediaan (qty × unit_cost), BUKAN omzet.
+
+export type PihakJenis = "supplier" | "customer" | "departemen" | "proyek" | "gudang" | "lainnya";
+
+export type TransaksiAnalyticsType =
+  "Penerimaan" | "Transfer Gudang" | "Retur Pembelian" | "Retur Penjualan";
+
+export type TransaksiAnalyticsParams = {
+  type: TransaksiAnalyticsType;
+  from: string;
+  to: string;
+  warehouseId?: number | null;
+  destinationWarehouseId?: number | null;
+  atRiskDays?: number | null;
+};
+
+export type PihakBulanRow = {
+  jenis: PihakJenis;
+  id: number | null;
+  nama: string;
+  bulan: string;
+  qty: number;
+  nilai: number;
+  dokumen: number;
+};
+
+export type TopPihakRow = {
+  jenis: PihakJenis;
+  id: number | null;
+  nama: string;
+  qty: number;
+  nilai: number;
+  dokumen: number;
+  share: number;
+  share_kumulatif: number;
+};
+
+export type TransaksiAnalyticsApi = {
+  type: TransaksiAnalyticsType;
+  periode: { from: string; to: string };
+  ringkasan: {
+    nilai: number;
+    qty: number;
+    dokumen: number;
+    rata_nilai: number;
+    mom: {
+      bulan: string;
+      bulan_lalu: string;
+      nilai: number;
+      nilai_lalu: number;
+      pct: number | null;
+      qty: number;
+      qty_lalu: number;
+      qty_pct: number | null;
+    } | null;
+  };
+  per_bulan: { bulan: string; qty: number; nilai: number; dokumen: number }[];
+  per_pihak_per_bulan: PihakBulanRow[];
+  top_pihak: TopPihakRow[];
+  retur: {
+    tertaut_qty: number;
+    tertaut_nilai: number;
+    tanpa_sumber_qty: number;
+    tanpa_sumber_nilai: number;
+    rate_qty: number;
+    per_alasan: { alasan: string; qty: number; nilai: number; dokumen: number }[];
+    per_item: {
+      item_id: number;
+      sku: string | null;
+      nama: string;
+      satuan: string | null;
+      qty: number;
+      nilai: number;
+    }[];
+  } | null;
+  varians_harga:
+    | {
+        supplier: string;
+        supplier_id: number | null;
+        item_id: number;
+        sku: string | null;
+        nama: string;
+        qty: number;
+        avg_harga: number;
+        master_cost: number;
+        varians_pct: number | null;
+      }[]
+    | null;
+  arus: {
+    lanes: {
+      from_id: number | null;
+      dari: string;
+      to_id: number | null;
+      ke: string;
+      qty: number;
+      nilai: number;
+      dokumen: number;
+    }[];
+    net: {
+      warehouse_id: number | null;
+      nama: string;
+      keluar: number;
+      masuk: number;
+      net: number;
+    }[];
+  } | null;
+  aktivitas: {
+    jenis: PihakJenis;
+    id: number | null;
+    nama: string;
+    dokumen: number;
+    nilai: number;
+    terakhir: string | null;
+    hari_sejak_terakhir: number | null;
+    status: "baru" | "aktif" | "at-risk";
+  }[];
+  proses: {
+    lead_median_hari: number | null;
+    lead_avg_hari: number | null;
+    tertahan_dokumen: number;
+    tertahan_nilai: number;
+    aging: { rentang: string; dokumen: number; nilai: number }[];
+  };
+};
 // ---- Update dokumen Stock Opname draft (PUT /api/persediaan/stock-documents/{id}) ----
 // Mengganti seluruh baris sesi opname; system_qty baris yang ada dipertahankan
 // dari snapshot dokumen asli (baris baru boleh kosong — di-backfill server).

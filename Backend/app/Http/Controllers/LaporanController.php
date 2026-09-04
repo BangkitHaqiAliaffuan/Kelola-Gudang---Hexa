@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LaporanKeluarAnalyticsRequest;
 use App\Http\Requests\LaporanMutasiRequest;
+use App\Http\Requests\TransaksiAnalyticsRequest;
 use App\Http\Resources\LaporanMutasiResource;
 use App\Models\Customer;
 use App\Models\Department;
@@ -13,7 +14,10 @@ use App\Models\Project;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
+use App\Models\Supplier;
+use App\Models\Warehouse;
 use App\Models\WorkOrder;
+use App\Support\TransaksiAnalytics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -614,6 +618,313 @@ class LaporanController extends Controller
             'aktivitas' => $aktivitas,
             'proses' => $proses,
             'proyek' => $proyekOut,
+        ]]);
+    }
+
+    /**
+     * Analitik generik laporan transaksi: Penerimaan, Transfer Gudang,
+     * Retur Pembelian, Retur Penjualan. (Pengeluaran dilayani endpoint
+     * khusus keluarAnalytics yang dibekukan — tidak didedupe di sini.)
+     *
+     * Dimensi "pihak" per tipe: supplier (Masuk/RP, via name-match karena
+     * tanpa FK), gudang tujuan (Transfer, via FK), customer (RJ, via FK).
+     * Semua "nilai" = nilai pokok persediaan (qty × unit_cost), BUKAN omzet.
+     * Angka keputusan hanya dari dokumen Selesai; sisanya masuk `proses`.
+     */
+    public function transaksiAnalytics(TransaksiAnalyticsRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $type = $data['type'];
+
+        $from = Carbon::parse($data['from'])->startOfDay();
+        $to = Carbon::parse($data['to'])->endOfDay();
+        $warehouseId = $data['warehouse_id'] ?? null;
+        $atRiskDays = (int) ($data['at_risk_days'] ?? 90);
+
+        $supplierMap = Supplier::query()->pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [mb_strtolower(trim((string) $name)) => ['id' => $id, 'name' => $name]]);
+        $customerMap = Customer::query()->pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [mb_strtolower(trim((string) $name)) => ['id' => $id, 'name' => $name]]);
+
+        $matchSupplier = function (?string $partner) use ($supplierMap): array {
+            $key = mb_strtolower(trim((string) $partner));
+            if ($key !== '' && isset($supplierMap[$key])) {
+                return ['jenis' => 'supplier', 'id' => (int) $supplierMap[$key]['id'], 'nama' => $supplierMap[$key]['name']];
+            }
+
+            return ['jenis' => 'lainnya', 'id' => null, 'nama' => $partner ?? '—'];
+        };
+
+        $classify = function (StockDocument $d) use ($type, $matchSupplier, $customerMap): array {
+            if ($type === 'Transfer Gudang') {
+                return ['jenis' => 'gudang', 'id' => $d->destination_warehouse_id !== null ? (int) $d->destination_warehouse_id : null, 'nama' => $d->destination?->name ?? '—'];
+            }
+            if ($type === 'Retur Penjualan') {
+                if ($d->customer_id) {
+                    return ['jenis' => 'customer', 'id' => (int) $d->customer_id, 'nama' => $d->customer?->name ?? $d->partner ?? '—'];
+                }
+                $key = mb_strtolower(trim((string) $d->partner));
+                if ($key !== '' && isset($customerMap[$key])) {
+                    return ['jenis' => 'customer', 'id' => (int) $customerMap[$key]['id'], 'nama' => $customerMap[$key]['name']];
+                }
+
+                return ['jenis' => 'lainnya', 'id' => null, 'nama' => $d->partner ?? '—'];
+            }
+
+            // Penerimaan & Retur Pembelian: pihak = supplier (snapshot teks).
+            return $matchSupplier($d->partner);
+        };
+        $pihakKey = fn (array $t): string => TransaksiAnalytics::pihakKey($t['jenis'], $t['id'], $t['nama']);
+
+        $docs = StockDocument::query()
+            ->with(['customer', 'warehouse', 'destination'])
+            ->withSum('lines as qty_total', 'qty')
+            ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
+            ->where('type', $type)
+            ->whereBetween('document_date', [$from, $to])
+            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
+            ->when(
+                $type === 'Transfer Gudang' && isset($data['destination_warehouse_id']),
+                fn ($q) => $q->where('destination_warehouse_id', $data['destination_warehouse_id'])
+            )
+            ->orderBy('document_date')
+            ->get()
+            ->each(fn (StockDocument $d) => $d->setAttribute('_pihak', $classify($d)));
+
+        $posted = $docs->where('status', 'Selesai')->values();
+        $tertahan = $docs->whereIn('status', ['Draft', 'Menunggu Approval', 'Dalam Perjalanan'])->values();
+
+        $absQty = fn (StockDocument $d): int => abs((int) ($d->qty_total ?? 0));
+        $absNilai = fn (StockDocument $d): float => round(abs((float) ($d->value_total ?? 0)), 2);
+
+        // ---- Ringkasan + MoM ----
+        $totalNilai = round($posted->sum($absNilai), 2);
+        $totalQty = $posted->sum($absQty);
+        $perBulan = [];
+        foreach ($posted as $d) {
+            $key = $d->document_date->format('Y-m');
+            $perBulan[$key] ??= ['bulan' => $key, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+            $perBulan[$key]['qty'] += $absQty($d);
+            $perBulan[$key]['nilai'] = round($perBulan[$key]['nilai'] + $absNilai($d), 2);
+            $perBulan[$key]['dokumen']++;
+        }
+        ksort($perBulan);
+        $perBulan = array_values($perBulan);
+
+        // ---- Agregat per pihak ----
+        $aggPihak = [];
+        $aggPihakBulan = [];
+        foreach ($posted as $d) {
+            $t = $d->getAttribute('_pihak');
+            $key = $pihakKey($t);
+            $aggPihak[$key] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+            $aggPihak[$key]['qty'] += $absQty($d);
+            $aggPihak[$key]['nilai'] = round($aggPihak[$key]['nilai'] + $absNilai($d), 2);
+            $aggPihak[$key]['dokumen']++;
+
+            $bulan = $d->document_date->format('Y-m');
+            $bk = $key.'|'.$bulan;
+            $aggPihakBulan[$bk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'bulan' => $bulan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+            $aggPihakBulan[$bk]['qty'] += $absQty($d);
+            $aggPihakBulan[$bk]['nilai'] = round($aggPihakBulan[$bk]['nilai'] + $absNilai($d), 2);
+            $aggPihakBulan[$bk]['dokumen']++;
+        }
+        $sortedPihak = collect(array_values($aggPihak))->sortByDesc('nilai')->values()->all();
+        $topPihak = TransaksiAnalytics::pareto($sortedPihak, 'nilai', $totalNilai);
+        $perPihakBulan = collect(array_values($aggPihakBulan))->sortBy([['bulan', 'asc'], ['nilai', 'desc']])->values()->all();
+
+        // ---- Retur: tertaut vs tanpa sumber + alasan + per item (RP & RJ) ----
+        $retur = null;
+        if (in_array($type, ['Retur Pembelian', 'Retur Penjualan'], true)) {
+            $tertautQty = 0;
+            $tertautNilai = 0.0;
+            $bebasQty = 0;
+            $bebasNilai = 0.0;
+            $perAlasan = [];
+            $perItem = [];
+            foreach ($posted as $r) {
+                $q = $absQty($r);
+                $n = $absNilai($r);
+                if ($r->source_document_id) {
+                    $tertautQty += $q;
+                    $tertautNilai = round($tertautNilai + $n, 2);
+                } else {
+                    $bebasQty += $q;
+                    $bebasNilai = round($bebasNilai + $n, 2);
+                }
+                $alasan = TransaksiAnalytics::parseAlasan($r->note);
+                $perAlasan[$alasan] ??= ['alasan' => $alasan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+                $perAlasan[$alasan]['qty'] += $q;
+                $perAlasan[$alasan]['nilai'] = round($perAlasan[$alasan]['nilai'] + $n, 2);
+                $perAlasan[$alasan]['dokumen']++;
+            }
+            $postedIds = $posted->pluck('id');
+            if ($postedIds->isNotEmpty()) {
+                $rows = StockDocumentLine::query()->whereIn('document_id', $postedIds)
+                    ->selectRaw('item_id, SUM(ABS(qty)) as qty, SUM(ABS(qty) * unit_cost) as nilai')
+                    ->groupBy('item_id')
+                    ->orderByDesc(DB::raw('SUM(ABS(qty) * unit_cost)'))
+                    ->limit(10)
+                    ->get();
+                $items = Item::with('unit')->whereIn('id', $rows->pluck('item_id'))->get()->keyBy('id');
+                foreach ($rows as $row) {
+                    $it = $items->get($row->item_id);
+                    $perItem[] = [
+                        'item_id' => (int) $row->item_id,
+                        'sku' => $it?->sku,
+                        'nama' => $it?->name ?? "Item #{$row->item_id}",
+                        'satuan' => $it?->unit?->name,
+                        'qty' => (int) $row->qty,
+                        'nilai' => round((float) $row->nilai, 2),
+                    ];
+                }
+            }
+            // Rate vs dokumen lawan arah periode sama (Penerimaan utk RP, Pengeluaran utk RJ).
+            $lawan = $type === 'Retur Pembelian' ? 'Penerimaan' : 'Pengeluaran';
+            $lawanQty = (int) abs((float) StockDocument::query()
+                ->join('stock_document_lines', 'stock_document_lines.document_id', '=', 'stock_documents.id')
+                ->where('stock_documents.type', $lawan)
+                ->where('stock_documents.status', 'Selesai')
+                ->whereBetween('stock_documents.document_date', [$from, $to])
+                ->when($warehouseId !== null, fn ($q) => $q->where('stock_documents.warehouse_id', $warehouseId))
+                ->sum(DB::raw('stock_document_lines.qty')));
+            $retur = [
+                'tertaut_qty' => $tertautQty,
+                'tertaut_nilai' => $tertautNilai,
+                'tanpa_sumber_qty' => $bebasQty,
+                'tanpa_sumber_nilai' => $bebasNilai,
+                'rate_qty' => $lawanQty > 0 ? round(($tertautQty + $bebasQty) / $lawanQty * 100, 2) : 0,
+                'per_alasan' => collect(array_values($perAlasan))->sortByDesc('nilai')->values()->all(),
+                'per_item' => $perItem,
+            ];
+        }
+
+        // ---- Varians harga beli per supplier (khusus Penerimaan) ----
+        $variansHarga = null;
+        if ($type === 'Penerimaan') {
+            $postedIds = $posted->pluck('id');
+            $variansHarga = [];
+            if ($postedIds->isNotEmpty()) {
+                $docPihak = $posted->mapWithKeys(fn (StockDocument $d) => [$d->id => $d->getAttribute('_pihak')]);
+                $lines = StockDocumentLine::query()->whereIn('document_id', $postedIds)->get();
+                $itemMaster = Item::whereIn('id', $lines->pluck('item_id')->unique()->values())->get()->keyBy('id');
+                $agg = [];
+                foreach ($lines as $ln) {
+                    $t = $docPihak->get($ln->document_id);
+                    if ($t === null) {
+                        continue;
+                    }
+                    $k = $pihakKey($t).'|'.$ln->item_id;
+                    $agg[$k] ??= ['jenis' => $t['jenis'], 'supplier_id' => $t['id'], 'supplier' => $t['nama'], 'item_id' => (int) $ln->item_id, 'qty' => 0, 'nilai' => 0.0];
+                    $agg[$k]['qty'] += abs((int) ($ln->qty ?? 0));
+                    $agg[$k]['nilai'] = round($agg[$k]['nilai'] + abs((int) ($ln->qty ?? 0)) * (float) ($ln->unit_cost ?? 0), 2);
+                }
+                foreach ($agg as $row) {
+                    $master = $itemMaster->get($row['item_id']);
+                    $avgHarga = $row['qty'] > 0 ? round($row['nilai'] / $row['qty'], 2) : 0;
+                    $masterCost = $master ? (float) $master->cost : 0;
+                    $variansHarga[] = [
+                        'supplier' => $row['supplier'],
+                        'supplier_id' => $row['supplier_id'],
+                        'item_id' => $row['item_id'],
+                        'sku' => $master?->sku,
+                        'nama' => $master?->name ?? "Item #{$row['item_id']}",
+                        'qty' => $row['qty'],
+                        'avg_harga' => $avgHarga,
+                        'master_cost' => $masterCost,
+                        'varians_pct' => $masterCost > 0 ? round(($avgHarga - $masterCost) / $masterCost * 100, 1) : null,
+                    ];
+                }
+                usort($variansHarga, fn ($x, $y) => abs($y['varians_pct'] ?? 0) <=> abs($x['varians_pct'] ?? 0));
+                $variansHarga = array_slice($variansHarga, 0, 20);
+            }
+        }
+
+        // ---- Arus gudang (khusus Transfer): lane + net flow ----
+        $arus = null;
+        if ($type === 'Transfer Gudang') {
+            $lanes = [];
+            $net = [];
+            foreach ($posted as $d) {
+                $fromId = $d->warehouse_id !== null ? (int) $d->warehouse_id : null;
+                $fromName = $d->warehouse?->name ?? '—';
+                $t = $d->getAttribute('_pihak');
+                $lk = ($fromId ?? 'null').'|'.($t['id'] ?? 'null');
+                $lanes[$lk] ??= ['from_id' => $fromId, 'dari' => $fromName, 'to_id' => $t['id'], 'ke' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+                $lanes[$lk]['qty'] += $absQty($d);
+                $lanes[$lk]['nilai'] = round($lanes[$lk]['nilai'] + $absNilai($d), 2);
+                $lanes[$lk]['dokumen']++;
+                $net[$fromId ?? 0] ??= ['warehouse_id' => $fromId, 'nama' => $fromName, 'keluar' => 0, 'masuk' => 0];
+                $net[$fromId ?? 0]['keluar'] += $absQty($d);
+                $net[$t['id'] ?? 0] ??= ['warehouse_id' => $t['id'], 'nama' => $t['nama'], 'keluar' => 0, 'masuk' => 0];
+                $net[$t['id'] ?? 0]['masuk'] += $absQty($d);
+            }
+            $arus = [
+                'lanes' => collect(array_values($lanes))->sortByDesc('qty')->values()->all(),
+                'net' => collect(array_values($net))->map(fn ($r) => $r + ['net' => $r['masuk'] - $r['keluar']])->sortBy('net')->values()->all(),
+            ];
+        }
+
+        // ---- Aktivitas pihak ----
+        $aktivitas = [];
+        foreach ($aggPihak as $key => $ap) {
+            $last = $posted->filter(fn (StockDocument $d) => $pihakKey($d->getAttribute('_pihak')) === $key)->max('document_date');
+            $days = $last ? $to->diffInDays($last, true) : null;
+            $aktivitas[] = [
+                'jenis' => $ap['jenis'],
+                'id' => $ap['id'],
+                'nama' => $ap['nama'],
+                'dokumen' => $ap['dokumen'],
+                'nilai' => $ap['nilai'],
+                'terakhir' => $last ? $last->toDateString() : null,
+                'hari_sejak_terakhir' => $days !== null ? (int) floor($days) : null,
+                'status' => $ap['dokumen'] <= 1 ? 'baru' : (($days !== null && $days > $atRiskDays) ? 'at-risk' : 'aktif'),
+            ];
+        }
+        usort($aktivitas, fn ($a, $b) => $b['nilai'] <=> $a['nilai']);
+
+        // ---- Kecepatan proses ----
+        $leadDays = [];
+        foreach ($posted as $d) {
+            if ($d->posted_at && $d->document_date) {
+                $leadDays[] = max(0, $d->document_date->diffInDays($d->posted_at, true));
+            }
+        }
+        sort($leadDays);
+        $aging = ['0-7 hari' => ['count' => 0, 'nilai' => 0.0], '8-30 hari' => ['count' => 0, 'nilai' => 0.0], '>30 hari' => ['count' => 0, 'nilai' => 0.0]];
+        $tertahanNilai = 0.0;
+        foreach ($tertahan as $d) {
+            $n = $absNilai($d);
+            $tertahanNilai = round($tertahanNilai + $n, 2);
+            $bucket = TransaksiAnalytics::agingBucket((int) floor($to->diffInDays($d->document_date, true)));
+            $aging[$bucket]['count']++;
+            $aging[$bucket]['nilai'] = round($aging[$bucket]['nilai'] + $n, 2);
+        }
+
+        return response()->json(['data' => [
+            'type' => $type,
+            'periode' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+            'ringkasan' => [
+                'nilai' => $totalNilai,
+                'qty' => $totalQty,
+                'dokumen' => $posted->count(),
+                'rata_nilai' => $posted->count() > 0 ? round($totalNilai / $posted->count(), 2) : 0,
+                'mom' => TransaksiAnalytics::mom($perBulan),
+            ],
+            'per_bulan' => $perBulan,
+            'per_pihak_per_bulan' => collect(array_values($aggPihakBulan))->sortBy([['bulan', 'asc'], ['nilai', 'desc']])->values()->all(),
+            'top_pihak' => array_slice($topPihak, 0, 10),
+            'retur' => $retur,
+            'varians_harga' => $variansHarga,
+            'arus' => $arus,
+            'aktivitas' => $aktivitas,
+            'proses' => [
+                'lead_median_hari' => $leadDays !== [] ? round($leadDays[(int) floor((count($leadDays) - 1) / 2)], 1) : null,
+                'lead_avg_hari' => $leadDays !== [] ? round(array_sum($leadDays) / count($leadDays), 1) : null,
+                'tertahan_dokumen' => $tertahan->count(),
+                'tertahan_nilai' => $tertahanNilai,
+                'aging' => array_map(fn ($k, $v) => ['rentang' => $k, 'dokumen' => $v['count'], 'nilai' => $v['nilai']], array_keys($aging), array_values($aging)),
+            ],
         ]]);
     }
 }

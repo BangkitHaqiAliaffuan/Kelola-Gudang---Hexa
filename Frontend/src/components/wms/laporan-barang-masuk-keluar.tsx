@@ -23,6 +23,9 @@ import {
 } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { LaporanKeluarAnalytics } from "./laporan-keluar-analytics";
+import { LaporanMasukAnalytics } from "./laporan-masuk-analytics";
+import { LaporanReturAnalytics } from "./laporan-retur-analytics";
+import { LaporanTransferAnalytics } from "./laporan-transfer-analytics";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -450,6 +453,40 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
 
       {type === "Pengeluaran" && (
         <LaporanKeluarAnalytics
+          from={from}
+          to={to}
+          warehouseId={whId}
+          enabled={canView && rangeValid}
+        />
+      )}
+      {type === "Penerimaan" && (
+        <LaporanMasukAnalytics
+          from={from}
+          to={to}
+          warehouseId={whId}
+          enabled={canView && rangeValid}
+        />
+      )}
+      {type === "Transfer Gudang" && (
+        <LaporanTransferAnalytics
+          from={from}
+          to={to}
+          warehouseId={whId}
+          enabled={canView && rangeValid}
+        />
+      )}
+      {type === "Retur Pembelian" && (
+        <LaporanReturAnalytics
+          kind="pembelian"
+          from={from}
+          to={to}
+          warehouseId={whId}
+          enabled={canView && rangeValid}
+        />
+      )}
+      {type === "Retur Penjualan" && (
+        <LaporanReturAnalytics
+          kind="penjualan"
           from={from}
           to={to}
           warehouseId={whId}
