@@ -1,6 +1,6 @@
 2. Filter gudang masuk ke session 
 4. Nilai barang yang dikeluarkan costumer berapa dalam 1 bulan
 5. Disebelah button fullscreen tambah button summarry (redirect ke page laporan)
-6. Fokus barang masuk keluar untuk button sumarry
+6. Fokus barang masuk keluar untuk button summary
 8. Detail barang master data - barcode & QR non generate langsung bawaan dari barang (tinggal barcode)
 9. Layout barcode bisa 3x3, 3x2, dll perlembar + label (Tahan)
