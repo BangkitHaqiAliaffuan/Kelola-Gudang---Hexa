@@ -31,4 +31,9 @@ class Warehouse extends Model
     {
         return $this->hasMany(Rack::class);
     }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(User::class, 'default_warehouse_id');
+    }
 }

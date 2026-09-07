@@ -21,6 +21,7 @@ class StoreUserRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
             'role' => ['required', Rule::in(self::ROLES)],
+            'default_warehouse_id' => ['nullable', 'integer', Rule::exists('warehouses', 'id')],
             'password' => ['required', 'string', 'min:8', 'max:64', 'confirmed'],
             'is_active' => ['sometimes', 'boolean'],
         ];

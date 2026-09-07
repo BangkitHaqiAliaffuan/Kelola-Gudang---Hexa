@@ -10,6 +10,10 @@ class CustomerSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Customer::where('code', 'CUS-001')->exists()) {
+            return;
+        }
+
         $customers = [
             ['name' => 'Toko Sinar Terang', 'city' => 'Jakarta Barat', 'segment' => 'Retail'],
             ['name' => 'CV Maju Bersama', 'city' => 'Surabaya', 'segment' => 'Distributor'],

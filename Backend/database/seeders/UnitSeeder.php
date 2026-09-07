@@ -9,6 +9,10 @@ class UnitSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Unit::where('code', 'UNT-001')->exists()) {
+            return;
+        }
+
         $units = [
             ['code' => 'UNT-001', 'name' => 'PCS'],
             ['code' => 'UNT-002', 'name' => 'BOX'],

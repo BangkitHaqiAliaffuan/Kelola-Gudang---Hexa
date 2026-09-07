@@ -25,6 +25,10 @@ class StockDocumentResource extends JsonResource
             'source_document' => $this->whenLoaded('sourceDocument', fn () => $this->sourceDocument?->no),
             'customer_id' => $this->customer_id,
             'customer' => $this->whenLoaded('customer', fn () => $this->customer?->name),
+            'department_id' => $this->department_id,
+            'department' => $this->whenLoaded('department', fn () => $this->department?->name),
+            'project_id' => $this->project_id,
+            'project' => $this->whenLoaded('project', fn () => $this->project?->name),
             'partner' => $this->partner,
             'reference_no' => $this->reference_no,
             'pic' => $this->pic,
@@ -46,6 +50,7 @@ class StockDocumentResource extends JsonResource
             'checked_count' => $this->when(isset($this->resource->checked_count), (int) $this->resource->checked_count),
             'qty_total' => $this->when(isset($this->resource->qty_total), (int) $this->resource->qty_total),
             'value_total' => $this->when(isset($this->resource->value_total), (float) $this->resource->value_total),
+            'revenue_total' => $this->when(isset($this->resource->revenue_total), (float) $this->resource->revenue_total),
             'lines' => StockDocumentLineResource::collection($this->whenLoaded('lines')),
         ];
     }

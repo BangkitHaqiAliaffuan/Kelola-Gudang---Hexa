@@ -26,3 +26,4 @@ dist/
 .nitro/
 public/build/
 vendor/
+todo.txt

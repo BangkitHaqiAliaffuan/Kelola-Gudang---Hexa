@@ -37,6 +37,8 @@ class StockDocumentLine extends Model
         'to_bin_id',
         'source_line_id',
         'unit_cost',
+        'unit_price',
+        'unit_price_estimated',
         'note',
         'reason_code',
         'counted_by_user_id',
@@ -48,8 +50,34 @@ class StockDocumentLine extends Model
         'system_qty' => 'integer',
         'actual_qty' => 'integer',
         'unit_cost' => 'float',
+        'unit_price' => 'float',
+        'unit_price_estimated' => 'boolean',
         'counted_at' => 'datetime',
     ];
+
+    /**
+     * Omzet baris (harga jual × qty absolut). Null bila tanpa harga jual.
+     */
+    public function subtotal(): ?float
+    {
+        if ($this->unit_price === null) {
+            return null;
+        }
+
+        return abs((int) $this->qty) * (float) $this->unit_price;
+    }
+
+    /**
+     * Margin kotor baris (omzet − HPP). Null bila tanpa harga jual.
+     */
+    public function margin(): ?float
+    {
+        if ($this->unit_price === null) {
+            return null;
+        }
+
+        return abs((int) $this->qty) * ((float) $this->unit_price - (float) $this->unit_cost);
+    }
 
     public function document(): BelongsTo
     {

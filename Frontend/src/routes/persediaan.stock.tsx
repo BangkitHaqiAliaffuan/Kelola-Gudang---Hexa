@@ -15,6 +15,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
 import { cn } from "@/lib/utils";
@@ -51,15 +52,17 @@ function StockSaatIni() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
   const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setCat(ALL);
-  }, []);
+  }, [whFilter]);
 
   const itemCat = useMemo(
     () => new Map((items?.data ?? []).map((i) => [i.id, i.category])),
@@ -220,7 +223,7 @@ function StockSaatIni() {
             <FilterSelect
               className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={wh}
-              onChange={setWh}
+              onChange={whFilter.onChange}
               placeholder="Semua Gudang"
               options={warehouseNames}
               loading={warehousesLoading}

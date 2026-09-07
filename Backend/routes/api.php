@@ -6,8 +6,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
-use App\Http\Controllers\MerkController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\MerkController;
 use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
@@ -49,6 +49,9 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::post('items/bulk-delete', [ItemController::class, 'bulkDestroy']);
     Route::post('items/bulk-status', [ItemController::class, 'bulkUpdateStatus']);
     Route::post('items/bulk-import', [ItemController::class, 'bulkImport']);
+    Route::get('items/cost-drift', [ItemController::class, 'costDrift']);
+    Route::post('items/sync-cost', [ItemController::class, 'syncCost']);
+    Route::get('items/lookup', [ItemController::class, 'lookup']);
     Route::apiResource('items', ItemController::class);
 });
 
@@ -99,4 +102,6 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
 
 Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
+    Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
+    Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
 });

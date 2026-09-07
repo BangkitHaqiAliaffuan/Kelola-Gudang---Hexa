@@ -9,6 +9,10 @@ class CategorySeeder extends Seeder
 {
     public function run(): void
     {
+        if (Category::where('code', 'KAT-001')->exists()) {
+            return;
+        }
+
         $categories = [
             ['code' => 'KAT-001', 'name' => 'Komponen Elektronik', 'description' => 'Resistor, kapasitor, sensor, dan modul elektronik.'],
             ['code' => 'KAT-002', 'name' => 'Perkakas Mesin', 'description' => 'Alat potong, bor, dan kelengkapan mesin.'],

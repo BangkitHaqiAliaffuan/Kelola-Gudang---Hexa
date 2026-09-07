@@ -10,6 +10,10 @@ class VendorSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Vendor::where('code', 'VDR-001')->exists()) {
+            return;
+        }
+
         $vendors = [
             ['name' => 'JNE Cabang Pusat', 'service_type' => 'Ekspedisi'],
             ['name' => 'PT SiCepat Express', 'service_type' => 'Ekspedisi'],

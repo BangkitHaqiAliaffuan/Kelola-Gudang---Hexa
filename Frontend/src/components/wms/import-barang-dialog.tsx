@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatNumber } from "@/lib/wms-data";
+import { nextSku } from "@/lib/sku";
 import {
   useBins,
   useCategories,
@@ -48,10 +49,10 @@ type AutoCreateEntry = {
 type ParsedRow = {
   raw: RawRow;
   resolved: Partial<BulkImportItem>;
-  status: "valid" | "duplicate" | "error" | "auto_create";
+  status: "valid" | "error" | "auto_create";
   errors: string[];
   warnings: string[];
-  action: "create" | "update";
+  action: "create";
   autoCreateCat?: AutoCreateEntry | undefined;
   autoCreateMerk?: AutoCreateEntry | undefined;
   autoCreateUnit?: AutoCreateEntry | undefined;
@@ -239,16 +240,25 @@ export function ImportBarangDialog({
             return names.has(name);
           }
 
-          const parsed: ParsedRow[] = rows.map((row) => {
+          // Track SKUs seen in this file (DB + already processed rows) for nextSku generation and duplicate check
+          const allSeen = new Set<string>(existingSkus);
+          const firstOcc = new Map<string, { idx: number; name: string }>();
+          // Seed firstOcc with DB SKUs for informative message (database)
+          for (const s of existingSkus) firstOcc.set(s, { idx: -1, name: "database" });
+
+          const parsed: ParsedRow[] = rows.map((row, idx) => {
             const errors: string[] = [];
             const warnings: string[] = [];
             const resolved: Partial<BulkImportItem> = {};
-            const sku = row["SKU"]?.trim() ?? "";
-
-            if (!sku) errors.push("SKU wajib diisi");
-
+            let sku = row["SKU"]?.trim() ?? "";
             const name = row["Nama Barang"]?.trim() ?? "";
             if (!name) errors.push("Nama Barang wajib diisi");
+
+            // Auto-generate SKU if empty (format A SKU-10001-001 series)
+            if (!sku) {
+              sku = nextSku([...allSeen]);
+              warnings.push(`SKU kosong — otomatis diisi ${sku} (auto)`);
+            }
 
             // Resolve Kategori — auto-createable
             const catName = row["Kategori"]?.trim() ?? "";
@@ -269,7 +279,9 @@ export function ImportBarangDialog({
             const subCatId = findIdByName(subCategories, row["Sub Kategori"]);
             if (row["Sub Kategori"]?.trim() && subCatId) resolved.sub_category_id = subCatId;
             else if (row["Sub Kategori"]?.trim())
-              warnings.push(`Sub Kategori '${row["Sub Kategori"]!.trim()}' tidak ditemukan, item akan dibuat tanpa sub kategori`);
+              warnings.push(
+                `Sub Kategori '${row["Sub Kategori"]!.trim()}' tidak ditemukan, item akan dibuat tanpa sub kategori`,
+              );
 
             // Merk — auto-createable
             const merkName = row["Merk"]?.trim() ?? "";
@@ -343,13 +355,26 @@ export function ImportBarangDialog({
             const statusRaw = row["Status"]?.trim() ?? "Aktif";
             resolved.status = statusRaw === "Nonaktif" ? "Nonaktif" : "Aktif";
 
+            const skuUpper = sku.toUpperCase();
+            // Block duplikat: cek DB + intra-file (sebutkan barang pertama)
+            if (allSeen.has(skuUpper)) {
+              const first = firstOcc.get(skuUpper);
+              const firstLabel =
+                first && first.idx >= 0 ? `baris ${first.idx + 1} ('${first.name}')` : "database";
+              errors.push(
+                `SKU '${sku}' duplikat di file dengan ${firstLabel} — barang '${name || "tanpa nama"}' baris ${idx + 1}`,
+              );
+            }
+            if (!firstOcc.has(skuUpper)) {
+              firstOcc.set(skuUpper, { idx, name: name || sku });
+            }
+            allSeen.add(skuUpper);
+
             resolved.sku = sku;
             resolved.barcode = row["Barcode"]?.trim() || null;
             resolved.name = name;
 
-            const isDuplicate = existingSkus.has(sku.toUpperCase());
-            const action: "create" | "update" = isDuplicate ? "update" : "create";
-            if (isDuplicate) errors.push("Duplikat SKU — akan diupdate");
+            const action = "create" as const;
 
             // Determine row-level status
             const hasAutoCreate = autoCreateCat || autoCreateMerk || autoCreateUnit;
@@ -368,8 +393,6 @@ export function ImportBarangDialog({
             let status: ParsedRow["status"];
             if (hasFatalError) {
               status = "error";
-            } else if (isDuplicate) {
-              status = "duplicate";
             } else if (hasAutoCreate) {
               status = "auto_create";
             } else {
@@ -409,26 +432,6 @@ export function ImportBarangDialog({
     [processFile],
   );
 
-  const toggleAction = useCallback((index: number) => {
-    setParsedRows((prev) =>
-      prev
-        ? prev.map((row, i) =>
-            i === index
-              ? {
-                  ...row,
-                  action: row.action === "create" ? "update" : "create",
-                  status: row.action === "create" ? "duplicate" : "valid",
-                  errors:
-                    row.action === "create"
-                      ? [...row.errors, "Duplikat SKU — akan diupdate"]
-                      : row.errors.filter((e) => !e.startsWith("Duplikat SKU")),
-                }
-              : row,
-          )
-        : prev,
-    );
-  }, []);
-
   const toggleAutoCreate = useCallback(
     (index: number, field: "autoCreateCat" | "autoCreateMerk" | "autoCreateUnit") => {
       setParsedRows((prev) =>
@@ -460,8 +463,6 @@ export function ImportBarangDialog({
 
               if (fatalErrors.length > 0) {
                 updatedRow.status = "error";
-              } else if (row.action === "update") {
-                updatedRow.status = "duplicate";
               } else if (hasAutoCreate) {
                 updatedRow.status = "auto_create";
               } else {
@@ -505,8 +506,6 @@ export function ImportBarangDialog({
 
               if (fatalErrors.length > 0) {
                 updatedRow.status = "error";
-              } else if (row.action === "update") {
-                updatedRow.status = "duplicate";
               } else if (hasAutoCreate) {
                 updatedRow.status = "auto_create";
               } else {
@@ -552,6 +551,16 @@ export function ImportBarangDialog({
       if (res.errors && Object.keys(res.errors).length > 0) {
         toast.warning(`${Object.keys(res.errors).length} baris gagal diproses`);
       }
+      if (res.warnings && Object.keys(res.warnings).length > 0) {
+        const first = Object.entries(res.warnings)
+          .slice(0, 3)
+          .map(([, w]) => w)
+          .join(" ");
+        toast.warning(
+          `${Object.keys(res.warnings).length} baris barcode dipakai bersama — ${first}`,
+          { duration: 8000 },
+        );
+      }
       setParsedRows(null);
       setFileName(null);
       onOpenChange(false);
@@ -563,18 +572,16 @@ export function ImportBarangDialog({
   }, [parsedRows, bulkImport, onOpenChange]);
 
   const stats = useMemo(() => {
-    if (!parsedRows) return { valid: 0, duplicate: 0, autoCreate: 0, error: 0, total: 0 };
+    if (!parsedRows) return { valid: 0, autoCreate: 0, error: 0, total: 0 };
     return {
       valid: parsedRows.filter((r) => r.status === "valid").length,
-      duplicate: parsedRows.filter((r) => r.status === "duplicate").length,
       autoCreate: parsedRows.filter((r) => r.status === "auto_create").length,
       error: parsedRows.filter((r) => r.status === "error").length,
       total: parsedRows.length,
     };
   }, [parsedRows]);
 
-  const canSubmit =
-    parsedRows && (stats.valid + stats.duplicate + stats.autoCreate) > 0 && !submitting;
+  const canSubmit = parsedRows && stats.valid + stats.autoCreate > 0 && !submitting;
 
   // Collect unique auto-create names for global toggle display
   const autoCreateSummary = useMemo(() => {
@@ -663,10 +670,6 @@ export function ImportBarangDialog({
                     baru
                   </span>
                 )}
-                <span className="flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5 text-warning" /> {stats.duplicate}{" "}
-                  Duplikat
-                </span>
                 <span className="flex items-center gap-1">
                   <XCircle className="h-3.5 w-3.5 text-destructive" /> {stats.error} Error
                 </span>
@@ -772,13 +775,11 @@ export function ImportBarangDialog({
                         className={
                           row.status === "error"
                             ? "bg-destructive/5"
-                            : row.status === "duplicate"
-                              ? "bg-warning/5"
-                              : row.status === "auto_create"
-                                ? "bg-info/5"
-                                : row.warnings.length > 0
-                                  ? "bg-warning/5"
-                                  : ""
+                            : row.status === "auto_create"
+                              ? "bg-info/5"
+                              : row.warnings.length > 0
+                                ? "bg-warning/5"
+                                : ""
                         }
                       >
                         <td className="border-b border-border/50 px-2 py-1.5">{i + 1}</td>
@@ -802,11 +803,6 @@ export function ImportBarangDialog({
                               <Sparkles className="h-3 w-3" /> Akan dibuat baru
                             </span>
                           )}
-                          {row.status === "duplicate" && (
-                            <span className="text-warning flex items-center gap-1">
-                              <TriangleAlert className="h-3.5 w-3.5" /> Duplikat
-                            </span>
-                          )}
                           {row.status === "error" && (
                             <span className="text-destructive flex items-center gap-1">
                               <XCircle className="h-3.5 w-3.5" /> Error
@@ -814,29 +810,28 @@ export function ImportBarangDialog({
                           )}
                         </td>
                         <td className="border-b border-border/50 px-2 py-1.5">
-                          {row.status === "duplicate" ? (
-                            <button
-                              onClick={() => toggleAction(i)}
-                              className="text-xs underline text-primary hover:text-primary/80"
-                            >
-                              {row.action === "update" ? "Skip →" : "Update →"}
-                            </button>
-                          ) : row.status === "valid" || row.status === "auto_create" ? (
+                          {row.status === "valid" || row.status === "auto_create" ? (
                             <span className="text-muted-foreground">Create</span>
-                          ) : null}
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="border-b border-border/50 px-2 py-1.5 text-xs">
                           {row.status === "auto_create" ? (
                             <span className="text-info">
                               <Sparkles className="mr-1 inline h-3.5 w-3.5" />
                               Akan dibuat baru:
-                              {row.autoCreateCat?.checked && ` Kategori '${row.autoCreateCat.name}'`}
+                              {row.autoCreateCat?.checked &&
+                                ` Kategori '${row.autoCreateCat.name}'`}
                               {row.autoCreateMerk?.checked && ` Merk '${row.autoCreateMerk.name}'`}
                               {row.autoCreateUnit?.checked &&
                                 ` Satuan '${row.autoCreateUnit.name}'`}
                               {row.warnings.length > 0 &&
                                 row.warnings.map((w, wi) => (
-                                  <span key={wi} className="block text-warning flex items-center gap-1">
+                                  <span
+                                    key={wi}
+                                    className="block text-warning flex items-center gap-1"
+                                  >
                                     <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
                                   </span>
                                 ))}
@@ -872,7 +867,7 @@ export function ImportBarangDialog({
           {parsedRows && (
             <Button className="rounded-xl" disabled={!canSubmit} onClick={handleSubmit}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Import {stats.valid + stats.duplicate + stats.autoCreate} Barang
+              Import {stats.valid + stats.autoCreate} Barang
             </Button>
           )}
         </DialogFooter>

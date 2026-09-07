@@ -10,6 +10,10 @@ class ProjectSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Project::where('code', 'PRJ-001')->exists()) {
+            return;
+        }
+
         $projects = [
             ['name' => 'Proyek Tol Cisumdawu', 'status' => 'Berjalan', 'budget' => 250000000],
             ['name' => 'Renovasi Line 3', 'status' => 'Berjalan', 'budget' => 95000000],

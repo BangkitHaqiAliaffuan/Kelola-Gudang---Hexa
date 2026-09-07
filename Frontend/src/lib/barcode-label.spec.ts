@@ -5,8 +5,11 @@ import {
   buildPrintHtml,
   buildSheetSvg,
   computeSheetLayout,
+  eanChecksumOk,
   encodeItem,
   findItemByCode,
+  findMatchesByCode,
+  matchSourceOf,
   normalizeCode,
   slugFilename,
 } from "./barcode-label";
@@ -164,6 +167,60 @@ describe("findItemByCode", () => {
   it("tidak ada kecocokan -> undefined", () => {
     expect(findItemByCode([...items], "TIDAK-ADA")).toBeUndefined();
     expect(findItemByCode([...items], "  ")).toBeUndefined();
+  });
+});
+
+describe("findMatchesByCode (barcode kemasan bersama)", () => {
+  const items = [
+    { id: 1, sku: "SKU-10001-001", barcode: "BERSAMA-1", internal_barcode: "IB-001" },
+    { id: 2, sku: "SKU-10001-002", barcode: "BERSAMA-1", internal_barcode: "IB-002" },
+    { id: 3, sku: "BERSAMA-1", barcode: null, internal_barcode: null },
+  ];
+
+  it("satu kode -> banyak calon terurut internal > produk > sku", () => {
+    const got = findMatchesByCode([...items], "bersama-1");
+    expect(got.map((m) => m.item.id)).toEqual([1, 2, 3]);
+    expect(got.map((m) => m.source)).toEqual(["produk", "produk", "sku"]);
+  });
+
+  it("internal selalu menang walau urutan input terbalik", () => {
+    const got = findMatchesByCode([items[1]!, items[0]!], "IB-001");
+    expect(got).toHaveLength(1);
+    expect(got[0]!.item.id).toBe(1);
+    expect(got[0]!.source).toBe("internal");
+  });
+
+  it("matchSourceOf mengenali tiap sumber dan null bila tak cocok", () => {
+    expect(matchSourceOf(items[0]!, "IB-001")).toBe("internal");
+    expect(matchSourceOf(items[0]!, "bersama-1")).toBe("produk");
+    expect(matchSourceOf(items[2]!, "BERSAMA-1")).toBe("sku");
+    expect(matchSourceOf(items[0]!, "TIDAK-ADA")).toBeNull();
+    expect(matchSourceOf(items[0]!, "  ")).toBeNull();
+  });
+
+  it("findItemByCode tetap kompatibel (cocok pertama = prioritas tertinggi)", () => {
+    expect(findItemByCode([...items], "BERSAMA-1")?.id).toBe(1);
+  });
+});
+
+describe("eanChecksumOk", () => {
+  it("EAN-13 valid dan salah digit cek", () => {
+    expect(eanChecksumOk("5901234123457")).toBe(true);
+    expect(eanChecksumOk("5901234123450")).toBe(false);
+  });
+
+  it("UPC-A (12 digit) dan EAN-8", () => {
+    expect(eanChecksumOk("123456789012")).toBe(true);
+    expect(eanChecksumOk("123456789013")).toBe(false);
+    expect(eanChecksumOk("96385074")).toBe(true);
+    expect(eanChecksumOk("96385075")).toBe(false);
+  });
+
+  it("null untuk non-digit atau panjang non-EAN (mis. CODE128 internal)", () => {
+    expect(eanChecksumOk("BRG-001")).toBeNull();
+    expect(eanChecksumOk("IB-123")).toBeNull();
+    expect(eanChecksumOk("12345")).toBeNull();
+    expect(eanChecksumOk("")).toBeNull();
   });
 });
 

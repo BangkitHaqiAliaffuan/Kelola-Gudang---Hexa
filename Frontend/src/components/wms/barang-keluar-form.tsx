@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Save, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
 import { Button } from "@/components/ui/button";
-import { useWmsScanner } from "@/hooks/use-wms-scanner";
+import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
+import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import {
   useBins,
   useCustomers,
@@ -37,6 +39,7 @@ import {
 } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
+import { buildStockCostMap, lookupBinCost } from "@/lib/stock-cost";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockDocumentPayload } from "@/lib/persediaan-types";
 
@@ -46,12 +49,13 @@ type FormLine = {
   binId: string;
   qty: string;
   cost: string;
+  price: string;
 };
 
 let lineSeq = 0;
 const newLine = (): FormLine => {
   lineSeq += 1;
-  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1", cost: "0" };
+  return { key: `L${lineSeq}`, itemId: "", binId: "", qty: "1", cost: "0", price: "0" };
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -71,6 +75,12 @@ export function BarangKeluarForm() {
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
+  // Inisialisasi Gudang dari rantai session (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
+  useEffect(() => {
+    if (whDefaultId == null || warehouseId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId]);
   const [purpose, setPurpose] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");
@@ -84,11 +94,13 @@ export function BarangKeluarForm() {
   // jendela refetch pasca-posting (invalidateQueries) sebelum navigate selesai.
   const [submitted, setSubmitted] = useState(false);
 
+  const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
     items: (items?.data ?? []) as never,
     onPick: (item) => {
       if (scanTarget) pickItem(scanTarget, String(item.id));
     },
+    onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
   });
 
   const binsInWarehouse = useMemo(
@@ -149,6 +161,21 @@ export function BarangKeluarForm() {
       map.set(`${r.warehouse_id}:${r.item_id}:${r.bin_id ?? "NULL"}`, r.available);
     return map;
   }, [stockRows]);
+
+  // HPP berjalan (moving average ledger) per (gudang, barang, bin) — dasar
+  // kolom HPP, peringatan jual-rugi, dan estimasi margin. Bukan Harga Pokok
+  // master (yang bisa basi): HPP final selalu mengikuti rata-rata saat posting.
+  const liveCostMap = useMemo(() => buildStockCostMap(stockRows?.data ?? []), [stockRows]);
+
+  const costFor = (itemId: string, binId: string): string => {
+    if (!itemId) return "";
+    if (warehouseId) {
+      const live = lookupBinCost(liveCostMap, warehouseId, itemId, binId);
+      if (live != null) return String(live);
+    }
+    const item = items?.data.find((x) => String(x.id) === itemId);
+    return item ? String(item.cost ?? 0) : "";
+  };
 
   // Item IDs yang punya stok >0 di gudang terpilih — untuk filter barang per gudang.
   const itemIdsInWarehouse = useMemo(() => {
@@ -223,6 +250,10 @@ export function BarangKeluarForm() {
     () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.cost) || 0), 0),
     [lines],
   );
+  const totalOmzet = useMemo(
+    () => lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.price) || 0), 0),
+    [lines],
+  );
 
   const patchLine = (
     key: string,
@@ -244,11 +275,15 @@ export function BarangKeluarForm() {
           (c) => String(c.bin_id ?? "NULL") === (line.binId === "" ? "NULL" : line.binId),
         ),
       );
-      const costVal = item ? String(item.cost ?? 0) : "";
+      // Harga Jual prefill dari master, tetap bisa diubah operator (diskon/nego).
+      const priceVal = item ? String(item.price ?? 0) : "";
+      // HPP = rata-rata berjalan di bin terpilih (live), fallback master bila
+      // belum ada histori. Bin ikut menentukan angka — ganti bin = HPP baru.
       // Jika sudah ada bin (termasuk lantai "") dan valid, pertahankan bin tapi update cost
-      if (line.binId !== "" && currentValid) return { itemId, cost: costVal };
+      if (line.binId !== "" && currentValid)
+        return { itemId, cost: costFor(itemId, line.binId), price: priceVal };
       if (line.binId === "" && candidates.some((c) => c.bin_id === null))
-        return { itemId, cost: costVal };
+        return { itemId, cost: costFor(itemId, ""), price: priceVal };
       const preferredBin =
         item?.default_bin_id != null && candidates.some((c) => c.bin_id === item.default_bin_id)
           ? String(item.default_bin_id)
@@ -257,30 +292,47 @@ export function BarangKeluarForm() {
               ? ""
               : String(candidates[0].bin_id)
             : "";
-      return { itemId, binId: preferredBin, cost: costVal };
+      return { itemId, binId: preferredBin, cost: costFor(itemId, preferredBin), price: priceVal };
     });
   };
 
-  const pickBin = (key: string, binId: string) => patchLine(key, { binId });
+  const pickBin = (key: string, binId: string) =>
+    patchLine(key, (line) => ({ binId, cost: costFor(line.itemId, binId) }));
 
   const pickWarehouse = (id: string) => {
     setWarehouseId(id);
-    setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
+    // Gudang ganti → rata-rata per bin ikut ganti; reset ke lantai + hitung ulang.
+    // (warehouseId state belum update di sini — costFor memakai id baru langsung.)
+    const wid = id;
+    setLines((prev) =>
+      prev.map((l) => {
+        if (!l.itemId) return { ...l, binId: "" };
+        const live = lookupBinCost(liveCostMap, wid, l.itemId, "");
+        const item = items?.data.find((x) => String(x.id) === l.itemId);
+        return {
+          ...l,
+          binId: "",
+          cost: live != null ? String(live) : item ? String(item.cost ?? 0) : "",
+        };
+      }),
+    );
   };
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
     let cid: number | null = null;
+    let did: number | null = null;
+    let pid: number | null = null;
     let partnerName: string | null = null;
     if (purpose) {
       if (purpose.startsWith("customer:")) {
         cid = Number(purpose.split(":")[1] ?? "");
         partnerName = customers?.data.find((c) => String(c.id) === String(cid))?.name ?? null;
       } else if (purpose.startsWith("department:")) {
-        const did = purpose.split(":")[1];
-        partnerName = departments?.data.find((d) => String(d.id) === did)?.name ?? null;
+        did = Number(purpose.split(":")[1] ?? "");
+        partnerName = departments?.data.find((d) => String(d.id) === String(did))?.name ?? null;
       } else if (purpose.startsWith("project:")) {
-        const pid = purpose.split(":")[1];
-        partnerName = projects?.data.find((p) => String(p.id) === pid)?.name ?? null;
+        pid = Number(purpose.split(":")[1] ?? "");
+        partnerName = projects?.data.find((p) => String(p.id) === String(pid))?.name ?? null;
       } else {
         // fallback legacy string (seharusnya tidak terjadi)
         partnerName = purpose;
@@ -293,6 +345,8 @@ export function BarangKeluarForm() {
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       customer_id: cid,
+      department_id: did,
+      project_id: pid,
       partner: partnerName,
       reference_no: reference.trim() || null,
       pic: pic.trim() || null,
@@ -303,6 +357,7 @@ export function BarangKeluarForm() {
           item_id: Number(l.itemId),
           qty: Number(l.qty),
           from_bin_id: l.binId ? Number(l.binId) : null,
+          unit_price: l.price === "" ? null : Number(l.price),
         })),
     };
   };
@@ -450,6 +505,7 @@ export function BarangKeluarForm() {
 
       <Panel
         title="Daftar Barang"
+        description="HPP = rata-rata berjalan per bin/gudang (estimasi). HPP final mengikuti rata-rata saat dokumen diposting dan dapat berbeda bila ada penerimaan baru."
         actions={
           canCreate && (
             <Button
@@ -464,10 +520,19 @@ export function BarangKeluarForm() {
         bodyClassName="p-0"
       >
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[960px] text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                {["Barang", "Asal Bin", "Qty", "Harga", "Subtotal", "Tersedia", ""].map((h) => (
+                {[
+                  "Barang",
+                  "Asal Bin",
+                  "Qty",
+                  "HPP berjalan",
+                  "Harga Jual",
+                  "Omzet",
+                  "Tersedia",
+                  "",
+                ].map((h) => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold">
                     {h}
                   </th>
@@ -559,11 +624,32 @@ export function BarangKeluarForm() {
                         min={0}
                         value={l.cost}
                         readOnly
+                        aria-label="HPP estimasi"
                         className="h-9 w-28 rounded-lg bg-muted text-muted-foreground"
                       />
                     </td>
+                    <td className="px-3 py-2 align-top">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={l.price}
+                        onChange={(e) => patchLine(l.key, { price: e.target.value })}
+                        aria-label="Harga jual"
+                        className="h-9 w-28 rounded-lg"
+                      />
+                      {lineError(i, "unit_price") && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {lineError(i, "unit_price")}
+                        </p>
+                      )}
+                      {Number(l.price) > 0 && Number(l.price) < Number(l.cost) && (
+                        <p className="mt-1 text-xs text-amber-600">
+                          Harga di bawah HPP (jual rugi).
+                        </p>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm font-semibold">
-                      {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 align-top text-sm text-muted-foreground">
                       {available !== undefined ? formatNumber(available) : "—"}
@@ -656,7 +742,7 @@ export function BarangKeluarForm() {
                     </p>
                   )}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Harga</span>
+                    <span className="text-xs text-muted-foreground">HPP berjalan</span>
                     <Input
                       type="number"
                       min={0}
@@ -668,11 +754,30 @@ export function BarangKeluarForm() {
                       {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))}
                     </span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Harga Jual</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={l.price}
+                      onChange={(e) => patchLine(l.key, { price: e.target.value })}
+                      className="h-9 w-28 rounded-lg"
+                    />
+                    <span className="ml-auto text-sm font-semibold">
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
+                    </span>
+                  </div>
+                  {Number(l.price) > 0 && Number(l.price) < Number(l.cost) && (
+                    <p className="text-xs text-amber-600">Harga di bawah HPP (jual rugi).</p>
+                  )}
                   {lineError(i, "from_bin_id") && (
                     <p className="text-xs text-destructive">{lineError(i, "from_bin_id")}</p>
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{lines.length === 1 ? "" : ""}</span>
+                    <span>
+                      HPP {formatIDR((Number(l.qty) || 0) * (Number(l.cost) || 0))} · Omzet{" "}
+                      {formatIDR((Number(l.qty) || 0) * (Number(l.price) || 0))}
+                    </span>
                     {canCreate && (
                       <button
                         type="button"
@@ -696,8 +801,12 @@ export function BarangKeluarForm() {
             <span className="text-sm font-bold">{formatNumber(totalQty)} PCS</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Grand Total Nilai</span>
+            <span className="text-sm font-medium">Grand Total Nilai (HPP)</span>
             <span className="text-lg font-bold">{formatIDR(totalNilai)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Total Omzet</span>
+            <span className="text-lg font-bold">{formatIDR(totalOmzet)}</span>
           </div>
         </div>
       </Panel>
@@ -751,6 +860,16 @@ export function BarangKeluarForm() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ScanDisambiguasiDialog
+        open={ambiguous !== null}
+        code={ambiguous?.code}
+        matches={ambiguous?.matches ?? []}
+        onClose={() => setAmbiguous(null)}
+        onPick={(item) => {
+          if (scanTarget) pickItem(scanTarget, String(item.id));
+          setAmbiguous(null);
+        }}
+      />
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent className="max-w-md rounded-xl">
           <DialogHeader>

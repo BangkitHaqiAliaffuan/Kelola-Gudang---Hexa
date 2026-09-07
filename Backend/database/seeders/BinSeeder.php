@@ -10,6 +10,11 @@ class BinSeeder extends Seeder
 {
     public function run(): void
     {
+        // Kode bin hanya unik per rak (composite), jadi guard memakai 01-01 pertama.
+        if (Bin::where('code', '01-01')->exists()) {
+            return;
+        }
+
         $racks = Rack::orderBy('id')->get();
 
         foreach ($racks as $rack) {

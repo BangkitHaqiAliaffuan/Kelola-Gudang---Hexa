@@ -9,6 +9,10 @@ class WarehouseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (Warehouse::where('code', 'GDG-001')->exists()) {
+            return;
+        }
+
         $warehouses = [
             ['code' => 'GDG-001', 'name' => 'Gudang Pusat Jakarta', 'city' => 'Jakarta Timur'],
             ['code' => 'GDG-002', 'name' => 'Gudang Bekasi', 'city' => 'Bekasi'],

@@ -49,6 +49,9 @@ const titles: Record<string, string> = {
   stock: "Laporan Stock",
   "barang-masuk": "Laporan Barang Masuk",
   "barang-keluar": "Laporan Barang Keluar",
+  transfer: "Laporan Transfer Gudang",
+  "retur-pembelian": "Laporan Retur Pembelian",
+  "retur-penjualan": "Laporan Retur Penjualan",
   mutasi: "Laporan Mutasi",
   "kartu-stock": "Laporan Kartu Stock",
   "nilai-persediaan": "Laporan Nilai Persediaan",
@@ -122,6 +125,9 @@ function Laporan() {
   if (report === "stock") return <LaporanStock />;
   if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
   if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
+  if (report === "transfer") return <LaporanBarangMasukKeluar type="Transfer Gudang" />;
+  if (report === "retur-pembelian") return <LaporanBarangMasukKeluar type="Retur Pembelian" />;
+  if (report === "retur-penjualan") return <LaporanBarangMasukKeluar type="Retur Penjualan" />;
   if (report === "kartu-stock") return <LaporanKartuStock />;
   if (report === "stock-minimum") return <LaporanStockMinimum />;
   if (report === "mutasi") return <LaporanMutasi />;

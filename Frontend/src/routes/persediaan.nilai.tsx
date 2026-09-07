@@ -27,6 +27,7 @@ import {
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockValuation } from "@/hooks/use-persediaan";
@@ -74,30 +75,33 @@ function unitCostFor(row: StockValuationApi, method: ValuationMethod): number {
 
 function NilaiPersediaan() {
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
-  const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [moving, setMoving] = useState(ALL);
+
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: cats, isLoading: catsLoading } = useCategories();
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
+
   const hasActiveFilters = useMemo(
     () => q !== "" || wh !== ALL || cat !== ALL || moving !== ALL,
     [q, wh, cat, moving],
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setCat(ALL);
     setMoving(ALL);
-  }, []);
+  }, [whFilter]);
 
-  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { data: cats, isLoading: catsLoading } = useCategories();
-
-  const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
+  const whId = whFilter.warehouseId;
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
 
   const { data, isLoading } = useStockValuation({
-    warehouseId: wh === ALL ? null : (whId ?? null),
+    warehouseId: whId,
     categoryId: cat === ALL ? null : (catId ?? null),
     search: debouncedQ.trim() || null,
   });
@@ -306,7 +310,7 @@ function NilaiPersediaan() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouseNames}
             loading={warehousesLoading}

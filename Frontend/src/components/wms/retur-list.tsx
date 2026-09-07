@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
+import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -8,8 +8,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
-import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import {
+  useCancelStockDocument,
+  usePostStockDocument,
+  useStockDocument,
+  useStockDocuments,
+} from "@/hooks/use-persediaan";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
@@ -30,6 +48,7 @@ type ReturListProps = {
   partnerLabel: string;
   createLabel: string;
   createSection: string;
+  reportSlug: "retur-pembelian" | "retur-penjualan";
 };
 
 function ReturListPage({
@@ -39,28 +58,64 @@ function ReturListPage({
   partnerLabel,
   createLabel,
   createSection,
+  reportSlug,
 }: ReturListProps) {
-  const { hasModuleLevel } = useAuth();
+  const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
+  const canPost = hasModuleLevel("Persediaan", "Tulis");
+  const canCancel = hasModuleLevel("Persediaan", "Kelola");
+  const canViewLaporan = hasModule("Laporan");
   const { data, isLoading } = useStockDocuments({ type });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const postDoc = usePostStockDocument();
+  const cancelDoc = useCancelStockDocument();
+  const [confirmPostId, setConfirmPostId] = useState<number | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+
+  const doPost = async () => {
+    if (confirmPostId == null) return;
+    try {
+      const res = await postDoc.mutateAsync(confirmPostId);
+      toast.success(`Dokumen ${res.data.no} berhasil diposting`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setConfirmPostId(null);
+    }
+  };
+
+  const doCancel = async () => {
+    if (confirmCancelId == null) return;
+    try {
+      const res = await cancelDoc.mutateAsync(confirmCancelId);
+      toast.success(`Dokumen ${res.data.no} dibatalkan`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setConfirmCancelId(null);
+    }
+  };
+
   const hasActiveFilters = useMemo(
     () => q !== "" || wh !== ALL || partner !== ALL || status !== ALL,
     [q, wh, partner, status],
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setPartner(ALL);
     setStatus(ALL);
-  }, []);
+  }, [whFilter]);
 
   const partners = useMemo(
     () =>
@@ -159,61 +214,90 @@ function ReturListPage({
 
   return (
     <>
-      <PageHeader
-        title={title}
-        description={description}
-        actions={
-          canCreate && (
-            <Button asChild className="rounded-xl">
-              <Link to="/transaksi/entri/$section" params={{ section: createSection }}>
-                <Plus className="h-4 w-4" /> Buat {createLabel}
-              </Link>
-            </Button>
-          )
-        }
-      />
+      <div inert={fullscreen || undefined} className="space-y-5">
+        <PageHeader
+          title={title}
+          description={description}
+          actions={
+            canCreate && (
+              <Button asChild className="rounded-xl">
+                <Link to="/transaksi/entri/$section" params={{ section: createSection }}>
+                  <Plus className="h-4 w-4" /> Buat {createLabel}
+                </Link>
+              </Button>
+            )
+          }
+        />
 
-      <Panel title="Filter">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="relative flex-1 min-w-[220px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, partner, gudang, PIC, tanggal, referensi, status..."
-              className="rounded-xl pl-9"
+        <Panel title="Filter">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, partner, gudang, PIC, tanggal, referensi, status..."
+                className="rounded-xl pl-9"
+              />
+            </div>
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={wh}
+              onChange={whFilter.onChange}
+              placeholder="Semua Gudang"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
             />
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={partner}
+              onChange={setPartner}
+              placeholder={`Semua ${partnerLabel}`}
+              options={partners}
+              loading={isLoading}
+            />
+            <FilterSelect
+              className="w-full flex-1 min-w-[140px] max-w-[180px]"
+              value={status}
+              onChange={setStatus}
+              placeholder="Semua Status"
+              options={[...stockDocumentStatuses]}
+            />
+            <div className="ml-auto flex shrink-0 items-end">
+              <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
+            </div>
           </div>
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={wh}
-            onChange={setWh}
-            placeholder="Semua Gudang"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-            loading={warehousesLoading}
-          />
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={partner}
-            onChange={setPartner}
-            placeholder={`Semua ${partnerLabel}`}
-            options={partners}
-            loading={isLoading}
-          />
-          <FilterSelect
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={status}
-            onChange={setStatus}
-            placeholder="Semua Status"
-            options={[...stockDocumentStatuses]}
-          />
-          <div className="ml-auto flex shrink-0 items-end">
-            <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
-          </div>
-        </div>
-      </Panel>
+        </Panel>
+      </div>
 
-      <Panel title={`Daftar ${title}`} description={`${formatNumber(rows.length)} dokumen`}>
+      <Panel
+        title={`Daftar ${title}`}
+        description={`${formatNumber(rows.length)} dokumen`}
+        actions={
+          <>
+            {canViewLaporan && (
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link to="/laporan/$report" params={{ report: reportSlug }}>
+                  <FileBarChart className="h-4 w-4" /> Summary
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
+        }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
+      >
         <DataTable
           columns={columns}
           rows={rows}
@@ -243,7 +327,48 @@ function ReturListPage({
         doc={detail?.data ?? null}
         isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
+        onPost={canPost ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
+        onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
+        busy={postDoc.isPending || cancelDoc.isPending}
       />
+
+      <AlertDialog open={confirmPostId != null} onOpenChange={(o) => !o && setConfirmPostId(null)}>
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Posting dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen akan diposting dan stok langsung ter-update. Tindakan ini tidak dapat
+              dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={() => void doPost()}>
+              Ya, Posting
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmCancelId != null}
+        onOpenChange={(o) => !o && setConfirmCancelId(null)}
+      >
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen Draft akan dibatalkan dan tidak dapat diposting lagi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Kembali</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={() => void doCancel()}>
+              Ya, Batalkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
@@ -257,6 +382,7 @@ export function ReturPembelianPage() {
       partnerLabel="Supplier"
       createLabel="Retur Pembelian"
       createSection="retur-pembelian"
+      reportSlug="retur-pembelian"
     />
   );
 }
@@ -270,6 +396,7 @@ export function ReturPenjualanPage() {
       partnerLabel="Customer"
       createLabel="Retur Penjualan"
       createSection="retur-penjualan"
+      reportSlug="retur-penjualan"
     />
   );
 }

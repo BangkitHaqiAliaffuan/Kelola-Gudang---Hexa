@@ -72,18 +72,72 @@ export function normalizeCode(s: string): string {
     .toLowerCase();
 }
 
+/**
+ * Cek digit EAN-13/EAN-8/UPC-A (UPC-A = EAN-13 berawalan 0).
+ * @returns true bila valid, false bila digit cek salah, null bila bukan
+ * panjang EAN (tidak perlu diperingatkan — mis. CODE128 internal).
+ */
+export function eanChecksumOk(code: string): boolean | null {
+  const digits = code.trim();
+  if (!/^\d+$/.test(digits)) return null;
+  if (digits.length !== 8 && digits.length !== 12 && digits.length !== 13) return null;
+  const nums = digits.split("").map(Number);
+  const check = nums[nums.length - 1]!;
+  // Aturan GS1: dari kanan (tanpa digit cek), bobot 3,1,3,1...
+  const body = nums.slice(0, -1).reverse();
+  let sum = 0;
+  body.forEach((d, i) => {
+    sum += d * (i % 2 === 0 ? 3 : 1);
+  });
+  return (10 - (sum % 10)) % 10 === check;
+}
+
 /** Cari ItemApi yang kodenya cocok dengan hasil scan (internal/barcode/sku). */
 export function findItemByCode<
   T extends Pick<ItemApi, "id" | "sku" | "barcode" | "internal_barcode">,
 >(items: T[], code: string): T | undefined {
+  return findMatchesByCode(items, code)[0]?.item;
+}
+
+/** Asal kecocokan scan — menentukan label sumber + prioritas. */
+export type MatchSource = "internal" | "produk" | "sku";
+
+export const MATCH_SOURCE_LABEL: Record<MatchSource, string> = {
+  internal: "label internal",
+  produk: "kemasan supplier",
+  sku: "SKU",
+};
+
+const SOURCE_RANK: Record<MatchSource, number> = { internal: 0, produk: 1, sku: 2 };
+
+/** Tentukan asal kecocokan satu barang terhadap kode scan (null bila tak cocok). */
+export function matchSourceOf(
+  item: Pick<ItemApi, "sku" | "barcode" | "internal_barcode">,
+  code: string,
+): MatchSource | null {
   const c = normalizeCode(code);
-  if (!c) return undefined;
-  return items.find(
-    (it) =>
-      normalizeCode(it.internal_barcode ?? "") === c ||
-      normalizeCode(it.barcode ?? "") === c ||
-      normalizeCode(it.sku) === c,
-  );
+  if (!c) return null;
+  if (normalizeCode(item.internal_barcode ?? "") === c) return "internal";
+  if (normalizeCode(item.barcode ?? "") === c) return "produk";
+  if (normalizeCode(item.sku) === c) return "sku";
+  return null;
+}
+
+/**
+ * Semua barang yang cocok dengan hasil scan, terurut prioritas
+ * (internal → produk → SKU). Barcode kemasan supplier boleh dipakai banyak
+ * barang — pemanggil wajib menampilkan dialog disambiguasi bila >1.
+ */
+export function findMatchesByCode<
+  T extends Pick<ItemApi, "id" | "sku" | "barcode" | "internal_barcode">,
+>(items: T[], code: string): { item: T; source: MatchSource }[] {
+  const out: { item: T; source: MatchSource }[] = [];
+  for (const it of items) {
+    const source = matchSourceOf(it, code);
+    if (source) out.push({ item: it, source });
+  }
+  out.sort((a, b) => SOURCE_RANK[a.source] - SOURCE_RANK[b.source]);
+  return out;
 }
 
 /**

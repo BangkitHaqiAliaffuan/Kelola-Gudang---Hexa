@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Save, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "./kit";
 import { FormCombobox, type ComboboxOption } from "./form-combobox";
-import { useWmsScanner } from "@/hooks/use-wms-scanner";
+import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
+import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useBins, useItems, useWarehouses } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
@@ -61,6 +63,12 @@ export function TransferGudangForm() {
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
 
   const [warehouseId, setWarehouseId] = useState("");
+  // Inisialisasi Gudang dari rantai session (read-only — form tidak menulis balik).
+  const whDefaultId = useWarehouseFilter(warehouses?.data).warehouseId;
+  useEffect(() => {
+    if (whDefaultId == null || warehouseId) return;
+    setWarehouseId(String(whDefaultId));
+  }, [whDefaultId, warehouseId]);
   const [destinationId, setDestinationId] = useState("");
   const [date, setDate] = useState(today());
   const [reference, setReference] = useState("");
@@ -73,11 +81,13 @@ export function TransferGudangForm() {
   // jendela refetch pasca-posting (invalidateQueries) sebelum navigate selesai.
   const [submitted, setSubmitted] = useState(false);
   const [scanTarget, setScanTarget] = useState<string | null>(null);
+  const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
     items: (items?.data ?? []) as never,
     onPick: (item) => {
       if (scanTarget) pickItem(scanTarget, String(item.id));
     },
+    onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
   });
 
   const warehouseOptions: ComboboxOption[] = useMemo(
@@ -735,6 +745,16 @@ export function TransferGudangForm() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ScanDisambiguasiDialog
+        open={ambiguous !== null}
+        code={ambiguous?.code}
+        matches={ambiguous?.matches ?? []}
+        onClose={() => setAmbiguous(null)}
+        onPick={(item) => {
+          if (scanTarget) pickItem(scanTarget, String(item.id));
+          setAmbiguous(null);
+        }}
+      />
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent className="max-w-md rounded-xl">
           <DialogHeader>

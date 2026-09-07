@@ -3,10 +3,15 @@
 namespace App\Http\Requests;
 
 use App\Models\Bin;
+use App\Models\Customer;
+use App\Models\Department;
+use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\Project;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
-use Illuminate\Support\Facades\DB;
+use App\Models\Warehouse;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -20,12 +25,34 @@ class StoreStockDocumentRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // Backwards compatibility: Retur Penjualan lama kirim partner string tanpa customer_id.
-        // Auto-resolve customer_id dari partner name sebelum validasi required.
-        if ($this->input('type') === 'Retur Penjualan' && empty($this->input('customer_id')) && ! empty($this->input('partner'))) {
-            $found = \App\Models\Customer::where('name', $this->input('partner'))->first();
-            if ($found) {
-                $this->merge(['customer_id' => $found->id]);
+        // Backwards compatibility: auto-resolve tujuan dari partner name.
+        // Retur Penjualan → customer; Pengeluaran → customer, lalu
+        // departemen, lalu proyek (tie-break sama dengan backfill migrasi).
+        if (empty($this->input('customer_id')) && ! empty($this->input('partner'))) {
+            if ($this->input('type') === 'Retur Penjualan') {
+                $found = Customer::where('name', $this->input('partner'))->first();
+                if ($found) {
+                    $this->merge(['customer_id' => $found->id]);
+                }
+            } elseif ($this->input('type') === 'Pengeluaran'
+                && empty($this->input('department_id'))
+                && empty($this->input('project_id'))
+            ) {
+                $partner = $this->input('partner');
+                $found = Customer::where('name', $partner)->first();
+                if ($found) {
+                    $this->merge(['customer_id' => $found->id]);
+                } else {
+                    $dept = Department::where('name', $partner)->first();
+                    if ($dept) {
+                        $this->merge(['department_id' => $dept->id]);
+                    } else {
+                        $proj = Project::where('name', $partner)->first();
+                        if ($proj) {
+                            $this->merge(['project_id' => $proj->id]);
+                        }
+                    }
+                }
             }
         }
     }
@@ -67,6 +94,24 @@ class StoreStockDocumentRequest extends FormRequest
                 Rule::exists('customers', 'id'),
                 Rule::requiredIf(fn () => $this->input('type') === 'Retur Penjualan'),
                 Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Pengeluaran', 'Retur Penjualan'], true)),
+                // Satu dokumen satu tujuan: customer / departemen / proyek eksklusif.
+                Rule::prohibitedIf(fn () => ! empty($this->input('department_id')) || ! empty($this->input('project_id'))),
+            ],
+            // Tujuan Barang Keluar selain customer: departemen / proyek.
+            // Hanya untuk Pengeluaran; eksklusif satu sama lain & vs customer_id.
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('departments', 'id'),
+                Rule::prohibitedIf(fn () => $this->input('type') !== 'Pengeluaran'),
+                Rule::prohibitedIf(fn () => ! empty($this->input('customer_id')) || ! empty($this->input('project_id'))),
+            ],
+            'project_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('projects', 'id'),
+                Rule::prohibitedIf(fn () => $this->input('type') !== 'Pengeluaran'),
+                Rule::prohibitedIf(fn () => ! empty($this->input('customer_id')) || ! empty($this->input('department_id'))),
             ],
             'reference_no' => ['nullable', 'string', 'max:255'],
             'pic' => ['nullable', 'string', 'max:255'],
@@ -97,6 +142,10 @@ class StoreStockDocumentRequest extends FormRequest
             // dipakai untuk Penerimaan & Retur Penjualan tanpa sumber (dan sebagai
             // fallback Stock Opname).
             'lines.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
+            // Snapshot harga jual per baris (sumber omzet). Hanya bermakna
+            // untuk Pengeluaran & Retur Penjualan; server mem-backfill dari
+            // Harga Jual master / baris sumber bila kosong (lihat controller).
+            'lines.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             // Opsi A: Semua transaksi boleh tanpa bin (lantai/gudang) termasuk Stock Opname — floor stock (bin_id IS NULL) ikut diopname.
             'lines.*.to_bin_id' => [
                 'nullable',
@@ -223,8 +272,8 @@ class StoreStockDocumentRequest extends FormRequest
 
                 $bins = Bin::with('rack.warehouse')->whereIn('id', $binIds)->get()->keyBy('id');
                 $itemIds = collect($lines)->pluck('item_id')->filter()->unique()->values();
-                $items = \App\Models\Item::whereIn('id', $itemIds)->get()->keyBy('id');
-                $headerWh = \App\Models\Warehouse::find($warehouseId);
+                $items = Item::whereIn('id', $itemIds)->get()->keyBy('id');
+                $headerWh = Warehouse::find($warehouseId);
                 $expectedWhName = $headerWh?->name ?? "Gudang ID {$warehouseId}";
 
                 foreach ($lines as $index => $line) {
@@ -251,14 +300,14 @@ class StoreStockDocumentRequest extends FormRequest
                         if ($bin->rack->warehouse_id !== $expected) {
                             $actualWh = $bin->rack->warehouse?->name ?? "Gudang ID {$bin->rack->warehouse_id}";
                             $expectedName = ($type === 'Transfer Gudang' && $field === 'to_bin_id')
-                                ? (\App\Models\Warehouse::find($destinationId)?->name ?? "Gudang ID {$destinationId}")
+                                ? (Warehouse::find($destinationId)?->name ?? "Gudang ID {$destinationId}")
                                 : $expectedWhName;
-                                
+
                             $item = $items->get((int) ($line['item_id'] ?? 0));
                             $skuLabel = $item ? " — SKU {$item->sku}" : '';
                             $validator->errors()->add(
                                 "lines.{$index}.{$field}",
-                                "Bin {$bin->code} (Rak {$bin->rack->code}) berada di {$actualWh}, bukan {$expectedName} (baris " . ($index + 1) . "{$skuLabel})."
+                                "Bin {$bin->code} (Rak {$bin->rack->code}) berada di {$actualWh}, bukan {$expectedName} (baris ".($index + 1)."{$skuLabel})."
                             );
                         }
                     }
@@ -407,7 +456,7 @@ class StoreStockDocumentRequest extends FormRequest
                     return;
                 }
                 try {
-                    $day = \Carbon\Carbon::parse($dateRaw)->toDateString();
+                    $day = Carbon::parse($dateRaw)->toDateString();
                 } catch (\Throwable) {
                     return;
                 }
@@ -417,8 +466,8 @@ class StoreStockDocumentRequest extends FormRequest
                     ->where('status', '!=', 'Dibatalkan')
                     ->first(['no', 'status', 'document_date', 'warehouse_id']);
                 if ($conflict) {
-                    $whName = \App\Models\Warehouse::find($warehouseId)?->name ?? "Gudang #{$warehouseId}";
-                    $tgl = \Carbon\Carbon::parse($conflict->document_date)->format('d M Y');
+                    $whName = Warehouse::find($warehouseId)?->name ?? "Gudang #{$warehouseId}";
+                    $tgl = Carbon::parse($conflict->document_date)->format('d M Y');
                     $validator->errors()->add('document_date', "Jadwal Stock Opname untuk {$whName} pada tanggal {$tgl} sudah ada ({$conflict->no} — {$conflict->status}). Hanya 1 jadwal per gudang per hari. Pilih tanggal lain, batalkan jadwal tersebut, atau lanjutkan proses opname yang sudah ada.");
                     $validator->errors()->add('warehouse_id', 'Gudang ini sudah punya jadwal opname di tanggal tersebut.');
                 }

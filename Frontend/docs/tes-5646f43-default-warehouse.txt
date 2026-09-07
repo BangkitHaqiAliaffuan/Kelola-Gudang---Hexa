@@ -1,0 +1,178 @@
+Tes Manual -- 5646f43 Gudang Default per User + Filter/Form Otomatis Terisi
+Commit: 5646f43 feat(auth): default warehouse per user (nullable FK) + auto-fill filter gudang + MasterUser + UserFormDialog
+Tanggal Uji: __________
+
+RINGKASAN PERUBAHAN (untuk penguji, boleh dilewati)
+  Sejak commit ini, setiap user punya "Gudang Default" (boleh kosong).
+  Gunanya: halaman daftar otomatis menampilkan filter Gudang milik user tersebut,
+  dan form-form transaksi/pengadaan otomatis mengisi kolom Gudang dengan gudang
+  milik user tersebut. Pilihan manual tidak akan ditimpa.
+
+PRASYARAT
+  - Dua server jalan: Backend (http://127.0.0.1:8000) + Frontend (http://localhost:8080)
+  - Pastikan migrasi terbaru sudah jalan (di folder Backend: php artisan migrate).
+    JANGAN menjalankan migrate:fresh / db:seed -- data akan hilang.
+  - Login memakai akun dari Frontend/docs/akun-login.md (password dari DEMO_PASSWORD).
+  - Acuan gudang default tiap akun (pada data bawaan standar; kalau di layarmu
+    tampil beda, ikuti yang tampil di layar sebagai acuan yang benar):
+      USR-001 Rudi Hartono  (Administrator)   -> Gudang Pusat Jakarta
+      USR-002 Siti Aminah   (Supervisor)      -> Gudang Pusat Jakarta
+      USR-003 Bayu Pratama  (Operator Gudang) -> Gudang Bekasi
+      USR-004 Dewi Lestari  (Auditor)         -> (kosong / Tanpa default)
+      USR-005 Agus Salim    (Operator Gudang) -> Gudang Surabaya
+      USR-006 Nur Hidayat   (Supervisor)      -> Gudang Bandung
+
+======================================================================
+A. Mengisi Gudang Default lewat halaman User (wajib login Rudi Hartono,
+   karena hanya Administrator yang boleh tambah/edit User)
+----------------------------------------------------------------------
+Langkah:
+  1. Login USR-001 Rudi Hartono, buka menu Master Data -> User
+  2. Klik tombol Tambah, isi Nama (mis. "Uji Coba"), Email (mis.
+     "uji.coba@kelolagudang.id"), Role "Operator Gudang", password 8+ karakter
+     beserta konfirmasinya
+  3. Pada field baru "Gudang Default (opsional)", pilih "Gudang Bandung"
+  4. Klik Simpan
+Harap:
+  - Muncul toast sukses, user baru muncul di tabel dengan kolom gudang
+    menunjukkan "Gudang Bandung"
+  [LULUS/GAGAL] __________
+
+Langkah:
+  5. Pada baris user baru itu, klik titik tiga -> Edit, ubah Gudang Default
+     menjadi "Gudang Bekasi", klik Simpan
+Harap:
+  - Muncul toast sukses, kolom gudang di tabel berubah menjadi "Gudang Bekasi"
+  [LULUS/GAGAL] __________
+
+Langkah:
+  6. Edit lagi user itu, ubah Gudang Default menjadi "Tanpa default --
+     Semua Gudang", klik Simpan
+Harap:
+  - Muncul toast sukses, kolom gudang di tabel menjadi kosong (tidak error).
+    Ini bukti gudang default boleh dikosongkan.
+  [LULUS/GAGAL] __________
+
+Langkah:
+  7. Hapus user uji coba itu (titik tiga -> Hapus -> konfirmasi)
+Harap:
+  - Muncul toast sukses, user hilang dari tabel (DB kembali bersih)
+  [LULUS/GAGAL] __________
+
+======================================================================
+B. Filter Gudang otomatis terisi di halaman daftar (login Bayu Pratama,
+   USR-003, gudang default: Gudang Bekasi)
+----------------------------------------------------------------------
+Langkah:
+  1. Logout, login USR-003 Bayu Pratama
+  2. Buka menu Transaksi -> Barang Masuk, perhatikan kotak filter "Gudang"
+Harap:
+  - Filter Gudang langsung menunjukkan "Gudang Bekasi" (bukan "Semua"),
+    tanpa diklik apa pun. Tabel hanya menampilkan dokumen gudang tersebut.
+  [LULUS/GAGAL] __________
+
+Langkah:
+  3. Ubah filter Gudang secara manual menjadi "Gudang Surabaya"
+  4. Masih di halaman yang sama, ketik sesuatu di kotak pencarian lalu hapus
+     lagi (agar halaman me-render ulang), perhatikan filter Gudang
+Harap:
+  - Filter tetap "Gudang Surabaya" -- pilihan manual TIDAK ditimpa kembali
+    menjadi Gudang Bekasi saat halaman me-render ulang.
+    (Catatan: kalau pindah menu lalu kembali, filter wajar kembali otomatis
+    ke Gudang Bekasi karena halaman dimuat ulang -- itu perilaku yang benar.)
+  [LULUS/GAGAL] __________
+
+Langkah:
+  5. Ulangi cek cepat langkah no. 2 untuk halaman-halaman di bawah ini:
+     cukup buka halamannya dan lihat filter Gudang otomatis menjadi
+     "Gudang Bekasi". Tulis LULUS/GAGAL per baris.
+Harap:
+  - Transaksi -> Barang Keluar                [LULUS/GAGAL] __________
+  - Transaksi -> Transfer Gudang              [LULUS/GAGAL] __________
+  - Transaksi -> Retur Pembelian              [LULUS/GAGAL] __________
+  - Transaksi -> Retur Penjualan              [LULUS/GAGAL] __________
+  - Pengadaan -> Receive Goods                [LULUS/GAGAL] __________
+  - Persediaan -> Stock Saat Ini              [LULUS/GAGAL] __________
+  - Persediaan -> Kartu Stock                 [LULUS/GAGAL] __________
+  - Persediaan -> Mutasi Stock                [LULUS/GAGAL] __________
+  - Persediaan -> Stock Minimum               [LULUS/GAGAL] __________
+  - Persediaan -> Nilai Persediaan            [LULUS/GAGAL] __________
+  - Persediaan -> Stock Adjustment            [LULUS/GAGAL] __________
+
+======================================================================
+C. Kolom Gudang otomatis terisi di form (tetap login Bayu Pratama)
+----------------------------------------------------------------------
+Langkah:
+  1. Buka Transaksi -> Barang Masuk -> klik Buat Baru, perhatikan kolom Gudang
+Harap:
+  - Kolom Gudang sudah terisi "Gudang Bekasi" sejak form dibuka
+  [LULUS/GAGAL] __________
+
+Langkah:
+  2. Ubah Gudang menjadi "Gudang Surabaya", lalu isi/tambah satu baris barang
+     (pilih barang + isi qty), perhatikan kolom Gudang
+Harap:
+  - Kolom Gudang tetap "Gudang Surabaya" -- tidak balik lagi ke Bekasi saat
+    form diisi. Batalkan form tanpa menyimpan (tombol Batal/Kembali).
+  [LULUS/GAGAL] __________
+
+Langkah:
+  3. Buat form Barang Masuk baru lagi, kali ini pilih dulu PO-nya
+     (kolom Referensi PO) sebelum menyentuh kolom Gudang
+Harap:
+  - Kolom Gudang mengikuti gudang dari PO yang dipilih (atau kosong bila PO
+    tersebut tidak punya gudang) -- yang penting BUKAN dipaksa menjadi
+    Gudang Bekasi. Batalkan form tanpa menyimpan.
+  [LULUS/GAGAL] __________
+
+Langkah:
+  4. Cek cepat form lain (cukup buka form barunya, lihat kolom Gudang sudah
+     terisi "Gudang Bekasi", lalu Batalkan tanpa menyimpan):
+Harap:
+  - Transaksi -> Barang Keluar -> Buat Baru    [LULUS/GAGAL] __________
+  - Transaksi -> Transfer Gudang -> Buat Baru  [LULUS/GAGAL] __________
+  - Persediaan -> Stock Adjustment -> Buat Baru[LULUS/GAGAL] __________
+  - Pengadaan -> Purchase Request -> Buat Baru [LULUS/GAGAL] __________
+  - Pengadaan -> Purchase Order -> Buat Baru   [LULUS/GAGAL] __________
+
+======================================================================
+D. Akun tanpa gudang default (login Dewi Lestari, USR-004, Auditor)
+----------------------------------------------------------------------
+Langkah:
+  1. Logout, login USR-004 Dewi Lestari
+  2. Buka Transaksi -> Barang Masuk, perhatikan filter Gudang
+Harap:
+  - Filter Gudang tetap "Semua" (tidak otomatis ke gudang mana pun),
+    tabel tampil normal, tidak ada error
+  [LULUS/GAGAL] __________
+
+Langkah:
+  3. Buka Persediaan -> Stock Saat Ini dan Persediaan -> Kartu Stock
+Harap:
+  - Filter Gudang di kedua halaman tetap "Semua", data tampil normal
+  [LULUS/GAGAL] __________
+
+======================================================================
+E. Simpan beneran satu dokumen dengan gudang otomatis (login Bayu Pratama)
+----------------------------------------------------------------------
+Langkah:
+  1. Logout, login USR-003 Bayu Pratama
+  2. Buka Transaksi -> Barang Masuk -> Buat Baru (kolom Gudang = Gudang Bekasi)
+  3. Isi Partner (mis. PT Uji Coba), tambah 1 baris barang dengan qty kecil
+     (mis. 1), Simpan sebagai Draft
+Harap:
+  - Muncul toast sukses, dokumen baru muncul di daftar dengan gudang
+    "Gudang Bekasi"
+  [LULUS/GAGAL] __________
+
+Langkah:
+  4. Buka dokumen itu, lalu Batalkan/Hapus dokumen tersebut
+Harap:
+  - Dokumen hilang dari daftar aktif (DB kembali bersih)
+  [LULUS/GAGAL] __________
+
+----------------------------------------------------------------------
+Tanggal: __________
+Penguji: __________
+Catatan: _______________________________________________________________
+________________________________________________________________________

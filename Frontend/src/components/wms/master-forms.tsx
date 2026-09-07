@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CrudFormDialog } from "./master-crud";
+import { BarcodeCameraDialog } from "./barcode-camera-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ScanLine, Camera } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -72,6 +73,9 @@ import {
   type WorkOrderInput,
 } from "@/lib/schemas";
 import { fieldError } from "@/lib/api";
+import { nextSku } from "@/lib/sku";
+import { eanChecksumOk, normalizeCode } from "@/lib/barcode-label";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import {
   useBins,
   useCategories,
@@ -170,24 +174,6 @@ function nextCode(codes: string[], prefix: string): string {
     if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
   }
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
-}
-
-function nextSku(codes: string[]): string {
-  let bestSeries = 10000;
-  let bestSeq = 0;
-  for (const c of codes) {
-    const m = /^SKU-(\d+)-(\d{3})$/.exec(c);
-    if (!m) continue;
-    const series = Number(m[1]);
-    const seq = Number(m[2]);
-    if (series > bestSeries || (series === bestSeries && seq > bestSeq)) {
-      bestSeries = series;
-      bestSeq = seq;
-    }
-  }
-  if (bestSeries === 10000 && bestSeq === 0) return "SKU-10001-001";
-  if (bestSeq >= 999) return `SKU-${bestSeries + 1}-001`;
-  return `SKU-${bestSeries}-${String(bestSeq + 1).padStart(3, "0")}`;
 }
 
 function nextYearlyCode(codes: string[], prefix: string, year = new Date().getFullYear()): string {
@@ -2430,6 +2416,40 @@ export function VendorFormDialog({
   );
 }
 
+/**
+ * Tombol isi kolom barcode dari scanner fisik (keyboard wedge).
+ * Alur: klik tombol (armed) → scan kemasan supplier → kolom terisi + disarm.
+ * Kamera tidak dipakai di sini agar tidak menduplikasi dialog kamera
+ * useWmsScanner (registrasi barang umumnya di PC + scanner USB).
+ */
+function BarcodeWedgeFillButton({ onFill }: { onFill: (code: string) => void }) {
+  const [armed, setArmed] = useState(false);
+  // useBarcodeScanner menyimpan onScan terbaru via ref — closure inline aman.
+  useBarcodeScanner({
+    enabled: armed,
+    onScan: (code) => {
+      const value = code.trim();
+      if (!value) return;
+      onFill(value);
+      setArmed(false);
+      toast.success(`Barcode terisi: ${value}`);
+    },
+  });
+  return (
+    <Button
+      type="button"
+      variant={armed ? "default" : "outline"}
+      size="icon"
+      className="h-10 w-10 shrink-0 rounded-xl"
+      title={armed ? "Siap — arahkan scanner ke barcode" : "Isi dari scanner fisik"}
+      aria-label="Isi barcode dari scanner fisik"
+      onClick={() => setArmed((a) => !a)}
+    >
+      <ScanLine className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export function ItemFormDialog({
   open,
   onOpenChange,
@@ -2441,6 +2461,7 @@ export function ItemFormDialog({
 }) {
   const create = useCreateItem();
   const update = useUpdateItem();
+  const [cameraOpen, setCameraOpen] = useState(false);
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: subCats, isLoading: subCatsLoading } = useSubCategories();
   const { data: merks, isLoading: merksLoading } = useMerks();
@@ -2598,18 +2619,69 @@ export function ItemFormDialog({
                 <FormField
                   control={form.control}
                   name="barcode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Barcode{" "}
-                        <span className="font-normal text-muted-foreground">(opsional)</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="8991..." className="rounded-xl" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const value = field.value ?? "";
+                    const norm = normalizeCode(value);
+                    const peers = norm
+                      ? (items?.data ?? []).filter(
+                          (it) => it.id !== initial?.id && normalizeCode(it.barcode ?? "") === norm,
+                        )
+                      : [];
+                    const checksum = value.trim() === "" ? null : eanChecksumOk(value);
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Barcode{" "}
+                          <span className="font-normal text-muted-foreground">(opsional)</span>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="8991... / scan kemasan"
+                              className="rounded-xl font-mono"
+                              {...field}
+                            />
+                            <BarcodeWedgeFillButton onFill={(code) => field.onChange(code)} />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-10 w-10 shrink-0 rounded-xl"
+                              title="Scan dengan kamera"
+                              aria-label="Scan barcode dengan kamera"
+                              onClick={() => setCameraOpen(true)}
+                            >
+                              <Camera className="h-4 w-4" />
+                            </Button>
+                            <BarcodeCameraDialog
+                              open={cameraOpen}
+                              onOpenChange={setCameraOpen}
+                              onDecode={(code) => {
+                                field.onChange(code);
+                                toast.success(`Barcode terisi: ${code}`);
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        {peers.length > 0 && (
+                          <p className="text-xs text-amber-600">
+                            Barcode dipakai {peers.length} barang lain:{" "}
+                            {peers
+                              .slice(0, 3)
+                              .map((p) => p.name)
+                              .join(", ")}
+                            {peers.length > 3 ? "…" : ""} — pastikan ini disengaja.
+                          </p>
+                        )}
+                        {checksum === false && (
+                          <p className="text-xs text-amber-600">
+                            Digit cek EAN tidak valid — periksa hasil scan.
+                          </p>
+                        )}
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={form.control}
@@ -3862,6 +3934,7 @@ export function UserFormDialog({
   const create = useCreateUser();
   const update = useUpdateUser();
   const { data: users } = useUsers();
+  const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const previewCode = nextCode(
     (users?.data ?? []).map((u) => u.code),
     "USR",
@@ -3884,6 +3957,7 @@ export function UserFormDialog({
               name: initial.name,
               email: initial.email ?? "",
               role: initial.role as UserInput["role"],
+              default_warehouse_id: initial.default_warehouse_id ?? "",
               password: "",
               password_confirmation: "",
               is_active: initial.is_active,
@@ -3893,6 +3967,7 @@ export function UserFormDialog({
               name: "",
               email: "",
               role: "Operator Gudang",
+              default_warehouse_id: "",
               password: "",
               password_confirmation: "",
               is_active: true,
@@ -3905,6 +3980,9 @@ export function UserFormDialog({
           role: values.role,
           is_active: values.is_active,
         };
+        const whId = values.default_warehouse_id;
+        if (whId !== "" && whId != null) payload.default_warehouse_id = Number(whId);
+        else if (initial) payload.default_warehouse_id = null;
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
         if (values.password) payload.password = values.password;
@@ -3925,12 +4003,14 @@ export function UserFormDialog({
           rowField(form as never, err, "name");
           rowField(form as never, err, "email");
           rowField(form as never, err, "role");
+          rowField(form as never, err, "default_warehouse_id");
           rowField(form as never, err, "password");
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
             !fieldError(err, "role") &&
+            !fieldError(err, "default_warehouse_id") &&
             !fieldError(err, "password")
           )
             toast.error((err as Error).message);
@@ -4011,6 +4091,38 @@ export function UserFormDialog({
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <FormField
+              control={form.control}
+              name="default_warehouse_id"
+              render={({ field }) => {
+                const options: ComboboxOption[] = (warehouses?.data ?? []).map((w) => ({
+                  value: String(w.id),
+                  label: w.name,
+                  keywords: w.code,
+                }));
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      Gudang Default{" "}
+                      <span className="font-normal text-muted-foreground">(opsional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <FormCombobox
+                        value={field.value == null || field.value === "" ? "" : String(field.value)}
+                        onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
+                        options={options}
+                        placeholder="Tanpa default — Semua Gudang"
+                        loading={warehousesLoading}
+                        allowEmpty
+                        side="bottom"
+                        avoidCollisions={false}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <div className="space-y-2">
               <Label>Password</Label>

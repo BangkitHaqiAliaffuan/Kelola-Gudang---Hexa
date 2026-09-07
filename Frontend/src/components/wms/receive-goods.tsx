@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,9 @@ export function ReceiveGoodsPage() {
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -63,10 +66,10 @@ export function ReceiveGoodsPage() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setPartner(ALL);
     setStatus(ALL);
-  }, []);
+  }, [whFilter]);
 
   const receipts = useMemo(() => (data?.data ?? []).filter(isPoReceipt), [data]);
 
@@ -229,7 +232,7 @@ export function ReceiveGoodsPage() {
             <FilterSelect
               className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={wh}
-              onChange={setWh}
+              onChange={whFilter.onChange}
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
               loading={warehousesLoading}

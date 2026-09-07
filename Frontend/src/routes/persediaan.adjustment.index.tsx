@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import {
   useApproveStockDocument,
@@ -79,7 +80,9 @@ function StockAdjustment() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -90,10 +93,10 @@ function StockAdjustment() {
   const handleClearFilters = useCallback(() => {
     setQ("");
     setStatus(ALL);
-    setWh(ALL);
+    whFilter.reset();
     setDateFrom("");
     setDateTo("");
-  }, []);
+  }, [whFilter]);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const postDoc = usePostStockDocument();
   const cancelDoc = useCancelStockDocument();
@@ -262,7 +265,7 @@ function StockAdjustment() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

@@ -7,6 +7,7 @@ import { EmptyState, TableSkeleton } from "./kit";
 export type Column<T> = {
   key: string;
   label: string;
+  header?: ReactNode;
   className?: string;
   sticky?: "left" | "right";
   sortable?: boolean;
@@ -105,19 +106,20 @@ export function DataTable<T extends { id: string | number }>({
                     c.className,
                   )}
                 >
-                  {c.sortable ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(c.key)}
-                      className="inline-flex items-center gap-1.5 select-none"
-                      aria-label={`Urutkan berdasarkan ${c.label}`}
-                    >
-                      {c.label}
-                      <SortIcon colKey={c.key} />
-                    </button>
-                  ) : (
-                    c.label
-                  )}
+                  {c.header ??
+                    (c.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(c.key)}
+                        className="inline-flex items-center gap-1.5 select-none"
+                        aria-label={`Urutkan berdasarkan ${c.label}`}
+                      >
+                        {c.label}
+                        <SortIcon colKey={c.key} />
+                      </button>
+                    ) : (
+                      c.label
+                    ))}
                 </th>
               ))}
             </tr>

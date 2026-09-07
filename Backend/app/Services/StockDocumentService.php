@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockDocument;
@@ -64,6 +65,21 @@ class StockDocumentService
                 foreach ($movements as $attributes) {
                     $this->assertNoNegativeStock($attributes);
                     StockMovement::create($attributes);
+                }
+
+                // Selaraskan unit_cost baris ke biaya posting (rata-rata berjalan
+                // saat posting) agar value_total dokumen = ledger. Tanpa ini,
+                // draft yang diposting berhari-hari kemudian (ada penerimaan baru
+                // di antaranya) menampilkan HPP saat draft dibuat, bukan HPP final.
+                // Dikecualikan: RP ter-link (harga beli asal dikunci), Opname
+                // (snapshot fisik), Penerimaan/RJ (harga input/sumber), dan garis
+                // IN (memakai unit_cost baris apa adanya).
+                $outCost = collect($movements)->firstWhere('direction', 'OUT')['unit_cost'] ?? null;
+                if ($outCost !== null
+                    && in_array($document->type, ['Pengeluaran', 'Transfer Gudang', 'Stock Adjustment'], true)
+                    && ! $this->usesPurchaseCost($document, $line)
+                ) {
+                    $line->update(['unit_cost' => (float) $outCost]);
                 }
 
                 $itemsTouched[$line->item_id] = true;
@@ -221,6 +237,7 @@ class StockDocumentService
                 $base = trim("{$sku} {$name}");
                 $binPart = $binCode ? " (Bin: {$binCode})" : '';
                 $lineNoPart = $lineNo ? " - Baris ke-{$lineNo}" : '';
+
                 return "{$base}{$binPart}{$lineNoPart}";
             })
             ->filter()
@@ -418,11 +435,11 @@ class StockDocumentService
         if ($attributes['qty'] > $available) {
             $item = Item::find($attributes['item_id']);
             $label = $item ? trim(($item->sku ?? '').' '.($item->name ?? '')) : "#{$attributes['item_id']}";
-            
-            $binLabel = $attributes['bin_id'] 
-                ? (\App\Models\Bin::find($attributes['bin_id'])?->code ?? 'Bin') 
+
+            $binLabel = $attributes['bin_id']
+                ? (Bin::find($attributes['bin_id'])?->code ?? 'Bin')
                 : 'Lantai/Tanpa Bin';
-                
+
             $totalWarehouse = ItemStock::where('item_id', $attributes['item_id'])
                 ->where('warehouse_id', $attributes['warehouse_id'])
                 ->selectRaw('COALESCE(SUM(stock),0) - COALESCE(SUM(reserved),0) AS total')

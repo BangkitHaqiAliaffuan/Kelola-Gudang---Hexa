@@ -1,41 +1,72 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { findItemByCode } from "@/lib/barcode-label";
+import { findMatchesByCode, MATCH_SOURCE_LABEL, type MatchSource } from "@/lib/barcode-label";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import type { ItemApi } from "@/lib/master-types";
 
+type ScanItem = Pick<ItemApi, "id" | "sku" | "barcode" | "internal_barcode" | "name">;
+
+export type ScanMatch = { item: ScanItem; source: MatchSource };
+
 type UseWmsScannerOptions = {
-  items: Pick<ItemApi, "id" | "sku" | "barcode" | "internal_barcode" | "name">[];
+  items: ScanItem[];
   onPick: (item: Pick<ItemApi, "id" | "name">) => void;
+  /**
+   * Dipanggil bila satu kode cocok dengan >1 barang (barcode kemasan bersama).
+   * Bila tidak diisi, fallback ke perilaku lama: pilih cocok pertama.
+   */
+  onAmbiguous?: (code: string, matches: ScanMatch[]) => void;
   readerId?: string;
 };
 
-export function useWmsScanner({ items, onPick, readerId = "wms-reader" }: UseWmsScannerOptions) {
+export function useWmsScanner({
+  items,
+  onPick,
+  onAmbiguous,
+  readerId = "wms-reader",
+}: UseWmsScannerOptions) {
   const [scanOpen, setScanOpen] = useState(false);
   const scannerRef = useRef<InstanceType<(typeof import("html5-qrcode"))["Html5Qrcode"]> | null>(
     null,
   );
   const scanHandledRef = useRef(false);
+  const onAmbiguousRef = useRef(onAmbiguous);
+  useEffect(() => {
+    onAmbiguousRef.current = onAmbiguous;
+  }, [onAmbiguous]);
 
-  const handleHardwareScan = useCallback(
-    (code: string) => {
+  /**
+   * Resolusi satu hasil scan (dipakai wedge fisik maupun kamera):
+   * 0 cocok → error; 1 cocok → pilih + toast sumber; >1 → dialog disambiguasi
+   * (atau cocok pertama bila caller belum menyediakan onAmbiguous).
+   */
+  const resolveScan = useCallback(
+    (code: string): boolean => {
       if (!items.length) {
         toast.error("Data barang belum siap — coba lagi sesaat");
-        return;
+        return false;
       }
-      const found = findItemByCode(items, code);
-      if (found) {
-        onPick(found as unknown as Pick<ItemApi, "id" | "name">);
-        toast.success(`Terpilih: ${(found as unknown as { name: string }).name}`);
-      } else {
+      const matches = findMatchesByCode(items, code);
+      if (matches.length === 0) {
         toast.error(`Barang tidak ditemukan: ${code.trim()}`);
+        return false;
       }
+      if (matches.length > 1 && onAmbiguousRef.current) {
+        onAmbiguousRef.current(code, matches);
+        return true;
+      }
+      const first = matches[0]!;
+      onPick(first.item as unknown as Pick<ItemApi, "id" | "name">);
+      toast.success(
+        `Terpilih: ${(first.item as unknown as { name: string }).name} (${MATCH_SOURCE_LABEL[first.source]})`,
+      );
+      return true;
     },
     [items, onPick],
   );
 
-  useBarcodeScanner({ onScan: handleHardwareScan, enabled: !scanOpen });
+  useBarcodeScanner({ onScan: resolveScan, enabled: !scanOpen });
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current;
@@ -89,14 +120,9 @@ export function useWmsScanner({ items, onPick, readerId = "wms-reader" }: UseWms
           { fps: 15, qrbox: { width: 400, height: 200 }, aspectRatio: 1.33, disableFlip: false },
           (decodedText) => {
             if (scanHandledRef.current) return;
-            const found = findItemByCode(items, decodedText);
-            if (found) {
+            if (resolveScan(decodedText)) {
               scanHandledRef.current = true;
-              onPick(found as unknown as Pick<ItemApi, "id" | "name">);
-              toast.success(`Terpilih: ${(found as unknown as { name: string }).name}`);
               setScanOpen(false);
-            } else {
-              toast.error(`Barang tidak ditemukan: ${decodedText.trim()}`);
             }
           },
           () => undefined,
@@ -114,7 +140,7 @@ export function useWmsScanner({ items, onPick, readerId = "wms-reader" }: UseWms
       cancelled = true;
       void stopScanner();
     };
-  }, [scanOpen, items, stopScanner]);
+  }, [scanOpen, items, stopScanner, resolveScan, readerId]);
 
   return { scanOpen, setScanOpen, readerId };
 }
