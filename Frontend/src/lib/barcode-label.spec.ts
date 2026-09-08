@@ -132,6 +132,38 @@ describe("buildPrintHtml", () => {
     const html = buildPrintHtml({ size: "30x20", labels });
     expect(html.match(/class="label/g)?.length).toBe(MAX_LABELS);
   });
+
+  it("memakai grid kolom tetap dan memecah halaman per perSheet", () => {
+    const labels = Array.from({ length: 30 }, (_, i) => ({
+      svg: "<svg></svg>",
+      name: `Item ${i}`,
+      meta: "m",
+      kind: "Barcode" as const,
+    }));
+    // 50x30 → 27/lembar: 30 label = 2 halaman (27 + 3).
+    const html = buildPrintHtml({ size: "50x30", labels });
+    expect(html).toContain("grid-template-columns: repeat(3, 50mm)");
+    expect(html.match(/class="page/g)?.length).toBe(2);
+    expect(html.match(/class="page break"/g)?.length).toBe(1);
+  });
+
+  it("halaman terakhir tanpa break dan label tunggal tanpa wrapper break", () => {
+    const one = buildPrintHtml({
+      size: "A4",
+      labels: [{ svg: "<svg></svg>", name: "I", meta: "m", kind: "Barcode" }],
+    });
+    expect(one).toContain('class="page"');
+    expect(one).not.toContain('class="page break"');
+  });
+
+  it("border panduan disembunyikan saat print", () => {
+    const html = buildPrintHtml({
+      size: "50x30",
+      labels: [{ svg: "<svg></svg>", name: "I", meta: "m", kind: "Barcode" }],
+    });
+    expect(html).toContain("@media print");
+    expect(html).toMatch(/@media print\s*\{\s*\.label\s*\{\s*border:\s*none/);
+  });
 });
 
 describe("buildSheetSvg", () => {

@@ -67,3 +67,27 @@ describe("useWmsScanner onUnknown", () => {
     expect(mockSuccess).toHaveBeenCalled();
   });
 });
+
+describe("useWmsScanner resolveScan (input manual)", () => {
+  it("mengekspos resolveScan untuk jalur ketik/tempel manual", () => {
+    const onUnknown = vi.fn();
+    const onPick = vi.fn();
+    const { result } = renderHook(() => useWmsScanner({ items, onPick, onUnknown }));
+
+    expect(result.current.resolveScan("  588191429331 ")).toBe(true);
+
+    expect(onUnknown).toHaveBeenCalledWith("588191429331");
+    expect(onPick).not.toHaveBeenCalled();
+  });
+
+  it("resolveScan kode dikenal memilih barang tanpa kamera", () => {
+    const onUnknown = vi.fn();
+    const onPick = vi.fn();
+    const { result } = renderHook(() => useWmsScanner({ items, onPick, onUnknown }));
+
+    expect(result.current.resolveScan("8990000000001")).toBe(true);
+
+    expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(onUnknown).not.toHaveBeenCalled();
+  });
+});

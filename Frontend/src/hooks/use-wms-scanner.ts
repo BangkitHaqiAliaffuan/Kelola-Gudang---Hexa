@@ -155,5 +155,5 @@ export function useWmsScanner({
     };
   }, [scanOpen, items, stopScanner, resolveScan, readerId]);
 
-  return { scanOpen, setScanOpen, readerId };
+  return { scanOpen, setScanOpen, readerId, resolveScan };
 }

@@ -218,21 +218,31 @@ function escapeHtml(s: string): string {
 /**
  * Dokumen HTML mandiri untuk print (hidden iframe): ukuran label dalam mm,
  * @page A4, baris teks nama + SKU/harga, warna kode dipertahankan.
+ *
+ * Layout memakai grid kolom tetap per ukuran + wrapper `.page` per lembar
+ * (break-after terkontrol) sehingga susunan halaman dapat diprediksi.
+ * Border dashed hanya panduan potong di layar — disembunyikan saat print.
+ * String HTML ini juga dipakai untuk preview WYSIWYG di halaman /barcode:
+ * satu sumber kebenaran untuk layar dan cetakan.
  */
 export function buildPrintHtml({ size, labels }: PrintLabels): string {
-  const { wMm, hMm } = computeSheetLayout(size);
+  const { wMm, hMm, cols, perSheet } = computeSheetLayout(size);
   const qrSideMm = Math.max(Math.min(wMm, hMm) - 8, 8);
-  const items = labels
-    .slice(0, MAX_LABELS)
-    .map(
-      (l) => `
+  const capped = labels.slice(0, MAX_LABELS);
+  const renderLabel = (l: PrintLabel) => `
       <div class="label ${l.kind === "QR Code" ? "qr" : "bars"}">
         <div class="code">${l.svg}</div>
         <div class="name">${escapeHtml(l.name)}</div>
         <div class="meta">${escapeHtml(l.meta)}</div>
-      </div>`,
-    )
-    .join("\n");
+      </div>`;
+  const pages: string[] = [];
+  for (let p = 0; p * perSheet < capped.length; p++) {
+    const pageLabels = capped.slice(p * perSheet, (p + 1) * perSheet);
+    const last = (p + 1) * perSheet >= capped.length;
+    pages.push(
+      `    <div class="page${last ? "" : " break"}">\n${pageLabels.map(renderLabel).join("\n")}\n    </div>`,
+    );
+  }
   return `<!doctype html>
 <html lang="id">
 <head>
@@ -244,13 +254,18 @@ export function buildPrintHtml({ size, labels }: PrintLabels): string {
   html, body { margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #000;
          -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page {
+    display: grid; grid-template-columns: repeat(${cols}, ${wMm}mm);
+    justify-content: start;
+  }
+  .page.break { break-after: page; page-break-after: always; }
   .label {
     width: ${wMm}mm; height: ${hMm}mm;
-    display: inline-block; vertical-align: top;
     border: 0.2mm dashed #bbb; padding: 2mm;
     break-inside: avoid; page-break-inside: avoid;
     overflow: hidden;
   }
+  @media print { .label { border: none; } }
   .label .code { display: flex; justify-content: center; }
   .label.bars .code svg { display: block; width: 100%; height: auto; }
   .label.qr .code { align-items: center; }
@@ -261,7 +276,7 @@ export function buildPrintHtml({ size, labels }: PrintLabels): string {
 </head>
 <body>
 <div class="sheet">
-${items}
+${pages.join("\n")}
 </div>
 </body>
 </html>`;
@@ -419,14 +434,10 @@ export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Prom
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas tidak didukung");
 
-  // Background putih + border tipis
+  // Background putih tanpa border — hasil PNG identik dengan cetakan
+  // (border panduan potong hanya tampil di preview layar).
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, wPx, hPx);
-  ctx.strokeStyle = "#bbbbbb";
-  ctx.lineWidth = Math.max(1, Math.round(0.2 * PX_PER_MM_300));
-  ctx.setLineDash([Math.round(2 * PX_PER_MM_300), Math.round(2 * PX_PER_MM_300)]);
-  ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, wPx - ctx.lineWidth, hPx - ctx.lineWidth);
-  ctx.setLineDash([]);
 
   const pad = Math.round(2 * PX_PER_MM_300);
   let y = pad;
