@@ -64,6 +64,28 @@ export function encodeItem(item: Pick<ItemApi, "sku" | "barcode" | "internal_bar
   return item.internal_barcode || item.barcode || item.sku;
 }
 
+/** Sumber nilai eksplisit untuk cetak — operator memilih, tanpa prioritas diam-diam. */
+export type CodeSource = "internal" | "produk" | "sku";
+
+export const CODE_SOURCE_LABEL: Record<CodeSource, string> = {
+  internal: "Barcode Internal",
+  produk: "Barcode Produk",
+  sku: "SKU",
+};
+
+/**
+ * Nilai yang di-encode sesuai pilihan operator. Mengembalikan "" bila kolom
+ * kosong — pemanggil menampilkan empty-state jujur seperti biasa.
+ */
+export function encodeItemWithSource(
+  item: Pick<ItemApi, "sku" | "barcode" | "internal_barcode">,
+  source: CodeSource,
+): string {
+  if (source === "internal") return item.internal_barcode ?? "";
+  if (source === "produk") return item.barcode ?? "";
+  return item.sku;
+}
+
 /** Normalisasi untuk matching scan: trim + buang \r\n + lower-case. */
 export function normalizeCode(s: string): string {
   return s

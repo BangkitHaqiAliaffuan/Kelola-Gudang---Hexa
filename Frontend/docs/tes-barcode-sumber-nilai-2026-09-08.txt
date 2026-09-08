@@ -1,0 +1,101 @@
+TES BARCODE — SELECTOR SUMBER NILAI + BUAT BARANG DARI SCAN
+Tanggal dokumen: 2026-09-08
+Fitur: pilih sumber nilai cetak (Internal/Produk/SKU) + scan barcode asing jadi barang baru
+
+PRASYARAT
+1. Dua server jalan: backend http://127.0.0.1:8000 dan frontend http://localhost:8080.
+2. Login dengan akun dari Frontend/docs/akun-login.md (pakai akun yang bisa
+   Tulis Master Data, mis. Administrator — untuk tombol Tetapkan & buat barang).
+3. Siapkan satu barang yang PUNYA barcode produk dan barcode internal
+   (lihat tab Barcode di detail barang), dan satu barang yang BELUM punya
+   barcode produk.
+4. Untuk bagian D siapkan scanner fisik ATAU laptop/HP berkamera. Bila tidak
+   ada keduanya, lewati bagian D dan tulis "DILEWATI (tanpa alat scan)".
+
+BAGIAN A — SELECTOR SUMBER NILAI DI HALAMAN BARCODE
+A1. Buka menu Barcode. Di panel Pengaturan Label, cari kontrol "Sumber Nilai".
+    Expected: ada 3 pilihan (Barcode Internal, Barcode Produk, SKU), yang aktif
+    adalah Barcode Internal.
+    [LULUS/GAGAL]
+A2. Tambah satu barang yang punya ketiga kode ke daftar (klik Tambah Barang,
+    pilih barang). Ganti Sumber Nilai ke Barcode Produk.
+    Expected: preview label berubah, teks kecil di bawah preview menunjukkan
+    nilai barcode produk barang itu.
+    [LULUS/GAGAL]
+A3. Ganti Sumber Nilai ke SKU.
+    Expected: preview menunjukkan nilai SKU.
+    [LULUS/GAGAL]
+A4. Tambah barang yang BELUM punya barcode produk, pilih Sumber Nilai
+    Barcode Produk.
+    Expected: kartu preview menampilkan pesan jujur (barang belum punya
+    barcode/SKU yang valid), bukan gambar rusak.
+    [LULUS/GAGAL]
+
+BAGIAN B — TOMBOL TETAPKAN BARCODE
+B1. Dengan Sumber Nilai = Barcode Internal, lihat tombol di bawah preview.
+    Expected: tombol bertuliskan "Bukan Barcode Produk" dan TIDAK bisa diklik
+    (arahkan kursor: ada penjelasan hanya barcode produk yang bisa ditetapkan).
+    [LULUS/GAGAL]
+B2. Ganti Sumber Nilai = SKU. Expected: tombol juga tidak bisa diklik.
+    [LULUS/GAGAL]
+B3. Ganti Sumber Nilai = Barcode Produk pada barang yang barcode produknya
+    masih kosong. Klik "Tetapkan Barcode".
+    Expected: toast sukses "tersimpan", tombol berubah jadi "Sudah Tersimpan".
+    Buka detail barang itu → kolom Barcode terisi nilai tadi.
+    [LULUS/GAGAL]
+
+BAGIAN C — TOGGLE QR DI TAB BARCODE DETAIL BARANG
+C1. Buka Master → Barang → klik salah satu barang → tab Barcode.
+    Expected: ada 4 slot (SKU, Barcode Produk, Barcode Internal, QR Code) dan
+    di atas slot QR ada pilihan sumber (default Barcode Internal) + tulisan
+    nilai yang di-encode.
+    [LULUS/GAGAL]
+C2. Ganti pilihan QR ke Barcode Produk lalu ke SKU.
+    Expected: gambar QR berubah mengikuti pilihan, tulisan nilainya ikut berubah.
+    [LULUS/GAGAL]
+C3. Klik tombol Cetak di slot QR.
+    Expected: dialog cetak browser muncul (cukup sampai dialog muncul, boleh Batal).
+    [LULUS/GAGAL]
+
+BAGIAN D — SCAN BARCODE ASING JADI BARANG BARU (butuh scanner/kamera)
+D1. Di halaman Barcode, klik ikon scan pada salah satu baris, arahkan ke
+    barcode kemasan yang BELUM terdaftar di sistem.
+    Expected: muncul dialog "Barcode belum terdaftar" menampilkan kodenya.
+    [LULUS/GAGAL]
+D2. Klik "Buat Barang Baru".
+    Expected: form Tambah Barang terbuka dan kolom Barcode SUDAH terisi kode
+    hasil scan. Kolom Barcode Internal terkunci ("Otomatis dibuat sistem").
+    [LULUS/GAGAL]
+D3. Lengkapi Nama + Kategori + harga, klik Simpan.
+    Expected: toast "Barang ditambahkan" dan barang baru OTOMATIS masuk daftar
+    label di halaman Barcode (toast "ditambahkan ke daftar label").
+    [LULUS/GAGAL]
+D4. Klik Batal pada dialog "Barcode belum terdaftar" untuk kode asing lain.
+    Expected: dialog tertutup, tidak ada barang dibuat, daftar label tetap.
+    [LULUS/GAGAL]
+
+BAGIAN E — REGRESI (tidak boleh rusak)
+E1. Scan barcode yang SUDAH terdaftar di halaman Barcode.
+    Expected: barang langsung terpilih + toast nama barang (tanpa dialog baru).
+    [LULUS/GAGAL]
+E2. Scan barcode kemasan yang dipakai >1 barang.
+    Expected: muncul dialog pilihan barang (disambiguasi), bukan langsung pilih.
+    [LULUS/GAGAL]
+E3. Buka Transaksi → Barang Masuk → scan kode yang BELUM terdaftar.
+    Expected: toast error "Barang tidak ditemukan" — TIDAK ada tawaran buat
+    barang baru (transaksi tidak boleh melahirkan master data).
+    [LULUS/GAGAL]
+E4. Login sebagai peran tanpa Tulis Master Data (mis. Auditor bila ada), scan
+    kode asing di halaman Barcode.
+    Expected: toast penolakan, TIDAK ada dialog buat barang.
+    [LULUS/GAGAL]
+
+CATATAN
+- Barcode produk tidak perlu dicetak ulang (sudah menempel di kemasan) — jalur
+  cetak default selalu Barcode Internal di semua tempat.
+- Bila ada langkah GAGAL, catat nomor langkah + pesan/toast yang muncul.
+
+Tanggal pengujian : ............
+Penguji           : ............
+Hasil akhir       : [LULUS SEMUA / ADA GAGAL]
+Catatan           : ............

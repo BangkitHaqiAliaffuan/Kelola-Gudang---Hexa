@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { FormCombobox, type ComboboxOption } from "@/components/wms/form-combobox";
 import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
 import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
+import { ItemFormDialog } from "@/components/wms/master-forms";
 import { useItems, useUpdateItem, type ItemPayload } from "@/hooks/use-master";
 import { useAuth } from "@/hooks/use-auth";
 import type { ItemApi } from "@/lib/master-types";
@@ -24,13 +25,16 @@ import { cn } from "@/lib/utils";
 import {
   LABEL_SIZES,
   MAX_LABELS,
+  CODE_SOURCE_LABEL,
   buildCodeSvg,
   buildPrintHtml,
   computeSheetLayout,
   downloadLabelsAsPngOrZip,
-  encodeItem,
+  encodeItemWithSource,
+  normalizeCode,
   printHtml,
   type BarcodeKind,
+  type CodeSource,
   type LabelSize,
   type PrintLabel,
 } from "@/lib/barcode-label";
@@ -74,6 +78,7 @@ function BarcodePage() {
   const { sku } = useSearch({ from: "/barcode" });
 
   const [kind, setKind] = useState<BarcodeKind>("Barcode");
+  const [source, setSource] = useState<CodeSource>("internal");
   const [size, setSize] = useState<LabelSize>("50x30");
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -119,6 +124,10 @@ function BarcodePage() {
 
   const [scanTarget, setScanTarget] = useState<number | null>(null);
   const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
+  // Kode hasil scan yang belum terdaftar di master → tawar buat barang baru.
+  const [unknownCode, setUnknownCode] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const pendingBarcode = useRef<string | null>(null);
   const { scanOpen, setScanOpen, readerId } = useWmsScanner({
     items: items as never,
     onPick: (item) => {
@@ -136,6 +145,13 @@ function BarcodePage() {
       }
     },
     onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
+    onUnknown: (code) => {
+      if (!canWrite) {
+        toast.error(`Barang tidak ditemukan: ${code} (perlu akses Tulis Master Data)`);
+        return;
+      }
+      setUnknownCode(code);
+    },
   });
 
   useEffect(() => {
@@ -145,6 +161,19 @@ function BarcodePage() {
       seeded.current = true;
     }
   }, [sku, items, addRow]);
+
+  // Setelah barang baru tersimpan (invalidasi items), masukkan otomatis ke
+  // daftar label. Aman dari batal: tanpa item cocok, tidak ada yang terjadi.
+  useEffect(() => {
+    const pending = pendingBarcode.current;
+    if (!pending || createOpen || items.length === 0) return;
+    const it = items.find((i) => normalizeCode(i.barcode ?? "") === normalizeCode(pending));
+    if (it) {
+      pendingBarcode.current = null;
+      addRow(it.id);
+      toast.success(`${it.name} ditambahkan ke daftar label`);
+    }
+  }, [items, createOpen, addRow]);
 
   type PreviewOk = { item: ItemApi; svg: string; key: number; qty: number; value: string };
   type PreviewErr = { item: ItemApi; error: true; key: number; qty: number };
@@ -156,14 +185,16 @@ function BarcodePage() {
           if (!it) return null;
           let svg: string;
           try {
-            svg = buildCodeSvg(encodeItem(it), kind, { codeHeightMm: CODE_HEIGHT[size] });
+            svg = buildCodeSvg(encodeItemWithSource(it, source), kind, {
+              codeHeightMm: CODE_HEIGHT[size],
+            });
           } catch {
             return { item: it, error: true, key: r.id, qty: r.qty };
           }
-          return { item: it, svg, key: r.id, qty: r.qty, value: encodeItem(it) };
+          return { item: it, svg, key: r.id, qty: r.qty, value: encodeItemWithSource(it, source) };
         })
         .filter((p): p is PreviewOk | PreviewErr => p !== null),
-    [rows, items, kind, size],
+    [rows, items, kind, size, source],
   );
 
   const buildLabels = useCallback((): { labels: PrintLabel[]; ok: boolean } => {
@@ -173,7 +204,9 @@ function BarcodePage() {
       if (!it) continue;
       let svg: string;
       try {
-        svg = buildCodeSvg(encodeItem(it), kind, { codeHeightMm: CODE_HEIGHT[size] });
+        svg = buildCodeSvg(encodeItemWithSource(it, source), kind, {
+          codeHeightMm: CODE_HEIGHT[size],
+        });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Gagal generate kode");
         return { labels, ok: false };
@@ -186,7 +219,7 @@ function BarcodePage() {
       if (labels.length >= MAX_LABELS) break;
     }
     return { labels, ok: true };
-  }, [rows, items, kind, size]);
+  }, [rows, items, kind, size, source]);
 
   const [downloading, setDownloading] = useState(false);
 
@@ -302,6 +335,29 @@ function BarcodePage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Sumber Nilai</Label>
+              <div className="flex rounded-xl border border-border bg-card p-1">
+                {(["internal", "produk", "sku"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSource(s)}
+                    className={cn(
+                      "flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                      source === s ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {CODE_SOURCE_LABEL[s]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Nilai yang di-encode ke label. Barcode produk tidak perlu dicetak ulang — sudah
+                menempel di kemasan supplier.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -462,15 +518,25 @@ function BarcodePage() {
                           variant="outline"
                           size="sm"
                           className="mt-2 w-full rounded-lg"
-                          disabled={updateItem.isPending || p.item.barcode === p.value}
-                          title={
+                          disabled={
+                            updateItem.isPending ||
+                            source !== "produk" ||
                             p.item.barcode === p.value
-                              ? "Nilai ini sudah tersimpan sebagai barcode produk"
-                              : "Simpan nilai ini sebagai barcode produk"
+                          }
+                          title={
+                            source !== "produk"
+                              ? "Hanya nilai Barcode Produk yang bisa ditetapkan (internal dikunci sistem)"
+                              : p.item.barcode === p.value
+                                ? "Nilai ini sudah tersimpan sebagai barcode produk"
+                                : "Simpan nilai ini sebagai barcode produk"
                           }
                           onClick={() => void assignBarcode(p.item.id, p.value)}
                         >
-                          {p.item.barcode === p.value ? "Sudah Tersimpan" : "Tetapkan Barcode"}
+                          {source !== "produk"
+                            ? "Bukan Barcode Produk"
+                            : p.item.barcode === p.value
+                              ? "Sudah Tersimpan"
+                              : "Tetapkan Barcode"}
                         </Button>
                       )}
                     </>
@@ -492,6 +558,38 @@ function BarcodePage() {
         </Panel>
       </div>
 
+      <Dialog open={unknownCode !== null} onOpenChange={(o) => !o && setUnknownCode(null)}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Barcode belum terdaftar</DialogTitle>
+            <DialogDescription>
+              <span className="font-mono">{unknownCode}</span> belum ada di master barang. Buat data
+              barang baru dengan barcode produk ini?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => setUnknownCode(null)}>
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl"
+              onClick={() => {
+                pendingBarcode.current = unknownCode;
+                setUnknownCode(null);
+                setCreateOpen(true);
+              }}
+            >
+              Buat Barang Baru
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ItemFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        initial={null}
+        prefillBarcode={pendingBarcode.current ?? undefined}
+      />
       <ScanDisambiguasiDialog
         open={ambiguous !== null}
         code={ambiguous?.code}

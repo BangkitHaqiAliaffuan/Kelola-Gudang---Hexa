@@ -2454,10 +2454,13 @@ export function ItemFormDialog({
   open,
   onOpenChange,
   initial,
+  prefillBarcode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initial: ItemApi | null;
+  /** Kode hasil scan untuk prefill kolom barcode saat tambah baru. */
+  prefillBarcode?: string | undefined;
 }) {
   const create = useCreateItem();
   const update = useUpdateItem();
@@ -2504,7 +2507,7 @@ export function ItemFormDialog({
           }
         : {
             sku: previewSku,
-            barcode: "",
+            barcode: prefillBarcode ?? "",
             internal_barcode: "",
             name: "",
             category_id: 0,
@@ -2524,7 +2527,7 @@ export function ItemFormDialog({
             dimension: "",
             status: "Aktif",
           },
-    [initial, previewSku],
+    [initial, previewSku, prefillBarcode],
   );
 
   const toPayload = (v: ItemInput): ItemPayload => {
@@ -2559,7 +2562,7 @@ export function ItemFormDialog({
       title={initial ? "Edit Barang" : "Tambah Barang"}
       description="Data pokok barang: identitas, klasifikasi, dan harga."
       schema={itemSchema}
-      resetKey={initial ? `edit-${initial.id}` : "create"}
+      resetKey={initial ? `edit-${initial.id}` : `create-${prefillBarcode ?? ""}`}
       defaultValues={defaultValues}
       onSubmit={async (values, form) => {
         const payload = toPayload(values);

@@ -7,6 +7,7 @@ import {
   computeSheetLayout,
   eanChecksumOk,
   encodeItem,
+  encodeItemWithSource,
   findItemByCode,
   findMatchesByCode,
   matchSourceOf,
@@ -30,6 +31,19 @@ describe("encodeItem", () => {
   it("string kosong dianggap kosong dan di-skip", () => {
     expect(encodeItem({ sku: "SKU-1", barcode: "8991", internal_barcode: "" })).toBe("8991");
     expect(encodeItem({ sku: "SKU-1", barcode: "", internal_barcode: "" })).toBe("SKU-1");
+  });
+});
+
+describe("encodeItemWithSource", () => {
+  it("mengembalikan kolom sesuai pilihan sumber", () => {
+    expect(encodeItemWithSource(item, "internal")).toBe("BRG-001");
+    expect(encodeItemWithSource(item, "produk")).toBe("8990000000001");
+    expect(encodeItemWithSource(item, "sku")).toBe("SKU-10001-001");
+  });
+
+  it("kolom kosong menghasilkan string kosong (empty-state jujur)", () => {
+    expect(encodeItemWithSource({ ...item, internal_barcode: null }, "internal")).toBe("");
+    expect(encodeItemWithSource({ ...item, barcode: null }, "produk")).toBe("");
   });
 });
 
