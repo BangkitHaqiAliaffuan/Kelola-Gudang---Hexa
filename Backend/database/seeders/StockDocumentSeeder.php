@@ -284,6 +284,7 @@ class StockDocumentSeeder extends Seeder
                     'to_bin_id' => null,
                     'from_warehouse_id' => $item->default_warehouse_id,
                     'direction' => $actual > $system ? 'IN' : ($actual < $system ? 'OUT' : null),
+                    'reason_code' => 'Selisih Opname Demo',
                 ];
             }
 
@@ -389,10 +390,26 @@ class StockDocumentSeeder extends Seeder
         for ($k = 0, $count = $int(4, 7); $k < $count; $k++) {
             $type = $pick($nonPostedTypes);
             $lineCount = $int(1, 3);
+
+            // Gudang asal header ditentukan dulu agar seluruh baris segudang.
+            $warehouse = $pick($warehouses->all());
+            $warehouseItems = $items->where('default_warehouse_id', $warehouse->id)->values();
+            if ($warehouseItems->isEmpty()) {
+                $warehouseItems = $items;
+            }
+
+            $toBinId = null;
+            $destWarehouse = null;
+            if ($type === 'Transfer Gudang') {
+                $destWarehouse = $pick(array_values($warehouses->reject(fn ($w) => $w->id === $warehouse->id)->all()));
+                $destBins = $binsByWarehouse[$destWarehouse->id] ?? collect();
+                $toBinId = $destBins->isNotEmpty() ? $pick($destBins->all())->id : null;
+            }
+
             $lines = [];
 
             for ($i = 0; $i < $lineCount; $i++) {
-                $item = $pick($items->all());
+                $item = $pick($warehouseItems->all());
                 $signed = match ($type) {
                     'Penerimaan' => 1,
                     'Pengeluaran' => -1,
@@ -405,8 +422,9 @@ class StockDocumentSeeder extends Seeder
                     'qty' => $signed * $int(1, 50),
                     'unit_cost' => $item->cost,
                     'from_bin_id' => $item->default_bin_id,
-                    'to_bin_id' => $type === 'Transfer Gudang' ? $pick($binsByWarehouse->first()->all())->id : null,
+                    'to_bin_id' => $type === 'Transfer Gudang' ? $toBinId : null,
                     'from_warehouse_id' => $item->default_warehouse_id,
+                    'reason_code' => $type === 'Stock Adjustment' ? 'Koreksi Stok Demo' : null,
                 ];
             }
 
@@ -414,8 +432,8 @@ class StockDocumentSeeder extends Seeder
             $documents[] = [
                 'type' => $type,
                 'day' => $ref->subDays($int(0, 30))->startOfDay()->toDateTimeString(),
-                'warehouse_id' => $lines[0]['item']->default_warehouse_id,
-                'destination_warehouse_id' => $type === 'Transfer Gudang' ? $pick(array_values($warehouses->all()))->id : null,
+                'warehouse_id' => $warehouse->id,
+                'destination_warehouse_id' => $type === 'Transfer Gudang' ? $destWarehouse->id : null,
                 'date' => $ref->subDays($int(0, 30))->setTime($int(7, 17), $int(0, 59), 0),
                 'partner' => $type === 'Penerimaan' ? ($lines[0]['item']->supplier?->name ?? 'Supplier') : ($type === 'Pengeluaran' ? ($custPick2?->name ?? 'Departemen Produksi') : null),
                 'customer_id' => $custPick2?->id,
@@ -535,6 +553,7 @@ class StockDocumentSeeder extends Seeder
                         'from_bin_id' => $line['from_bin_id'] ?? null,
                         'to_bin_id' => $line['to_bin_id'] ?? null,
                         'unit_cost' => $line['unit_cost'] ?? 0,
+                        'reason_code' => $line['reason_code'] ?? null,
                         // Snapshot harga jual master untuk garis keluar (sumber omzet);
                         // tipe lain tidak bermakna revenue → NULL.
                         'unit_price' => in_array($def['type'], ['Pengeluaran', 'Retur Penjualan'], true)

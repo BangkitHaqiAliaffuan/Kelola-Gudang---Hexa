@@ -15,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\Vendor;
 use App\Models\Warehouse;
 use App\Models\WorkOrder;
+use App\Services\StockDocumentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -209,6 +210,16 @@ class DatabaseSeederConsistencyTest extends TestCase
             0,
             StockMovement::where('movement_type', 'Transfer Gudang')->whereNull('pair_id')->count()
         );
+
+        // Integritas bin & gudang: SEMUA dokumen (posted maupun Draft/Menunggu
+        // Approval/Dibatalkan) wajib lolos guard posting — melempar
+        // InvalidArgumentException bila ada yang melanggar.
+        $guard = app(StockDocumentService::class);
+        $docs = StockDocument::with(['warehouse', 'destination', 'lines.item', 'lines.fromBin.rack.warehouse', 'lines.toBin.rack.warehouse'])->get();
+        $this->assertGreaterThan(0, $docs->count());
+        foreach ($docs as $doc) {
+            $guard->assertBinsBelongToWarehouse($doc);
+        }
     }
 
     private function assertWorkOrdersConsistent(): void
