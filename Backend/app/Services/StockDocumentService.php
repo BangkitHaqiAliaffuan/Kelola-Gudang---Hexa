@@ -31,15 +31,16 @@ class StockDocumentService
             throw new \InvalidArgumentException('Dokumen yang dibatalkan tidak dapat diposting.');
         }
 
+        $document->loadMissing(['warehouse', 'destination', 'lines.item.bin.rack', 'lines.fromBin.rack.warehouse', 'lines.toBin.rack.warehouse']);
+        $this->assertBinsBelongToWarehouse($document);
+
         if ($document->type === 'Stock Opname') {
-            $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
             $this->assertOpnameReadyForPost($document);
 
             return $this->postOpname($document);
         }
 
         if ($document->type === 'Stock Adjustment') {
-            $document->loadMissing(['lines.item']);
             $this->assertAdjustmentReadyForPost($document);
         }
 
@@ -269,6 +270,49 @@ class StockDocumentService
     }
 
     /**
+     * Validasi kepemilikan gudang untuk setiap bin pada baris dokumen.
+     * Mencegah drift/mismatch antara warehouse_id dokumen vs bin.rack.warehouse_id
+     * yang menyebabkan baris dilewati oleh ledger.
+     */
+    public function assertBinsBelongToWarehouse(StockDocument $document): void
+    {
+        $type = $document->type;
+        $docWhId = (int) $document->warehouse_id;
+        $destWhId = (int) ($document->destination_warehouse_id ?? 0);
+        $expectedWhName = $document->warehouse?->name ?? "Gudang ID {$docWhId}";
+        $expectedDestWhName = $document->destination?->name ?? "Gudang ID {$destWhId}";
+
+        foreach ($document->lines as $line) {
+            $sku = $line->item?->sku ?? "ID {$line->item_id}";
+            $lineNo = $line->line_no;
+
+            if ($line->fromBin) {
+                $fromWhId = (int) $line->fromBin->rack?->warehouse_id;
+                if ($fromWhId !== $docWhId) {
+                    $actualWh = $line->fromBin->rack?->warehouse?->name ?? "Gudang ID {$fromWhId}";
+                    $rackCode = $line->fromBin->rack?->code ?? '-';
+                    throw new \InvalidArgumentException(
+                        "Bin {$line->fromBin->code} (Rak {$rackCode}) berada di {$actualWh}, bukan {$expectedWhName} (baris {$lineNo} — SKU {$sku})."
+                    );
+                }
+            }
+
+            if ($line->toBin) {
+                $expected = ($type === 'Transfer Gudang') ? $destWhId : $docWhId;
+                $expectedName = ($type === 'Transfer Gudang') ? $expectedDestWhName : $expectedWhName;
+                $toWhId = (int) $line->toBin->rack?->warehouse_id;
+                if ($toWhId !== $expected) {
+                    $actualWh = $line->toBin->rack?->warehouse?->name ?? "Gudang ID {$toWhId}";
+                    $rackCode = $line->toBin->rack?->code ?? '-';
+                    throw new \InvalidArgumentException(
+                        "Bin {$line->toBin->code} (Rak {$rackCode}) berada di {$actualWh}, bukan {$expectedName} (baris {$lineNo} — SKU {$sku})."
+                    );
+                }
+            }
+        }
+    }
+
+    /**
      * Build the 1-2 movement payloads a single line produces.
      */
     private function movementsFor(StockDocument $document, StockDocumentLine $line): array
@@ -290,26 +334,20 @@ class StockDocumentService
         ];
 
         if ($document->type === 'Transfer Gudang') {
-            $source = $line->fromBin ?? $line->item->bin;
-            $dest = $line->toBin ?? $line->item->bin;
-            $sourceWarehouseId = $document->warehouse_id;
-            $destWarehouseId = $document->destination_warehouse_id;
-            if ($source && $source->rack->warehouse_id !== $sourceWarehouseId) {
-                Log::warning('Bin gudang tidak sama dengan dokumen (source)', [
-                    'document_no' => $document->no,
-                    'document_warehouse_id' => $sourceWarehouseId,
-                    'bin_id' => $source->id,
-                    'bin_warehouse_id' => $source->rack->warehouse_id,
-                ]);
-            }
-            if ($dest && $dest->rack->warehouse_id !== $destWarehouseId) {
-                Log::warning('Bin gudang tidak sama dengan dokumen (dest)', [
-                    'document_no' => $document->no,
-                    'document_warehouse_id' => $destWarehouseId,
-                    'bin_id' => $dest->id,
-                    'bin_warehouse_id' => $dest->rack->warehouse_id,
-                ]);
-            }
+            $sourceWarehouseId = (int) $document->warehouse_id;
+            $destWarehouseId = (int) $document->destination_warehouse_id;
+
+            $source = $line->fromBin ?? (
+                $line->item->bin && (int) $line->item->bin->rack?->warehouse_id === $sourceWarehouseId
+                    ? $line->item->bin
+                    : null
+            );
+            $dest = $line->toBin ?? (
+                $line->item->bin && (int) $line->item->bin->rack?->warehouse_id === $destWarehouseId
+                    ? $line->item->bin
+                    : null
+            );
+
             $cost = $this->costAt($line->item_id, $source, $sourceWarehouseId);
 
             return [
@@ -334,24 +372,22 @@ class StockDocumentService
             ];
         }
 
-        // Arah IN memprioritaskan bin tujuan (to_bin_id); bin asal dipakai sebagai
-        // fallback agar dokumen lama (BM/BK/ADJ yang hanya mengisi from_bin_id) tetap
-        // terposting. Arah OUT memakai bin asal (sumber stok).
-        // warehouse_id SELALU dari dokumen (sumber kebenaran gudang), bin hanya untuk lokasi fisik.
-        $bin = $direction === 'IN'
-            ? ($line->toBin ?? $line->fromBin ?? $line->item->bin)
-            : ($line->fromBin ?? $line->item->bin);
+        $warehouseId = (int) $document->warehouse_id;
 
-        $warehouseId = $document->warehouse_id;
-        if ($bin && $bin->rack->warehouse_id !== $warehouseId) {
-            Log::warning('Bin gudang tidak sama dengan dokumen', [
-                'document_no' => $document->no,
-                'document_warehouse_id' => $warehouseId,
-                'bin_id' => $bin->id,
-                'bin_warehouse_id' => $bin->rack->warehouse_id,
-                'direction' => $direction,
-            ]);
-        }
+        // Arah IN memprioritaskan bin tujuan (to_bin_id); bin asal dipakai sebagai
+        // fallback agar dokumen lama yang hanya mengisi from_bin_id tetap terposting.
+        // Arah OUT memakai bin asal (from_bin_id).
+        // Fallback ke default_bin item HANYA dipakai jika default_bin tersebut berada di gudang yang sama.
+        // Bila tidak segudang atau tanpa bin, bin bernilai null (stok lantai).
+        $chosenBin = $direction === 'IN'
+            ? ($line->toBin ?? $line->fromBin)
+            : $line->fromBin;
+
+        $bin = $chosenBin ?? (
+            $line->item->bin && (int) $line->item->bin->rack?->warehouse_id === $warehouseId
+                ? $line->item->bin
+                : null
+        );
 
         return [[
             ...$base,

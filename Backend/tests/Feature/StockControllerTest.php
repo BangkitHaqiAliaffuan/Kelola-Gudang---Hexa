@@ -117,8 +117,14 @@ class StockControllerTest extends TestCase
         $doc = \App\Models\StockDocument::where('no', $res->json('data.no'))->firstOrFail();
         $mov = \App\Models\StockMovement::where('stock_document_id', $doc->id)->firstOrFail();
         $this->assertSame($whSidoarjo->id, $mov->warehouse_id, 'warehouse_id harus ikut dokumen Sidoarjo, bukan default Medan');
-        // bin_id tetap dari item default (atau null) - tidak diubah
-        $this->assertSame($binMedan->id, $mov->bin_id);
+        $this->assertNull($mov->bin_id, 'bin_id harus null (lantai) karena default bin berada di gudang Medan');
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $whSidoarjo->id,
+            'bin_id' => null,
+            'stock' => 5,
+        ]);
     }
 
     public function test_penerimaan_with_matching_bin_still_correct(): void

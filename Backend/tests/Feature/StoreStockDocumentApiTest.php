@@ -1585,6 +1585,105 @@ class StoreStockDocumentApiTest extends TestCase
         $this->assertSame($before, StockDocument::count());
     }
 
+    public function test_floor_penerimaan_with_cross_warehouse_default_bin_posts_as_null_bin_and_appears_in_item_stock(): void
+    {
+        [$whA] = $this->makeLocation();
+        [$whB, $rackB, $binB] = $this->makeLocation();
+
+        $item = Item::factory()->create([
+            'default_warehouse_id' => $whB->id,
+            'default_rack_id' => $rackB->id,
+            'default_bin_id' => $binB->id,
+        ]);
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-15',
+            'warehouse_id' => $whA->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 15, 'unit_cost' => 50000, 'to_bin_id' => null],
+            ],
+        ]);
+
+        $res->assertStatus(201);
+        $doc = StockDocument::where('no', $res->json('data.no'))->firstOrFail();
+
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_document_id' => $doc->id,
+            'item_id' => $item->id,
+            'warehouse_id' => $whA->id,
+            'bin_id' => null,
+            'direction' => 'IN',
+            'qty' => 15,
+        ]);
+
+        $this->assertDatabaseHas('item_stock', [
+            'item_id' => $item->id,
+            'warehouse_id' => $whA->id,
+            'bin_id' => null,
+            'stock' => 15,
+        ]);
+
+        $stockRes = $this->getJson("/api/persediaan/stock?warehouse_id={$whA->id}&item_id={$item->id}");
+        $stockRes->assertStatus(200)
+            ->assertJsonPath('data.0.item_id', $item->id)
+            ->assertJsonPath('data.0.warehouse_id', $whA->id)
+            ->assertJsonPath('data.0.bin_id', null)
+            ->assertJsonPath('data.0.stock', 15);
+    }
+
+    public function test_post_document_with_mismatched_bin_is_rejected_422(): void
+    {
+        [$whA] = $this->makeLocation();
+        [$whB, , $binB] = $this->makeLocation();
+
+        $item = $this->makeItem();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-15',
+            'warehouse_id' => $whA->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 10000, 'to_bin_id' => $binB->id],
+            ],
+        ]);
+
+        $res->assertStatus(422)
+            ->assertJsonValidationErrors('lines.0.to_bin_id');
+    }
+
+    public function test_post_draft_endpoint_with_mismatched_bin_is_rejected_422_by_service(): void
+    {
+        [$whA] = $this->makeLocation();
+        [$whB, $rackB, $binB] = $this->makeLocation();
+
+        $item = $this->makeItem();
+
+        // Create draft manually or via model
+        $doc = StockDocument::create([
+            'no' => 'BM/2026/99999',
+            'type' => 'Penerimaan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-15',
+            'warehouse_id' => $whA->id,
+        ]);
+
+        \App\Models\StockDocumentLine::create([
+            'document_id' => $doc->id,
+            'line_no' => 1,
+            'item_id' => $item->id,
+            'qty' => 5,
+            'unit_cost' => 10000,
+            'to_bin_id' => $binB->id,
+        ]);
+
+        $res = $this->postJson("/api/persediaan/stock-documents/{$doc->id}/post");
+        $res->assertStatus(422)
+            ->assertJsonPath('message', fn ($msg) => str_contains($msg, 'Bin') && str_contains($msg, 'berada di'));
+    }
+
     private function makeItem(): Item
     {
         $unique = random_int(10000, 99999);

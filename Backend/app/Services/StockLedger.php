@@ -70,7 +70,7 @@ class StockLedger
             if ($binId !== null) {
                 $rackWh = \App\Models\Bin::with('rack')->find($binId)?->rack?->warehouse_id;
                 if ($rackWh !== null && (int) $warehouseId !== (int) $rackWh) {
-                    \Illuminate\Support\Facades\Log::warning('StockLedger: warehouse mismatch, skip write', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
+                    \Illuminate\Support\Facades\Log::error('StockLedger: warehouse mismatch, skip write — jalankan stock:reconcile-bin-mismatch untuk perbaikan', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
                     continue;
                 }
             }
