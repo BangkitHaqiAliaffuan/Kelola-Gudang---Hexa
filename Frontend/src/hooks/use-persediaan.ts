@@ -27,6 +27,21 @@ export function useStockRows() {
   });
 }
 
+// Lokasi stock satu barang: satu baris per (gudang, bin) langsung dari
+// `item_stock` (kolom stock/reserved selalu mutakhir per posting terakhir —
+// tabel ini tidak punya timestamp, jadi kesegaran dijamin via refetch).
+export function useStockLocations(itemId: number | undefined) {
+  return useQuery({
+    queryKey: ["persediaan", "stock", { item: itemId ?? null }],
+    queryFn: () =>
+      api.get<Paginated<StockRowApi>>(`/persediaan/stock?item_id=${itemId}&per_page=${PER_PAGE}`),
+    enabled: itemId != null && typeof window !== "undefined",
+    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useStockCard(
   itemId: number | undefined,
   method: ValuationMethod,
