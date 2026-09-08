@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ const statusTone: Record<StockRowApi["status"], Tone> = {
 };
 
 function StockSaatIni() {
+  const navigate = useNavigate();
   const { data, isLoading } = useStockRows();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
@@ -83,6 +84,15 @@ function StockSaatIni() {
 
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
+
+  const goToDetail = useCallback(
+    (r: StockRowApi) =>
+      void navigate({
+        to: "/persediaan/stock/$itemId",
+        params: { itemId: String(r.item_id) },
+      }),
+    [navigate],
+  );
 
   const columns: Column<StockRowApi>[] = [
     {
@@ -267,6 +277,7 @@ function StockSaatIni() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          onRowClick={goToDetail}
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -297,6 +308,14 @@ function StockSaatIni() {
                   </b>
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1 rounded-lg"
+                onClick={() => goToDetail(r)}
+              >
+                Lihat Detail
+              </Button>
             </div>
           )}
         />

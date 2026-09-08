@@ -192,7 +192,9 @@ export function useUpdateStockDocument() {
       // Invalidate detail juga agar tab lain dapat refetch saat mount, tapi
       // refetchOnWindowFocus tetap false untuk cegah kedipan saat fokus
       if (data?.data?.id) {
-        qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", data.data.id] });
+        qc.invalidateQueries({
+          queryKey: ["persediaan", "stock-documents", "detail", data.data.id],
+        });
       } else if (vars?.id) {
         qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", vars.id] });
       }
@@ -203,7 +205,8 @@ export function useUpdateStockDocument() {
 export function useLockStockDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/lock`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/lock`, null),
     onSuccess: (data) => {
       qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
       qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
@@ -213,14 +216,16 @@ export function useLockStockDocument() {
 
 export function useHeartbeatStockDocument() {
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/heartbeat`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/heartbeat`, null),
   });
 }
 
 export function useUnlockStockDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/unlock`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/unlock`, null),
     onSuccess: (data) => {
       qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
     },
