@@ -21,6 +21,14 @@ export const MAX_LABELS = 500;
 const SHEET_W_MM = 190;
 const SHEET_H_MM = 277;
 
+/** Kertas A4 penuh (mm) — area cetak = kertas − 2 × margin. */
+const PAPER_W_MM = 210;
+const PAPER_H_MM = 297;
+
+/** Batas bawah dimensi label (mm) agar CODE128 + quiet zone tetap terbaca
+ *  scanner murah. Usulan — perlu persetujuan pembimbing (lihat plan). */
+export const MIN_LABEL_MM = 15;
+
 export type SheetLayout = {
   wMm: number;
   hMm: number;
@@ -54,6 +62,161 @@ export function computeSheetLayout(size: LabelSize): SheetLayout {
   const cols = Math.max(Math.floor(SHEET_W_MM / wMm), 1);
   const rows = Math.max(Math.floor(SHEET_H_MM / hMm), 1);
   return { wMm, hMm, cols, rows, perSheet: cols * rows };
+}
+
+/**
+ * Template layout label: preset standar (geometri legacy tetap) atau custom
+ * operator (dimensi dihitung fill-width agar pas kertas).
+ * Custom tersimpan di localStorage "kg-label-templates" (lihat use-label-templates).
+ */
+export type LabelTemplate = {
+  id: string;
+  name: string;
+  cols: number;
+  rows: number;
+  marginMm: number;
+  gapMm: number;
+  showName: boolean;
+  showMeta: boolean;
+  /** Diisi hanya untuk preset — geometri legacy yang tidak boleh bergeser. */
+  labelWMm?: number;
+  labelHMm?: number;
+};
+
+/** Preset ekuivalen 1:1 dengan LabelSize lama (lihat computeSheetLayout). */
+export const LABEL_TEMPLATES: LabelTemplate[] = [
+  {
+    id: "std-30x20",
+    name: "30×20 mm",
+    cols: 6,
+    rows: 13,
+    marginMm: 10,
+    gapMm: 0,
+    showName: true,
+    showMeta: true,
+    labelWMm: 30,
+    labelHMm: 20,
+  },
+  {
+    id: "std-50x30",
+    name: "50×30 mm",
+    cols: 3,
+    rows: 9,
+    marginMm: 10,
+    gapMm: 0,
+    showName: true,
+    showMeta: true,
+    labelWMm: 50,
+    labelHMm: 30,
+  },
+  {
+    id: "std-100x50",
+    name: "100×50 mm",
+    cols: 1,
+    rows: 5,
+    marginMm: 10,
+    gapMm: 0,
+    showName: true,
+    showMeta: true,
+    labelWMm: 100,
+    labelHMm: 50,
+  },
+  {
+    id: "std-a4",
+    name: "A4 Penuh",
+    cols: 1,
+    rows: 1,
+    marginMm: 10,
+    gapMm: 0,
+    showName: true,
+    showMeta: true,
+    labelWMm: SHEET_W_MM,
+    labelHMm: SHEET_H_MM,
+  },
+];
+
+const TEMPLATE_FOR_SIZE: Record<LabelSize, string> = {
+  "30x20": "std-30x20",
+  "50x30": "std-50x30",
+  "100x50": "std-100x50",
+  A4: "std-a4",
+};
+
+/** Preset ekuivalen sebuah LabelSize lama (untuk kompatibilitas pemanggil lama). */
+export function presetForSize(size: LabelSize): LabelTemplate {
+  return LABEL_TEMPLATES.find((t) => t.id === TEMPLATE_FOR_SIZE[size])!;
+}
+
+export type TemplateDims = SheetLayout & { marginMm: number; gapMm: number };
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Dimensi final sebuah template. Preset memakai geometri legacy tetap;
+ *  custom menghitung fill-width dari margin + gap. */
+export function templateDims(t: LabelTemplate): TemplateDims {
+  if (t.labelWMm != null && t.labelHMm != null) {
+    return {
+      wMm: t.labelWMm,
+      hMm: t.labelHMm,
+      cols: t.cols,
+      rows: t.rows,
+      perSheet: t.cols * t.rows,
+      marginMm: t.marginMm,
+      gapMm: t.gapMm,
+    };
+  }
+  const printW = PAPER_W_MM - 2 * t.marginMm;
+  const printH = PAPER_H_MM - 2 * t.marginMm;
+  return {
+    wMm: round2((printW - t.gapMm * (t.cols - 1)) / t.cols),
+    hMm: round2((printH - t.gapMm * (t.rows - 1)) / t.rows),
+    cols: t.cols,
+    rows: t.rows,
+    perSheet: t.cols * t.rows,
+    marginMm: t.marginMm,
+    gapMm: t.gapMm,
+  };
+}
+
+/** Validasi template custom. null = valid, string = pesan kesalahan (id). */
+export function validateTemplate(
+  t: Pick<LabelTemplate, "cols" | "rows" | "marginMm" | "gapMm" | "name">,
+): string | null {
+  if (!Number.isInteger(t.cols) || t.cols < 1 || t.cols > 20)
+    return "Kolom harus bilangan bulat 1–20";
+  if (!Number.isInteger(t.rows) || t.rows < 1 || t.rows > 30)
+    return "Baris harus bilangan bulat 1–30";
+  if (!(t.marginMm >= 0) || t.marginMm > 20) return "Margin harus 0–20 mm";
+  if (!(t.gapMm >= 0) || t.gapMm > 5) return "Jarak antar label harus 0–5 mm";
+  if (!t.name.trim() || t.name.trim().length > 40) return "Nama template 1–40 karakter";
+  const d = templateDims({ ...t, id: "", showName: true, showMeta: true });
+  if (d.wMm < MIN_LABEL_MM || d.hMm < MIN_LABEL_MM)
+    return `Label hasil ${d.wMm}×${d.hMm} mm — terlalu kecil (minimal ${MIN_LABEL_MM} mm agar barcode terbaca)`;
+  return null;
+}
+
+/** Tinggi bar CODE128 (mm). Preset memakai nilai legacy; custom proporsional. */
+export function codeHeightForTemplate(t: LabelTemplate): number {
+  switch (t.id) {
+    case "std-30x20":
+      return 8;
+    case "std-50x30":
+      return 14;
+    case "std-100x50":
+      return 22;
+    case "std-a4":
+      return 60;
+    default: {
+      const { hMm } = templateDims(t);
+      return Math.min(Math.max(Math.round(hMm * 0.45), 6), 60);
+    }
+  }
+}
+
+/** Sisi QR (mm) = sisi terpendek label − 8. Peringatan bila ≤ 12 (≈30×20). */
+export function qrSideForTemplate(t: LabelTemplate): number {
+  const { wMm, hMm } = templateDims(t);
+  return Math.max(Math.min(wMm, hMm) - 8, 8);
 }
 
 /**
@@ -202,10 +365,8 @@ export type PrintLabel = {
   sku?: string;
 };
 
-export type PrintLabels = {
-  size: LabelSize;
-  labels: PrintLabel[];
-};
+export type PrintLabels =
+  { size: LabelSize; labels: PrintLabel[] } | { template: LabelTemplate; labels: PrintLabel[] };
 
 function escapeHtml(s: string): string {
   return s
@@ -225,15 +386,25 @@ function escapeHtml(s: string): string {
  * String HTML ini juga dipakai untuk preview WYSIWYG di halaman /barcode:
  * satu sumber kebenaran untuk layar dan cetakan.
  */
-export function buildPrintHtml({ size, labels }: PrintLabels): string {
-  const { wMm, hMm, cols, perSheet } = computeSheetLayout(size);
-  const qrSideMm = Math.max(Math.min(wMm, hMm) - 8, 8);
+export function buildPrintHtml(input: PrintLabels): string {
+  const template = "template" in input ? input.template : presetForSize(input.size);
+  const labels = input.labels;
+  const { wMm, hMm, cols, perSheet, marginMm, gapMm } = templateDims(template);
+  const qrSideMm = qrSideForTemplate(template);
   const capped = labels.slice(0, MAX_LABELS);
   const renderLabel = (l: PrintLabel) => `
       <div class="label ${l.kind === "QR Code" ? "qr" : "bars"}">
-        <div class="code">${l.svg}</div>
-        <div class="name">${escapeHtml(l.name)}</div>
-        <div class="meta">${escapeHtml(l.meta)}</div>
+        <div class="code">${l.svg}</div>${
+          template.showName
+            ? `
+        <div class="name">${escapeHtml(l.name)}</div>`
+            : ""
+        }${
+          template.showMeta
+            ? `
+        <div class="meta">${escapeHtml(l.meta)}</div>`
+            : ""
+        }
       </div>`;
   const pages: string[] = [];
   for (let p = 0; p * perSheet < capped.length; p++) {
@@ -249,13 +420,18 @@ export function buildPrintHtml({ size, labels }: PrintLabels): string {
 <meta charset="utf-8" />
 <title>Cetak Label</title>
 <style>
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: ${marginMm}mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { margin: 0; padding: 0; }
   body { font-family: Arial, Helvetica, sans-serif; color: #000;
          -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .page {
-    display: grid; grid-template-columns: repeat(${cols}, ${wMm}mm);
+    display: grid; grid-template-columns: repeat(${cols}, ${wMm}mm);${
+      gapMm > 0
+        ? `
+    gap: ${gapMm}mm;`
+        : ""
+    }
     justify-content: start;
   }
   .page.break { break-after: page; page-break-after: always; }
@@ -291,7 +467,7 @@ const PX_PER_MM_300 = 300 / 25.4;
  * SVG bwip-js dinest ke dalam <svg> induk ber-sistem koordinat mm.
  * @deprecated Gunakan PNG/ZIP helpers di bawah untuk unduhan baru.
  */
-export function buildSheetSvg({ size, labels }: PrintLabels): string {
+export function buildSheetSvg({ size, labels }: { size: LabelSize; labels: PrintLabel[] }): string {
   const { wMm, hMm, cols, perSheet } = computeSheetLayout(size);
   const page = labels.slice(0, perSheet);
   const W = Math.round(wMm * PX_PER_MM);
@@ -393,8 +569,9 @@ export function svgToPngBlob(svg: string, widthPx: number, heightPx: number): Pr
   });
 }
 
-function labelCanvasSize(size: LabelSize): { wPx: number; hPx: number } {
-  const { wMm, hMm } = computeSheetLayout(size);
+function labelCanvasSize(input: LabelSize | LabelTemplate): { wPx: number; hPx: number } {
+  const { wMm, hMm } =
+    typeof input === "string" ? templateDims(presetForSize(input)) : templateDims(input);
   return {
     wPx: Math.max(1, Math.round(wMm * PX_PER_MM_300)),
     hPx: Math.max(1, Math.round(hMm * PX_PER_MM_300)),
@@ -405,22 +582,21 @@ function labelCanvasSize(size: LabelSize): { wPx: number; hPx: number } {
  * Bangun PNG untuk satu label (kode + nama + meta) — layout mirip buildPrintHtml
  * tapi diraster menjadi bitmap 300 DPI. Mengembalikan Blob image/png.
  */
-export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Promise<Blob> {
-  const { wMm, hMm } = computeSheetLayout(size);
-  const { wPx, hPx } = labelCanvasSize(size);
-  const qrSidePx = Math.max(
-    Math.round(Math.min(wPx, hPx) - 8 * PX_PER_MM_300),
-    Math.round(8 * PX_PER_MM_300),
-  );
+export async function renderLabelToPng(
+  label: PrintLabel,
+  input: LabelSize | LabelTemplate,
+): Promise<Blob> {
+  const template = typeof input === "string" ? presetForSize(input) : input;
+  const { wPx, hPx } = labelCanvasSize(template);
+  const qrSideMm = qrSideForTemplate(template);
+  const qrSidePx = Math.max(Math.round(qrSideMm * PX_PER_MM_300), Math.round(8 * PX_PER_MM_300));
 
   // Raster kode SVG menjadi canvas sementara
   const codeW = wPx - Math.round(4 * PX_PER_MM_300);
   const codeH =
     label.kind === "QR Code"
       ? qrSidePx
-      : Math.round(
-          (size === "A4" ? 60 : size === "100x50" ? 22 : size === "50x30" ? 14 : 8) * PX_PER_MM_300,
-        );
+      : Math.round(codeHeightForTemplate(template) * PX_PER_MM_300);
   const codeBlob =
     label.kind === "QR Code"
       ? await svgToPngBlob(label.svg, qrSidePx, qrSidePx)
@@ -453,21 +629,25 @@ export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Prom
   }
   codeBitmap.close?.();
 
-  // Teks nama + meta (tengah)
-  ctx.fillStyle = "#000000";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  const nameSize = Math.round(9 * (300 / 72) * 0.35);
-  ctx.font = `700 ${nameSize}px Arial, Helvetica, sans-serif`;
-  const name = label.name.length > 28 ? `${label.name.slice(0, 28)}…` : label.name;
-  ctx.fillText(name, wPx / 2, y, wPx - pad * 2);
-  y += nameSize + Math.round(0.5 * PX_PER_MM_300);
-  const metaSize = Math.round(8 * (300 / 72) * 0.32);
-  ctx.font = `${metaSize}px Arial, Helvetica, sans-serif`;
-  ctx.fillStyle = "#333333";
-  ctx.fillText(label.meta, wPx / 2, y, wPx - pad * 2);
-  void wMm;
-  void hMm;
+  // Teks nama + meta (tengah) — mengikuti toggle template
+  if (template.showName) {
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const nameSize = Math.round(9 * (300 / 72) * 0.35);
+    ctx.font = `700 ${nameSize}px Arial, Helvetica, sans-serif`;
+    const name = label.name.length > 28 ? `${label.name.slice(0, 28)}…` : label.name;
+    ctx.fillText(name, wPx / 2, y, wPx - pad * 2);
+    y += nameSize + Math.round(0.5 * PX_PER_MM_300);
+  }
+  if (template.showMeta) {
+    ctx.fillStyle = "#333333";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const metaSize = Math.round(8 * (300 / 72) * 0.32);
+    ctx.font = `${metaSize}px Arial, Helvetica, sans-serif`;
+    ctx.fillText(label.meta, wPx / 2, y, wPx - pad * 2);
+  }
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -484,13 +664,14 @@ export async function renderLabelToPng(label: PrintLabel, size: LabelSize): Prom
  */
 export async function downloadLabelsAsPngOrZip(
   labels: PrintLabel[],
-  size: LabelSize,
+  input: LabelSize | LabelTemplate,
 ): Promise<string> {
+  const template = typeof input === "string" ? presetForSize(input) : input;
   const capped = labels.slice(0, MAX_LABELS);
   if (capped.length === 0) throw new Error("Tidak ada label untuk diunduh");
   if (capped.length === 1) {
     const l = capped[0]!;
-    const blob = await renderLabelToPng(l, size);
+    const blob = await renderLabelToPng(l, template);
     const base = l.sku ? slugFilename(l.sku) : slugFilename(l.name);
     const filename = `label-${base}.png`;
     downloadPng(blob, filename);
@@ -500,7 +681,7 @@ export async function downloadLabelsAsPngOrZip(
   const zip = new JSZip();
   const counts = new Map<string, number>();
   for (const l of capped) {
-    const blob = await renderLabelToPng(l, size);
+    const blob = await renderLabelToPng(l, template);
     const base = l.sku ? slugFilename(l.sku) : slugFilename(l.name);
     const n = (counts.get(base) ?? 0) + 1;
     counts.set(base, n);
@@ -512,7 +693,7 @@ export async function downloadLabelsAsPngOrZip(
     compression: "DEFLATE",
     compressionOptions: { level: 6 },
   });
-  const zipName = `label-${size}.zip`;
+  const zipName = `label-${template.id}.zip`;
   downloadBlob(zipBlob, zipName);
   return zipName;
 }

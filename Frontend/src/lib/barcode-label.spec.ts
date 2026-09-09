@@ -4,6 +4,7 @@ import {
   buildCodeSvg,
   buildPrintHtml,
   buildSheetSvg,
+  codeHeightForTemplate,
   computeSheetLayout,
   eanChecksumOk,
   encodeItem,
@@ -12,7 +13,12 @@ import {
   findMatchesByCode,
   matchSourceOf,
   normalizeCode,
+  presetForSize,
+  qrSideForTemplate,
   slugFilename,
+  templateDims,
+  validateTemplate,
+  type LabelTemplate,
 } from "./barcode-label";
 
 const item = {
@@ -156,6 +162,15 @@ describe("buildPrintHtml", () => {
     expect(one).not.toContain('class="page break"');
   });
 
+  it("preset menghasilkan HTML identik dengan pemanggilan size lama", () => {
+    const labels = [{ svg: "<svg></svg>", name: "I", meta: "m", kind: "Barcode" as const }];
+    for (const s of ["30x20", "50x30", "100x50", "A4"] as const) {
+      expect(buildPrintHtml({ template: presetForSize(s), labels })).toBe(
+        buildPrintHtml({ size: s, labels }),
+      );
+    }
+  });
+
   it("border panduan disembunyikan saat print", () => {
     const html = buildPrintHtml({
       size: "50x30",
@@ -163,6 +178,108 @@ describe("buildPrintHtml", () => {
     });
     expect(html).toContain("@media print");
     expect(html).toMatch(/@media print\s*\{\s*\.label\s*\{\s*border:\s*none/);
+  });
+});
+
+describe("templateDims", () => {
+  it("preset memakai geometri legacy tetap", () => {
+    expect(templateDims(presetForSize("30x20"))).toEqual({
+      wMm: 30,
+      hMm: 20,
+      cols: 6,
+      rows: 13,
+      perSheet: 78,
+      marginMm: 10,
+      gapMm: 0,
+    });
+  });
+
+  it("custom 3x2 mengisi penuh area cetak", () => {
+    const d = templateDims({
+      id: "custom-x",
+      name: "Custom 3x2",
+      cols: 3,
+      rows: 2,
+      marginMm: 10,
+      gapMm: 0,
+      showName: true,
+      showMeta: true,
+    });
+    expect(d.perSheet).toBe(6);
+    expect(d.wMm).toBeCloseTo(190 / 3, 2);
+    expect(d.hMm).toBeCloseTo(277 / 2, 2);
+  });
+
+  it("gap mengurangi dimensi label", () => {
+    const d = templateDims({
+      id: "custom-x",
+      name: "Custom",
+      cols: 3,
+      rows: 2,
+      marginMm: 10,
+      gapMm: 2,
+      showName: true,
+      showMeta: true,
+    });
+    expect(d.wMm).toBeCloseTo((190 - 4) / 3, 2);
+  });
+});
+
+describe("validateTemplate", () => {
+  const base = { name: "Custom 3x2", cols: 3, rows: 2, marginMm: 10, gapMm: 0 };
+
+  it("menerima template valid", () => {
+    expect(validateTemplate(base)).toBeNull();
+  });
+
+  it("menolak kolom/baris di luar batas", () => {
+    expect(validateTemplate({ ...base, cols: 0 })).toContain("Kolom");
+    expect(validateTemplate({ ...base, cols: 21 })).toContain("Kolom");
+    expect(validateTemplate({ ...base, rows: 0 })).toContain("Baris");
+    expect(validateTemplate({ ...base, cols: 1.5 })).toContain("Kolom");
+  });
+
+  it("menolak margin/gap di luar batas", () => {
+    expect(validateTemplate({ ...base, marginMm: 21 })).toContain("Margin");
+    expect(validateTemplate({ ...base, gapMm: 6 })).toContain("Jarak");
+  });
+
+  it("menolak label hasil di bawah ambang baca", () => {
+    expect(validateTemplate({ ...base, cols: 20, rows: 30 })).toContain("terlalu kecil");
+  });
+
+  it("menolak nama kosong/terlalu panjang", () => {
+    expect(validateTemplate({ ...base, name: "  " })).toContain("Nama");
+    expect(validateTemplate({ ...base, name: "x".repeat(41) })).toContain("Nama");
+  });
+});
+
+describe("codeHeightForTemplate/qrSideForTemplate", () => {
+  it("preset memakai tinggi legacy", () => {
+    expect(codeHeightForTemplate(presetForSize("30x20"))).toBe(8);
+    expect(codeHeightForTemplate(presetForSize("50x30"))).toBe(14);
+    expect(codeHeightForTemplate(presetForSize("100x50"))).toBe(22);
+    expect(codeHeightForTemplate(presetForSize("A4"))).toBe(60);
+  });
+
+  it("qr sisi terpendek minus 8, peringatan pada 30x20", () => {
+    expect(qrSideForTemplate(presetForSize("30x20"))).toBe(12);
+    expect(qrSideForTemplate(presetForSize("50x30"))).toBe(22);
+  });
+
+  it("custom proporsional dan terjepit 6–60", () => {
+    const t: LabelTemplate = {
+      id: "custom-x",
+      name: "C",
+      cols: 3,
+      rows: 2,
+      marginMm: 10,
+      gapMm: 0,
+      showName: true,
+      showMeta: true,
+    };
+    expect(codeHeightForTemplate(t)).toBe(60);
+    expect(qrSideForTemplate(t)).toBeCloseTo(190 / 3 - 8, 2);
   });
 });
 

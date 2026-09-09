@@ -24,21 +24,25 @@ import type { ItemApi } from "@/lib/master-types";
 import { formatIDR } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
 import {
-  LABEL_SIZES,
   MAX_LABELS,
   CODE_SOURCE_LABEL,
   buildCodeSvg,
   buildPrintHtml,
-  computeSheetLayout,
+  codeHeightForTemplate,
   downloadLabelsAsPngOrZip,
   encodeItemWithSource,
   normalizeCode,
   printHtml,
+  qrSideForTemplate,
+  templateDims,
+  validateTemplate,
   type BarcodeKind,
   type CodeSource,
-  type LabelSize,
+  type LabelTemplate,
   type PrintLabel,
 } from "@/lib/barcode-label";
+import { useLabelTemplates, type TemplateDraft } from "@/hooks/use-label-templates";
+import { LabelTemplateDialog } from "@/components/wms/label-template-dialog";
 
 const barcodeSearchSchema = z.object({
   sku: z.string().optional(),
@@ -62,14 +66,6 @@ export const Route = createFileRoute("/barcode")({
 
 type Row = { id: number; itemId: number; qty: number };
 
-/** Tinggi bar barcode (mm) agar muat beserta nama + SKU/harga di label. */
-const CODE_HEIGHT: Record<LabelSize, number> = {
-  "30x20": 8,
-  "50x30": 14,
-  "100x50": 22,
-  A4: 60,
-};
-
 function BarcodePage() {
   const itemsQ = useItems();
   const { hasModuleLevel } = useAuth();
@@ -80,14 +76,55 @@ function BarcodePage() {
 
   const [kind, setKind] = useState<BarcodeKind>("Barcode");
   const [source, setSource] = useState<CodeSource>("internal");
-  const [size, setSize] = useState<LabelSize>("50x30");
   const [rows, setRows] = useState<Row[]>([]);
+
+  // Template layout: pilihan tersimpan vs draft susunan custom.
+  const { custom, all, byId, saveCustom, removeCustom } = useLabelTemplates();
+  const [selectedId, setSelectedId] = useState<string | null>("std-50x30");
+  // Draft selalu mencerminkan template terpilih saat dimuat.
+  const [draft, setDraft] = useState<TemplateDraft>(() => {
+    const t = byId("std-50x30");
+    return {
+      cols: t.cols,
+      rows: t.rows,
+      marginMm: t.marginMm,
+      gapMm: t.gapMm,
+      showName: t.showName,
+      showMeta: t.showMeta,
+    };
+  });
+  const [manageOpen, setManageOpen] = useState(false);
+
+  /** Template efektif: pilihan tersimpan, atau draft bila sudah diubah. */
+  const template: LabelTemplate = useMemo(() => {
+    if (selectedId) return byId(selectedId);
+    return { ...draft, id: "draft", name: "Susunan custom" };
+  }, [selectedId, byId, draft]);
+  const dims = useMemo(() => templateDims(template), [template]);
+  const { perSheet } = dims;
+  const draftError = useMemo(() => validateTemplate({ ...draft, name: "draft" }), [draft]);
+
+  const pickTemplate = useCallback((t: LabelTemplate) => {
+    setSelectedId(t.id);
+    setDraft({
+      cols: t.cols,
+      rows: t.rows,
+      marginMm: t.marginMm,
+      gapMm: t.gapMm,
+      showName: t.showName,
+      showMeta: t.showMeta,
+    });
+  }, []);
+
+  const patchDraft = useCallback((patch: Partial<TemplateDraft>) => {
+    setDraft((d) => ({ ...d, ...patch }));
+    setSelectedId(null);
+  }, []);
 
   const nextRowId = useRef(1);
   const seeded = useRef(false);
 
   const total = rows.reduce((s, r) => s + r.qty, 0);
-  const { perSheet } = computeSheetLayout(size);
 
   const options: ComboboxOption[] = useMemo(
     () =>
@@ -187,7 +224,7 @@ function BarcodePage() {
       let svg: string;
       try {
         svg = buildCodeSvg(encodeItemWithSource(it, source), kind, {
-          codeHeightMm: CODE_HEIGHT[size],
+          codeHeightMm: codeHeightForTemplate(template),
         });
       } catch {
         if (!failedIds.includes(it.id)) failedIds.push(it.id);
@@ -201,18 +238,19 @@ function BarcodePage() {
       if (labels.length >= MAX_LABELS) break;
     }
     return { labels, failedIds };
-  }, [rows, items, kind, size, source]);
+  }, [rows, items, kind, source, template]);
 
   /** Preview WYSIWYG: string HTML yang PERSIS SAMA dengan yang dikirim ke printer. */
   const preview = useMemo(() => {
     if (rows.length === 0) return null;
+    if (draftError !== null) return { html: "", failed: [] as ItemApi[] };
     const { labels, failedIds } = tryBuildLabels();
     const failed = failedIds
       .map((id) => items.find((i) => i.id === id))
       .filter((x): x is ItemApi => x !== undefined);
     if (labels.length === 0) return { html: "", failed };
-    return { html: buildPrintHtml({ size, labels }), failed };
-  }, [rows, tryBuildLabels, items, size]);
+    return { html: buildPrintHtml({ template, labels }), failed };
+  }, [rows, tryBuildLabels, items, template, draftError]);
 
   /** Barang yang nilainya bisa ditetapkan sebagai barcode produk (satu klik).
    * Kandidat = barcode produk bila terisi, jika tidak fallback ke SKU
@@ -238,8 +276,8 @@ function BarcodePage() {
   /** ID barang yang baru saja ditetapkan — tombolnya menjadi "Sudah Tersimpan". */
   const [assignedIds, setAssignedIds] = useState<number[]>([]);
 
-  /** QR di label 30x20 hanya ±12mm — peringatkan keterbacaan, tetap boleh cetak. */
-  const qrTooSmall = kind === "QR Code" && size === "30x20";
+  /** QR di label kecil (±12mm ke bawah) — peringatkan keterbacaan, tetap boleh cetak. */
+  const qrTooSmall = kind === "QR Code" && qrSideForTemplate(template) <= 12;
 
   const buildLabels = useCallback((): { labels: PrintLabel[]; ok: boolean } => {
     const { labels, failedIds } = tryBuildLabels();
@@ -298,7 +336,7 @@ function BarcodePage() {
     }
     const { labels, ok } = buildLabels();
     if (!ok || labels.length === 0) return;
-    printHtml(buildPrintHtml({ size, labels }));
+    printHtml(buildPrintHtml({ template, labels }));
     toast.success(`${labels.length} label dikirim ke printer`);
   };
 
@@ -314,7 +352,7 @@ function BarcodePage() {
       labels.length === 1 ? "Menyiapkan PNG..." : `Menyiapkan ${labels.length} PNG (ZIP)...`,
     );
     try {
-      const filename = await downloadLabelsAsPngOrZip(labels, size);
+      const filename = await downloadLabelsAsPngOrZip(labels, template);
       toast.success(`Label diunduh sebagai ${filename}`, { id: toastId });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal mengunduh label", { id: toastId });
@@ -334,11 +372,17 @@ function BarcodePage() {
               variant="outline"
               className="rounded-xl"
               onClick={handleDownload}
-              disabled={rows.length === 0 || downloading}
+              disabled={rows.length === 0 || downloading || draftError !== null}
+              title={draftError ?? undefined}
             >
               <Download className="h-4 w-4" /> {downloading ? "Menyiapkan..." : "Download PNG"}
             </Button>
-            <Button className="rounded-xl" onClick={handlePrint} disabled={rows.length === 0}>
+            <Button
+              className="rounded-xl"
+              onClick={handlePrint}
+              disabled={rows.length === 0 || draftError !== null}
+              title={draftError ?? undefined}
+            >
               <Printer className="h-4 w-4" /> Print
             </Button>
           </>
@@ -391,24 +435,141 @@ function BarcodePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Ukuran Label</Label>
+              <div className="flex items-center justify-between">
+                <Label>Template Label</Label>
+                <button
+                  type="button"
+                  onClick={() => setManageOpen(true)}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Kelola…
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2">
-                {LABEL_SIZES.map((s) => (
+                {all.map((t) => {
+                  const d = templateDims(t);
+                  const active = selectedId === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => pickTemplate(t)}
+                      className={cn(
+                        "rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors",
+                        active ? "border-primary/40 bg-primary-soft text-primary" : "border-border",
+                      )}
+                    >
+                      {t.name}
+                      <span className="block font-normal opacity-70">
+                        {t.cols}×{t.rows} · {d.perSheet}/lembar
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedId === null && (
+                <p className="text-xs text-muted-foreground">
+                  Susunan custom (belum disimpan) — simpan via Kelola… agar bisa dipakai lagi.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Susunan Grid (kolom × baris)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    step={1}
+                    value={draft.cols}
+                    onChange={(e) => {
+                      const v = Number.parseInt(e.target.value, 10);
+                      if (Number.isInteger(v)) patchDraft({ cols: v });
+                    }}
+                    aria-label="Jumlah kolom"
+                    className="h-9 rounded-xl"
+                  />
+                  <span className="text-xs text-muted-foreground">kolom</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={draft.rows}
+                    onChange={(e) => {
+                      const v = Number.parseInt(e.target.value, 10);
+                      if (Number.isInteger(v)) patchDraft({ rows: v });
+                    }}
+                    aria-label="Jumlah baris"
+                    className="h-9 rounded-xl"
+                  />
+                  <span className="text-xs text-muted-foreground">baris</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    step={1}
+                    value={draft.marginMm}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) patchDraft({ marginMm: v });
+                    }}
+                    aria-label="Margin kertas (mm)"
+                    className="h-9 rounded-xl"
+                  />
+                  <span className="text-xs text-muted-foreground">margin</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.5}
+                    value={draft.gapMm}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (Number.isFinite(v)) patchDraft({ gapMm: v });
+                    }}
+                    aria-label="Jarak antar label (mm)"
+                    className="h-9 rounded-xl"
+                  />
+                  <span className="text-xs text-muted-foreground">jarak</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Label hasil {dims.wMm}×{dims.hMm} mm · {perSheet}/lembar — pratinjau di kanan
+                mengikuti susunan ini.
+              </p>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ["showName", "Nama"],
+                    ["showMeta", "SKU/Harga"],
+                  ] as const
+                ).map(([key, label]) => (
                   <button
-                    key={s.id}
+                    key={key}
                     type="button"
-                    onClick={() => setSize(s.id)}
+                    onClick={() => patchDraft({ [key]: !draft[key] })}
+                    aria-pressed={draft[key]}
                     className={cn(
-                      "rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
-                      size === s.id
+                      "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                      draft[key]
                         ? "border-primary/40 bg-primary-soft text-primary"
-                        : "border-border",
+                        : "border-border text-muted-foreground",
                     )}
                   >
-                    {s.label} · {computeSheetLayout(s.id).perSheet}/lembar
+                    {label}: {draft[key] ? "Ya" : "Tidak"}
                   </button>
                 ))}
               </div>
+              {draftError && <p className="text-xs text-destructive">{draftError}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -507,7 +668,7 @@ function BarcodePage() {
 
         <Panel
           title="Preview Label"
-          description={`${kind} · ${size === "A4" ? "A4 Penuh" : size} · ${total} label · persis hasil cetak`}
+          description={`${kind} · ${template.name} · ${total} label · persis hasil cetak`}
         >
           {itemsQ.isLoading ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -522,10 +683,15 @@ function BarcodePage() {
             />
           ) : (
             <div className="space-y-3">
+              {draftError && (
+                <p className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                  Susunan tidak valid: {draftError}
+                </p>
+              )}
               {qrTooSmall && (
                 <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
-                  QR pada label 30×20 hanya ±12 mm dan mungkin sulit dipindai — disarankan ukuran
-                  ≥50×30.
+                  QR pada label ini hanya ±{Math.round(qrSideForTemplate(template))} mm dan mungkin
+                  sulit dipindai — disarankan label ≥50×30.
                 </p>
               )}
               {preview.failed.map((it) => (
@@ -667,6 +833,22 @@ function BarcodePage() {
           </form>
         </DialogContent>
       </Dialog>
+      <LabelTemplateDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        draftSummary={`${draft.cols}×${draft.rows} · margin ${draft.marginMm} · gap ${draft.gapMm}`}
+        draftError={draftError}
+        onSave={(name) => {
+          const r = saveCustom(name, draft);
+          if (r.template) setSelectedId(r.template.id);
+          return r.error ?? null;
+        }}
+        custom={custom}
+        onRemove={(id) => {
+          removeCustom(id);
+          setSelectedId((s) => (s === id ? null : s));
+        }}
+      />
     </>
   );
 }
