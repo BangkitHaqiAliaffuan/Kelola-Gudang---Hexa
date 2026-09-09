@@ -339,6 +339,8 @@ export type LaporanMutasiRowApi = {
   saldo_akhir: number;
   nilai_akhir: number;
   unit_cost_avg: number;
+  min_stock: number;
+  max_stock: number | null;
 };
 
 export type LaporanMutasiParams = {

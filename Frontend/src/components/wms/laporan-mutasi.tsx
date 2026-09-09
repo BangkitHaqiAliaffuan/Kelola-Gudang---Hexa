@@ -9,6 +9,8 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  CircleDollarSign,
+  ArrowDownToLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,6 +25,7 @@ import {
   type Tone,
 } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
+import { MutasiStockSheet } from "@/components/wms/mutasi-stock-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -32,6 +35,27 @@ import { useLaporanMutasi } from "@/hooks/use-laporan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { LaporanMutasiRowApi } from "@/lib/persediaan-types";
+
+const STATUS_OPTIONS = [
+  { value: ALL, label: "Semua Status" },
+  { value: "Habis", label: "Habis" },
+  { value: "Menipis", label: "Menipis" },
+  { value: "Normal", label: "Normal" },
+] as const;
+
+type StatusFilter = (typeof STATUS_OPTIONS)[number]["value"];
+
+function stockStatus(r: LaporanMutasiRowApi): string {
+  if (r.saldo_akhir <= 0) return "Habis";
+  if (r.max_stock != null) {
+    if (r.saldo_akhir <= r.min_stock) return "Kritis";
+    if (r.saldo_akhir <= r.max_stock) return "Menipis";
+  }
+  return "Normal";
+}
+
+const statusTone = (s: string): Tone =>
+  s === "Habis" || s === "Kritis" ? "danger" : s === "Menipis" ? "warning" : "success";
 
 const toISODate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -48,6 +72,8 @@ export function LaporanMutasi() {
   const debouncedQ = useDebouncedValue(q);
   const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(ALL);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [from, setFrom] = useState(() =>
     toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
   );
@@ -55,12 +81,13 @@ export function LaporanMutasi() {
   const hasActiveFilters = useMemo(() => {
     const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
     const defaultTo = toISODate(new Date());
-    return q !== "" || wh !== ALL || cat !== ALL || from !== defaultFrom || to !== defaultTo;
-  }, [q, wh, cat, from, to]);
+    return q !== "" || wh !== ALL || cat !== ALL || statusFilter !== ALL || from !== defaultFrom || to !== defaultTo;
+  }, [q, wh, cat, statusFilter, from, to]);
   const handleClearFilters = useCallback(() => {
     setQ("");
     setWh(ALL);
     setCat(ALL);
+    setStatusFilter(ALL);
     setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
     setTo(toISODate(new Date()));
   }, []);
@@ -86,14 +113,26 @@ export function LaporanMutasi() {
     enabled: canView && rangeValid,
   });
 
-  const rows = useMemo(() => (data?.data ?? []) as LaporanMutasiRowApi[], [data]);
+  const allRows = useMemo(() => (data?.data ?? []) as LaporanMutasiRowApi[], [data]);
+
+  const rows = useMemo(() => {
+    if (statusFilter === ALL) return allRows;
+    return allRows.filter((r) => stockStatus(r) === statusFilter);
+  }, [allRows, statusFilter]);
+
+  const selected = useMemo(
+    () => allRows.find((r) => r.item_id === selectedId) ?? null,
+    [allRows, selectedId],
+  );
 
   const stats = useMemo(() => {
     const sku = new Set(rows.map((r) => r.item_id)).size;
     const masuk = rows.reduce((s, r) => s + r.masuk, 0);
     const keluar = rows.reduce((s, r) => s + r.keluar, 0);
     const nilai = rows.reduce((s, r) => s + r.nilai_akhir, 0);
-    return { sku, masuk, keluar, nilai };
+    const nilaiMasuk = rows.reduce((s, r) => s + r.masuk * r.unit_cost_avg, 0);
+    const nilaiKeluar = rows.reduce((s, r) => s + r.keluar * r.unit_cost_avg, 0);
+    return { sku, masuk, keluar, nilai, nilaiMasuk, nilaiKeluar };
   }, [rows]);
 
   const chart = useMemo(() => {
@@ -124,7 +163,9 @@ export function LaporanMutasi() {
       masuk: r.masuk,
       keluar: r.keluar,
       saldo_akhir: r.saldo_akhir,
+      unit_cost_avg: r.unit_cost_avg,
       nilai_akhir: r.nilai_akhir,
+      status: stockStatus(r),
     }));
     const content =
       toCsv(metaRows, [
@@ -141,7 +182,9 @@ export function LaporanMutasi() {
         { key: "masuk", label: "Masuk" },
         { key: "keluar", label: "Keluar" },
         { key: "saldo_akhir", label: "Saldo Akhir" },
+        { key: "unit_cost_avg", label: "HPP Satuan" },
         { key: "nilai_akhir", label: "Nilai Akhir" },
+        { key: "status", label: "Status Stok" },
       ]);
     downloadCsv(`laporan-mutasi-${from}-${to}.csv`, content);
     toast.success("CSV diunduh");
@@ -165,7 +208,9 @@ export function LaporanMutasi() {
         <td class="right">${formatNumber(r.masuk)}</td>
         <td class="right">${formatNumber(r.keluar)}</td>
         <td class="right"><b>${formatNumber(r.saldo_akhir)}</b></td>
+        <td class="right">${formatIDR(r.unit_cost_avg)}</td>
         <td class="right">${formatIDR(r.nilai_akhir)}</td>
+        <td>${stockStatus(r)}</td>
       </tr>`,
       )
       .join("");
@@ -176,7 +221,7 @@ export function LaporanMutasi() {
   h1{font-size:18px;margin:0}
   .mono{font-family:Consolas,monospace}
   .muted{color:#64748b;font-size:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
   th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
   th{background:#f1f5f9;font-size:12px}
   .right{text-align:right}
@@ -185,7 +230,7 @@ export function LaporanMutasi() {
 <h1>Laporan Mutasi</h1>
 <p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${wh === ALL ? "" : ""}${formatNumber(rows.length)} SKU</p>
 <table>
-  <thead><tr><th>Barang</th><th>SKU</th><th>Kategori</th><th>Satuan</th><th class="right">Saldo Awal</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">Nilai Akhir</th></tr></thead>
+  <thead><tr><th>Barang</th><th>SKU</th><th>Kategori</th><th>Satuan</th><th class="right">Saldo Awal</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">HPP Satuan</th><th class="right">Nilai Akhir</th><th>Status</th></tr></thead>
   <tbody>${tbody}</tbody>
 </table>
 <div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
@@ -250,12 +295,31 @@ export function LaporanMutasi() {
       render: (r) => `${formatNumber(r.saldo_akhir)} ${r.unit ?? ""}`,
     },
     {
+      key: "unit_cost_avg",
+      label: "HPP Satuan",
+      className: "text-right min-w-[120px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => r.unit_cost_avg,
+      render: (r) => formatIDR(r.unit_cost_avg),
+    },
+    {
       key: "nilai_akhir",
       label: "Nilai Akhir",
       className: "text-right min-w-[130px] whitespace-nowrap",
       sortable: true,
       sortAccessor: (r) => r.nilai_akhir,
       render: (r) => formatIDR(r.nilai_akhir),
+    },
+    {
+      key: "status",
+      label: "Status",
+      className: "w-[90px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => stockStatus(r),
+      render: (r) => {
+        const s = stockStatus(r);
+        return <Pill tone={statusTone(s)}>{s}</Pill>;
+      },
     },
   ];
 
@@ -295,7 +359,7 @@ export function LaporanMutasi() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard
           label="Total SKU"
           value={isLoading || isFetching ? "…" : formatNumber(stats.sku)}
@@ -314,6 +378,22 @@ export function LaporanMutasi() {
           value={isLoading || isFetching ? "…" : formatNumber(stats.keluar)}
           icon={TrendingDown}
           tone="warning"
+          loading={isLoading || isFetching}
+        />
+        <StatCard
+          label="Nilai Masuk"
+          value={isLoading || isFetching ? "…" : formatIDRCompact(stats.nilaiMasuk)}
+          icon={ArrowDownToLine}
+          tone="success"
+          {...(isLoading || isFetching ? {} : { valueTitle: formatIDR(stats.nilaiMasuk) })}
+          loading={isLoading || isFetching}
+        />
+        <StatCard
+          label="Nilai Keluar"
+          value={isLoading || isFetching ? "…" : formatIDRCompact(stats.nilaiKeluar)}
+          icon={CircleDollarSign}
+          tone="warning"
+          {...(isLoading || isFetching ? {} : { valueTitle: formatIDR(stats.nilaiKeluar) })}
           loading={isLoading || isFetching}
         />
         <StatCard
@@ -352,6 +432,13 @@ export function LaporanMutasi() {
             placeholder="Semua Kategori"
             options={cats?.data.map((c) => c.name) ?? []}
             loading={catsLoading}
+          />
+          <FilterSelect
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
+            value={statusFilter}
+            onChange={(v) => setStatusFilter(v as StatusFilter)}
+            placeholder="Status Stok"
+            options={[...STATUS_OPTIONS]}
           />
           <Input
             type="date"
@@ -425,6 +512,7 @@ export function LaporanMutasi() {
           loading={isLoading}
           error={error}
           onRetry={() => refetch()}
+          onRowClick={(r) => setSelectedId(r.item_id)}
           initialSort={{ key: "name", dir: "asc" }}
           mobileCard={(r) => (
             <div className="space-y-1.5">
@@ -458,6 +546,12 @@ export function LaporanMutasi() {
           )}
         />
       </Panel>
+
+      <MutasiStockSheet
+        item={selected}
+        periodLabel={periodLabel}
+        onOpenChange={(o) => !o && setSelectedId(null)}
+      />
     </>
   );
 }

@@ -27,6 +27,8 @@ class LaporanMutasiResource extends JsonResource
             'saldo_akhir' => (int) ($this->resource->saldo_akhir ?? 0),
             'nilai_akhir' => (float) ($this->resource->nilai_akhir ?? 0),
             'unit_cost_avg' => (float) ($this->resource->unit_cost_avg ?? 0),
+            'min_stock' => (int) ($this->resource->min_stock ?? 0),
+            'max_stock' => isset($this->resource->max_stock) ? (int) $this->resource->max_stock : null,
         ];
     }
 }
