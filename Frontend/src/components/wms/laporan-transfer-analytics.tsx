@@ -22,7 +22,6 @@ import {
   ProsesPanel,
   TopPihakTable,
   matchPihak,
-  pihakOptions,
 } from "./laporan-analytics-shared";
 
 /**
@@ -46,18 +45,38 @@ export function LaporanTransferAnalytics({
   const { data: warehouses } = useWarehouses();
   const destWarehouseId =
     destId === ALL ? null : (warehouses?.data.find((w) => w.name === destId)?.id ?? null);
+
+  // pihak format: "gudang:<id>" — parse to numeric warehouse_id for backend
+  const pihakWarehouseId = useMemo(() => {
+    if (pihak === ALL) return null;
+    const parts = pihak.split(":");
+    if (parts[0] === "gudang") {
+      const id = Number(parts[1]);
+      return Number.isFinite(id) ? id : null;
+    }
+    return null;
+  }, [pihak]);
+
   const { data, isLoading, isFetching, error, refetch } = useTransaksiAnalytics({
     type: "Transfer Gudang",
     from,
     to,
-    warehouseId,
+    warehouseId: pihakWarehouseId ?? warehouseId,
     destinationWarehouseId: destWarehouseId,
     enabled,
   });
   const a = data?.data;
   const busy = isLoading || isFetching;
 
-  const options = useMemo(() => pihakOptions(a?.aktivitas ?? []), [a]);
+  // Use stable warehouses list (not aktivitas which changes with source filter)
+  const options = useMemo(
+    () =>
+      (warehouses?.data ?? []).map((w) => ({
+        value: `gudang:${w.id}`,
+        label: `${w.name} — Gudang`,
+      })),
+    [warehouses],
+  );
   const f = (jenis: string, id: number | null, nama: string) => matchPihak(pihak, jenis, id, nama);
 
   const laneRows = useMemo(() => {
