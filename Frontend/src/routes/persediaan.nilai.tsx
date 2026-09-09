@@ -100,7 +100,7 @@ function NilaiPersediaan() {
   const whId = whFilter.warehouseId;
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
 
-  const { data, isLoading } = useStockValuation({
+  const { data, isLoading, error, refetch } = useStockValuation({
     warehouseId: whId,
     categoryId: cat === ALL ? null : (catId ?? null),
     search: debouncedQ.trim() || null,
@@ -517,6 +517,8 @@ function NilaiPersediaan() {
           rows={filteredRows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           initialSort={{ key: "nilai", dir: "desc" }}
           mobileCard={(r) => (
             <div className="space-y-1.5">

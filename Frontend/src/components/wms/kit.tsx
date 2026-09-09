@@ -1,4 +1,12 @@
-import { FilterX, Loader2, Warehouse, Inbox, X, type LucideIcon } from "lucide-react";
+import {
+  FilterX,
+  Loader2,
+  Warehouse,
+  Inbox,
+  TriangleAlert,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -253,15 +261,28 @@ export function EmptyState({
   title = "Belum ada data",
   description = "Data akan tampil di sini setelah transaksi dibuat.",
   action,
+  tone = "neutral",
 }: {
   title?: string;
   description?: string;
   action?: ReactNode;
+  tone?: "neutral" | "error";
 }) {
+  const Icon = tone === "error" ? TriangleAlert : Inbox;
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 py-14 text-center">
-      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
-        <Inbox className="h-6 w-6" />
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-14 text-center",
+        tone === "error" ? "border-danger/50 bg-danger/5" : "border-border",
+      )}
+    >
+      <span
+        className={cn(
+          "grid h-12 w-12 place-items-center rounded-2xl",
+          tone === "error" ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Icon className="h-6 w-6" />
       </span>
       <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
       <p className="mt-1 max-w-sm text-xs text-muted-foreground">{description}</p>

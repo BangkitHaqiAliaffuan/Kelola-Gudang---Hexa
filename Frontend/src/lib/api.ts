@@ -21,11 +21,21 @@ export type Paginated<T> = {
 export class ApiError extends Error {
   readonly status: number;
   readonly errors: Record<string, string[]> | undefined;
+  readonly path: string;
+  readonly method: string;
 
-  constructor(status: number, message: string, errors?: Record<string, string[]>) {
+  constructor(
+    status: number,
+    message: string,
+    path = "",
+    method = "GET",
+    errors?: Record<string, string[]>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.path = path;
+    this.method = method;
     this.errors = errors;
   }
 }
@@ -47,6 +57,7 @@ export function clearAuthToken(): void {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = init?.method ?? "GET";
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
@@ -65,6 +76,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(
       0,
       "Tidak dapat terhubung ke server backend. Pastikan Laravel berjalan (composer dev).",
+      path,
+      method,
     );
   }
 
@@ -78,7 +91,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // non-JSON error body — keep generic message
     }
-    throw new ApiError(res.status, message, errors);
+    throw new ApiError(res.status, message, path, method, errors);
   }
 
   if (res.status === 204) return undefined as T;
@@ -150,4 +163,26 @@ export function fieldError(err: unknown, field: string): string | undefined {
 
 export function isApiError(err: unknown): err is ApiError {
   return err instanceof ApiError;
+}
+
+const IS_DEV = (import.meta.env["DEV"] as boolean | undefined) ?? false;
+
+/** Judul ramah-pengguna untuk error query. Endpoint hanya diungkap di DEV. */
+export function formatQueryError(err: unknown): { title: string; detail: string } {
+  if (!isApiError(err)) {
+    const message = err instanceof Error ? err.message : "Terjadi kesalahan tak terduga.";
+    return {
+      title: message,
+      detail: IS_DEV ? "Non-API error (lihat console)" : "",
+    };
+  }
+  let title = err.message;
+  if (err.status === 0) title = "Tidak dapat terhubung ke server backend";
+  else if (err.status === 401) title = "Sesi berakhir. Silakan login kembali.";
+  else if (err.status === 403) title = "Akses ditolak untuk peran Anda.";
+  else if (err.status === 404) title = "Data tidak ditemukan di server.";
+  else if (err.status === 429) title = "Terlalu banyak permintaan. Coba lagi sesaat lagi.";
+  else if (err.status >= 500) title = "Server backend bermasalah. Coba lagi sesaat lagi.";
+  const detail = IS_DEV && err.path ? `${err.method} ${err.path} → ${err.status}` : "";
+  return { title, detail };
 }

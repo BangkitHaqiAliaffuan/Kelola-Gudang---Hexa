@@ -345,6 +345,8 @@ function StockDetail() {
           rows={locations}
           pageSize={12}
           loading={locQ.isLoading}
+          error={locQ.error}
+          onRetry={() => locQ.refetch()}
           onRowClick={(r) => goToCard(r.warehouse_id)}
           mobileCard={(r) => (
             <div className="space-y-2">

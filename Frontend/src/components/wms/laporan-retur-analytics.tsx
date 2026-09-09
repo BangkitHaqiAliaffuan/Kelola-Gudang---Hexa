@@ -41,7 +41,7 @@ export function LaporanReturAnalytics({
   const type: TransaksiAnalyticsType = kind === "pembelian" ? "Retur Pembelian" : "Retur Penjualan";
   const pihakLabel = kind === "pembelian" ? "Supplier" : "Customer";
   const [pihak, setPihak] = useState<string>(ALL);
-  const { data, isLoading, isFetching } = useTransaksiAnalytics({
+  const { data, isLoading, isFetching, error, refetch } = useTransaksiAnalytics({
     type,
     from,
     to,
@@ -192,11 +192,11 @@ export function LaporanReturAnalytics({
       </Panel>
 
       <Panel title={`Top ${pihakLabel} Retur`} description="Peringkat + share kumulatif (Pareto)">
-        <TopPihakTable rows={topRows} loading={busy} />
+        <TopPihakTable rows={topRows} loading={busy} error={error} onRetry={() => refetch()} />
       </Panel>
 
       <Panel title={`Retur per ${pihakLabel} per Bulan`} description="Rincian bulanan">
-        <PihakBulanTable rows={bulanRows} loading={busy} />
+        <PihakBulanTable rows={bulanRows} loading={busy} error={error} onRetry={() => refetch()} />
       </Panel>
 
       {(a?.retur?.per_alasan?.length ?? 0) > 0 && (
@@ -235,12 +235,14 @@ export function LaporanReturAnalytics({
               <p className="mb-2 text-sm font-semibold">Top Item Diretur</p>
               <DataTable
                 columns={returItemColumns}
-                rows={(a!.retur!.per_item ?? []).map((r) => ({
+                rows={(a?.retur?.per_item ?? []).map((r) => ({
                   ...r,
                   id: `retur-item:${r.item_id}`,
                 }))}
                 pageSize={5}
                 loading={busy}
+                error={error}
+                onRetry={() => refetch()}
                 mobileCard={(r) => (
                   <div className="space-y-1">
                     <p className="truncate text-sm font-semibold">{r.nama}</p>
@@ -256,8 +258,13 @@ export function LaporanReturAnalytics({
         </Panel>
       )}
 
-      <AtRiskTable rows={a?.aktivitas ?? []} loading={busy} />
-      <ProsesPanel proses={a?.proses} loading={busy} />
+      <AtRiskTable
+        rows={a?.aktivitas ?? []}
+        loading={busy}
+        error={error}
+        onRetry={() => refetch()}
+      />
+      <ProsesPanel proses={a?.proses} loading={busy} error={error} onRetry={() => refetch()} />
     </>
   );
 }

@@ -84,7 +84,7 @@ export function LaporanKeluarAnalytics({
   const [jenis, setJenis] = useState<string>(ALL);
   const [tujuan, setTujuan] = useState<string>(ALL);
 
-  const { data, isLoading, isFetching } = useLaporanKeluarAnalytics({
+  const { data, isLoading, isFetching, error, refetch } = useLaporanKeluarAnalytics({
     from,
     to,
     warehouseId,
@@ -334,6 +334,8 @@ export function LaporanKeluarAnalytics({
           rows={withRowId(topTujuan, (r, i) => `${r.jenis}:${r.id ?? r.nama}:${i}`)}
           pageSize={10}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(r) => (
             <div className="space-y-1">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -405,6 +407,8 @@ export function LaporanKeluarAnalytics({
           )}
           pageSize={10}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(r) => (
             <div className="space-y-1">
               <p className="truncate text-sm font-semibold">{r.nama}</p>
@@ -434,6 +438,8 @@ export function LaporanKeluarAnalytics({
           )}
           pageSize={12}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(r) => (
             <div className="space-y-1">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -492,9 +498,11 @@ export function LaporanKeluarAnalytics({
               <p className="mb-2 text-sm font-semibold">Top Item Diretur</p>
               <DataTable
                 columns={returItemColumns}
-                rows={withRowId(a.retur.per_item, (r) => `retur-item:${r.item_id}`)}
+                rows={withRowId(a?.retur?.per_item ?? [], (r) => `retur-item:${r.item_id}`)}
                 pageSize={5}
                 loading={busy}
+                error={error}
+                onRetry={() => refetch()}
                 mobileCard={(r) => (
                   <div className="space-y-1">
                     <p className="truncate text-sm font-semibold">{r.nama}</p>
@@ -520,6 +528,8 @@ export function LaporanKeluarAnalytics({
             rows={withRowId(atRisk, (r, i) => `atrisk:${r.jenis}:${r.id ?? r.nama}:${i}`)}
             pageSize={8}
             loading={busy}
+            error={error}
+            onRetry={() => refetch()}
             mobileCard={(r) => (
               <div className="space-y-1">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -560,6 +570,8 @@ export function LaporanKeluarAnalytics({
                     rows={withRowId(p.items, (r) => `proyek-item:${p.id ?? p.nama}:${r.item_id}`)}
                     pageSize={5}
                     loading={busy}
+                    error={error}
+                    onRetry={() => refetch()}
                     mobileCard={(r) => (
                       <div className="space-y-1">
                         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">

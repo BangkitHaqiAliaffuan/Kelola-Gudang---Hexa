@@ -52,7 +52,7 @@ const varianceTone = (l: StockDocumentLineApi): "neutral" | "success" | "info" |
  */
 export function OpnameDetailPage({ docId }: { docId: number }) {
   const router = useRouter();
-  const { data: detail, isLoading } = useStockDocument(docId);
+  const { data: detail, isLoading, error, refetch } = useStockDocument(docId);
   const doc = detail?.data ?? null;
   const lines = useMemo(() => doc?.lines ?? [], [doc]);
 
@@ -447,6 +447,8 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(l) => {
             const variance = l.variance ?? 0;
             return (

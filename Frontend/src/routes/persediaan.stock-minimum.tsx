@@ -108,7 +108,7 @@ function StockMinimum() {
   const whId = whFilter.warehouseId;
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
 
-  const { data, isLoading } = useStockMinimum({
+  const { data, isLoading, error, refetch } = useStockMinimum({
     days: days === ALL ? DEFAULT_DAYS : Number(days),
     warehouseId: whId,
     categoryId: cat === ALL ? null : (catId ?? null),
@@ -422,6 +422,8 @@ function StockMinimum() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

@@ -47,7 +47,7 @@ export function BarangMasukPage() {
   const canPost = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const canViewLaporan = hasModule("Laporan");
-  const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
+  const { data, isLoading, error, refetch } = useStockDocuments({ type: "Penerimaan" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -285,6 +285,8 @@ export function BarangMasukPage() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

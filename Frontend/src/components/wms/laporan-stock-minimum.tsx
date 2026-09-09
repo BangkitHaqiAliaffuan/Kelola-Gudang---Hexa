@@ -66,7 +66,7 @@ export function LaporanStockMinimum() {
   const { data: cats, isLoading: catsLoading } = useCategories();
   const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
-  const { data, isLoading } = useStockMinimum({
+  const { data, isLoading, error, refetch } = useStockMinimum({
     days: days === ALL ? DEFAULT_DAYS : Number(days),
     warehouseId: wh === ALL ? null : (whId ?? null),
     categoryId: cat === ALL ? null : (catId ?? null),
@@ -373,6 +373,8 @@ export function LaporanStockMinimum() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

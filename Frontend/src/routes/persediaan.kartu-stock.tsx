@@ -97,7 +97,12 @@ type CardRow = StockCardRowApi & {
 };
 
 function KartuStock() {
-  const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const {
+    data: itemsData,
+    isLoading: itemsLoading,
+    error: itemsError,
+    refetch: refetchItems,
+  } = useItems();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
   // Prefill dari redirect (mis. detail stock): barang + gudang terisi otomatis.
@@ -213,6 +218,17 @@ function KartuStock() {
     setDateFrom("");
     setDateTo("");
   }, [whFilter]);
+
+  // Ringkasan filter aktif untuk empty state — membedakan "kosong karena
+  // filter" (mis. barang hanya ada di gudang lain) dari error fetch.
+  const emptyDescription = useMemo(() => {
+    if (!hasActiveFilters) return undefined;
+    const parts = [`Barang: ${item?.name ?? "—"}`, `Gudang: ${wh === ALL ? "Semua" : wh}`];
+    if (dateFrom !== "" || dateTo !== "")
+      parts.push(`Periode: ${dateFrom || "…"}–${dateTo || "…"}`);
+    if (debouncedQ !== "") parts.push(`Cari: ${debouncedQ}`);
+    return `${parts.join(" · ")}. Ubah filter atau klik Hapus Filter bila data seharusnya ada.`;
+  }, [hasActiveFilters, item?.name, wh, dateFrom, dateTo, debouncedQ]);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
   const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
@@ -669,6 +685,12 @@ function KartuStock() {
           rows={filteredRows}
           pageSize={10}
           loading={itemsLoading || card.isFetching}
+          error={card.error ?? itemsError}
+          onRetry={() => {
+            card.refetch();
+            refetchItems();
+          }}
+          emptyDescription={emptyDescription}
           onRowClick={(r) => openDetail(r)}
           initialSort={{ key: "date", dir: "asc" }}
           mobileCard={(r) => (

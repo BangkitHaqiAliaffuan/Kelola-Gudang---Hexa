@@ -62,7 +62,7 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         : "warning";
 
 function MutasiStock() {
-  const { data, isLoading } = useStockDocuments();
+  const { data, isLoading, error, refetch } = useStockDocuments();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -204,6 +204,8 @@ function MutasiStock() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

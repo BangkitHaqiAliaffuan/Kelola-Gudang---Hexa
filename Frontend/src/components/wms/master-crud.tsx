@@ -49,6 +49,8 @@ export function MasterCrudPage<T extends { id: number }>({
   mobileCard,
   rows,
   isLoading,
+  error = null,
+  onRetry,
   onAdd,
   addLabel = "Tambah",
   onRowClick,
@@ -68,6 +70,8 @@ export function MasterCrudPage<T extends { id: number }>({
   mobileCard: (row: T) => ReactNode;
   rows: T[] | undefined;
   isLoading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   onAdd?: () => void;
   addLabel?: string;
   onRowClick?: (row: T) => void;
@@ -267,6 +271,8 @@ export function MasterCrudPage<T extends { id: number }>({
           rows={filtered ?? []}
           pageSize={10}
           loading={isLoading}
+          error={error}
+          onRetry={onRetry}
           {...(onRowClick ? { onRowClick } : {})}
           mobileCard={mobileCardWithActions}
         />

@@ -46,7 +46,7 @@ export function LaporanTransferAnalytics({
   const { data: warehouses } = useWarehouses();
   const destWarehouseId =
     destId === ALL ? null : (warehouses?.data.find((w) => w.name === destId)?.id ?? null);
-  const { data, isLoading, isFetching } = useTransaksiAnalytics({
+  const { data, isLoading, isFetching, error, refetch } = useTransaksiAnalytics({
     type: "Transfer Gudang",
     from,
     to,
@@ -203,6 +203,8 @@ export function LaporanTransferAnalytics({
           rows={laneRows.map((r, i) => ({ ...r, id: `lane:${r.from_id}:${r.to_id}:${i}` }))}
           pageSize={10}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(r) => (
             <div className="space-y-1">
               <p className="truncate text-sm font-semibold">
@@ -226,6 +228,8 @@ export function LaporanTransferAnalytics({
           }))}
           pageSize={10}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
           mobileCard={(r) => (
             <div className="flex justify-between text-sm">
               <span className="font-semibold">{r.nama}</span>
@@ -242,11 +246,18 @@ export function LaporanTransferAnalytics({
         <TopPihakTable
           rows={(a?.top_pihak ?? []).filter((r) => f(r.jenis, r.id, r.nama))}
           loading={busy}
+          error={error}
+          onRetry={() => refetch()}
         />
       </Panel>
 
-      <AtRiskTable rows={a?.aktivitas ?? []} loading={busy} />
-      <ProsesPanel proses={a?.proses} loading={busy} />
+      <AtRiskTable
+        rows={a?.aktivitas ?? []}
+        loading={busy}
+        error={error}
+        onRetry={() => refetch()}
+      />
+      <ProsesPanel proses={a?.proses} loading={busy} error={error} onRetry={() => refetch()} />
     </>
   );
 }

@@ -111,7 +111,7 @@ function dateStamp(): string {
 }
 
 export function KategoriPage() {
-  const { data, isLoading } = useCategories();
+  const { data, isLoading, error, refetch } = useCategories();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [viewing, setViewing] = useState<Category | null>(null);
@@ -146,6 +146,8 @@ export function KategoriPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -186,7 +188,7 @@ export function KategoriPage() {
 }
 
 export function SubKategoriPage() {
-  const { data, isLoading } = useSubCategories();
+  const { data, isLoading, error, refetch } = useSubCategories();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SubCategory | null>(null);
   const del = useDeleteSubCategory();
@@ -216,6 +218,8 @@ export function SubKategoriPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -251,7 +255,7 @@ export function SubKategoriPage() {
 }
 
 export function MerkPage() {
-  const { data, isLoading } = useMerks();
+  const { data, isLoading, error, refetch } = useMerks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Merk | null>(null);
   const del = useDeleteMerk();
@@ -286,6 +290,8 @@ export function MerkPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -321,7 +327,7 @@ export function MerkPage() {
 }
 
 export function SatuanPage() {
-  const { data, isLoading } = useUnits();
+  const { data, isLoading, error, refetch } = useUnits();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Unit | null>(null);
   const del = useDeleteUnit();
@@ -355,6 +361,8 @@ export function SatuanPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -388,7 +396,7 @@ export function SatuanPage() {
 }
 
 export function GudangPage() {
-  const { data, isLoading } = useWarehouses();
+  const { data, isLoading, error, refetch } = useWarehouses();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Warehouse | null>(null);
   const del = useDeleteWarehouse();
@@ -424,6 +432,8 @@ export function GudangPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -459,7 +469,7 @@ export function GudangPage() {
 }
 
 export function RakPage() {
-  const { data, isLoading } = useRacks();
+  const { data, isLoading, error, refetch } = useRacks();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Rack | null>(null);
   const del = useDeleteRack();
@@ -494,6 +504,8 @@ export function RakPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -529,7 +541,7 @@ export function RakPage() {
 }
 
 export function BinPage() {
-  const { data, isLoading } = useBins();
+  const { data, isLoading, error, refetch } = useBins();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Bin | null>(null);
   const del = useDeleteBin();
@@ -567,6 +579,8 @@ export function BinPage() {
         columns={columns}
         rows={data?.data}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -604,7 +618,7 @@ export function BinPage() {
 }
 
 export function SupplierPage() {
-  const { data, isLoading } = useSuppliers();
+  const { data, isLoading, error, refetch } = useSuppliers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [viewing, setViewing] = useState<Supplier | null>(null);
@@ -682,6 +696,8 @@ export function SupplierPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onView={setViewing}
         onRowClick={setViewing}
         onAdd={() => {
@@ -748,7 +764,7 @@ export function SupplierPage() {
 }
 
 export function CustomerPage() {
-  const { data, isLoading } = useCustomers();
+  const { data, isLoading, error, refetch } = useCustomers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [viewing, setViewing] = useState<Customer | null>(null);
@@ -821,6 +837,8 @@ export function CustomerPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onView={setViewing}
         onRowClick={setViewing}
         onAdd={() => {
@@ -887,7 +905,7 @@ export function CustomerPage() {
 }
 
 export function VendorPage() {
-  const { data, isLoading } = useVendors();
+  const { data, isLoading, error, refetch } = useVendors();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
   const [viewing, setViewing] = useState<Vendor | null>(null);
@@ -947,6 +965,8 @@ export function VendorPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onView={setViewing}
         onRowClick={setViewing}
         onAdd={() => {
@@ -1055,7 +1075,7 @@ function CategorySubCategoriesDialog({
 }
 
 export function DepartemenPage() {
-  const { data, isLoading } = useDepartments();
+  const { data, isLoading, error, refetch } = useDepartments();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -1105,6 +1125,8 @@ export function DepartemenPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -1149,7 +1171,7 @@ export function DepartemenPage() {
 }
 
 export function ProyekPage() {
-  const { data, isLoading } = useProjects();
+  const { data, isLoading, error, refetch } = useProjects();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -1215,6 +1237,8 @@ export function ProyekPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -1261,7 +1285,7 @@ export function ProyekPage() {
 }
 
 export function WorkOrderPage() {
-  const { data, isLoading } = useWorkOrders();
+  const { data, isLoading, error, refetch } = useWorkOrders();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -1339,6 +1363,8 @@ export function WorkOrderPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -1396,7 +1422,7 @@ export function WorkOrderPage() {
 }
 
 export function UserPage() {
-  const { data, isLoading } = useUsers();
+  const { data, isLoading, error, refetch } = useUsers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<MasterUser | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -1459,6 +1485,8 @@ export function UserPage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onAdd={() => {
           setEditing(null);
           setDialogOpen(true);
@@ -1513,7 +1541,7 @@ export function UserPage() {
 }
 
 export function RolePage() {
-  const { data, isLoading } = useRoles();
+  const { data, isLoading, error, refetch } = useRoles();
   const [levelFilter, setLevelFilter] = useState(ALL);
   const [editingRole, setEditingRole] = useState<RoleCatalog | null>(null);
   const slotHasActive = useMemo(() => levelFilter !== ALL, [levelFilter]);
@@ -1583,6 +1611,8 @@ export function RolePage() {
         columns={columns}
         rows={filtered}
         isLoading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
         onEdit={(r) => setEditingRole(r)}
         slotHasActive={slotHasActive}
         onClearSlot={handleClearSlot}

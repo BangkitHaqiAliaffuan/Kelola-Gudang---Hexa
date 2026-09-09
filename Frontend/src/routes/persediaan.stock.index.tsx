@@ -46,7 +46,7 @@ const statusTone: Record<StockRowApi["status"], Tone> = {
 
 function StockSaatIni() {
   const navigate = useNavigate();
-  const { data, isLoading } = useStockRows();
+  const { data, isLoading, error, refetch } = useStockRows();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: items } = useItems();
@@ -277,6 +277,8 @@ function StockSaatIni() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={goToDetail}
           mobileCard={(r) => (
             <div className="space-y-2">
