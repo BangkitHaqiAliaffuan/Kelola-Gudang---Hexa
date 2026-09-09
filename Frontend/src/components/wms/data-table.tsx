@@ -45,6 +45,7 @@ export function DataTable<T extends { id: string | number }>({
   emptyDescription,
   onRowClick,
   initialSort,
+  rowClassName,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -58,6 +59,7 @@ export function DataTable<T extends { id: string | number }>({
   emptyDescription?: string | undefined;
   onRowClick?: (row: T) => void;
   initialSort?: SortState;
+  rowClassName?: (row: T) => string | undefined;
 }) {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
@@ -165,6 +167,7 @@ export function DataTable<T extends { id: string | number }>({
                 className={cn(
                   "group transition-colors hover:bg-accent/40",
                   onRowClick && "cursor-pointer",
+                  rowClassName?.(row),
                 )}
               >
                 {columns.map((c) => (
@@ -193,7 +196,10 @@ export function DataTable<T extends { id: string | number }>({
           <div
             key={row.id}
             onClick={() => onRowClick?.(row)}
-            className="rounded-xl border border-border bg-card p-3.5 shadow-soft transition-colors active:bg-accent/40"
+            className={cn(
+              "rounded-xl border border-border bg-card p-3.5 shadow-soft transition-colors active:bg-accent/40",
+              rowClassName?.(row),
+            )}
           >
             {mobileCard(row)}
           </div>

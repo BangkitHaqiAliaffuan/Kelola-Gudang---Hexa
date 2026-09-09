@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Boxes, FileSpreadsheet, Printer, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Boxes, FileSpreadsheet, Filter, Printer, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ALL,
   ClearFiltersButton,
@@ -41,6 +43,16 @@ const typeTone = (t: string): Tone =>
       : "info";
 
 type CardRow = StockCardRowApi & { warehouse?: string | null; destination?: string | null };
+
+function computeStats(values: number[]) {
+  if (values.length === 0) return { mean: 0, stddev: 0 };
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+  return { mean, stddev: Math.sqrt(variance) };
+}
+
+type TypeBreakdown = { type: string; masuk: number; keluar: number; count: number };
 
 function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -90,7 +102,7 @@ export function LaporanKartuStock() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [jenis, setJenis] = useState(ALL);
+  const [jenis, setJenis] = useState<string[]>([]);
   const hasActiveFilters = useMemo(() => {
     const defaultFrom = toISODate(
       new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1),
@@ -99,7 +111,7 @@ export function LaporanKartuStock() {
     return (
       id !== null ||
       q !== "" ||
-      jenis !== ALL ||
+      jenis.length > 0 ||
       wh !== ALL ||
       from !== defaultFrom ||
       to !== defaultTo
@@ -108,7 +120,7 @@ export function LaporanKartuStock() {
   const handleClearFilters = useCallback(() => {
     setId(null);
     setQ("");
-    setJenis(ALL);
+    setJenis([]);
     setWh(ALL);
     setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
     setTo(toISODate(new Date()));
@@ -126,10 +138,36 @@ export function LaporanKartuStock() {
             .includes(debouncedQ.toLowerCase())
         )
           return false;
-        if (jenis !== ALL && r.type !== jenis) return false;
+        if (jenis.length > 0 && !jenis.includes(r.type)) return false;
         return true;
       }),
     [tableRows, debouncedQ, jenis],
+  );
+
+  const typeBreakdown = useMemo<TypeBreakdown[]>(() => {
+    const map = new Map<string, TypeBreakdown>();
+    for (const r of filteredRows) {
+      const entry = map.get(r.type) ?? { type: r.type, masuk: 0, keluar: 0, count: 0 };
+      entry.masuk += r.masuk;
+      entry.keluar += r.keluar;
+      entry.count += 1;
+      map.set(r.type, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => b.masuk + b.keluar - (a.masuk + a.keluar));
+  }, [filteredRows]);
+
+  const highlightThreshold = useMemo(() => {
+    const changes = filteredRows.map((r) => Math.abs(r.masuk - r.keluar));
+    const { mean, stddev } = computeStats(changes);
+    return mean + stddev;
+  }, [filteredRows]);
+
+  const isSignificant = useCallback(
+    (r: CardRow) => {
+      if (filteredRows.length < 3) return false;
+      return Math.abs(r.masuk - r.keluar) > highlightThreshold;
+    },
+    [filteredRows.length, highlightThreshold],
   );
 
   const periodLabel = rangeValid ? `${formatDate(from)} s.d. ${formatDate(to)}` : "Semua periode";
@@ -408,14 +446,55 @@ export function LaporanKartuStock() {
             loading={warehousesLoading}
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
-          <FilterSelect
-            value={jenis}
-            onChange={setJenis}
-            placeholder="Semua Jenis"
-            options={Array.from(new Set(rows.map((r) => r.type)))}
-            loading={card.isFetching}
-            className="w-full flex-1 min-w-[140px] max-w-[180px]"
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "h-9 rounded-xl min-w-[140px] max-w-[180px] justify-start text-left font-normal",
+                  jenis.length > 0 && "border-primary text-primary",
+                )}
+              >
+                <Filter className="mr-2 h-3.5 w-3.5" />
+                {jenis.length === 0
+                  ? "Semua Jenis"
+                  : jenis.length === 1
+                    ? jenis[0]
+                    : `${jenis.length} Jenis`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-0.5">
+                {jenisOptions.map((t) => (
+                  <label
+                    key={t}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={jenis.includes(t)}
+                      onCheckedChange={(checked) => {
+                        setJenis((prev) =>
+                          checked ? [...prev, t] : prev.filter((v) => v !== t),
+                        );
+                      }}
+                    />
+                    <Pill tone={typeTone(t)} className="text-[10px]">
+                      {t}
+                    </Pill>
+                  </label>
+                ))}
+              </div>
+              {jenis.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setJenis([])}
+                  className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                >
+                  <X className="h-3 w-3" /> Hapus semua
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
           <Input
             type="date"
             value={from}
@@ -469,6 +548,28 @@ export function LaporanKartuStock() {
         />
       </div>
 
+      {typeBreakdown.length > 0 && (
+        <Panel title="Ringkasan per Jenis Transaksi">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {typeBreakdown.map((tb) => (
+              <div
+                key={tb.type}
+                className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Pill tone={typeTone(tb.type)}>{tb.type}</Pill>
+                  <span className="text-xs text-muted-foreground">{tb.count} transaksi</span>
+                </div>
+                <div className="flex items-center gap-3 text-xs font-semibold">
+                  {tb.masuk > 0 && <span className="text-success">+{formatNumber(tb.masuk)}</span>}
+                  {tb.keluar > 0 && <span className="text-destructive">-{formatNumber(tb.keluar)}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
       <Panel
         title={item?.name ?? "Memuat…"}
         description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${periodLabel}`}
@@ -483,6 +584,11 @@ export function LaporanKartuStock() {
           onRetry={() => card.refetch()}
           onRowClick={(r) => openDetail(r)}
           initialSort={{ key: "date", dir: "asc" }}
+          rowClassName={(r) =>
+            isSignificant(r)
+              ? "bg-amber-50/60 dark:bg-amber-950/20 border-l-2 border-l-amber-400"
+              : undefined
+          }
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
