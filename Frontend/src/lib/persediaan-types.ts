@@ -556,6 +556,7 @@ export type TopPihakRow = {
   dokumen: number;
   share: number;
   share_kumulatif: number;
+  rate_qty?: number | null;
 };
 
 export type TransaksiAnalyticsApi = {

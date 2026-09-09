@@ -5,6 +5,7 @@ import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, StatCard } fr
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useTransaksiAnalytics } from "@/hooks/use-laporan";
+import { useSuppliers, useCustomers } from "@/hooks/use-master";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type { TransaksiAnalyticsType } from "@/lib/persediaan-types";
 import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
@@ -15,7 +16,6 @@ import {
   ProsesPanel,
   TopPihakTable,
   matchPihak,
-  pihakOptions,
   tooltipStyle,
 } from "./laporan-analytics-shared";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -51,7 +51,18 @@ export function LaporanReturAnalytics({
   const a = data?.data;
   const busy = isLoading || isFetching;
 
-  const options = useMemo(() => pihakOptions(a?.aktivitas ?? []), [a]);
+  const { data: suppliersData, isLoading: suppliersLoading } = useSuppliers();
+  const { data: customersData, isLoading: customersLoading } = useCustomers();
+  const masterLoading = kind === "pembelian" ? suppliersLoading : customersLoading;
+
+  const options = useMemo(() => {
+    const list = kind === "pembelian" ? suppliersData?.data ?? [] : customersData?.data ?? [];
+    const jenis = kind === "pembelian" ? "supplier" : "customer";
+    return list.map((s: { id: number; name: string }) => ({
+      value: `${jenis}:${s.id}:${s.name}`,
+      label: s.name,
+    }));
+  }, [kind, suppliersData, customersData]);
   const f = (jenis: string, id: number | null, nama: string) => matchPihak(pihak, jenis, id, nama);
 
   const chartRows = useMemo(
@@ -70,10 +81,22 @@ export function LaporanReturAnalytics({
     [a, pihak],
   );
 
+  const filteredStats = useMemo(() => {
+    const dokumen = topRows.reduce((s, r) => s + r.dokumen, 0);
+    const qty = topRows.reduce((s, r) => s + r.qty, 0);
+    const nilai = topRows.reduce((s, r) => s + r.nilai, 0);
+    const rates = topRows.filter((r) => r.rate_qty != null);
+    const rateQty =
+      rates.length > 0
+        ? Math.round((rates.reduce((s, r) => s + (r.rate_qty ?? 0), 0) / rates.length) * 100) / 100
+        : 0;
+    return { dokumen, qty, nilai, rateQty };
+  }, [topRows]);
+
   const insight = useMemo(() => {
     if (!a) return null;
     const parts = [
-      `Tingkat retur ${a.retur?.rate_qty ?? 0}% dari ${kind === "pembelian" ? "penerimaan" : "pengeluaran"} periode ini.`,
+      `Tingkat retur ${filteredStats.rateQty}% dari ${kind === "pembelian" ? "penerimaan" : "pengeluaran"} periode ini.`,
     ];
     const topAlasan = a.retur?.per_alasan?.[0];
     if (topAlasan)
@@ -82,7 +105,7 @@ export function LaporanReturAnalytics({
     if (bebas > 0)
       parts.push(`${formatNumber(bebas)} unit retur tanpa dokumen sumber — telusuri manual.`);
     return parts.join(" ");
-  }, [a, kind]);
+  }, [a, kind, filteredStats.rateQty]);
 
   const handleExportCsv = () => {
     if (!a) return;
@@ -143,7 +166,7 @@ export function LaporanReturAnalytics({
             onChange={setPihak}
             placeholder={`Semua ${pihakLabel}`}
             options={options}
-            loading={isLoading}
+            loading={masterLoading}
           />
           <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={pihak !== ALL} onClick={() => setPihak(ALL)} />
@@ -155,30 +178,30 @@ export function LaporanReturAnalytics({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Dokumen Retur"
-          value={busy ? "…" : formatNumber(a!.ringkasan.dokumen)}
+          value={busy ? "…" : formatNumber(filteredStats.dokumen)}
           icon={ClipboardList}
           loading={busy}
         />
         <StatCard
           label="Qty Retur"
-          value={busy ? "…" : `${formatNumber(a!.ringkasan.qty)} unit`}
+          value={busy ? "…" : `${formatNumber(filteredStats.qty)} unit`}
           icon={Package}
           tone="info"
           loading={busy}
         />
         <StatCard
           label="Nilai Retur"
-          value={busy ? "…" : formatIDRCompact(a!.ringkasan.nilai)}
+          value={busy ? "…" : formatIDRCompact(filteredStats.nilai)}
           icon={Wallet}
           tone="success"
           loading={busy}
-          {...(busy ? {} : { valueTitle: formatIDR(a!.ringkasan.nilai) })}
+          {...(busy ? {} : { valueTitle: formatIDR(filteredStats.nilai) })}
         />
         <StatCard
           label="Tingkat Retur"
-          value={busy ? "…" : `${a!.retur?.rate_qty ?? 0}%`}
+          value={busy ? "…" : `${filteredStats.rateQty}%`}
           icon={Undo2}
-          tone={(a?.retur?.rate_qty ?? 0) > 5 ? "danger" : "warning"}
+          tone={filteredStats.rateQty > 5 ? "danger" : "warning"}
           loading={busy}
         />
       </div>
