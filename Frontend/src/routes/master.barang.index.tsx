@@ -92,7 +92,7 @@ function MasterBarang() {
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("Master Data", "Tulis");
   const canDelete = hasModuleLevel("Master Data", "Kelola");
-  const { data, isLoading } = useItems();
+  const { data, isLoading, error, refetch } = useItems();
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: subs, isLoading: subsLoading } = useSubCategories();
   const { data: merks, isLoading: merksLoading } = useMerks();
@@ -599,6 +599,8 @@ function MasterBarang() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => navigate({ to: "/master/barang/$id", params: { id: String(r.id) } })}
           mobileCard={(r) => {
             const s = stockStatus(r);

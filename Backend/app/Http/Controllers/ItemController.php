@@ -47,6 +47,8 @@ class ItemController extends Controller
 
         $query->orderBy('name');
 
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         $items = $query->paginate((int) $request->query('per_page', 20));
 
         return ItemResource::collection($items);
@@ -535,6 +537,9 @@ class ItemController extends Controller
                         ?? CodeGenerator::next(Item::class, 'IB', 'internal_barcode');
                     Item::create($payload);
                     $created++;
+                } catch (QueryException $e) {
+                    report($e);
+                    $errors[$index] = 'Baris '.($index + 1).': gagal disimpan (kemungkinan data duplikat/tidak valid).';
                 } catch (\Exception $e) {
                     $errors[$index] = 'Baris '.($index + 1).': '.$e->getMessage();
                 }

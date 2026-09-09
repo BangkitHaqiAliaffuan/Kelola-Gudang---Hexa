@@ -47,6 +47,7 @@ class ProcDocController extends Controller
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = ProcDoc::query()

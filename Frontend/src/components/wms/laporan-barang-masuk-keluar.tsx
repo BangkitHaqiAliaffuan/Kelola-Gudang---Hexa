@@ -142,7 +142,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
   );
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
-  const { data, isLoading, isFetching } = useStockDocuments({
+  const { data, isLoading, isFetching, error, refetch } = useStockDocuments({
     type,
     warehouseId: whId,
     from: from || null,
@@ -586,6 +586,8 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           initialSort={{ key: "document_date", dir: "desc" }}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (

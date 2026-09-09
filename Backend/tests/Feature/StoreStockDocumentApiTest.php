@@ -196,7 +196,7 @@ class StoreStockDocumentApiTest extends TestCase
             ],
         ])->assertStatus(201)->json('data.no');
 
-        $row = collect($this->getJson('/api/persediaan/stock-documents?per_page=10000')->assertOk()->json('data'))
+        $row = collect($this->getJson('/api/persediaan/stock-documents?per_page=100')->assertOk()->json('data'))
             ->firstWhere('no', $no);
 
         $this->assertNotNull($row, 'dokumen tidak muncul di index');

@@ -71,7 +71,7 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
           : "warning";
 
 function StockAdjustment() {
-  const { data, isLoading } = useStockDocuments({ type: ADJUSTMENT_TYPE });
+  const { data, isLoading, error, refetch } = useStockDocuments({ type: ADJUSTMENT_TYPE });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
@@ -305,6 +305,8 @@ function StockAdjustment() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

@@ -46,7 +46,7 @@ export function PurchaseOrderPage() {
     (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage),
     [user, canApprove, canManage],
   );
-  const { data, isLoading } = useProcDocsPo("PO");
+  const { data, isLoading, error, refetch } = useProcDocsPo("PO");
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: suppliers, isLoading: suppliersLoading } = useSuppliers();
 
@@ -308,6 +308,8 @@ export function PurchaseOrderPage() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           initialSort={{ key: "document_date", dir: "desc" }}
           mobileCard={(r) => (

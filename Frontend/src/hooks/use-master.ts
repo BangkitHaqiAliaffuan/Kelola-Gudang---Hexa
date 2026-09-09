@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Paginated } from "@/lib/api";
+import { api, fetchAll } from "@/lib/api";
 import type { RoleAccessEntry } from "@/lib/schemas";
 import type {
   Bin,
@@ -20,11 +20,9 @@ import type {
   WorkOrder,
 } from "@/lib/master-types";
 
-// Data volume is small, so fetch everything and let the UI (DataTable)
-// paginate + filter client-side, matching the existing UX. 10000 covers the
-// largest dataset today (bins, ~578 rows) with ample headroom — matches the
-// DOCS_PER_PAGE convention used by use-purchase-order.ts / use-persediaan.ts.
-const PER_PAGE = 10000;
+// Backend membatasi `per_page` maks 100 (Fase 1.2 skalabilitas), jadi daftar
+// yang butuh seluruh baris di client diambil via fetchAll() — loop halaman
+// 100 mengikuti meta.last_page, perilaku tetap sama seperti fetch-all lama.
 
 const keys = {
   categories: ["master", "categories"] as const,
@@ -49,7 +47,7 @@ const keys = {
 export function useCategories() {
   return useQuery({
     queryKey: keys.categories,
-    queryFn: () => api.get<Paginated<Category>>(`/master/categories?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Category>("/master/categories"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -57,7 +55,7 @@ export function useCategories() {
 export function useSubCategories() {
   return useQuery({
     queryKey: keys.subCategories,
-    queryFn: () => api.get<Paginated<SubCategory>>(`/master/sub-categories?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<SubCategory>("/master/sub-categories"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -65,7 +63,7 @@ export function useSubCategories() {
 export function useMerks() {
   return useQuery({
     queryKey: keys.merks,
-    queryFn: () => api.get<Paginated<Merk>>(`/master/merks?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Merk>("/master/merks"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -73,7 +71,7 @@ export function useMerks() {
 export function useUnits() {
   return useQuery({
     queryKey: keys.units,
-    queryFn: () => api.get<Paginated<Unit>>(`/master/units?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Unit>("/master/units"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -81,7 +79,7 @@ export function useUnits() {
 export function useWarehouses() {
   return useQuery({
     queryKey: keys.warehouses,
-    queryFn: () => api.get<Paginated<Warehouse>>(`/master/warehouses?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Warehouse>("/master/warehouses"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -89,7 +87,7 @@ export function useWarehouses() {
 export function useRacks() {
   return useQuery({
     queryKey: keys.racks,
-    queryFn: () => api.get<Paginated<Rack>>(`/master/racks?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Rack>("/master/racks"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -97,7 +95,7 @@ export function useRacks() {
 export function useBins() {
   return useQuery({
     queryKey: keys.bins,
-    queryFn: () => api.get<Paginated<Bin>>(`/master/bins?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Bin>("/master/bins"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -105,7 +103,7 @@ export function useBins() {
 export function useItems() {
   return useQuery({
     queryKey: keys.items,
-    queryFn: () => api.get<Paginated<ItemApi>>(`/master/items?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<ItemApi>("/master/items"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -113,7 +111,7 @@ export function useItems() {
 export function useSuppliers() {
   return useQuery({
     queryKey: keys.suppliers,
-    queryFn: () => api.get<Paginated<Supplier>>(`/master/suppliers?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Supplier>("/master/suppliers"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -121,7 +119,7 @@ export function useSuppliers() {
 export function useCustomers() {
   return useQuery({
     queryKey: keys.customers,
-    queryFn: () => api.get<Paginated<Customer>>(`/master/customers?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Customer>("/master/customers"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -129,7 +127,7 @@ export function useCustomers() {
 export function useVendors() {
   return useQuery({
     queryKey: keys.vendors,
-    queryFn: () => api.get<Paginated<Vendor>>(`/master/vendors?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Vendor>("/master/vendors"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -137,7 +135,7 @@ export function useVendors() {
 export function useUsers() {
   return useQuery({
     queryKey: keys.users,
-    queryFn: () => api.get<Paginated<MasterUser>>(`/master/users?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<MasterUser>("/master/users"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -173,7 +171,7 @@ export function useUpdateRole() {
 export function useDepartments() {
   return useQuery({
     queryKey: keys.departments,
-    queryFn: () => api.get<Paginated<Department>>(`/master/departments?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Department>("/master/departments"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -181,7 +179,7 @@ export function useDepartments() {
 export function useProjects() {
   return useQuery({
     queryKey: keys.projects,
-    queryFn: () => api.get<Paginated<Project>>(`/master/projects?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<Project>("/master/projects"),
     enabled: typeof window !== "undefined",
   });
 }
@@ -189,7 +187,7 @@ export function useProjects() {
 export function useWorkOrders() {
   return useQuery({
     queryKey: keys.workOrders,
-    queryFn: () => api.get<Paginated<WorkOrder>>(`/master/work-orders?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<WorkOrder>("/master/work-orders"),
     enabled: typeof window !== "undefined",
   });
 }

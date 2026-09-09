@@ -17,6 +17,11 @@ type UseWmsScannerOptions = {
    * Bila tidak diisi, fallback ke perilaku lama: pilih cocok pertama.
    */
   onAmbiguous?: (code: string, matches: ScanMatch[]) => void;
+  /**
+   * Dipanggil bila kode tidak cocok dengan barang mana pun (mis. barcode
+   * produk baru). Bila tidak diisi, fallback ke toast error.
+   */
+  onUnknown?: (code: string) => void;
   readerId?: string;
 };
 
@@ -24,6 +29,7 @@ export function useWmsScanner({
   items,
   onPick,
   onAmbiguous,
+  onUnknown,
   readerId = "wms-reader",
 }: UseWmsScannerOptions) {
   const [scanOpen, setScanOpen] = useState(false);
@@ -32,14 +38,17 @@ export function useWmsScanner({
   );
   const scanHandledRef = useRef(false);
   const onAmbiguousRef = useRef(onAmbiguous);
+  const onUnknownRef = useRef(onUnknown);
   useEffect(() => {
     onAmbiguousRef.current = onAmbiguous;
-  }, [onAmbiguous]);
+    onUnknownRef.current = onUnknown;
+  }, [onAmbiguous, onUnknown]);
 
   /**
    * Resolusi satu hasil scan (dipakai wedge fisik maupun kamera):
-   * 0 cocok → error; 1 cocok → pilih + toast sumber; >1 → dialog disambiguasi
-   * (atau cocok pertama bila caller belum menyediakan onAmbiguous).
+   * 0 cocok → onUnknown (atau error); 1 cocok → pilih + toast sumber;
+   * >1 → dialog disambiguasi (atau cocok pertama bila caller belum
+   * menyediakan onAmbiguous).
    */
   const resolveScan = useCallback(
     (code: string): boolean => {
@@ -49,6 +58,10 @@ export function useWmsScanner({
       }
       const matches = findMatchesByCode(items, code);
       if (matches.length === 0) {
+        if (onUnknownRef.current) {
+          onUnknownRef.current(code.trim());
+          return true;
+        }
         toast.error(`Barang tidak ditemukan: ${code.trim()}`);
         return false;
       }
@@ -142,5 +155,5 @@ export function useWmsScanner({
     };
   }, [scanOpen, items, stopScanner, resolveScan, readerId]);
 
-  return { scanOpen, setScanOpen, readerId };
+  return { scanOpen, setScanOpen, readerId, resolveScan };
 }

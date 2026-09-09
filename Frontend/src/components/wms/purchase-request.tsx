@@ -201,7 +201,7 @@ export function PurchaseRequestPage() {
     (d: ProcDocApi) => canDecideProcDoc(d, user, canApprove, canManage),
     [user, canApprove, canManage],
   );
-  const { data, isLoading } = useProcDocs();
+  const { data, isLoading, error, refetch } = useProcDocs();
   const { data: departments, isLoading: departmentsLoading } = useDepartments();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
@@ -470,6 +470,8 @@ export function PurchaseRequestPage() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

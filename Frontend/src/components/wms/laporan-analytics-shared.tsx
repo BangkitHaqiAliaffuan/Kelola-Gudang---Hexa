@@ -191,13 +191,25 @@ const topPihakColumns: Column<{ id: string } & TopPihakVM>[] = [
   },
 ];
 
-export function TopPihakTable({ rows, loading }: { rows: TopPihakVM[]; loading: boolean }) {
+export function TopPihakTable({
+  rows,
+  loading,
+  error = null,
+  onRetry,
+}: {
+  rows: TopPihakVM[];
+  loading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
+}) {
   return (
     <DataTable
       columns={topPihakColumns}
       rows={withRowId(rows, (r, i) => `${r.jenis}:${r.id ?? r.nama}:${i}`)}
       pageSize={10}
       loading={loading}
+      error={error}
+      onRetry={onRetry}
       mobileCard={(r) => (
         <div className="space-y-1">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -264,13 +276,25 @@ const pihakBulanColumns: Column<{ id: string } & PihakBulanVM>[] = [
   },
 ];
 
-export function PihakBulanTable({ rows, loading }: { rows: PihakBulanVM[]; loading: boolean }) {
+export function PihakBulanTable({
+  rows,
+  loading,
+  error = null,
+  onRetry,
+}: {
+  rows: PihakBulanVM[];
+  loading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
+}) {
   return (
     <DataTable
       columns={pihakBulanColumns}
       rows={withRowId(rows, (r, i) => `${r.jenis}:${r.id ?? r.nama}:${r.bulan}:${i}`)}
       pageSize={12}
       loading={loading}
+      error={error}
+      onRetry={onRetry}
       mobileCard={(r) => (
         <div className="space-y-1">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -339,9 +363,19 @@ const atRiskColumns: Column<{ id: string } & AktivitasVM>[] = [
   },
 ];
 
-export function AtRiskTable({ rows, loading }: { rows: AktivitasVM[]; loading: boolean }) {
+export function AtRiskTable({
+  rows,
+  loading,
+  error = null,
+  onRetry,
+}: {
+  rows: AktivitasVM[];
+  loading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
+}) {
   const atRisk = rows.filter((r) => r.status === "at-risk");
-  if (atRisk.length === 0) return null;
+  if (atRisk.length === 0 && !error) return null;
   return (
     <Panel title="Pihak At-Risk" description="Tanpa transaksi > 90 hari — kandidat follow-up">
       <DataTable
@@ -349,6 +383,8 @@ export function AtRiskTable({ rows, loading }: { rows: AktivitasVM[]; loading: b
         rows={withRowId(atRisk, (r, i) => `atrisk:${r.jenis}:${r.id ?? r.nama}:${i}`)}
         pageSize={8}
         loading={loading}
+        error={error}
+        onRetry={onRetry}
         mobileCard={(r) => (
           <div className="space-y-1">
             <p className="truncate text-sm font-semibold">{r.nama}</p>
@@ -367,6 +403,8 @@ export function AtRiskTable({ rows, loading }: { rows: AktivitasVM[]; loading: b
 export function ProsesPanel({
   proses,
   loading,
+  error = null,
+  onRetry,
 }: {
   proses:
     | {
@@ -377,6 +415,8 @@ export function ProsesPanel({
       }
     | undefined;
   loading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
 }) {
   if (!proses || (proses.tertahan_dokumen === 0 && proses.lead_median_hari == null)) return null;
   return (
@@ -410,9 +450,11 @@ export function ProsesPanel({
             render: (r: { rentang: string; dokumen: number; nilai: number }) => formatIDR(r.nilai),
           },
         ]}
-        rows={proses.aging.map((r, i) => ({ ...r, id: `aging:${i}` }))}
+        rows={(proses?.aging ?? []).map((r, i) => ({ ...r, id: `aging:${i}` }))}
         pageSize={5}
         loading={loading}
+        error={error}
+        onRetry={onRetry}
         mobileCard={(r) => (
           <div className="flex justify-between text-sm">
             <span className="font-semibold">{r.rentang}</span>

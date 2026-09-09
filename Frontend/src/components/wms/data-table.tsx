@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { formatQueryError } from "@/lib/api";
 import { EmptyState, TableSkeleton } from "./kit";
 
 export type Column<T> = {
@@ -32,6 +40,9 @@ export function DataTable<T extends { id: string | number }>({
   mobileCard,
   pageSize = 10,
   loading = false,
+  error = null,
+  onRetry,
+  emptyDescription,
   onRowClick,
   initialSort,
 }: {
@@ -40,6 +51,11 @@ export function DataTable<T extends { id: string | number }>({
   mobileCard: (row: T) => ReactNode;
   pageSize?: number;
   loading?: boolean;
+  /** Error query — bila diisi, tampil panel error (bukan empty state). */
+  error?: unknown;
+  onRetry?: (() => void) | undefined;
+  /** Deskripsi kustom saat baris kosong (mis. ringkasan filter aktif). */
+  emptyDescription?: string | undefined;
   onRowClick?: (row: T) => void;
   initialSort?: SortState;
 }) {
@@ -82,11 +98,28 @@ export function DataTable<T extends { id: string | number }>({
   };
 
   if (loading) return <TableSkeleton rows={pageSize} cols={Math.min(columns.length, 6)} />;
+  if (error) {
+    const { title, detail } = formatQueryError(error);
+    return (
+      <EmptyState
+        tone="error"
+        title={title}
+        description={detail || "Coba lagi sesaat lagi."}
+        action={
+          onRetry ? (
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={onRetry}>
+              <RotateCcw className="h-3.5 w-3.5" /> Coba lagi
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
   if (!rows.length)
     return (
       <EmptyState
         title="Data tidak ditemukan"
-        description="Coba ubah kata kunci pencarian atau filter yang dipakai."
+        description={emptyDescription ?? "Coba ubah kata kunci pencarian atau filter yang dipakai."}
       />
     );
 

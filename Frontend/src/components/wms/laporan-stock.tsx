@@ -49,7 +49,7 @@ export function LaporanStock() {
   const canView = hasModuleLevel("Laporan", "Baca");
   const noAccess = authStatus === "authenticated" && !canView;
 
-  const { data, isLoading } = useStockRows();
+  const { data, isLoading, error, refetch } = useStockRows();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: items } = useItems();
@@ -459,6 +459,8 @@ export function LaporanStock() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           initialSort={{ key: "name", dir: "asc" }}
           mobileCard={(r) => (
             <div className="space-y-2">

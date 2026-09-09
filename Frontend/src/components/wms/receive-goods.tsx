@@ -48,7 +48,7 @@ const isPoReceipt = (d: StockDocumentApi) => /^po[-/]/i.test((d.reference_no ?? 
 export function ReceiveGoodsPage() {
   const { hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
-  const { data, isLoading } = useStockDocuments({ type: "Penerimaan" });
+  const { data, isLoading, error, refetch } = useStockDocuments({ type: "Penerimaan" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -283,6 +283,8 @@ export function ReceiveGoodsPage() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => (
             <div className="space-y-1.5">

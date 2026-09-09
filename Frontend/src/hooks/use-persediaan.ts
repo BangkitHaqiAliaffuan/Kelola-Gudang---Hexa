@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Paginated } from "@/lib/api";
+import { api, fetchAll, type Paginated } from "@/lib/api";
 import type {
   StockCardApi,
   StockDocumentApi,
@@ -12,18 +12,32 @@ import type {
   ValuationMethod,
 } from "@/lib/persediaan-types";
 
-// Data volume is small (~300 rows), so fetch everything and let the UI
-// (DataTable) paginate + filter client-side, matching the master-data pattern.
+// Backend membatasi `per_page` maks 100 (Fase 1.2 skalabilitas): daftar yang
+// butuh seluruh baris diambil via fetchAll() (loop halaman 100). Valuasi
+// tetap request tunggal per_page=500 (batas endpoint agregat, K6).
 const PER_PAGE = 500;
-// Stock documents are seeded in the thousands (~4.6k today) — fetch them all so
+// Stock documents are seeded in the thousands — fetch them all so
 // the client-side type/status/warehouse filters stay truthful.
-const DOCS_PER_PAGE = 10000;
 
 export function useStockRows() {
   return useQuery({
     queryKey: ["persediaan", "stock"],
-    queryFn: () => api.get<Paginated<StockRowApi>>(`/persediaan/stock?per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<StockRowApi>("/persediaan/stock"),
     enabled: typeof window !== "undefined",
+  });
+}
+
+// Lokasi stock satu barang: satu baris per (gudang, bin) langsung dari
+// `item_stock` (kolom stock/reserved selalu mutakhir per posting terakhir —
+// tabel ini tidak punya timestamp, jadi kesegaran dijamin via refetch).
+export function useStockLocations(itemId: number | undefined) {
+  return useQuery({
+    queryKey: ["persediaan", "stock", { item: itemId ?? null }],
+    queryFn: () => fetchAll<StockRowApi>("/persediaan/stock", { item_id: String(itemId) }),
+    enabled: itemId != null && typeof window !== "undefined",
+    staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -88,14 +102,20 @@ export function useStockDocuments(
     // pola resmi TanStack Query v5 (placeholderData: keepPreviousData).
     placeholderData: keepPreviousData,
     queryFn: () => {
-      const sp = new URLSearchParams({ per_page: String(perPage ?? DOCS_PER_PAGE) });
-      if (type) sp.set("type", type);
-      if (status) sp.set("status", status);
-      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
-      if (search) sp.set("search", search);
-      if (from) sp.set("from", from);
-      if (to) sp.set("to", to);
-      return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
+      const params: Record<string, string> = {};
+      if (type) params["type"] = type;
+      if (status) params["status"] = status;
+      if (warehouseId != null) params["warehouse_id"] = String(warehouseId);
+      if (search) params["search"] = search;
+      if (from) params["from"] = from;
+      if (to) params["to"] = to;
+      // Pemanggil dengan perPage eksplisit (mis. form retur, perPage=20) tetap
+      // request tunggal; tanpa perPage → fetchAll agar filter client truthful.
+      if (perPage != null) {
+        const sp = new URLSearchParams({ ...params, per_page: String(perPage) });
+        return api.get<Paginated<StockDocumentApi>>(`/persediaan/stock-documents?${sp.toString()}`);
+      }
+      return fetchAll<StockDocumentApi>("/persediaan/stock-documents", params);
     },
     enabled: typeof window !== "undefined" && enabled,
   });
@@ -177,7 +197,9 @@ export function useUpdateStockDocument() {
       // Invalidate detail juga agar tab lain dapat refetch saat mount, tapi
       // refetchOnWindowFocus tetap false untuk cegah kedipan saat fokus
       if (data?.data?.id) {
-        qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", data.data.id] });
+        qc.invalidateQueries({
+          queryKey: ["persediaan", "stock-documents", "detail", data.data.id],
+        });
       } else if (vars?.id) {
         qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "detail", vars.id] });
       }
@@ -188,7 +210,8 @@ export function useUpdateStockDocument() {
 export function useLockStockDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/lock`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/lock`, null),
     onSuccess: (data) => {
       qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
       qc.invalidateQueries({ queryKey: ["persediaan", "stock-documents", "list"] });
@@ -198,14 +221,16 @@ export function useLockStockDocument() {
 
 export function useHeartbeatStockDocument() {
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/heartbeat`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/heartbeat`, null),
   });
 }
 
 export function useUnlockStockDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/unlock`, null),
+    mutationFn: (id: number) =>
+      api.post<{ data: StockDocumentApi }>(`/persediaan/stock-documents/${id}/unlock`, null),
     onSuccess: (data) => {
       qc.setQueryData(["persediaan", "stock-documents", "detail", data.data.id], data);
     },
@@ -291,11 +316,11 @@ export function useStockMinimum(
   return useQuery({
     queryKey: ["persediaan", "stock-minimum", days, warehouseId ?? null, categoryId ?? null],
     queryFn: () => {
-      const sp = new URLSearchParams({ per_page: String(PER_PAGE) });
-      if (days) sp.set("days", String(days));
-      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
-      if (categoryId != null) sp.set("category_id", String(categoryId));
-      return api.get<Paginated<StockMinimumApi>>(`/persediaan/stock-minimum?${sp.toString()}`);
+      const params: Record<string, string> = {};
+      if (days) params["days"] = String(days);
+      if (warehouseId != null) params["warehouse_id"] = String(warehouseId);
+      if (categoryId != null) params["category_id"] = String(categoryId);
+      return fetchAll<StockMinimumApi>("/persediaan/stock-minimum", params);
     },
     enabled: typeof window !== "undefined",
   });

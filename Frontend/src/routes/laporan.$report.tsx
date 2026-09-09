@@ -117,7 +117,12 @@ function Laporan() {
     report,
   );
 
-  const { data: opnameDocs, isLoading: opnameLoading } = useStockDocuments({
+  const {
+    data: opnameDocs,
+    isLoading: opnameLoading,
+    error: opnameError,
+    refetch: refetchOpname,
+  } = useStockDocuments({
     type: "Stock Opname",
   });
   const opnameRows: OpnameDoc[] = isStockOpname ? ((opnameDocs?.data ?? []) as OpnameDoc[]) : [];
@@ -356,6 +361,8 @@ function Laporan() {
           rows={rows}
           pageSize={12}
           loading={isStockOpname && opnameLoading}
+          error={isStockOpname ? opnameError : null}
+          onRetry={isStockOpname ? () => refetchOpname() : undefined}
           mobileCard={(r) =>
             isStockOpname ? (
               <div className="space-y-1">

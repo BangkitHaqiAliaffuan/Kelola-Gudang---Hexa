@@ -3,7 +3,15 @@ import { useState } from "react";
 import { ArrowLeft, Printer, Pencil, Paperclip, QrCode } from "lucide-react";
 import { PageHeader, Panel, Pill, ItemThumb, EmptyState } from "@/components/wms/kit";
 import { Button } from "@/components/ui/button";
-import { buildCodeSvg, buildPrintHtml, printHtml, type BarcodeKind } from "@/lib/barcode-label";
+import {
+  buildCodeSvg,
+  buildPrintHtml,
+  CODE_SOURCE_LABEL,
+  encodeItemWithSource,
+  printHtml,
+  type BarcodeKind,
+  type CodeSource,
+} from "@/lib/barcode-label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
@@ -103,6 +111,43 @@ function CodeSlot({
       >
         <Printer className="h-4 w-4" /> Cetak
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Slot QR dengan pilihan sumber nilai eksplisit (default Internal — jalur
+ * cetak; barcode produk tidak perlu dicetak ulang). Caption selalu
+ * menunjukkan nilai yang di-encode.
+ */
+function QrSlot({ item }: { item: ItemApi }) {
+  const [source, setSource] = useState<CodeSource>("internal");
+  const value = encodeItemWithSource(item, source);
+  return (
+    <div>
+      <div className="mb-2 flex rounded-xl border border-border bg-card p-1">
+        {(["internal", "produk", "sku"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSource(s)}
+            className={
+              source === s
+                ? "flex-1 rounded-lg bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground"
+                : "flex-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground"
+            }
+          >
+            {CODE_SOURCE_LABEL[s]}
+          </button>
+        ))}
+      </div>
+      <CodeSlot
+        label={`QR Code (${CODE_SOURCE_LABEL[source]})`}
+        value={value || null}
+        kind="QR Code"
+        sku={item.sku}
+        name={item.name}
+      />
     </div>
   );
 }
@@ -333,13 +378,7 @@ function DetailBarang() {
                 sku={item.sku}
                 name={item.name}
               />
-              <CodeSlot
-                label="QR Code"
-                value={item.barcode ?? item.internal_barcode}
-                kind="QR Code"
-                sku={item.sku}
-                name={item.name}
-              />
+              <QrSlot item={item} />
             </TabsContent>
 
             <TabsContent value="riwayat" className="m-0 p-5">

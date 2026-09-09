@@ -76,7 +76,7 @@ export function LaporanMutasi() {
 
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
-  const { data, isLoading, isFetching } = useLaporanMutasi({
+  const { data, isLoading, isFetching, error, refetch } = useLaporanMutasi({
     from: from || toISODate(new Date()),
     to: to || toISODate(new Date()),
     warehouseId: whId,
@@ -423,6 +423,8 @@ export function LaporanMutasi() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           initialSort={{ key: "name", dir: "asc" }}
           mobileCard={(r) => (
             <div className="space-y-1.5">

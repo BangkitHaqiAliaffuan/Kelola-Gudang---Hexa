@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { z } from "zod";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
@@ -61,7 +62,13 @@ import {
   type Trx,
 } from "@/lib/wms-data";
 
+const kartuStockSearchSchema = z.object({
+  item_id: z.coerce.number().optional(),
+  warehouse_id: z.coerce.number().optional(),
+});
+
 export const Route = createFileRoute("/persediaan/kartu-stock")({
+  validateSearch: kartuStockSearchSchema,
   head: () => ({
     meta: [
       { title: "Kartu Stock — KelolaGudang" },
@@ -90,14 +97,45 @@ type CardRow = StockCardRowApi & {
 };
 
 function KartuStock() {
-  const { data: itemsData, isLoading: itemsLoading } = useItems();
+  const {
+    data: itemsData,
+    isLoading: itemsLoading,
+    error: itemsError,
+    refetch: refetchItems,
+  } = useItems();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
+  // Prefill dari redirect (mis. detail stock): barang + gudang terisi otomatis.
+  const search = useSearch({ from: "/persediaan/kartu-stock" });
+  const searchItemId =
+    search.item_id != null && Number.isInteger(search.item_id) ? search.item_id : undefined;
+  const searchWarehouseId =
+    search.warehouse_id != null && Number.isInteger(search.warehouse_id)
+      ? search.warehouse_id
+      : undefined;
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   // Filter gudang: pilihan tersimpan per user → default user → Semua.
   const whFilter = useWarehouseFilter(warehouses?.data);
-  const wh = whFilter.value;
+  // Override gudang sekali pakai dari redirect — hanya untuk kunjungan ini,
+  // tidak menulis filter tersimpan; gugur saat user mengubah/menghapus filter.
+  const [whOverride, setWhOverride] = useState<number | null | undefined>(searchWarehouseId);
+  useEffect(() => {
+    setWhOverride(searchWarehouseId);
+  }, [searchWarehouseId]);
+  const overrideId = whOverride ?? null;
+  const overrideName =
+    overrideId != null ? warehouses?.data.find((w) => w.id === overrideId)?.name : undefined;
+  // Id yatim / daftar belum dimuat → fallback ke filter tersimpan.
+  const wh = overrideName ?? whFilter.value;
+  const whId = overrideName !== undefined ? overrideId : whFilter.warehouseId;
+  const handleWhChange = useCallback(
+    (v: string) => {
+      setWhOverride(null);
+      whFilter.onChange(v);
+    },
+    [whFilter],
+  );
   const [fullscreen, setFullscreen] = useState(false);
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -109,8 +147,9 @@ function KartuStock() {
     readerId: "kartu-stock-reader",
   });
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
-  const activeId = id ?? options[0]?.id;
-  const whId = whFilter.warehouseId;
+  const searchIdValid =
+    searchItemId != null && options.some((o) => o.id === searchItemId) ? searchItemId : undefined;
+  const activeId = id ?? searchIdValid ?? options[0]?.id;
   const isWarehouseReady = wh === ALL || !warehousesLoading;
   const whIdForFetch = isWarehouseReady ? whId : null;
   const activeIdForFetch = isWarehouseReady ? activeId : undefined;
@@ -174,10 +213,22 @@ function KartuStock() {
     setQ("");
     setJenis(ALL);
     setPic(ALL);
+    setWhOverride(null);
     whFilter.reset();
     setDateFrom("");
     setDateTo("");
   }, [whFilter]);
+
+  // Ringkasan filter aktif untuk empty state — membedakan "kosong karena
+  // filter" (mis. barang hanya ada di gudang lain) dari error fetch.
+  const emptyDescription = useMemo(() => {
+    if (!hasActiveFilters) return undefined;
+    const parts = [`Barang: ${item?.name ?? "—"}`, `Gudang: ${wh === ALL ? "Semua" : wh}`];
+    if (dateFrom !== "" || dateTo !== "")
+      parts.push(`Periode: ${dateFrom || "…"}–${dateTo || "…"}`);
+    if (debouncedQ !== "") parts.push(`Cari: ${debouncedQ}`);
+    return `${parts.join(" · ")}. Ubah filter atau klik Hapus Filter bila data seharusnya ada.`;
+  }, [hasActiveFilters, item?.name, wh, dateFrom, dateTo, debouncedQ]);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
   const picOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.pic))), [rows]);
@@ -593,7 +644,7 @@ function KartuStock() {
           <FilterSelect
             className="w-full"
             value={wh}
-            onChange={whFilter.onChange}
+            onChange={handleWhChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
@@ -634,6 +685,12 @@ function KartuStock() {
           rows={filteredRows}
           pageSize={10}
           loading={itemsLoading || card.isFetching}
+          error={card.error ?? itemsError}
+          onRetry={() => {
+            card.refetch();
+            refetchItems();
+          }}
+          emptyDescription={emptyDescription}
           onRowClick={(r) => openDetail(r)}
           initialSort={{ key: "date", dir: "asc" }}
           mobileCard={(r) => (

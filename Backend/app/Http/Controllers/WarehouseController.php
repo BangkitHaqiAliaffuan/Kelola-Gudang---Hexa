@@ -27,6 +27,8 @@ class WarehouseController extends Controller
 
         $query->orderBy('name');
 
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         $warehouses = $query->paginate((int) $request->query('per_page', 20));
 
         return WarehouseResource::collection($warehouses);

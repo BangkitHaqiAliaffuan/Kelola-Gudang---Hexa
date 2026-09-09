@@ -22,7 +22,7 @@ import type { StockDocumentApi } from "@/lib/persediaan-types";
 export function OpnameJadwalPage() {
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("Persediaan", "Tulis");
-  const { data, isLoading } = useStockDocuments({ type: "Stock Opname" });
+  const { data, isLoading, error, refetch } = useStockDocuments({ type: "Stock Opname" });
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
 
   const [q, setQ] = useState("");
@@ -184,6 +184,8 @@ export function OpnameJadwalPage() {
           rows={rows}
           pageSize={12}
           loading={isLoading}
+          error={error}
+          onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
           mobileCard={(r) => {
             const label = opnameLabel(r);

@@ -13,27 +13,37 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { FormCombobox, type ComboboxOption } from "@/components/wms/form-combobox";
 import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
 import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
+import { ItemFormDialog } from "@/components/wms/master-forms";
 import { useItems, useUpdateItem, type ItemPayload } from "@/hooks/use-master";
 import { useAuth } from "@/hooks/use-auth";
 import type { ItemApi } from "@/lib/master-types";
 import { formatIDR } from "@/lib/wms-data";
 import { cn } from "@/lib/utils";
 import {
-  LABEL_SIZES,
   MAX_LABELS,
+  CODE_SOURCE_LABEL,
   buildCodeSvg,
   buildPrintHtml,
-  computeSheetLayout,
+  codeHeightForTemplate,
   downloadLabelsAsPngOrZip,
-  encodeItem,
+  encodeItemWithSource,
+  normalizeCode,
+  parseGridNumber,
   printHtml,
+  qrSideForTemplate,
+  templateDims,
+  validateTemplate,
   type BarcodeKind,
-  type LabelSize,
+  type CodeSource,
+  type LabelTemplate,
   type PrintLabel,
 } from "@/lib/barcode-label";
+import { useLabelTemplates, type TemplateDraft } from "@/hooks/use-label-templates";
+import { LabelTemplateDialog } from "@/components/wms/label-template-dialog";
 
 const barcodeSearchSchema = z.object({
   sku: z.string().optional(),
@@ -57,13 +67,71 @@ export const Route = createFileRoute("/barcode")({
 
 type Row = { id: number; itemId: number; qty: number };
 
-/** Tinggi bar barcode (mm) agar muat beserta nama + SKU/harga di label. */
-const CODE_HEIGHT: Record<LabelSize, number> = {
-  "30x20": 8,
-  "50x30": 14,
-  "100x50": 22,
-  A4: 60,
-};
+/**
+ * Input angka grid dengan state teks lokal: setiap keystroke diterima
+ * (termasuk mengosongkan field), nilai valid di-commit ke draft, nilai
+ * invalid tidak menimpa draft, blur/Escape mengembalikan tampilan ke nilai
+ * valid terakhir. Nilai eksternal (mis. pilih preset) me-reset teks.
+ */
+export function GridNumberInput({
+  ariaLabel,
+  unit,
+  value,
+  integer,
+  min,
+  max,
+  step,
+  onCommit,
+}: {
+  ariaLabel: string;
+  unit: string;
+  value: number;
+  integer?: boolean;
+  min?: number;
+  max?: number;
+  step?: number | string;
+  onCommit: (v: number) => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const lastExternal = useRef(value);
+  useEffect(() => {
+    if (value !== lastExternal.current) {
+      lastExternal.current = value;
+      setText(null);
+    }
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={text ?? String(value)}
+        onChange={(e) => {
+          const s = e.target.value;
+          setText(s);
+          const v = parseGridNumber(s, integer === true);
+          if (v !== null) {
+            lastExternal.current = v;
+            onCommit(v);
+          }
+        }}
+        onBlur={() => setText(null)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setText(null);
+            e.currentTarget.blur();
+          }
+        }}
+        aria-label={ariaLabel}
+        className="h-9 rounded-xl"
+      />
+      <span className="text-xs text-muted-foreground">{unit}</span>
+    </div>
+  );
+}
 
 function BarcodePage() {
   const itemsQ = useItems();
@@ -74,14 +142,56 @@ function BarcodePage() {
   const { sku } = useSearch({ from: "/barcode" });
 
   const [kind, setKind] = useState<BarcodeKind>("Barcode");
-  const [size, setSize] = useState<LabelSize>("50x30");
+  const [source, setSource] = useState<CodeSource>("internal");
   const [rows, setRows] = useState<Row[]>([]);
+
+  // Template layout: pilihan tersimpan vs draft susunan custom.
+  const { custom, all, byId, saveCustom, removeCustom } = useLabelTemplates();
+  const [selectedId, setSelectedId] = useState<string | null>("std-50x30");
+  // Draft selalu mencerminkan template terpilih saat dimuat.
+  const [draft, setDraft] = useState<TemplateDraft>(() => {
+    const t = byId("std-50x30");
+    return {
+      cols: t.cols,
+      rows: t.rows,
+      marginMm: t.marginMm,
+      gapMm: t.gapMm,
+      showName: t.showName,
+      showMeta: t.showMeta,
+    };
+  });
+  const [manageOpen, setManageOpen] = useState(false);
+
+  /** Template efektif: pilihan tersimpan, atau draft bila sudah diubah. */
+  const template: LabelTemplate = useMemo(() => {
+    if (selectedId) return byId(selectedId);
+    return { ...draft, id: "draft", name: "Susunan custom" };
+  }, [selectedId, byId, draft]);
+  const dims = useMemo(() => templateDims(template), [template]);
+  const { perSheet } = dims;
+  const draftError = useMemo(() => validateTemplate({ ...draft, name: "draft" }), [draft]);
+
+  const pickTemplate = useCallback((t: LabelTemplate) => {
+    setSelectedId(t.id);
+    setDraft({
+      cols: t.cols,
+      rows: t.rows,
+      marginMm: t.marginMm,
+      gapMm: t.gapMm,
+      showName: t.showName,
+      showMeta: t.showMeta,
+    });
+  }, []);
+
+  const patchDraft = useCallback((patch: Partial<TemplateDraft>) => {
+    setDraft((d) => ({ ...d, ...patch }));
+    setSelectedId(null);
+  }, []);
 
   const nextRowId = useRef(1);
   const seeded = useRef(false);
 
   const total = rows.reduce((s, r) => s + r.qty, 0);
-  const { perSheet } = computeSheetLayout(size);
 
   const options: ComboboxOption[] = useMemo(
     () =>
@@ -118,8 +228,13 @@ function BarcodePage() {
   }, []);
 
   const [scanTarget, setScanTarget] = useState<number | null>(null);
+  const [manualCode, setManualCode] = useState("");
   const [ambiguous, setAmbiguous] = useState<{ code: string; matches: ScanMatch[] } | null>(null);
-  const { scanOpen, setScanOpen, readerId } = useWmsScanner({
+  // Kode hasil scan yang belum terdaftar di master → tawar buat barang baru.
+  const [unknownCode, setUnknownCode] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const pendingBarcode = useRef<string | null>(null);
+  const { scanOpen, setScanOpen, readerId, resolveScan } = useWmsScanner({
     items: items as never,
     onPick: (item) => {
       const pickedId = (item as { id: number }).id;
@@ -136,6 +251,13 @@ function BarcodePage() {
       }
     },
     onAmbiguous: (code, matches) => setAmbiguous({ code, matches }),
+    onUnknown: (code) => {
+      if (!canWrite) {
+        toast.error(`Barang tidak ditemukan: ${code} (perlu akses Tulis Master Data)`);
+        return;
+      }
+      setUnknownCode(code);
+    },
   });
 
   useEffect(() => {
@@ -146,37 +268,34 @@ function BarcodePage() {
     }
   }, [sku, items, addRow]);
 
-  type PreviewOk = { item: ItemApi; svg: string; key: number; qty: number; value: string };
-  type PreviewErr = { item: ItemApi; error: true; key: number; qty: number };
-  const previews = useMemo(
-    () =>
-      rows
-        .map((r): PreviewOk | PreviewErr | null => {
-          const it = items.find((i) => i.id === r.itemId);
-          if (!it) return null;
-          let svg: string;
-          try {
-            svg = buildCodeSvg(encodeItem(it), kind, { codeHeightMm: CODE_HEIGHT[size] });
-          } catch {
-            return { item: it, error: true, key: r.id, qty: r.qty };
-          }
-          return { item: it, svg, key: r.id, qty: r.qty, value: encodeItem(it) };
-        })
-        .filter((p): p is PreviewOk | PreviewErr => p !== null),
-    [rows, items, kind, size],
-  );
+  // Setelah barang baru tersimpan (invalidasi items), masukkan otomatis ke
+  // daftar label. Aman dari batal: tanpa item cocok, tidak ada yang terjadi.
+  useEffect(() => {
+    const pending = pendingBarcode.current;
+    if (!pending || createOpen || items.length === 0) return;
+    const it = items.find((i) => normalizeCode(i.barcode ?? "") === normalizeCode(pending));
+    if (it) {
+      pendingBarcode.current = null;
+      addRow(it.id);
+      toast.success(`${it.name} ditambahkan ke daftar label`);
+    }
+  }, [items, createOpen, addRow]);
 
-  const buildLabels = useCallback((): { labels: PrintLabel[]; ok: boolean } => {
+  /** Bangun label tanpa efek samping (tanpa toast) — dipakai print, unduh, dan preview. */
+  const tryBuildLabels = useCallback((): { labels: PrintLabel[]; failedIds: number[] } => {
     const labels: PrintLabel[] = [];
+    const failedIds: number[] = [];
     for (const r of rows) {
       const it = items.find((i) => i.id === r.itemId);
       if (!it) continue;
       let svg: string;
       try {
-        svg = buildCodeSvg(encodeItem(it), kind, { codeHeightMm: CODE_HEIGHT[size] });
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Gagal generate kode");
-        return { labels, ok: false };
+        svg = buildCodeSvg(encodeItemWithSource(it, source), kind, {
+          codeHeightMm: codeHeightForTemplate(template),
+        });
+      } catch {
+        if (!failedIds.includes(it.id)) failedIds.push(it.id);
+        continue;
       }
       const meta = `${it.sku} · ${formatIDR(it.price)}`;
       const remaining = MAX_LABELS - labels.length;
@@ -185,8 +304,56 @@ function BarcodePage() {
       }
       if (labels.length >= MAX_LABELS) break;
     }
+    return { labels, failedIds };
+  }, [rows, items, kind, source, template]);
+
+  /** Preview WYSIWYG: string HTML yang PERSIS SAMA dengan yang dikirim ke printer. */
+  const preview = useMemo(() => {
+    if (rows.length === 0) return null;
+    if (draftError !== null) return { html: "", failed: [] as ItemApi[] };
+    const { labels, failedIds } = tryBuildLabels();
+    const failed = failedIds
+      .map((id) => items.find((i) => i.id === id))
+      .filter((x): x is ItemApi => x !== undefined);
+    if (labels.length === 0) return { html: "", failed };
+    return { html: buildPrintHtml({ template, labels }), failed };
+  }, [rows, tryBuildLabels, items, template, draftError]);
+
+  /** Barang yang nilainya bisa ditetapkan sebagai barcode produk (satu klik).
+   * Kandidat = barcode produk bila terisi, jika tidak fallback ke SKU
+   * (legal: barcode tidak unique, max 30 — SKU selalu memenuhi keduanya).
+   * Barang tanpa kandidat tetap tampil jujur sebagai gagal cetak (A4)
+   * sekaligus mendapat tombol penetapan (B3). */
+  const assignable = useMemo(() => {
+    if (!canWrite || source !== "produk") return [];
+    const seen = new Set<number>();
+    const out: { item: ItemApi; value: string; fromSku: boolean }[] = [];
+    for (const r of rows) {
+      const it = items.find((i) => i.id === r.itemId);
+      if (!it || seen.has(it.id)) continue;
+      seen.add(it.id);
+      const targetValue = it.barcode || it.sku;
+      if (targetValue && it.barcode !== targetValue) {
+        out.push({ item: it, value: targetValue, fromSku: !it.barcode });
+      }
+    }
+    return out;
+  }, [rows, items, source, canWrite]);
+
+  /** ID barang yang baru saja ditetapkan — tombolnya menjadi "Sudah Tersimpan". */
+  const [assignedIds, setAssignedIds] = useState<number[]>([]);
+
+  /** QR di label kecil (±12mm ke bawah) — peringatkan keterbacaan, tetap boleh cetak. */
+  const qrTooSmall = kind === "QR Code" && qrSideForTemplate(template) <= 12;
+
+  const buildLabels = useCallback((): { labels: PrintLabel[]; ok: boolean } => {
+    const { labels, failedIds } = tryBuildLabels();
+    if (failedIds.length > 0) {
+      toast.error("Sebagian barang belum punya barcode/SKU yang valid");
+      return { labels, ok: false };
+    }
     return { labels, ok: true };
-  }, [rows, items, kind, size]);
+  }, [tryBuildLabels]);
 
   const [downloading, setDownloading] = useState(false);
 
@@ -222,6 +389,7 @@ function BarcodePage() {
     };
     try {
       await updateItem.mutateAsync({ id: it.id, ...payload });
+      setAssignedIds((prev) => (prev.includes(it.id) ? prev : [...prev, it.id]));
       toast.success(`Barcode ${value} tersimpan ke ${it.name}`);
     } catch (err) {
       toast.error((err as Error).message);
@@ -235,7 +403,7 @@ function BarcodePage() {
     }
     const { labels, ok } = buildLabels();
     if (!ok || labels.length === 0) return;
-    printHtml(buildPrintHtml({ size, labels }));
+    printHtml(buildPrintHtml({ template, labels }));
     toast.success(`${labels.length} label dikirim ke printer`);
   };
 
@@ -251,7 +419,7 @@ function BarcodePage() {
       labels.length === 1 ? "Menyiapkan PNG..." : `Menyiapkan ${labels.length} PNG (ZIP)...`,
     );
     try {
-      const filename = await downloadLabelsAsPngOrZip(labels, size);
+      const filename = await downloadLabelsAsPngOrZip(labels, template);
       toast.success(`Label diunduh sebagai ${filename}`, { id: toastId });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal mengunduh label", { id: toastId });
@@ -271,11 +439,17 @@ function BarcodePage() {
               variant="outline"
               className="rounded-xl"
               onClick={handleDownload}
-              disabled={rows.length === 0 || downloading}
+              disabled={rows.length === 0 || downloading || draftError !== null}
+              title={draftError ?? undefined}
             >
               <Download className="h-4 w-4" /> {downloading ? "Menyiapkan..." : "Download PNG"}
             </Button>
-            <Button className="rounded-xl" onClick={handlePrint} disabled={rows.length === 0}>
+            <Button
+              className="rounded-xl"
+              onClick={handlePrint}
+              disabled={rows.length === 0 || draftError !== null}
+              title={draftError ?? undefined}
+            >
               <Printer className="h-4 w-4" /> Print
             </Button>
           </>
@@ -305,24 +479,138 @@ function BarcodePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Ukuran Label</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {LABEL_SIZES.map((s) => (
+              <Label>Sumber Nilai</Label>
+              <div className="flex rounded-xl border border-border bg-card p-1">
+                {(["internal", "produk", "sku"] as const).map((s) => (
                   <button
-                    key={s.id}
+                    key={s}
                     type="button"
-                    onClick={() => setSize(s.id)}
+                    onClick={() => setSource(s)}
                     className={cn(
-                      "rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
-                      size === s.id
-                        ? "border-primary/40 bg-primary-soft text-primary"
-                        : "border-border",
+                      "flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                      source === s ? "bg-primary text-primary-foreground" : "text-muted-foreground",
                     )}
                   >
-                    {s.label} · {computeSheetLayout(s.id).perSheet}/lembar
+                    {CODE_SOURCE_LABEL[s]}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Nilai yang di-encode ke label. Barcode produk tidak perlu dicetak ulang — sudah
+                menempel di kemasan supplier.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label>Template Label</Label>
+                <button
+                  type="button"
+                  onClick={() => setManageOpen(true)}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Kelola…
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {all.map((t) => {
+                  const d = templateDims(t);
+                  const active = selectedId === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => pickTemplate(t)}
+                      className={cn(
+                        "rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors",
+                        active ? "border-primary/40 bg-primary-soft text-primary" : "border-border",
+                      )}
+                    >
+                      {t.name}
+                      <span className="block font-normal opacity-70">
+                        {t.cols}×{t.rows} · {d.perSheet}/lembar
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedId === null && (
+                <p className="text-xs text-muted-foreground">
+                  Susunan custom (belum disimpan) — simpan via Kelola… agar bisa dipakai lagi.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Susunan Grid (kolom × baris)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <GridNumberInput
+                  ariaLabel="Jumlah kolom"
+                  unit="kolom"
+                  value={draft.cols}
+                  integer
+                  min={1}
+                  max={20}
+                  step={1}
+                  onCommit={(v) => patchDraft({ cols: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Jumlah baris"
+                  unit="baris"
+                  value={draft.rows}
+                  integer
+                  min={1}
+                  max={30}
+                  step={1}
+                  onCommit={(v) => patchDraft({ rows: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Margin kertas (mm)"
+                  unit="margin"
+                  value={draft.marginMm}
+                  min={0}
+                  max={20}
+                  step={1}
+                  onCommit={(v) => patchDraft({ marginMm: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Jarak antar label (mm)"
+                  unit="jarak"
+                  value={draft.gapMm}
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  onCommit={(v) => patchDraft({ gapMm: v })}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Label hasil {dims.wMm}×{dims.hMm} mm · {perSheet}/lembar — pratinjau di kanan
+                mengikuti susunan ini.
+              </p>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ["showName", "Nama"],
+                    ["showMeta", "SKU/Harga"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => patchDraft({ [key]: !draft[key] })}
+                    aria-pressed={draft[key]}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors",
+                      draft[key]
+                        ? "border-primary/40 bg-primary-soft text-primary"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {label}: {draft[key] ? "Ya" : "Tidak"}
+                  </button>
+                ))}
+              </div>
+              {draftError && <p className="text-xs text-destructive">{draftError}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -421,7 +709,7 @@ function BarcodePage() {
 
         <Panel
           title="Preview Label"
-          description={`${kind} · ${size === "A4" ? "A4 Penuh" : size} · ${total} label`}
+          description={`${kind} · ${template.name} · ${total} label · persis hasil cetak`}
         >
           {itemsQ.isLoading ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -429,69 +717,117 @@ function BarcodePage() {
                 <div key={i} className="h-40 animate-pulse rounded-xl bg-muted" />
               ))}
             </div>
-          ) : previews.length === 0 ? (
+          ) : preview === null ? (
             <EmptyState
               title="Belum ada barang"
               description="Pilih barang dan tentukan jumlahnya di panel Pengaturan untuk melihat preview label."
             />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {previews.map((p) => (
-                <div
-                  key={p.key}
-                  className={cn(
-                    "rounded-xl border border-dashed border-border bg-card p-4 text-center",
-                    size === "A4" && "sm:col-span-2",
-                  )}
+            <div className="space-y-3">
+              {draftError && (
+                <p className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                  Susunan tidak valid: {draftError}
+                </p>
+              )}
+              {qrTooSmall && (
+                <p className="rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-xs font-medium text-warning">
+                  QR pada label ini hanya ±{Math.round(qrSideForTemplate(template))} mm dan mungkin
+                  sulit dipindai — disarankan label ≥50×30.
+                </p>
+              )}
+              {preview.failed.map((it) => (
+                <p
+                  key={it.id}
+                  className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger"
                 >
-                  {"svg" in p ? (
-                    <>
-                      <div
-                        className="mx-auto max-w-64 [&_svg]:h-auto [&_svg]:w-full"
-                        dangerouslySetInnerHTML={{ __html: p.svg }}
-                      />
-                      <p className="mt-2 truncate text-xs font-semibold">{p.item.name}</p>
-                      <p className="truncate font-mono text-[10px] text-muted-foreground">
-                        {p.value}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {p.qty} label · {formatIDR(p.item.price)}
-                      </p>
-                      {canWrite && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 w-full rounded-lg"
-                          disabled={updateItem.isPending || p.item.barcode === p.value}
-                          title={
-                            p.item.barcode === p.value
-                              ? "Nilai ini sudah tersimpan sebagai barcode produk"
-                              : "Simpan nilai ini sebagai barcode produk"
-                          }
-                          onClick={() => void assignBarcode(p.item.id, p.value)}
-                        >
-                          {p.item.barcode === p.value ? "Sudah Tersimpan" : "Tetapkan Barcode"}
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p className="py-6 text-xs text-danger">
-                        Barang ini belum punya barcode/SKU yang valid.
-                      </p>
-                      <p className="mt-2 truncate text-xs font-semibold">{p.item.name}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {p.qty} label · {formatIDR(p.item.price)}
-                      </p>
-                    </>
-                  )}
-                </div>
+                  {it.name} — belum punya barcode/SKU yang valid, tidak ikut tercetak.
+                </p>
               ))}
+              {assignable.length > 0 && (
+                <div className="space-y-1.5">
+                  {assignable.map(({ item, value, fromSku }) => {
+                    const done = assignedIds.includes(item.id) || item.barcode === value;
+                    return (
+                      <Button
+                        key={item.id}
+                        variant="outline"
+                        size="sm"
+                        className="w-full rounded-lg"
+                        disabled={updateItem.isPending || done}
+                        onClick={() => void assignBarcode(item.id, value)}
+                      >
+                        {done
+                          ? "Sudah Tersimpan"
+                          : fromSku
+                            ? `Tetapkan SKU ${item.sku} sebagai Barcode Produk`
+                            : `Tetapkan ${value} ke ${item.name}`}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+              {preview.html !== "" && (
+                <div className="overflow-hidden rounded-xl border border-border bg-white">
+                  {/* Skala 60% via transform (bukan properti non-standar zoom):
+                      iframe 560px di-scale ke 336px; wrapper dipatok 336px dan
+                      lebar 166.67% (= 1/0.6) agar tidak ada ruang kosong. */}
+                  <div className="overflow-hidden" style={{ height: 336 }}>
+                    <iframe
+                      title="Preview label persis hasil cetak"
+                      srcDoc={preview.html}
+                      sandbox=""
+                      className="border-0"
+                      style={{
+                        width: "166.67%",
+                        height: 560,
+                        transform: "scale(0.6)",
+                        transformOrigin: "top left",
+                      }}
+                    />
+                  </div>
+                  <p className="border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
+                    Preview di atas adalah dokumen yang persis dikirim ke printer (diperkecil 60%).
+                    Garis putus-putus hanya panduan potong di layar.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </Panel>
       </div>
 
+      <Dialog open={unknownCode !== null} onOpenChange={(o) => !o && setUnknownCode(null)}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Barcode belum terdaftar</DialogTitle>
+            <DialogDescription>
+              <span className="font-mono">{unknownCode}</span> belum ada di master barang. Buat data
+              barang baru dengan barcode produk ini?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => setUnknownCode(null)}>
+              Batal
+            </Button>
+            <Button
+              className="rounded-xl"
+              onClick={() => {
+                pendingBarcode.current = unknownCode;
+                setUnknownCode(null);
+                setCreateOpen(true);
+              }}
+            >
+              Buat Barang Baru
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ItemFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        initial={null}
+        prefillBarcode={pendingBarcode.current ?? undefined}
+      />
       <ScanDisambiguasiDialog
         open={ambiguous !== null}
         code={ambiguous?.code}
@@ -522,10 +858,48 @@ function BarcodePage() {
             className="min-h-[280px] overflow-hidden rounded-xl border border-border bg-black"
           />
           <p className="text-center text-xs text-muted-foreground">
-            Mendukung EAN-13, Code 128, dan QR
+            Mendukung EAN-13, Code 128, dan QR. Bila kamera sulit membaca (mis. scan dari layar),
+            perbesar gambar, naikkan kecerahan, dan hindari pantulan — atau ketik kodenya di bawah.
           </p>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const code = manualCode.trim();
+              if (!code) return;
+              if (resolveScan(code)) setScanOpen(false);
+              setManualCode("");
+            }}
+          >
+            <Input
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="Ketik / tempel kode barcode..."
+              className="h-9 flex-1 rounded-lg font-mono"
+              aria-label="Ketik kode barcode manual"
+            />
+            <Button type="submit" variant="outline" className="h-9 shrink-0 rounded-lg">
+              Proses
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
+      <LabelTemplateDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        draftSummary={`${draft.cols}×${draft.rows} · margin ${draft.marginMm} · gap ${draft.gapMm}`}
+        draftError={draftError}
+        onSave={(name) => {
+          const r = saveCustom(name, draft);
+          if (r.template) setSelectedId(r.template.id);
+          return r.error ?? null;
+        }}
+        custom={custom}
+        onRemove={(id) => {
+          removeCustom(id);
+          setSelectedId((s) => (s === id ? null : s));
+        }}
+      />
     </>
   );
 }

@@ -30,6 +30,11 @@ class DepartmentSeeder extends Seeder
             $users = User::where('is_active', true)->orderBy('id')->get();
         }
 
+        // Pola ProcDocSeeder: run standalone tanpa user = no-op, bukan division-by-zero.
+        if ($users->isEmpty()) {
+            return;
+        }
+
         foreach ($departments as $i => $name) {
             Department::create([
                 'code' => 'DEP-'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),

@@ -19,6 +19,9 @@ Thumbs.db
 *.p12
 ngrok.yml
 
+# Manual browser-test docs (session-local, UI-only guides — lihat AGENTS.md)
+Frontend/docs/*.txt
+
 # Build output / deps (sub-projects cover these too)
 node_modules/
 dist/

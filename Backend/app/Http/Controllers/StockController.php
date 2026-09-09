@@ -58,6 +58,8 @@ class StockController extends Controller
             );
         }
 
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         $rows = $query
             ->orderBy('items.name')
             ->paginate($request->integer('per_page', 20));
@@ -77,6 +79,7 @@ class StockController extends Controller
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'search' => ['nullable', 'string', 'max:255'],
             'days' => ['nullable', 'integer', Rule::in([14, 30, 60, 90])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $days = (int) ($data['days'] ?? 30);

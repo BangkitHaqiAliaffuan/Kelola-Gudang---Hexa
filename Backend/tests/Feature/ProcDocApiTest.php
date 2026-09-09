@@ -145,7 +145,7 @@ class ProcDocApiTest extends TestCase
             ],
         ])->assertStatus(201)->json('data.no');
 
-        $row = collect($this->getJson('/api/pengadaan/proc-docs?per_page=10000')->assertOk()->json('data'))
+        $row = collect($this->getJson('/api/pengadaan/proc-docs?per_page=100')->assertOk()->json('data'))
             ->firstWhere('no', $no);
 
         $this->assertNotNull($row, 'dokumen tidak muncul di index');
@@ -155,8 +155,8 @@ class ProcDocApiTest extends TestCase
         $this->assertSame(19500, (int) $row['value_total']);
 
         // Filter status: Draft hanya memuat dokumen baru.
-        $this->assertSame(1, count($this->getJson('/api/pengadaan/proc-docs?status=Draft&per_page=10000')->assertOk()->json('data')));
-        $this->assertSame(0, count($this->getJson('/api/pengadaan/proc-docs?status=Disetujui&per_page=10000')->assertOk()->json('data')));
+        $this->assertSame(1, count($this->getJson('/api/pengadaan/proc-docs?status=Draft&per_page=100')->assertOk()->json('data')));
+        $this->assertSame(0, count($this->getJson('/api/pengadaan/proc-docs?status=Disetujui&per_page=100')->assertOk()->json('data')));
     }
 
     public function test_show_returns_lines_with_item_and_unit(): void
@@ -769,17 +769,17 @@ class ProcDocApiTest extends TestCase
             ],
         ])->assertStatus(201)->json('data.no');
 
-        $poRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PO&per_page=10000')->assertOk()->json('data'));
+        $poRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PO&per_page=100')->assertOk()->json('data'));
         $this->assertTrue($poRows->contains('no', $poNo));
         $this->assertFalse($poRows->contains('no', $no));
 
-        $prRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PR&per_page=10000')->assertOk()->json('data'));
+        $prRows = collect($this->getJson('/api/pengadaan/proc-docs?kind=PR&per_page=100')->assertOk()->json('data'));
         $this->assertTrue($prRows->contains('no', $no));
         $this->assertFalse($prRows->contains('no', $poNo));
 
         // Status filter memvalidasi set status sesuai kind.
-        $this->getJson('/api/pengadaan/proc-docs?kind=PR&status=Disetujui&per_page=10000')->assertOk();
-        $this->getJson('/api/pengadaan/proc-docs?kind=PO&status=Disetujui&per_page=10000')
+        $this->getJson('/api/pengadaan/proc-docs?kind=PR&status=Disetujui&per_page=100')->assertOk();
+        $this->getJson('/api/pengadaan/proc-docs?kind=PO&status=Disetujui&per_page=100')
             ->assertOk()
             ->assertJsonCount(1, 'data');
     }
@@ -821,7 +821,7 @@ class ProcDocApiTest extends TestCase
         // ter-submit siapa pun tampil; Draft milik orang lain disembunyikan.
         Sanctum::actingAs($supervisor, ['*'], 'sanctum');
 
-        $numbers = array_column($this->getJson('/api/pengadaan/proc-docs?per_page=10000')->assertOk()->json('data'), 'no');
+        $numbers = array_column($this->getJson('/api/pengadaan/proc-docs?per_page=100')->assertOk()->json('data'), 'no');
 
         $this->assertContains($mineNo, $numbers);
         $this->assertContains($othersSubmittedNo, $numbers);
@@ -829,7 +829,7 @@ class ProcDocApiTest extends TestCase
 
         // Filter status=Draft juga dibatasi ke Draft milik sendiri.
         $drafts = array_column(
-            $this->getJson('/api/pengadaan/proc-docs?status=Draft&per_page=10000')->assertOk()->json('data'),
+            $this->getJson('/api/pengadaan/proc-docs?status=Draft&per_page=100')->assertOk()->json('data'),
             'no'
         );
         $this->assertContains($mineNo, $drafts);

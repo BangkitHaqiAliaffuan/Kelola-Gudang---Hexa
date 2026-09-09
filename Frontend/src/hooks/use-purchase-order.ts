@@ -1,17 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Paginated } from "@/lib/api";
+import { api, fetchAll } from "@/lib/api";
 import type { ProcDocApi, ProcDocPayload } from "@/lib/purchase-order-types";
-
-const DOCS_PER_PAGE = 10000;
 
 export function useProcDocsPo(kind: "PO", params: { status?: string; enabled?: boolean } = {}) {
   const { status, enabled = true } = params;
   return useQuery({
     queryKey: ["pengadaan", "proc-docs", "list", kind, status ?? null],
     queryFn: () => {
-      const sp = new URLSearchParams({ kind, per_page: String(DOCS_PER_PAGE) });
-      if (status) sp.set("status", status);
-      return api.get<Paginated<ProcDocApi>>(`/pengadaan/proc-docs?${sp.toString()}`);
+      const p: Record<string, string> = { kind };
+      if (status) p["status"] = status;
+      return fetchAll<ProcDocApi>("/pengadaan/proc-docs", p);
     },
     enabled: enabled && typeof window !== "undefined",
   });
@@ -29,9 +27,7 @@ export function useApprovedProcDocsPr() {
   return useQuery({
     queryKey: ["pengadaan", "proc-docs", "list", "PR", "Disetujui"],
     queryFn: () =>
-      api.get<Paginated<ProcDocApi>>(
-        `/pengadaan/proc-docs?kind=PR&status=Disetujui&per_page=${DOCS_PER_PAGE}`,
-      ),
+      fetchAll<ProcDocApi>("/pengadaan/proc-docs", { kind: "PR", status: "Disetujui" }),
     enabled: typeof window !== "undefined",
   });
 }

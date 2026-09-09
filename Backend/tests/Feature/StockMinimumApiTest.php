@@ -25,7 +25,7 @@ class StockMinimumApiTest extends TestCase
     {
         $this->makeStockItem(10, 100, 30);
 
-        $this->getJson('/api/persediaan/stock-minimum?per_page=500')
+        $this->getJson('/api/persediaan/stock-minimum?per_page=100')
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [
@@ -48,7 +48,7 @@ class StockMinimumApiTest extends TestCase
         $this->makeStockItem(10, 100, 8);            // Menipis (available <= min)
         $this->makeStockItem(10, 100, 30);           // Normal
 
-        $rows = $this->getJson('/api/persediaan/stock-minimum?per_page=500')->assertOk()->json('data');
+        $rows = $this->getJson('/api/persediaan/stock-minimum?per_page=100')->assertOk()->json('data');
 
         foreach ($rows as $row) {
             $min = $row['min'];
@@ -93,7 +93,7 @@ class StockMinimumApiTest extends TestCase
         $this->makeStockItem(10, 100, 8);
         $this->makeStockItem(10, 100, 30);
 
-        $response = $this->getJson('/api/persediaan/stock-minimum?per_page=500')
+        $response = $this->getJson('/api/persediaan/stock-minimum?per_page=100')
             ->assertOk();
 
         collect($response->json('data'))->each(function (array $row) {
@@ -155,11 +155,11 @@ class StockMinimumApiTest extends TestCase
 
         [$wh1Id, $wh2Id] = [$warehouseIds->first(), $warehouseIds->last()];
 
-        $r1 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh1Id}&per_page=500")
+        $r1 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh1Id}&per_page=100")
             ->assertOk()
             ->json('data');
 
-        $r2 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh2Id}&per_page=500")
+        $r2 = $this->getJson("/api/persediaan/stock-minimum?warehouse_id={$wh2Id}&per_page=100")
             ->assertOk()
             ->json('data');
 

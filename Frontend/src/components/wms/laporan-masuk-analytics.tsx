@@ -45,7 +45,7 @@ export function LaporanMasukAnalytics({
   enabled: boolean;
 }) {
   const [pihak, setPihak] = useState<string>(ALL);
-  const { data, isLoading, isFetching } = useTransaksiAnalytics({
+  const { data, isLoading, isFetching, error, refetch } = useTransaksiAnalytics({
     type: "Penerimaan",
     from,
     to,
@@ -209,14 +209,14 @@ export function LaporanMasukAnalytics({
       </Panel>
 
       <Panel title="Top Supplier" description="Peringkat penyerap nilai + share kumulatif (Pareto)">
-        <TopPihakTable rows={topRows} loading={busy} />
+        <TopPihakTable rows={topRows} loading={busy} error={error} onRetry={() => refetch()} />
       </Panel>
 
       <Panel
         title="Nilai per Supplier per Bulan"
         description="Jawaban 'nilai dari 1 supplier dalam 1 bulan'"
       >
-        <PihakBulanTable rows={bulanRows} loading={busy} />
+        <PihakBulanTable rows={bulanRows} loading={busy} error={error} onRetry={() => refetch()} />
       </Panel>
 
       {(a?.varians_harga?.length ?? 0) > 0 && (
@@ -229,6 +229,8 @@ export function LaporanMasukAnalytics({
             rows={withRowId(variansRows, (r) => `var:${r.supplier_id ?? r.supplier}:${r.item_id}`)}
             pageSize={10}
             loading={busy}
+            error={error}
+            onRetry={() => refetch()}
             mobileCard={(r) => (
               <div className="space-y-1">
                 <p className="truncate text-sm font-semibold">{r.nama}</p>
@@ -245,8 +247,13 @@ export function LaporanMasukAnalytics({
         </Panel>
       )}
 
-      <AtRiskTable rows={a?.aktivitas ?? []} loading={busy} />
-      <ProsesPanel proses={a?.proses} loading={busy} />
+      <AtRiskTable
+        rows={a?.aktivitas ?? []}
+        loading={busy}
+        error={error}
+        onRetry={() => refetch()}
+      />
+      <ProsesPanel proses={a?.proses} loading={busy} error={error} onRetry={() => refetch()} />
     </>
   );
 }

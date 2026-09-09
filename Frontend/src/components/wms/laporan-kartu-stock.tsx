@@ -479,6 +479,8 @@ export function LaporanKartuStock() {
           rows={filteredRows}
           pageSize={10}
           loading={itemsLoading || card.isFetching}
+          error={card.error}
+          onRetry={() => card.refetch()}
           onRowClick={(r) => openDetail(r)}
           initialSort={{ key: "date", dir: "asc" }}
           mobileCard={(r) => (
