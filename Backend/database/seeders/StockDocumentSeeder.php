@@ -384,8 +384,11 @@ class StockDocumentSeeder extends Seeder
         }
 
         // ---- Phase 6: a few non-posted documents (lines but no movements) ----
+        // Hanya Stock Adjustment yang punya alur approval — tipe lain tidak
+        // boleh Menunggu Approval (lihat StoreStockDocumentRequest).
         $nonPostedTypes = ['Penerimaan', 'Pengeluaran', 'Stock Adjustment', 'Transfer Gudang'];
-        $nonPostedStatuses = ['Draft', 'Menunggu Approval', 'Dibatalkan'];
+        $nonPostedStatuses = ['Draft', 'Dibatalkan'];
+        $adjustmentStatuses = ['Draft', 'Menunggu Approval', 'Dibatalkan'];
 
         for ($k = 0, $count = $int(4, 7); $k < $count; $k++) {
             $type = $pick($nonPostedTypes);
@@ -439,7 +442,7 @@ class StockDocumentSeeder extends Seeder
                 'customer_id' => $custPick2?->id,
                 'pic' => $pick(self::PICS),
                 'note' => 'Dokumen belum diposting',
-                'status' => $pick($nonPostedStatuses),
+                'status' => $pick($type === 'Stock Adjustment' ? $adjustmentStatuses : $nonPostedStatuses),
                 'lines' => $lines,
             ];
         }

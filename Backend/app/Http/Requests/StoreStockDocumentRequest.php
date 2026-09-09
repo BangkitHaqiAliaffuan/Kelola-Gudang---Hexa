@@ -182,6 +182,20 @@ class StoreStockDocumentRequest extends FormRequest
     {
         return [
             function (Validator $validator) {
+                // Hanya tipe dengan alur approval yang boleh dibuat langsung
+                // Menunggu Approval: Stock Adjustment (submit-approval) dan
+                // Stock Opname (submit-review). Tipe lain (Penerimaan,
+                // Pengeluaran, Transfer Gudang, Retur ...) tidak punya fungsi
+                // approval sehingga status tersebut tidak valid saat create.
+                if ($this->input('status') === 'Menunggu Approval'
+                    && ! in_array($this->input('type'), ['Stock Adjustment', 'Stock Opname'], true)) {
+                    $validator->errors()->add(
+                        'status',
+                        'Status Menunggu Approval hanya untuk Stock Adjustment dan Stock Opname.'
+                    );
+                }
+            },
+            function (Validator $validator) {
                 $lines = $this->input('lines') ?? [];
                 if ($this->input('type') === 'Stock Opname' && $lines) {
                     $seen = [];

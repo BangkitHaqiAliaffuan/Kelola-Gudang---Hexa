@@ -195,6 +195,10 @@ class DatabaseSeederConsistencyTest extends TestCase
         $this->assertSame(0, StockDocument::whereNotIn('status', StockDocument::STATUSES)->count());
         $this->assertSame(0, StockDocument::doesntHave('lines')->count());
 
+        // Hanya tipe ber-alur approval (Adjustment, Opname) yang boleh Menunggu Approval.
+        $this->assertSame(0, StockDocument::where('status', 'Menunggu Approval')
+            ->whereNotIn('type', ['Stock Adjustment', 'Stock Opname'])->count());
+
         // Setiap mutasi di ledger bersumber dari dokumen.
         $this->assertSame(0, StockMovement::whereNull('stock_document_id')->count());
 
