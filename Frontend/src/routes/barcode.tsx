@@ -32,6 +32,7 @@ import {
   downloadLabelsAsPngOrZip,
   encodeItemWithSource,
   normalizeCode,
+  parseGridNumber,
   printHtml,
   qrSideForTemplate,
   templateDims,
@@ -65,6 +66,72 @@ export const Route = createFileRoute("/barcode")({
 });
 
 type Row = { id: number; itemId: number; qty: number };
+
+/**
+ * Input angka grid dengan state teks lokal: setiap keystroke diterima
+ * (termasuk mengosongkan field), nilai valid di-commit ke draft, nilai
+ * invalid tidak menimpa draft, blur/Escape mengembalikan tampilan ke nilai
+ * valid terakhir. Nilai eksternal (mis. pilih preset) me-reset teks.
+ */
+export function GridNumberInput({
+  ariaLabel,
+  unit,
+  value,
+  integer,
+  min,
+  max,
+  step,
+  onCommit,
+}: {
+  ariaLabel: string;
+  unit: string;
+  value: number;
+  integer?: boolean;
+  min?: number;
+  max?: number;
+  step?: number | string;
+  onCommit: (v: number) => void;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const lastExternal = useRef(value);
+  useEffect(() => {
+    if (value !== lastExternal.current) {
+      lastExternal.current = value;
+      setText(null);
+    }
+  }, [value]);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={text ?? String(value)}
+        onChange={(e) => {
+          const s = e.target.value;
+          setText(s);
+          const v = parseGridNumber(s, integer === true);
+          if (v !== null) {
+            lastExternal.current = v;
+            onCommit(v);
+          }
+        }}
+        onBlur={() => setText(null)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setText(null);
+            e.currentTarget.blur();
+          }
+        }}
+        aria-label={ariaLabel}
+        className="h-9 rounded-xl"
+      />
+      <span className="text-xs text-muted-foreground">{unit}</span>
+    </div>
+  );
+}
 
 function BarcodePage() {
   const itemsQ = useItems();
@@ -477,70 +544,44 @@ function BarcodePage() {
             <div className="space-y-1.5">
               <Label>Susunan Grid (kolom × baris)</Label>
               <div className="grid grid-cols-2 gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={20}
-                    step={1}
-                    value={draft.cols}
-                    onChange={(e) => {
-                      const v = Number.parseInt(e.target.value, 10);
-                      if (Number.isInteger(v)) patchDraft({ cols: v });
-                    }}
-                    aria-label="Jumlah kolom"
-                    className="h-9 rounded-xl"
-                  />
-                  <span className="text-xs text-muted-foreground">kolom</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={30}
-                    step={1}
-                    value={draft.rows}
-                    onChange={(e) => {
-                      const v = Number.parseInt(e.target.value, 10);
-                      if (Number.isInteger(v)) patchDraft({ rows: v });
-                    }}
-                    aria-label="Jumlah baris"
-                    className="h-9 rounded-xl"
-                  />
-                  <span className="text-xs text-muted-foreground">baris</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={20}
-                    step={1}
-                    value={draft.marginMm}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) patchDraft({ marginMm: v });
-                    }}
-                    aria-label="Margin kertas (mm)"
-                    className="h-9 rounded-xl"
-                  />
-                  <span className="text-xs text-muted-foreground">margin</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={5}
-                    step={0.5}
-                    value={draft.gapMm}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (Number.isFinite(v)) patchDraft({ gapMm: v });
-                    }}
-                    aria-label="Jarak antar label (mm)"
-                    className="h-9 rounded-xl"
-                  />
-                  <span className="text-xs text-muted-foreground">jarak</span>
-                </div>
+                <GridNumberInput
+                  ariaLabel="Jumlah kolom"
+                  unit="kolom"
+                  value={draft.cols}
+                  integer
+                  min={1}
+                  max={20}
+                  step={1}
+                  onCommit={(v) => patchDraft({ cols: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Jumlah baris"
+                  unit="baris"
+                  value={draft.rows}
+                  integer
+                  min={1}
+                  max={30}
+                  step={1}
+                  onCommit={(v) => patchDraft({ rows: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Margin kertas (mm)"
+                  unit="margin"
+                  value={draft.marginMm}
+                  min={0}
+                  max={20}
+                  step={1}
+                  onCommit={(v) => patchDraft({ marginMm: v })}
+                />
+                <GridNumberInput
+                  ariaLabel="Jarak antar label (mm)"
+                  unit="jarak"
+                  value={draft.gapMm}
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  onCommit={(v) => patchDraft({ gapMm: v })}
+                />
               </div>
               <p className="text-xs text-muted-foreground">
                 Label hasil {dims.wMm}×{dims.hMm} mm · {perSheet}/lembar — pratinjau di kanan
@@ -727,13 +768,23 @@ function BarcodePage() {
               )}
               {preview.html !== "" && (
                 <div className="overflow-hidden rounded-xl border border-border bg-white">
-                  <iframe
-                    title="Preview label persis hasil cetak"
-                    srcDoc={preview.html}
-                    sandbox=""
-                    className="h-[560px] w-full border-0"
-                    style={{ zoom: 0.6 }}
-                  />
+                  {/* Skala 60% via transform (bukan properti non-standar zoom):
+                      iframe 560px di-scale ke 336px; wrapper dipatok 336px dan
+                      lebar 166.67% (= 1/0.6) agar tidak ada ruang kosong. */}
+                  <div className="overflow-hidden" style={{ height: 336 }}>
+                    <iframe
+                      title="Preview label persis hasil cetak"
+                      srcDoc={preview.html}
+                      sandbox=""
+                      className="border-0"
+                      style={{
+                        width: "166.67%",
+                        height: 560,
+                        transform: "scale(0.6)",
+                        transformOrigin: "top left",
+                      }}
+                    />
+                  </div>
                   <p className="border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
                     Preview di atas adalah dokumen yang persis dikirim ke printer (diperkecil 60%).
                     Garis putus-putus hanya panduan potong di layar.

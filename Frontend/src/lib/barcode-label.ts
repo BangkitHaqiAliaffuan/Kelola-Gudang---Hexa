@@ -29,6 +29,21 @@ const PAPER_H_MM = 297;
  *  scanner murah. Usulan — perlu persetujuan pembimbing (lihat plan). */
 export const MIN_LABEL_MM = 15;
 
+/**
+ * Parse teks field angka grid template. null = belum valid (mis. field
+ * dikosongkan saat mengetik) — pemanggil mempertahankan teks dan tidak
+ * commit ke draft, sehingga digit pertama/tunggal pun bisa dihapus/diketik
+ * ulang lewat keyboard. Rentang nilai (1–20, 0–5, ...) divalidasi terpisah
+ * oleh validateTemplate agar pesan kesalahan tetap muncul di UI.
+ */
+export function parseGridNumber(raw: string, integer: boolean): number | null {
+  const s = raw.trim();
+  if (s === "") return null;
+  if (integer && !/^-?\d+$/.test(s)) return null;
+  const v = integer ? Number.parseInt(s, 10) : Number(s);
+  return Number.isFinite(v) ? v : null;
+}
+
 export type SheetLayout = {
   wMm: number;
   hMm: number;
@@ -440,14 +455,21 @@ export function buildPrintHtml(input: PrintLabels): string {
     border: 0.2mm dashed #bbb; padding: 2mm;
     break-inside: avoid; page-break-inside: avoid;
     overflow: hidden;
+    display: flex; flex-direction: column;
   }
   @media print { .label { border: none; } }
-  .label .code { display: flex; justify-content: center; }
-  .label.bars .code svg { display: block; width: 100%; height: auto; }
-  .label.qr .code { align-items: center; }
-  .label.qr .code svg { width: ${qrSideMm}mm; height: ${qrSideMm}mm; }
-  .name { margin-top: 1mm; font-size: 9pt; font-weight: 700; line-height: 1.15; text-align: center; }
-  .meta { margin-top: 0.5mm; font-size: 8pt; line-height: 1.2; text-align: center; color: #333; }
+  /* Area kode fleksibel dengan batas tegas: SVG mengecil mengikuti ruang
+     (keputusan: teks nama/meta tidak boleh terpotong), bukan mendorong teks
+     keluar kotak. Ukuran intrinsik dari codeHeightForTemplate dipertahankan
+     sehingga penyusutan hanya terjadi bila kalau tidak teks terpotong. */
+  .label .code { display: flex; justify-content: center; align-items: center;
+    flex: 1 1 auto; min-height: 0; min-width: 0; }
+  .label.bars .code svg { display: block; width: auto; height: auto;
+    max-width: 100%; max-height: 100%; }
+  .label.qr .code svg { width: ${qrSideMm}mm; height: ${qrSideMm}mm;
+    max-width: 100%; max-height: 100%; }
+  .name { flex: none; margin-top: 1mm; font-size: 9pt; font-weight: 700; line-height: 1.15; text-align: center; }
+  .meta { flex: none; margin-top: 0.5mm; font-size: 8pt; line-height: 1.2; text-align: center; color: #333; }
 </style>
 </head>
 <body>

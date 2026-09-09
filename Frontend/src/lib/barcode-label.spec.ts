@@ -179,6 +179,38 @@ describe("buildPrintHtml", () => {
     expect(html).toContain("@media print");
     expect(html).toMatch(/@media print\s*\{\s*\.label\s*\{\s*border:\s*none/);
   });
+
+  it("label flex kolom agar teks tidak terpotong barcode", () => {
+    const html = buildPrintHtml({
+      size: "30x20",
+      labels: [{ svg: "<svg></svg>", name: "I", meta: "m", kind: "Barcode" }],
+    });
+    // Area kode fleksibel + SVG dibatasi dua dimensi (mengecil mengikuti
+    // ruang, bukan mendorong .name/.meta keluar kotak overflow:hidden).
+    expect(html).toContain("flex-direction: column");
+    expect(html).toContain("max-height: 100%");
+    // Teks tidak boleh menyusut (flex item default bisa shrink ke nol).
+    expect(html).toMatch(/\.name\s*\{[^}]*flex:\s*none/);
+    expect(html).toMatch(/\.meta\s*\{[^}]*flex:\s*none/);
+  });
+
+  it("toggle showName/showMeta mengendalikan baris teks", () => {
+    const labels = [
+      { svg: "<svg></svg>", name: "Bearing 6205", meta: "SKU-1", kind: "Barcode" as const },
+    ];
+    const on = buildPrintHtml({
+      template: { ...presetForSize("50x30"), showName: true, showMeta: true },
+      labels,
+    });
+    expect(on).toContain('class="name"');
+    expect(on).toContain('class="meta"');
+    const off = buildPrintHtml({
+      template: { ...presetForSize("50x30"), showName: false, showMeta: false },
+      labels,
+    });
+    expect(off).not.toContain('class="name"');
+    expect(off).not.toContain('class="meta"');
+  });
 });
 
 describe("templateDims", () => {
