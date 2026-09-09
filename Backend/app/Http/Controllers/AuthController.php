@@ -34,6 +34,8 @@ class AuthController extends Controller
         }
 
         $user->load('defaultWarehouse');
+        // Batasi penumpukan token: hapus token lebih tua dari umur expiry (24 jam).
+        $user->tokens()->where('created_at', '<', now()->subHours(24))->delete();
         $token = $user->createToken('kg-session')->plainTextToken;
 
         return response()->json([

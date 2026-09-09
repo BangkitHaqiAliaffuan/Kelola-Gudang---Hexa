@@ -30,7 +30,7 @@ class StockDocumentApiTest extends TestCase
         $this->makeDoc('Pengeluaran', 'Draft');
         $this->makeDoc('Transfer Gudang', 'Menunggu Approval');
 
-        $this->getJson('/api/persediaan/stock-documents?per_page=500')
+        $this->getJson('/api/persediaan/stock-documents?per_page=100')
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [

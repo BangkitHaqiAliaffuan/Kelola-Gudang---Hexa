@@ -139,6 +139,36 @@ class AuthApiTest extends TestCase
         $this->withToken($token)->getJson('/api/auth/me')->assertUnauthorized();
     }
 
+    public function test_token_older_than_expiration_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('old-session')->plainTextToken;
+
+        // Mundurkan created_at melewati batas expiry 24 jam.
+        $user->tokens()->update(['created_at' => now()->subHours(25)]);
+        Auth::forgetGuards();
+
+        $this->withToken($token)->getJson('/api/auth/me')->assertUnauthorized();
+    }
+
+    public function test_login_prunes_tokens_older_than_24_hours(): void
+    {
+        $password = Str::password(16);
+        $user = User::factory()->create(['password' => Hash::make($password)]);
+
+        $old = $user->createToken('stale-session');
+        $old->accessToken->forceFill(['created_at' => now()->subHours(25)])->save();
+        $fresh = $user->createToken('recent-session');
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => $password,
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $old->accessToken->id]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $fresh->accessToken->id]);
+    }
+
     public function test_master_routes_require_authentication(): void
     {
         $this->getJson('/api/master/categories')->assertUnauthorized();

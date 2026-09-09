@@ -36,6 +36,8 @@ class WorkOrderController extends Controller
 
         $query->orderByDesc('id');
 
+        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+
         $workOrders = $query->paginate((int) $request->query('per_page', 20));
 
         return WorkOrderResource::collection($workOrders);

@@ -24,6 +24,15 @@ class StockApiTest extends TestCase
         $this->actingAsMasterAdmin();
     }
 
+    public function test_index_rejects_per_page_above_max(): void
+    {
+        $this->getJson('/api/persediaan/stock?per_page=1000')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('per_page');
+
+        $this->getJson('/api/persediaan/stock?per_page=100')->assertOk();
+    }
+
     public function test_index_returns_complete_stock_rows(): void
     {
         $item = Item::factory()->create([
@@ -39,7 +48,7 @@ class StockApiTest extends TestCase
             ['stock' => 100, 'reserved' => 0, 'unit_cost_avg' => 1000, 'updated_at' => now()]
         );
 
-        $this->getJson('/api/persediaan/stock?per_page=500')
+        $this->getJson('/api/persediaan/stock?per_page=100')
             ->assertOk()
             ->assertJsonStructure([
                 'data' => [

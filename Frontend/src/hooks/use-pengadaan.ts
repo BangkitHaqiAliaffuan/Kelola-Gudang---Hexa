@@ -1,16 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Paginated } from "@/lib/api";
+import { api, fetchAll } from "@/lib/api";
 import type { ProcDocApi, ProcDocPayload } from "@/lib/pengadaan-types";
 
-// Dokumen PR hanya ~60-an, ambil semua agar filter status/departemen/gudang
-// client-side tetap benar (pola master-data).
-const PER_PAGE = 500;
-
+// Backend membatasi `per_page` maks 100 — daftar PR diambil via fetchAll()
+// (loop halaman 100) agar filter client-side tetap truthful.
 export function useProcDocs() {
   return useQuery({
     queryKey: ["pengadaan", "proc-docs", "list"],
-    queryFn: () =>
-      api.get<Paginated<ProcDocApi>>(`/pengadaan/proc-docs?kind=PR&per_page=${PER_PAGE}`),
+    queryFn: () => fetchAll<ProcDocApi>("/pengadaan/proc-docs", { kind: "PR" }),
     enabled: typeof window !== "undefined",
   });
 }

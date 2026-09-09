@@ -38,6 +38,7 @@ class StockDocumentController extends Controller
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = StockDocument::query()

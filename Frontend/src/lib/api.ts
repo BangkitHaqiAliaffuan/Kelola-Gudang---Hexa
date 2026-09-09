@@ -95,6 +95,53 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
+/**
+ * Fetch-all paginasi server (Fase 1.2 skalabilitas): meminta halaman
+ * `per_page=100` berulang mengikuti `meta.last_page` lalu menggabung `data`.
+ * Batas backend `max:100` membuat request tunggal raksasa ditolak 422 —
+ * gunakan ini untuk daftar yang memang butuh seluruh baris di client
+ * (filter/paginasi client-side). Bukan untuk laporan agregat (tetap
+ * server-driven). Ada pengaman jumlah halaman agar loop tidak liar.
+ */
+const FETCH_ALL_PER_PAGE = 100;
+const FETCH_ALL_MAX_PAGES = 500;
+
+export async function fetchAll<T>(
+  path: string,
+  params: Record<string, string> = {},
+): Promise<Paginated<T>> {
+  const all: T[] = [];
+  let last: Paginated<T> | null = null;
+  let page = 1;
+  for (;;) {
+    const sp = new URLSearchParams({
+      ...params,
+      per_page: String(FETCH_ALL_PER_PAGE),
+      page: String(page),
+    });
+    const sep = path.includes("?") ? "&" : "?";
+    const res = await request<Paginated<T>>(`${path}${sep}${sp.toString()}`);
+    all.push(...res.data);
+    last = res;
+    const lastPage = res.meta?.last_page ?? page;
+    if (page >= lastPage || page >= FETCH_ALL_MAX_PAGES) break;
+    page += 1;
+  }
+  const out: Paginated<T> = { data: all };
+  if (last?.links !== undefined) out.links = last.links;
+  if (last?.meta !== undefined) {
+    out.meta = {
+      ...last.meta,
+      current_page: 1,
+      last_page: 1,
+      per_page: all.length,
+      from: all.length > 0 ? 1 : null,
+      to: all.length > 0 ? all.length : null,
+    };
+  }
+  return out;
+}
+
 /** Pick the first validation message for a field from an ApiError, if any. */
 export function fieldError(err: unknown, field: string): string | undefined {
   if (err instanceof ApiError) return err.errors?.[field]?.[0];
