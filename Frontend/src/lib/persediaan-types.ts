@@ -646,6 +646,48 @@ export type TransaksiAnalyticsApi = {
     aging: { rentang: string; dokumen: number; nilai: number }[];
   };
 };
+// ---- Laporan Fast Moving (GET /api/laporan/fast-moving) ----
+// Velocity per item per periode dari konsumsi nyata (OUT Pengeluaran saja).
+// Keputusan: prioritas reorder, safety stock, alokasi gudang, cegah stockout.
+
+export type FastMovingRisiko = "Habis" | "Kritis" | "Menipis" | "Aman";
+
+export type FastMovingRowApi = {
+  id: number;
+  item_id: number;
+  sku: string | null;
+  name: string | null;
+  unit: string | null;
+  category: string | null;
+  category_id: number | null;
+  min: number | null;
+  max: number | null;
+  lead_time: number;
+  cost: number;
+  keluar_qty: number;
+  frekuensi: number;
+  nilai_keluar: number;
+  unit_cost_avg_keluar: number;
+  adu: number;
+  days_of_cover: number | null;
+  tersedia: number;
+  reserved: number;
+  prev_qty: number;
+  trend_pct: number | null;
+  butuh_reorder: boolean;
+  risiko: FastMovingRisiko;
+};
+
+export type FastMovingParams = {
+  from: string;
+  to: string;
+  warehouseId?: number | null;
+  categoryId?: number | null;
+  search?: string | null;
+  perPage?: number;
+  page?: number;
+};
+
 // ---- Update dokumen Stock Opname draft (PUT /api/persediaan/stock-documents/{id}) ----
 // Mengganti seluruh baris sesi opname; system_qty baris yang ada dipertahankan
 // dari snapshot dokumen asli (baris baru boleh kosong — di-backfill server).

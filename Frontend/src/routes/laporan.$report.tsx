@@ -32,6 +32,7 @@ import { LaporanMutasi } from "@/components/wms/laporan-mutasi";
 import { LaporanStock } from "@/components/wms/laporan-stock";
 import { LaporanStockMinimum } from "@/components/wms/laporan-stock-minimum";
 import { LaporanDeadStock } from "@/components/wms/laporan-dead-stock";
+import { LaporanFastMoving } from "@/components/wms/laporan-fast-moving";
 import { LaporanNilaiPersediaan } from "@/components/wms/laporan-nilai-persediaan";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
@@ -139,6 +140,7 @@ function Laporan() {
   if (report === "stock-minimum") return <LaporanStockMinimum />;
   if (report === "mutasi") return <LaporanMutasi />;
   if (report === "dead-stock") return <LaporanDeadStock />;
+  if (report === "fast-moving") return <LaporanFastMoving />;
   if (report === "nilai-persediaan") return <LaporanNilaiPersediaan />;
 
   const source: Row[] = isStockOpname

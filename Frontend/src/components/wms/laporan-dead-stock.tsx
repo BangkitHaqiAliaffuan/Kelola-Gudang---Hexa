@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Download,
-  PackageX,
-  Search,
-  CalendarClock,
-  BarChart3,
-  TrendingDown,
-} from "lucide-react";
+import { Download, PackageX, Search, CalendarClock, BarChart3, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 import {
   ALL,
@@ -83,34 +76,41 @@ export function LaporanDeadStock() {
     warehouseId: whFilter.warehouseId,
     categoryId: cat === ALL ? null : (catId ?? null),
     search: debouncedQ.trim() || null,
+    moving: "Dead",
   });
 
-  const allRows = useMemo(() => data?.data ?? [], [data]);
+  // Hanya item Dead berstok > 0 yang relevan untuk keputusan (obral, retur ke
+  // supplier, mutasi, write-off). Stok 0 = tidak ada modal tertanam.
+  // Filter client-side selalu diterapkan (truth); param moving di atas
+  // menyempitkan hasil di server setelah backend mendukungnya.
+  const deadRows = useMemo(
+    () => (data?.data ?? []).filter((r) => r.moving === "Dead" && r.stock > 0),
+    [data],
+  );
 
-  // Backend sudah filter moving=Dead via warehouse_id. Kita filter lagi
-  // untuk age bucket (client-side, karena backend tidak punya field daysAgo).
+  // Filter umur (bucket) client-side — backend tidak punya field daysAgo.
   const rows = useMemo(() => {
-    if (ageFilter === ALL) return allRows;
-    return allRows.filter((r) => {
+    if (ageFilter === ALL) return deadRows;
+    return deadRows.filter((r) => {
       const days = daysSince(r.last_move_at);
       return ageBucket(days) === ageFilter;
     });
-  }, [allRows, ageFilter]);
+  }, [deadRows, ageFilter]);
 
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
 
   const selected = useMemo(
-    () => allRows.find((it) => it.item_id === selectedId) ?? null,
-    [allRows, selectedId],
+    () => deadRows.find((it) => it.item_id === selectedId) ?? null,
+    [deadRows, selectedId],
   );
 
   const stats = useMemo(() => {
-    const totalStockAll = allRows.reduce((a, b) => a + b.stock, 0);
-    const totalValueAll = allRows.reduce((a, b) => a + b.nilai_fifo, 0);
+    const totalStockAll = deadRows.reduce((a, b) => a + b.stock, 0);
+    const totalValueAll = deadRows.reduce((a, b) => a + b.nilai_fifo, 0);
     const deadQty = rows.reduce((a, b) => a + b.stock, 0);
     const deadValue = rows.reduce((a, b) => a + b.nilai_fifo, 0);
-    const deadPct = totalStockAll > 0 ? (deadQty / totalStockAll) * 100 : 0;
+    const deadPct = deadRows.length > 0 ? (rows.length / deadRows.length) * 100 : 0;
     const avgDays =
       rows.length > 0
         ? Math.round(
@@ -118,7 +118,7 @@ export function LaporanDeadStock() {
           )
         : 0;
     return { deadQty, deadValue, deadPct, avgDays, totalStockAll, totalValueAll };
-  }, [rows, allRows]);
+  }, [rows, deadRows]);
 
   const handleExport = () => {
     const content = toCsv(
@@ -242,9 +242,7 @@ export function LaporanDeadStock() {
             loading={isLoading}
             label="Total Dead Stock"
             value={isLoading ? "…" : formatNumber(stats.deadQty)}
-            {...(isLoading
-              ? {}
-              : { hint: `${formatNumber(rows.length)} item tidak bergerak` })}
+            {...(isLoading ? {} : { hint: `${formatNumber(rows.length)} item tidak bergerak` })}
             icon={PackageX}
             tone="danger"
           />
@@ -263,7 +261,7 @@ export function LaporanDeadStock() {
             {...(isLoading
               ? {}
               : {
-                  hint: `${formatNumber(stats.deadQty)} / ${formatNumber(stats.totalStockAll)} total stok`,
+                  hint: `${formatNumber(rows.length)} dari ${formatNumber(deadRows.length)} item dead`,
                 })}
             icon={BarChart3}
             tone="warning"
@@ -349,7 +347,7 @@ export function LaporanDeadStock() {
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                     <p className="truncate text-sm font-semibold">{r.name ?? "—"}</p>
-            <Pill tone={ageBucketTone(bucket)}>{bucket}</Pill>
+                    <Pill tone={ageBucketTone(bucket)}>{bucket}</Pill>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {r.sku ?? "—"} · {r.category ?? "—"}

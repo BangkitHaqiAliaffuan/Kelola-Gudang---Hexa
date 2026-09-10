@@ -331,16 +331,28 @@ export function useStockValuation(
     warehouseId?: number | null;
     categoryId?: number | null;
     search?: string | null;
+    moving?: string | null;
   } = {},
 ) {
-  const { warehouseId, categoryId, search } = params;
+  const { warehouseId, categoryId, search, moving } = params;
   return useQuery({
-    queryKey: ["persediaan", "valuation", warehouseId ?? null, categoryId ?? null, search ?? null],
+    queryKey: [
+      "persediaan",
+      "valuation",
+      warehouseId ?? null,
+      categoryId ?? null,
+      search ?? null,
+      moving ?? null,
+    ],
     queryFn: () => {
       const sp = new URLSearchParams({ per_page: String(PER_PAGE) });
       if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
       if (categoryId != null) sp.set("category_id", String(categoryId));
       if (search) sp.set("search", search);
+      // Filter server-side (didukung backend setelah param `moving` mendarat di
+      // StockController::valuation; sebelum itu diabaikan backend dan filter
+      // client-side di bawah yang menentukan).
+      if (moving) sp.set("moving", moving);
       return api.get<Paginated<StockValuationApi>>(`/persediaan/valuation?${sp.toString()}`);
     },
     enabled: typeof window !== "undefined",

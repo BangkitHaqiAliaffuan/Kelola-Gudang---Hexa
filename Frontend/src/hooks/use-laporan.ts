@@ -1,6 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { api, type Paginated } from "@/lib/api";
+import { api, fetchAll, type Paginated } from "@/lib/api";
 import type {
+  FastMovingParams,
+  FastMovingRowApi,
   KeluarAnalyticsApi,
   KeluarAnalyticsParams,
   LaporanMutasiParams,
@@ -111,6 +113,36 @@ export function useTransaksiAnalytics(params: TransaksiAnalyticsParams & { enabl
       return api.get<{ data: TransaksiAnalyticsApi }>(
         `/laporan/transaksi-analytics?${sp.toString()}`,
       );
+    },
+    enabled: typeof window !== "undefined" && enabled,
+  });
+}
+
+// ---- Fast Moving (GET /api/laporan/fast-moving) ----
+// Backend mem-paginasi server-side (max per_page 500); rank hanya truthful bila
+// seluruh baris ditarik — gunakan fetchAll() seperti hooks master (loop halaman
+// 100) lalu urutkan client-side.
+export function useLaporanFastMoving(params: FastMovingParams & { enabled?: boolean }) {
+  const { from, to, warehouseId, categoryId, search, enabled = true } = params;
+  return useQuery({
+    queryKey: [
+      "laporan",
+      "fast-moving",
+      from,
+      to,
+      warehouseId ?? null,
+      categoryId ?? null,
+      search ?? null,
+    ],
+    placeholderData: keepPreviousData,
+    queryFn: () => {
+      const p: Record<string, string> = {};
+      if (warehouseId != null) p["warehouse_id"] = String(warehouseId);
+      if (categoryId != null) p["category_id"] = String(categoryId);
+      if (search) p["search"] = search;
+      const sp = new URLSearchParams({ from, to });
+      const suffix = sp.toString();
+      return fetchAll<FastMovingRowApi>(`/laporan/fast-moving?${suffix}`, p);
     },
     enabled: typeof window !== "undefined" && enabled,
   });

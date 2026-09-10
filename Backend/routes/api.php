@@ -7,6 +7,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LaporanController;
+use App\Http\Controllers\LaporanFastMovingController;
 use App\Http\Controllers\MerkController;
 use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
@@ -104,4 +105,5 @@ Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->g
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
     Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
+    Route::get('fast-moving', [LaporanFastMovingController::class, 'index']);
 });
