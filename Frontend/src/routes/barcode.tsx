@@ -43,7 +43,11 @@ import {
   type PrintLabel,
 } from "@/lib/barcode-label";
 import { useLabelTemplates, type TemplateDraft } from "@/hooks/use-label-templates";
+import { useViewportHeight } from "@/hooks/use-mobile";
 import { LabelTemplateDialog } from "@/components/wms/label-template-dialog";
+
+/** Skala preview layar (konten dibagi angka ini agar pas wrapper). */
+const PREVIEW_SCALE = 0.6;
 
 const barcodeSearchSchema = z.object({
   sku: z.string().optional(),
@@ -192,6 +196,12 @@ function BarcodePage() {
   const seeded = useRef(false);
 
   const total = rows.reduce((s, r) => s + r.qty, 0);
+
+  // Tinggi preview mengikuti viewport (scale tetap 60%): lantai 336px
+  // (perilaku lama), langit-langit 600px agar tak raksasa di monitor tinggi.
+  const viewportH = useViewportHeight();
+  const previewBoxH = Math.min(600, Math.max(336, viewportH - 420));
+  const previewDocH = Math.round(previewBoxH / PREVIEW_SCALE);
 
   const options: ComboboxOption[] = useMemo(
     () =>
@@ -768,10 +778,11 @@ function BarcodePage() {
               )}
               {preview.html !== "" && (
                 <div className="overflow-hidden rounded-xl border border-border bg-white">
-                  {/* Skala 60% via transform (bukan properti non-standar zoom):
-                      iframe 560px di-scale ke 336px; wrapper dipatok 336px dan
-                      lebar 166.67% (= 1/0.6) agar tidak ada ruang kosong. */}
-                  <div className="overflow-hidden" style={{ height: 336 }}>
+                  {/* Skala via transform (bukan properti non-standar zoom):
+                      tinggi wrapper mengikuti viewport (lantai 336px, langit
+                      600px); tinggi konten = wrapper / skala; lebar 166.67%
+                      (= 1/skala) agar tidak ada ruang kosong. */}
+                  <div className="overflow-hidden" style={{ height: previewBoxH }}>
                     <iframe
                       title="Preview label persis hasil cetak"
                       srcDoc={preview.html}
@@ -779,15 +790,15 @@ function BarcodePage() {
                       className="border-0"
                       style={{
                         width: "166.67%",
-                        height: 560,
-                        transform: "scale(0.6)",
+                        height: previewDocH,
+                        transform: `scale(${PREVIEW_SCALE})`,
                         transformOrigin: "top left",
                       }}
                     />
                   </div>
                   <p className="border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
-                    Preview di atas adalah dokumen yang persis dikirim ke printer (diperkecil 60%).
-                    Garis putus-putus hanya panduan potong di layar.
+                    Preview di atas adalah dokumen yang persis dikirim ke printer (diperkecil 60%,
+                    tinggi mengikuti layar). Garis putus-putus hanya panduan potong di layar.
                   </p>
                 </div>
               )}

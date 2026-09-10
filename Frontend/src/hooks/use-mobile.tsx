@@ -17,3 +17,19 @@ export function useIsMobile() {
 
   return !!isMobile;
 }
+
+/** Tinggi viewport (px) — untuk panel yang mengikuti tinggi layar. SSR-safe (default 800). */
+export function useViewportHeight() {
+  const [h, setH] = React.useState(800);
+
+  React.useEffect(() => {
+    const onChange = () => {
+      setH(window.innerHeight);
+    };
+    onChange();
+    window.addEventListener("resize", onChange);
+    return () => window.removeEventListener("resize", onChange);
+  }, []);
+
+  return h;
+}
