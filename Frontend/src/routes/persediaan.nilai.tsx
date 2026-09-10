@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import {
+  CalendarClock,
   Download,
   FileSpreadsheet,
+  Hourglass,
   Search,
+  ShoppingCart,
+  TriangleAlert,
   Wallet,
   TrendingUp,
   TrendingDown,
@@ -29,8 +33,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
-import { useCategories, useWarehouses } from "@/hooks/use-master";
-import { useStockValuation } from "@/hooks/use-persediaan";
+import { useCategories, useCostDrift, useWarehouses } from "@/hooks/use-master";
+import { useStockMinimum, useStockValuation } from "@/hooks/use-persediaan";
 import {
   stockMovingTypes,
   valuationMethodLabels,
@@ -73,12 +77,27 @@ function unitCostFor(row: StockValuationApi, method: ValuationMethod): number {
       : row.unit_cost_max;
 }
 
+// Klasifikasi ABC (Pareto 80/20) atas nilai kini: A ≈ 80% nilai pertama,
+// B hingga 95%, sisanya C. Dihitung client-side dari baris yang tampil.
+type AbcClass = "A" | "B" | "C";
+
+const ABC_OPTIONS = [
+  { value: "A", label: "Kelas A — penopang nilai" },
+  { value: "B", label: "Kelas B — menengah" },
+  { value: "C", label: "Kelas C — ekor panjang" },
+] as const;
+
+const abcTone = (c: AbcClass) => (c === "A" ? "brand" : c === "B" ? "info" : "neutral");
+
+const DRIFT_THRESHOLD_PCT = 10;
+
 function NilaiPersediaan() {
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
   const [cat, setCat] = useState(ALL);
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [moving, setMoving] = useState(ALL);
+  const [abc, setAbc] = useState(ALL);
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
@@ -87,14 +106,15 @@ function NilaiPersediaan() {
   const wh = whFilter.value;
 
   const hasActiveFilters = useMemo(
-    () => q !== "" || wh !== ALL || cat !== ALL || moving !== ALL,
-    [q, wh, cat, moving],
+    () => q !== "" || wh !== ALL || cat !== ALL || moving !== ALL || abc !== ALL,
+    [q, wh, cat, moving, abc],
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
     whFilter.reset();
     setCat(ALL);
     setMoving(ALL);
+    setAbc(ALL);
   }, [whFilter]);
 
   const whId = whFilter.warehouseId;
@@ -106,7 +126,24 @@ function NilaiPersediaan() {
     search: debouncedQ.trim() || null,
   });
 
+  // Join operasional per item_id: batas minimum/ADU/cover + sinyal cost drift.
+  const { data: minData } = useStockMinimum({
+    days: 30,
+    warehouseId: whId,
+    categoryId: cat === ALL ? null : (catId ?? null),
+  });
+  const { data: driftData } = useCostDrift(DRIFT_THRESHOLD_PCT);
+
   const rows = useMemo(() => data?.data ?? [], [data]);
+
+  const minById = useMemo(
+    () => new Map((minData?.data ?? []).map((m) => [m.item_id, m])),
+    [minData],
+  );
+  const driftById = useMemo(
+    () => new Map((driftData?.data ?? []).map((d) => [d.item_id, d.drift_pct])),
+    [driftData],
+  );
 
   const total = useMemo(() => rows.reduce((a, b) => a + nilaiFor(b, method), 0), [rows, method]);
   const nilaiReserved = useMemo(
@@ -143,7 +180,62 @@ function NilaiPersediaan() {
   const termahal = sorted[0];
   const termurah = sorted[sorted.length - 1];
   const dead = rows.filter((i) => i.moving === "Dead");
+  const slow = rows.filter((i) => i.moving === "Slow");
   const fast = rows.filter((i) => i.moving === "Fast");
+
+  // Kelas ABC stabil per cakupan server (rows) + metode aktif.
+  const abcById = useMemo(() => {
+    const map = new Map<number, AbcClass>();
+    const ranked = [...rows].sort((a, b) => nilaiFor(b, method) - nilaiFor(a, method));
+    const grand = ranked.reduce((s, r) => s + nilaiFor(r, method), 0);
+    if (grand <= 0) {
+      ranked.forEach((r) => map.set(r.item_id, "C"));
+      return map;
+    }
+    let cum = 0;
+    for (const r of ranked) {
+      cum += nilaiFor(r, method);
+      const share = cum / grand;
+      map.set(r.item_id, share <= 0.8 ? "A" : share <= 0.95 ? "B" : "C");
+    }
+    return map;
+  }, [rows, method]);
+
+  const abcDist = useMemo(
+    () =>
+      (["A", "B", "C"] as AbcClass[]).map((c) => {
+        const list = rows.filter((r) => abcById.get(r.item_id) === c);
+        return {
+          kelas: c,
+          sku: list.length,
+          nilai: list.reduce((s, r) => s + nilaiFor(r, method), 0),
+        };
+      }),
+    [rows, abcById, method],
+  );
+
+  // Modal tertahan (Dead + Slow) dan kebutuhan replenishment dalam Rupiah.
+  const stuckValue = useMemo(
+    () =>
+      rows
+        .filter((r) => r.moving === "Dead" || r.moving === "Slow")
+        .reduce((s, r) => s + nilaiFor(r, method), 0),
+    [rows, method],
+  );
+  const stuckShare = total > 0 ? (stuckValue / total) * 100 : 0;
+
+  const replenish = useMemo(() => {
+    let rp = 0;
+    let sku = 0;
+    for (const r of rows) {
+      const sug = minById.get(r.item_id)?.suggested_qty ?? 0;
+      if (sug > 0) {
+        rp += sug * unitCostFor(r, method);
+        sku += 1;
+      }
+    }
+    return { rp, sku };
+  }, [rows, minById, method]);
 
   const totalByMethod = useMemo(
     () => ({
@@ -164,8 +256,13 @@ function NilaiPersediaan() {
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
 
   const filteredRows = useMemo(
-    () => rows.filter((r) => moving === ALL || r.moving === moving),
-    [rows, moving],
+    () =>
+      rows.filter(
+        (r) =>
+          (moving === ALL || r.moving === moving) &&
+          (abc === ALL || (abcById.get(r.item_id) ?? "C") === abc),
+      ),
+    [rows, moving, abc, abcById],
   );
 
   const movingTone = (m: StockValuationApi["moving"]) =>
@@ -181,9 +278,13 @@ function NilaiPersediaan() {
         stock: r.stock,
         reserved: r.reserved,
         available: r.available,
+        days_of_cover: minById.get(r.item_id)?.days_of_cover ?? "",
+        suggested_qty: minById.get(r.item_id)?.suggested_qty ?? 0,
         unit_cost: unitCostFor(r, method),
         nilai: nilaiFor(r, method),
         moving: r.moving,
+        abc_class: abcById.get(r.item_id) ?? "C",
+        drift_pct: driftById.get(r.item_id) ?? "",
       })),
       [
         { key: "sku", label: "SKU" },
@@ -193,9 +294,13 @@ function NilaiPersediaan() {
         { key: "stock", label: "Stok" },
         { key: "reserved", label: "Reserved" },
         { key: "available", label: "Available" },
+        { key: "days_of_cover", label: "Days of Cover" },
+        { key: "suggested_qty", label: "Saran Beli" },
         { key: "unit_cost", label: `HPP ${valuationMethodLabels[method]}` },
         { key: "nilai", label: `Nilai ${valuationMethodLabels[method]}` },
         { key: "moving", label: "Moving" },
+        { key: "abc_class", label: "Kelas ABC" },
+        { key: "drift_pct", label: "Drift HPP (%)" },
       ],
     );
     downloadCsv(
@@ -211,11 +316,25 @@ function NilaiPersediaan() {
       label: "Barang",
       className: "min-w-[200px]",
       sortable: true,
-      render: (r) => (
-        <span className="block max-w-[240px] truncate font-medium" title={r.name ?? ""}>
-          {r.name ?? "—"}
-        </span>
-      ),
+      render: (r) => {
+        const drift = driftById.get(r.item_id);
+        const drifted = drift != null && Math.abs(drift) >= DRIFT_THRESHOLD_PCT;
+        return (
+          <span className="block max-w-[240px]">
+            <span className="block truncate font-medium" title={r.name ?? ""}>
+              {r.name ?? "—"}
+            </span>
+            {drifted && (
+              <span
+                className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-warning"
+                title={`HPP ${valuationMethodLabels[method]} menyimpang ${drift}% dari HPP master — cek harga beli terakhir`}
+              >
+                <TriangleAlert className="h-3 w-3" /> Drift {drift}%
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "sku",
@@ -232,6 +351,17 @@ function NilaiPersediaan() {
       render: (r) => r.category ?? "—",
     },
     {
+      key: "abc",
+      label: "ABC",
+      className: "w-[70px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => abcById.get(r.item_id) ?? "C",
+      render: (r) => {
+        const c = abcById.get(r.item_id) ?? "C";
+        return <Pill tone={abcTone(c) as never}>{c}</Pill>;
+      },
+    },
+    {
       key: "stock",
       label: "Stok",
       className: "text-right w-[90px] whitespace-nowrap",
@@ -244,6 +374,29 @@ function NilaiPersediaan() {
       className: "text-right w-[100px] whitespace-nowrap",
       sortable: true,
       render: (r) => formatNumber(r.available),
+    },
+    {
+      key: "cover",
+      label: "Cover",
+      className: "text-right w-[90px] whitespace-nowrap",
+      sortable: true,
+      sortAccessor: (r) => minById.get(r.item_id)?.days_of_cover ?? -1,
+      render: (r) => {
+        const cover = minById.get(r.item_id)?.days_of_cover;
+        return (
+          <span
+            className="inline-flex items-center gap-1"
+            title={
+              cover == null
+                ? "Tanpa pemakaian 30 hari — cover tak terhingga"
+                : `Stok bertahan ±${cover} hari pada laju pakai 30 hari`
+            }
+          >
+            <CalendarClock className="h-3 w-3 text-muted-foreground" />
+            {cover == null ? "—" : `${cover} hr`}
+          </span>
+        );
+      },
     },
     {
       key: "unit_cost",
@@ -274,7 +427,7 @@ function NilaiPersediaan() {
     <>
       <PageHeader
         title="Nilai Persediaan"
-        description="Analisis nilai stok berdasarkan metode perhitungan"
+        description="Kokpit operasional: nilai kini per metode, klasifikasi ABC, dan sinyal aksi (cover, drift, replenishment)"
         actions={
           <div className="flex rounded-xl border border-border bg-card p-1">
             {valuationMethods.map((m) => (
@@ -330,13 +483,20 @@ function NilaiPersediaan() {
             placeholder="Semua Moving"
             options={[...stockMovingTypes]}
           />
+          <FilterSelect
+            className="w-full flex-1 min-w-[140px] max-w-[180px]"
+            value={abc}
+            onChange={setAbc}
+            placeholder="Semua Kelas ABC"
+            options={[...ABC_OPTIONS]}
+          />
           <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>
       </Panel>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <StatCard
           loading={isLoading}
           label="Total Nilai Stock"
@@ -398,6 +558,32 @@ function NilaiPersediaan() {
           icon={Lock}
           tone="info"
         />
+        <StatCard
+          loading={isLoading}
+          label="Modal Tertahan"
+          value={isLoading ? "…" : formatIDRCompact(stuckValue)}
+          {...(isLoading
+            ? {}
+            : {
+                valueTitle: formatIDR(stuckValue),
+                hint: `${stuckShare.toFixed(1)}% dari total · Dead + Slow`,
+              })}
+          icon={Hourglass}
+          tone="danger"
+        />
+        <StatCard
+          loading={isLoading}
+          label="Butuh Replenishment"
+          value={isLoading ? "…" : formatIDRCompact(replenish.rp)}
+          {...(isLoading
+            ? {}
+            : {
+                valueTitle: formatIDR(replenish.rp),
+                hint: `${formatNumber(replenish.sku)} SKU di bawah batas`,
+              })}
+          icon={ShoppingCart}
+          tone="warning"
+        />
       </div>
 
       <Panel
@@ -446,25 +632,35 @@ function NilaiPersediaan() {
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="10 Barang Nilai Tertinggi">
+        <Panel
+          title="10 Barang Nilai Tertinggi"
+          {...(total > 0 ? { description: "Persen = porsi terhadap total nilai" } : {})}
+        >
           {isLoading ? (
             <TableSkeleton rows={10} cols={2} />
           ) : sorted.length === 0 ? (
             <EmptyState title="Tidak ada data" />
           ) : (
             <div className="space-y-2">
-              {sorted.slice(0, 10).map((it) => (
-                <div
-                  key={it.item_id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{it.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{it.sku}</p>
+              {sorted.slice(0, 10).map((it) => {
+                const v = nilaiFor(it, method);
+                const share = total > 0 ? (v / total) * 100 : 0;
+                return (
+                  <div
+                    key={it.item_id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-border px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{it.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{it.sku}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold">{formatIDR(v)}</p>
+                      <p className="text-xs text-muted-foreground">{share.toFixed(1)}%</p>
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold">{formatIDR(nilaiFor(it, method))}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Panel>
@@ -499,6 +695,43 @@ function NilaiPersediaan() {
       </div>
 
       <Panel
+        title={`Konsentrasi Nilai (ABC) — ${valuationMethodLabels[method]}`}
+        description="A ≈ 80% nilai pertama · B hingga 95% · C ekor panjang — fokuskan cycle count & pengaman stok pada kelas A"
+      >
+        {isLoading ? (
+          <TableSkeleton rows={3} cols={2} />
+        ) : (
+          <div className="space-y-3">
+            {abcDist.map((d) => {
+              const share = total > 0 ? (d.nilai / total) * 100 : 0;
+              return (
+                <div key={d.kelas} className="rounded-xl border border-border p-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <p className="truncate text-sm font-medium">
+                      <Pill tone={abcTone(d.kelas) as never}>Kelas {d.kelas}</Pill>{" "}
+                      <span className="text-muted-foreground">
+                        {formatNumber(d.sku)} SKU · {share.toFixed(1)}% nilai
+                      </span>
+                    </p>
+                    <Pill tone="neutral">{formatIDR(d.nilai)}</Pill>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${share}%`,
+                        backgroundImage: "var(--gradient-primary)",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+
+      <Panel
         title="Daftar Nilai Persediaan"
         description={`${formatNumber(filteredRows.length)} barang · metode ${valuationMethodLabels[method]}`}
         actions={
@@ -524,7 +757,12 @@ function NilaiPersediaan() {
             <div className="space-y-1.5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <p className="truncate text-sm font-semibold">{r.name ?? "—"}</p>
-                <Pill tone={movingTone(r.moving) as never}>{r.moving}</Pill>
+                <span className="inline-flex items-center gap-1">
+                  <Pill tone={abcTone(abcById.get(r.item_id) ?? "C") as never}>
+                    {abcById.get(r.item_id) ?? "C"}
+                  </Pill>
+                  <Pill tone={movingTone(r.moving) as never}>{r.moving}</Pill>
+                </span>
               </div>
               <p className="truncate font-mono text-xs text-muted-foreground">
                 {r.sku ?? "—"} · {r.category ?? "—"}

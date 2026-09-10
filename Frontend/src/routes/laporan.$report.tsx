@@ -32,6 +32,7 @@ import { LaporanMutasi } from "@/components/wms/laporan-mutasi";
 import { LaporanStock } from "@/components/wms/laporan-stock";
 import { LaporanStockMinimum } from "@/components/wms/laporan-stock-minimum";
 import { LaporanDeadStock } from "@/components/wms/laporan-dead-stock";
+import { LaporanNilaiPersediaan } from "@/components/wms/laporan-nilai-persediaan";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 import {
   formatDate,
@@ -138,6 +139,7 @@ function Laporan() {
   if (report === "stock-minimum") return <LaporanStockMinimum />;
   if (report === "mutasi") return <LaporanMutasi />;
   if (report === "dead-stock") return <LaporanDeadStock />;
+  if (report === "nilai-persediaan") return <LaporanNilaiPersediaan />;
 
   const source: Row[] = isStockOpname
     ? opnameRows.map((d) => ({
