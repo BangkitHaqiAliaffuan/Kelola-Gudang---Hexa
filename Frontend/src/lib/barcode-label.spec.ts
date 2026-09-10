@@ -11,6 +11,7 @@ import {
   encodeItemWithSource,
   findItemByCode,
   findMatchesByCode,
+  fitText,
   matchSourceOf,
   normalizeCode,
   presetForSize,
@@ -447,5 +448,43 @@ describe("svgNaturalSize", () => {
     expect(svgNaturalSize("<svg></svg>")).toBeNull();
     expect(svgNaturalSize('<svg viewBox="0 0 0 10"></svg>')).toBeNull();
     expect(svgNaturalSize('<svg viewBox="0 0 abc 10"></svg>')).toBeNull();
+  });
+});
+
+describe("fitText", () => {
+  // Mock ctx: lebar = jumlah karakter × ukuran font saat ini.
+  const mockCtx = () => {
+    let size = 0;
+    return {
+      get font() {
+        return `${size}px Arial`;
+      },
+      set font(v: string) {
+        size = Number(v.match(/(\d+)px/)?.[1] ?? 0);
+      },
+      measureText: (t: string) => ({ width: t.length * size }),
+    };
+  };
+
+  it("teks pendek tidak diubah", () => {
+    const ctx = mockCtx();
+    const r = fitText(ctx, "AB", { startSize: 20, maxWidth: 100 });
+    expect(r.text).toBe("AB");
+    expect(r.size).toBe(20);
+  });
+
+  it("teks panjang mengecilkan font tanpa ellipsis", () => {
+    const ctx = mockCtx();
+    const r = fitText(ctx, "ABCDEFGH", { startSize: 20, maxWidth: 100 });
+    expect(r.text).toBe("ABCDEFGH");
+    expect(r.size).toBeLessThan(20);
+    expect(8 * r.size).toBeLessThanOrEqual(100);
+  });
+
+  it("teks sangat panjang dipotong ellipsis pada ukuran minimum", () => {
+    const ctx = mockCtx();
+    const r = fitText(ctx, "A".repeat(100), { startSize: 20, maxWidth: 100 });
+    expect(r.size).toBe(12); // 60% dari 20
+    expect(r.text.endsWith("…")).toBe(true);
   });
 });

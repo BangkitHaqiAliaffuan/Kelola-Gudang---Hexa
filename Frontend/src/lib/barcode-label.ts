@@ -624,6 +624,49 @@ export function svgToPngBlob(
   });
 }
 
+/** Konteks minimal untuk fitText (Canvas asli maupun mock test). */
+export type TextMeasurer = {
+  font: string;
+  measureText: (text: string) => { width: number };
+};
+
+/**
+ * Sesuaikan teks agar muat dalam maxWidth TANPA memampatkan horizontal
+ * (param maxWidth fillText justru membuat huruf gepeng).
+ * Strategi: kecilkan font sampai muat (batas minRatio dari ukuran awal),
+ * terakhir potong + ellipsis. Mengembalikan font & teks final (font juga
+ * sudah dipasang ke ctx).
+ */
+export function fitText(
+  ctx: TextMeasurer,
+  text: string,
+  opts: {
+    weight?: string;
+    family?: string;
+    startSize: number;
+    maxWidth: number;
+    minRatio?: number;
+  },
+): { font: string; size: number; text: string } {
+  const weight = opts.weight ?? "";
+  const family = opts.family ?? "Arial, Helvetica, sans-serif";
+  const min = Math.max(1, Math.floor(opts.startSize * (opts.minRatio ?? 0.6)));
+  let size = opts.startSize;
+  const apply = (s: number) => {
+    ctx.font = `${weight ? `${weight} ` : ""}${s}px ${family}`;
+  };
+  apply(size);
+  while (size > min && ctx.measureText(text).width > opts.maxWidth) {
+    size -= 1;
+    apply(size);
+  }
+  let out = text;
+  while (out.length > 1 && ctx.measureText(out).width > opts.maxWidth) {
+    out = `${out.slice(0, -2)}…`;
+  }
+  return { font: ctx.font, size, text: out };
+}
+
 function labelCanvasSize(input: LabelSize | LabelTemplate): { wPx: number; hPx: number } {
   const { wMm, hMm } =
     typeof input === "string" ? templateDims(presetForSize(input)) : templateDims(input);
@@ -685,24 +728,32 @@ export async function renderLabelToPng(
   }
   codeBitmap.close?.();
 
-  // Teks nama + meta (tengah) — mengikuti toggle template
+  // Teks nama + meta (tengah) — mengikuti toggle template.
+  // Ukuran font mengecil otomatis agar muat (fitText); tidak pernah
+  // dimampatkan horizontal via maxWidth agar huruf tidak gepeng.
   if (template.showName) {
     ctx.fillStyle = "#000000";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const nameSize = Math.round(9 * (300 / 72) * 0.35);
-    ctx.font = `700 ${nameSize}px Arial, Helvetica, sans-serif`;
-    const name = label.name.length > 28 ? `${label.name.slice(0, 28)}…` : label.name;
-    ctx.fillText(name, wPx / 2, y, wPx - pad * 2);
-    y += nameSize + Math.round(0.5 * PX_PER_MM_300);
+    const fitted = fitText(ctx, label.name, {
+      weight: "700",
+      startSize: nameSize,
+      maxWidth: wPx - pad * 2,
+    });
+    ctx.fillText(fitted.text, wPx / 2, y);
+    y += fitted.size + Math.round(0.5 * PX_PER_MM_300);
   }
   if (template.showMeta) {
     ctx.fillStyle = "#333333";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const metaSize = Math.round(8 * (300 / 72) * 0.32);
-    ctx.font = `${metaSize}px Arial, Helvetica, sans-serif`;
-    ctx.fillText(label.meta, wPx / 2, y, wPx - pad * 2);
+    const fitted = fitText(ctx, label.meta, {
+      startSize: metaSize,
+      maxWidth: wPx - pad * 2,
+    });
+    ctx.fillText(fitted.text, wPx / 2, y);
   }
 
   return await new Promise<Blob>((resolve, reject) => {
