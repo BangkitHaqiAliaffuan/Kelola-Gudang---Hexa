@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   ALL,
   ClearFiltersButton,
+  FilterCombobox,
   FilterSelect,
   HelpHint,
   PageHeader,
@@ -448,7 +449,7 @@ export function LaporanKartuStock() {
             loading={itemsLoading}
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
-          <FilterSelect
+          <FilterCombobox
             value={wh}
             onChange={setWh}
             placeholder="Semua Gudang"

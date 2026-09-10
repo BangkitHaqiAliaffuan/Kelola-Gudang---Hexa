@@ -57,13 +57,29 @@ export function pihakKeyOf(jenis: string, id: number | null, nama: string): stri
   return `${jenis}:${id ?? nama}`;
 }
 
+function normNama(s: string): string {
+  return s.trim().toLowerCase();
+}
+
 export function matchPihak(
   selected: string,
   jenis: string,
   id: number | null,
   nama: string,
 ): boolean {
-  return selected === ALL || selected === pihakKeyOf(jenis, id, nama);
+  if (selected === ALL) return true;
+  // Format kanonis 2 segmen "jenis:id-atau-nama" — equality persis.
+  if (selected === pihakKeyOf(jenis, id, nama)) return true;
+  // Format master 3 segmen "jenis:id:name" (opsi dropdown dari master):
+  // cocok bila jenis sama dan id sama; bila baris tak tertaut master
+  // (id null), fallback cocokkan nama case-insensitive.
+  const parts = selected.split(":");
+  if (parts.length >= 3 && parts[0] === jenis) {
+    const selId = Number(parts[1]);
+    if (id != null && Number.isInteger(selId)) return id === selId;
+    if (id == null) return normNama(nama) === normNama(parts.slice(2).join(":"));
+  }
+  return false;
 }
 
 export function pihakOptions(

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ALL,
   ClearFiltersButton,
+  FilterCombobox,
   FilterSelect,
   PageHeader,
   Panel,
@@ -287,7 +288,7 @@ export function LaporanDeadStock() {
                 className="rounded-xl pl-9"
               />
             </div>
-            <FilterSelect
+            <FilterCombobox
               className="w-full"
               value={whFilter.value}
               onChange={whFilter.onChange}
@@ -295,7 +296,7 @@ export function LaporanDeadStock() {
               options={warehouseNames}
               loading={warehousesLoading}
             />
-            <FilterSelect
+            <FilterCombobox
               className="w-full"
               value={cat}
               onChange={setCat}

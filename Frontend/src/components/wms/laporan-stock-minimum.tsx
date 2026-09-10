@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import {
   ALL,
+  FilterCombobox,
   FilterSelect,
   PageHeader,
   Panel,
@@ -316,7 +317,7 @@ export function LaporanStockMinimum() {
                 className="rounded-xl pl-9"
               />
             </div>
-            <FilterSelect
+            <FilterCombobox
               className="w-full"
               value={wh}
               onChange={setWh}
@@ -324,7 +325,7 @@ export function LaporanStockMinimum() {
               options={warehouseNames}
               loading={warehousesLoading}
             />
-            <FilterSelect
+            <FilterCombobox
               className="w-full"
               value={cat}
               onChange={setCat}

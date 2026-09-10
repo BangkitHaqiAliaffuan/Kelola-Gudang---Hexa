@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   ALL,
   ClearFiltersButton,
+  FilterCombobox,
   FilterSelect,
   HelpHint,
   PageHeader,
@@ -66,6 +67,8 @@ export function LaporanReturAnalytics({
   const options = useMemo(() => {
     const list = kind === "pembelian" ? (suppliersData?.data ?? []) : (customersData?.data ?? []);
     const jenis = kind === "pembelian" ? "supplier" : "customer";
+    // Format master 3 segmen "jenis:id:name": matchPihak mencocokkan id bila
+    // baris tertaut, atau fallback nama (case-insensitive) bila tidak.
     return list.map((s: { id: number; name: string }) => ({
       value: `${jenis}:${s.id}:${s.name}`,
       label: s.name,
@@ -168,7 +171,7 @@ export function LaporanReturAnalytics({
       />
       <Panel title="Filter Analitik">
         <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect
+          <FilterCombobox
             className="w-full flex-1 min-w-[180px] max-w-[260px]"
             value={pihak}
             onChange={setPihak}

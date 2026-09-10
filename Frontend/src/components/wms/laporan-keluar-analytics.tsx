@@ -25,7 +25,17 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, EmptyState, FilterSelect, HelpHint, Panel, Pill, StatCard, type Tone } from "./kit";
+import {
+  ALL,
+  EmptyState,
+  FilterCombobox,
+  FilterSelect,
+  HelpHint,
+  Panel,
+  Pill,
+  StatCard,
+  type Tone,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useLaporanKeluarAnalytics } from "@/hooks/use-laporan";
@@ -141,6 +151,13 @@ export function LaporanKeluarAnalytics({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [a, tujuan],
   );
+  // Kartu Top Margin memakai baris teratas yang SAMA dengan tabel (terfilter),
+  // agar kartu dan tabel tidak pernah menampilkan nama yang berbeda.
+  const topMargin = useMemo(
+    () => (a?.omzet.top_margin ?? []).filter((r) => matchTujuan(r.jenis, r.id, r.nama)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [a, tujuan],
+  );
 
   const insight = useMemo(() => {
     if (!a || a.top_tujuan.length === 0) return null;
@@ -236,7 +253,7 @@ export function LaporanKeluarAnalytics({
             placeholder="Semua Jenis"
             options={["customer", "departemen", "proyek", "lainnya"]}
           />
-          <FilterSelect
+          <FilterCombobox
             className="w-full flex-1 min-w-[180px] max-w-[260px]"
             value={tujuan}
             onChange={setTujuan}
@@ -413,15 +430,20 @@ export function LaporanKeluarAnalytics({
           />
           <StatCard
             label="Top Margin"
-            value={busy ? "…" : (a!.omzet.top_margin[0]?.nama ?? "—")}
+            value={busy ? "…" : (topMargin[0]?.nama ?? "—")}
             icon={Crown}
             tone="warning"
             loading={busy}
             valueTitle={
-              a?.omzet.top_margin[0]
-                ? `${formatIDR(a.omzet.top_margin[0].margin)} (${a.omzet.top_margin[0].margin_pct ?? "—"}%)`
+              topMargin[0]
+                ? `${formatIDR(topMargin[0].margin)} (${topMargin[0].margin_pct ?? "—"}%)`
                 : undefined
             }
+            {...(busy
+              ? {}
+              : {
+                  hint: `dari ${formatNumber(topMargin.length)} customer ber-omzet`,
+                })}
           />
         </div>
         <DataTable

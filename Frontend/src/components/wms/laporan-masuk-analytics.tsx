@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   ALL,
   ClearFiltersButton,
+  FilterCombobox,
   FilterSelect,
   HelpHint,
   PageHeader,
@@ -163,7 +164,7 @@ export function LaporanMasukAnalytics({
       />
       <Panel title="Filter Analitik">
         <div className="flex flex-wrap items-center gap-3">
-          <FilterSelect
+          <FilterCombobox
             className="w-full flex-1 min-w-[180px] max-w-[260px]"
             value={pihak}
             onChange={setPihak}

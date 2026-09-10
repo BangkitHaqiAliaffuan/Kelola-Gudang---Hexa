@@ -17,6 +17,7 @@ import {
   ALL,
   ClearFiltersButton,
   EmptyState,
+  FilterCombobox,
   FilterSelect,
   HelpHint,
   PageHeader,
@@ -440,7 +441,7 @@ ${companyKopHtml(company)}
               className="rounded-xl pl-9"
             />
           </div>
-          <FilterSelect
+          <FilterCombobox
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
             onChange={setWh}
@@ -448,7 +449,7 @@ ${companyKopHtml(company)}
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
           />
-          <FilterSelect
+          <FilterCombobox
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={cat}
             onChange={setCat}

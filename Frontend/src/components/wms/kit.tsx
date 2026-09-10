@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { FormCombobox } from "@/components/wms/form-combobox";
 import {
   Select,
   SelectContent,
@@ -94,6 +95,41 @@ export function FilterSelect({
         )}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * FilterSelect bervolume besar: API kompatibel FilterSelect (termasuk entri
+ * `{ALL, placeholder}` sebagai opsi "Semua"), tapi dengan kolom cari di dalam
+ * dropdown. Pakai untuk opsi data-driven (gudang/kategori/supplier/customer/
+ * tujuan/barang); enum kecil tetap FilterSelect biasa.
+ */
+export function FilterCombobox({
+  value,
+  onChange,
+  placeholder,
+  options,
+  className,
+  loading = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  options: Array<string | { value: string; label: string }>;
+  className?: string;
+  loading?: boolean;
+}) {
+  const entries = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+  return (
+    <FormCombobox
+      value={value === ALL ? "" : value}
+      onValueChange={(v) => onChange(v === "" ? ALL : v)}
+      options={[{ value: "", label: placeholder }, ...entries]}
+      placeholder={placeholder}
+      searchPlaceholder={`Cari ${placeholder.replace(/^Semua\s+/i, "")}...`}
+      loading={loading}
+      className={className}
+    />
   );
 }
 

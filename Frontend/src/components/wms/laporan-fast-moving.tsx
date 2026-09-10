@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import {
   ALL,
   ClearFiltersButton,
+  FilterCombobox,
   FilterSelect,
   PageHeader,
   Panel,
@@ -373,7 +374,7 @@ export function LaporanFastMoving() {
             }}
             className="rounded-xl"
           />
-          <FilterSelect
+          <FilterCombobox
             className="w-full"
             value={cat}
             onChange={setCat}
@@ -390,7 +391,7 @@ export function LaporanFastMoving() {
             placeholder="Risiko"
             options={[...RISIKO_OPTIONS]}
           />
-          <FilterSelect
+          <FilterCombobox
             className="w-full"
             value={whFilter.value}
             onChange={whFilter.onChange}
