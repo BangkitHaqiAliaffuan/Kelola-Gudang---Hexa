@@ -31,6 +31,7 @@ import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
@@ -106,7 +107,8 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [from, setFrom] = useState(() =>
@@ -130,17 +132,14 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
   }, [q, wh, partner, status, from, to]);
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setPartner(ALL);
     setStatus(ALL);
     setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
     setTo(toISODate(new Date()));
-  }, []);
+  }, [whFilter]);
 
-  const whId = useMemo(
-    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
-    [wh, warehouses],
-  );
+  const whId = whFilter.warehouseId;
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
   const { data, isLoading, isFetching, error, refetch } = useStockDocuments({
@@ -508,8 +507,8 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
           </div>
           <FilterCombobox
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={wh}
-            onChange={setWh}
+            value={whFilter.value}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

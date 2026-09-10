@@ -31,6 +31,7 @@ import { MutasiStockSheet } from "@/components/wms/mutasi-stock-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useLaporanMutasi } from "@/hooks/use-laporan";
@@ -74,7 +75,8 @@ export function LaporanMutasi() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -96,17 +98,14 @@ export function LaporanMutasi() {
   }, [q, wh, cat, statusFilter, from, to]);
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setCat(ALL);
     setStatusFilter(ALL);
     setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)));
     setTo(toISODate(new Date()));
-  }, []);
+  }, [whFilter]);
 
-  const whId = useMemo(
-    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
-    [wh, warehouses],
-  );
+  const whId = whFilter.warehouseId;
   const catId = useMemo(
     () => (cat === ALL ? null : (cats?.data.find((c) => c.name === cat)?.id ?? null)),
     [cats, cat],
@@ -443,8 +442,8 @@ ${companyKopHtml(company)}
           </div>
           <FilterCombobox
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={wh}
-            onChange={setWh}
+            value={whFilter.value}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

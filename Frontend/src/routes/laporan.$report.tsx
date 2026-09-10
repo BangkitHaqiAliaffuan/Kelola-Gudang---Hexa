@@ -25,6 +25,8 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
+import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocuments } from "@/hooks/use-persediaan";
 import { LaporanBarangMasukKeluar } from "@/components/wms/laporan-barang-masuk-keluar";
 import { LaporanKartuStock } from "@/components/wms/laporan-kartu-stock";
@@ -103,7 +105,9 @@ function Laporan() {
   const { report } = Route.useParams();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  const { data: filterWarehouses } = useWarehouses();
+  const whFilter = useWarehouseFilter(filterWarehouses?.data);
+  const wh = whFilter.value;
   const [filterDate, setFilterDate] = useState("2026-07-01");
   const hasActiveFilters = useMemo(
     () => q !== "" || wh !== ALL || filterDate !== "2026-07-01",
@@ -111,9 +115,9 @@ function Laporan() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setFilterDate("2026-07-01");
-  }, []);
+  }, [whFilter]);
 
   const isStockOpname = report === "stock-opname";
   const isItemReport = ["stock-minimum", "dead-stock", "fast-moving", "nilai-persediaan"].includes(
@@ -317,8 +321,8 @@ function Laporan() {
           </div>
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
-            value={wh}
-            onChange={setWh}
+            value={whFilter.value}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={whOptions}
           />

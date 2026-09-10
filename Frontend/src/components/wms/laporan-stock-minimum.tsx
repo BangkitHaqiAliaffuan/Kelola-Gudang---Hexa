@@ -24,6 +24,7 @@ import { StockMinimumSheet } from "@/components/wms/stock-minimum-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -56,7 +57,6 @@ const statusLabel: Record<StockMinimumStatus, string> = {
 export function LaporanStockMinimum() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
   const [cat, setCat] = useState(ALL);
   const [days, setDays] = useState(String(DEFAULT_DAYS));
   const [severity, setSeverity] = useState(ALL);
@@ -65,11 +65,11 @@ export function LaporanStockMinimum() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
-  const whId = useMemo(() => warehouses?.data.find((w) => w.name === wh)?.id, [warehouses, wh]);
+  const whFilter = useWarehouseFilter(warehouses?.data);
   const catId = useMemo(() => cats?.data.find((c) => c.name === cat)?.id, [cats, cat]);
   const { data, isLoading, error, refetch } = useStockMinimum({
     days: days === ALL ? DEFAULT_DAYS : Number(days),
-    warehouseId: wh === ALL ? null : (whId ?? null),
+    warehouseId: whFilter.warehouseId,
     categoryId: cat === ALL ? null : (catId ?? null),
   });
 
@@ -319,8 +319,8 @@ export function LaporanStockMinimum() {
             </div>
             <FilterCombobox
               className="w-full"
-              value={wh}
-              onChange={setWh}
+              value={whFilter.value}
+              onChange={whFilter.onChange}
               placeholder="Semua Gudang"
               options={warehouseNames}
               loading={warehousesLoading}

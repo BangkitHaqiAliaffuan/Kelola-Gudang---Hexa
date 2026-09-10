@@ -31,6 +31,7 @@ import { FormCombobox } from "@/components/wms/form-combobox";
 import { StockDocumentSheet } from "@/components/wms/stock-document-sheet";
 import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -75,7 +76,8 @@ export function LaporanKartuStock() {
   const options = useMemo(() => itemsData?.data ?? [], [itemsData]);
   const [id, setId] = useState<number | null>(null);
   const [method, setMethod] = useState<ValuationMethod>("FIFO");
-  const [wh, setWh] = useState(ALL);
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [from, setFrom] = useState(() =>
     toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)),
   );
@@ -85,10 +87,7 @@ export function LaporanKartuStock() {
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
 
   const activeId = id ?? options[0]?.id;
-  const whId = useMemo(
-    () => (wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null)),
-    [warehouses, wh],
-  );
+  const whId = whFilter.warehouseId;
   const rangeValid = Boolean(from) && Boolean(to) && from <= to;
 
   const card = useStockCard(
@@ -132,10 +131,10 @@ export function LaporanKartuStock() {
     setId(null);
     setQ("");
     setJenis([]);
-    setWh(ALL);
+    whFilter.reset();
     setFrom(toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
     setTo(toISODate(new Date()));
-  }, []);
+  }, [whFilter]);
 
   const jenisOptions = useMemo(() => Array.from(new Set(rows.map((r) => r.type))), [rows]);
 
@@ -450,8 +449,8 @@ export function LaporanKartuStock() {
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
           />
           <FilterCombobox
-            value={wh}
-            onChange={setWh}
+            value={whFilter.value}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
