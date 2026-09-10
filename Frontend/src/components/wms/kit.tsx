@@ -173,7 +173,7 @@ export function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1 truncate text-xs font-medium text-muted-foreground">
-            <span className="truncate">{label}</span>
+            <span className="min-w-0 truncate">{label}</span>
             {help}
           </p>
           {loading ? (
