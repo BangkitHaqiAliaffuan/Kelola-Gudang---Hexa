@@ -41,6 +41,7 @@ import {
   useSubmitProcDoc,
 } from "@/hooks/use-pengadaan";
 import { useUsers } from "@/hooks/use-master";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { canDecideProcDoc, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
 
@@ -76,7 +77,7 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 /** Cetak sungguhan: buka jendela print dengan layout dokumen PR. */
-function printProcDoc(doc: ProcDocApi) {
+function printProcDoc(doc: ProcDocApi, kopHtml: string) {
   const win = window.open("", "_blank", "width=900,height=650");
   if (!win) {
     toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
@@ -114,6 +115,7 @@ function printProcDoc(doc: ProcDocApi) {
   .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
 </style></head><body>
 <h1>Purchase Request</h1>
+${kopHtml}
 <p class="mono muted">${doc.no} · Status: ${doc.status} · Tanggal: ${fmtDate(doc.document_date)}</p>
 <div class="grid">
   <div class="field"><span>Departemen</span><b>${doc.department ?? "—"}</b></div>
@@ -158,6 +160,7 @@ export function PurchaseRequestSheet({
   const remove = useDeleteProcDoc();
   const reassign = useReassignProcDoc();
   const { data: usersData } = useUsers();
+  const { data: company } = useCompanySettings();
 
   const [confirmAction, setConfirmAction] = useState<
     "submit" | "approve" | "cancel" | "delete" | null
@@ -434,7 +437,11 @@ export function PurchaseRequestSheet({
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-card px-5 py-3">
-          <Button variant="outline" className="rounded-xl" onClick={() => printProcDoc(doc)}>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => printProcDoc(doc, companyKopHtml(company))}
+          >
             <Printer className="h-4 w-4" /> Cetak
           </Button>
           {isDraft && canWrite && (

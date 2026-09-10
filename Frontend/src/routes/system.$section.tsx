@@ -22,6 +22,8 @@ import { themes, useTheme } from "@/components/wms/theme";
 import { cn } from "@/lib/utils";
 import { formatDateTime, formatNumber } from "@/lib/wms-data";
 import { AUDIT_ACTIONS, useAuditLogs, type AuditLogApi } from "@/hooks/use-audit";
+import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/use-settings";
+import { fieldError } from "@/lib/api";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -65,7 +67,7 @@ const actionTone = (a: string): Tone =>
     ? "success"
     : a === "Delete" || a === "Reject"
       ? "danger"
-      : a === "Update" || a === "Cancel"
+      : a === "Update" || a === "Cancel" || a === "Force Unlock"
         ? "warning"
         : a === "Login" || a === "Logout"
           ? "info"
@@ -325,41 +327,98 @@ function AuditTrails() {
   );
 }
 
+const PROFILE_FIELDS: Array<{ label: string; fieldKey: string; placeholder?: string }> = [
+  { label: "Nama Perusahaan", fieldKey: "company.name" },
+  { label: "NPWP", fieldKey: "company.npwp", placeholder: "15/16 digit" },
+  { label: "Alamat", fieldKey: "company.address" },
+  { label: "Telepon", fieldKey: "company.phone" },
+  { label: "Email", fieldKey: "company.email" },
+  { label: "Mata Uang", fieldKey: "company.currency", placeholder: "IDR" },
+];
+
 function GeneralSetting() {
   const { theme, setTheme } = useTheme();
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("System", "Tulis");
+
+  const { data: settings, isLoading: settingsLoading, error: settingsError } = useCompanySettings();
+  const [draft, setDraft] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    if (settings && draft === null) setDraft({ ...settings });
+  }, [settings, draft]);
+  const save = useUpdateCompanySettings();
+  const values = draft ?? settings ?? {};
+  const handleSave = () => {
+    const company: Record<string, string | null> = {};
+    for (const f of PROFILE_FIELDS) {
+      const v = (values[f.fieldKey] ?? "").trim();
+      company[f.fieldKey.replace("company.", "")] = v === "" ? null : v;
+    }
+    save.mutate(company, {
+      onSuccess: (res) => {
+        setDraft(null);
+        toast.success(res.message || "Pengaturan disimpan");
+      },
+      onError: () => {
+        toast.error("Gagal menyimpan — periksa kembali isian.");
+      },
+    });
+  };
+
   return (
     <>
       <Panel
         title="Profil Perusahaan"
+        description="Tampil pada kop dokumen cetakan"
         actions={
           canWrite && (
-            <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
+            <Button
+              className="rounded-xl"
+              onClick={handleSave}
+              disabled={settingsLoading || save.isPending}
+            >
               <Save className="h-4 w-4" />
-              Simpan
+              {save.isPending ? "Menyimpan..." : "Simpan"}
             </Button>
           )
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["Nama Perusahaan", "PT Kelola Nusantara"],
-            ["NPWP", "01.234.567.8-091.000"],
-            ["Alamat", "Jl. Industri Raya No. 88, Bekasi"],
-            ["Telepon", "021-8899-2233"],
-            ["Email", "ops@kelolagudang.id"],
-            ["Mata Uang", "IDR (Rupiah)"],
-          ].map(([label, val]) => (
-            <div key={label} className="space-y-1.5">
-              <Label>{label}</Label>
-              <Input defaultValue={val} readOnly={!canWrite} className="rounded-xl" />
-            </div>
-          ))}
-        </div>
+        {settingsLoading && draft === null ? (
+          <p className="text-sm text-muted-foreground">Memuat pengaturan...</p>
+        ) : settingsError && draft === null ? (
+          <p className="text-sm text-destructive">
+            Tidak dapat memuat pengaturan.{" "}
+            {canWrite ? "Coba lagi sesaat lagi." : "Hubungi administrator."}
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {PROFILE_FIELDS.map((f) => {
+              const err = fieldError(save.error, f.fieldKey);
+              return (
+                <div key={f.fieldKey} className="space-y-1.5">
+                  <Label>{f.label}</Label>
+                  <Input
+                    value={values[f.fieldKey] ?? ""}
+                    placeholder={f.placeholder}
+                    readOnly={!canWrite}
+                    className="rounded-xl"
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...(d ?? values), [f.fieldKey]: e.target.value }))
+                    }
+                  />
+                  {err && <p className="text-xs text-destructive">{err}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Panel>
 
-      <Panel title="Penomoran Dokumen" description="Format otomatis nomor dokumen">
+      <Panel
+        title="Penomoran Dokumen"
+        description="Format otomatis nomor dokumen"
+        actions={<Pill tone="neutral">Segera</Pill>}
+      >
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             ["Barang Masuk", "BM/{YYYY}/{00000}"],
@@ -381,7 +440,7 @@ function GeneralSetting() {
         </div>
       </Panel>
 
-      <Panel title="Preferensi Operasional">
+      <Panel title="Preferensi Operasional" actions={<Pill tone="neutral">Segera</Pill>}>
         <div className="space-y-2">
           {[
             ["Aktifkan approval berjenjang", true],

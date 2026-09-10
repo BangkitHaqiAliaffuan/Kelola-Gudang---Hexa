@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { useStockValuation } from "@/hooks/use-persediaan";
 import { useLaporanMutasi } from "@/hooks/use-laporan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -91,6 +92,7 @@ export function LaporanNilaiPersediaan() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
+  const { data: company } = useCompanySettings();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -302,6 +304,7 @@ export function LaporanNilaiPersediaan() {
   .foot{margin-top:24px;font-size:11px;color:#64748b}
 </style></head><body>
 <h1>Laporan Nilai Persediaan</h1>
+${companyKopHtml(company)}
 <p class="mono muted">Periode: ${periodLabel} · Gudang: ${wh === ALL ? "Semua" : wh} · Kategori: ${cat === ALL ? "Semua" : cat} · Metode: ${METHOD_LABEL} · ${formatNumber(rows.length)} SKU</p>
 <table>
   <thead><tr><th>Barang</th><th>SKU</th><th class="right">Saldo Awal</th><th class="right">Nilai Awal*</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">Nilai Akhir</th><th class="right">Selisih</th></tr></thead>

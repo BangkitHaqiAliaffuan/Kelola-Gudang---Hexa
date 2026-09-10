@@ -13,6 +13,7 @@ use App\Http\Controllers\ProcDocController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\RackController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\StockDocumentController;
 use App\Http\Controllers\SubCategoryController;
@@ -106,4 +107,9 @@ Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->g
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
     Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
     Route::get('fast-moving', [LaporanFastMovingController::class, 'index']);
+});
+
+Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->group(function () {
+    Route::get('settings', [SettingController::class, 'index']);
+    Route::put('settings', [SettingController::class, 'update']);
 });

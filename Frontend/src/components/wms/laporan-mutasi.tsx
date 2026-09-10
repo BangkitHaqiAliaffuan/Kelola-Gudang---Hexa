@@ -33,6 +33,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useLaporanMutasi } from "@/hooks/use-laporan";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { LaporanMutasiRowApi } from "@/lib/persediaan-types";
@@ -68,6 +69,7 @@ export function LaporanMutasi() {
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
+  const { data: company } = useCompanySettings();
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -236,6 +238,7 @@ export function LaporanMutasi() {
   .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
 </style></head><body>
 <h1>Laporan Mutasi</h1>
+${companyKopHtml(company)}
 <p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${wh === ALL ? "" : ""}${formatNumber(rows.length)} SKU</p>
 <table>
   <thead><tr><th>Barang</th><th>SKU</th><th>Kategori</th><th>Satuan</th><th class="right">Saldo Awal</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">HPP Satuan</th><th class="right">Nilai Akhir</th><th>Status</th></tr></thead>
