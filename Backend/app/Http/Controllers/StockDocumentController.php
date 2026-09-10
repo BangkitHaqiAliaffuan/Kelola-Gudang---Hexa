@@ -14,6 +14,7 @@ use App\Models\Project;
 use App\Models\RolePermission;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
+use App\Services\AuditLogger;
 use App\Services\StockDocumentService;
 use App\Support\CodeGenerator;
 use Carbon\Carbon;
@@ -24,6 +25,17 @@ use Illuminate\Validation\Rule;
 class StockDocumentController extends Controller
 {
     public function __construct(private readonly StockDocumentService $service) {}
+
+    private function auditDoc(StockDocument $doc, string $action): void
+    {
+        AuditLogger::record([
+            'action' => $action,
+            'module' => 'Persediaan',
+            'auditable_type' => 'StockDocument',
+            'auditable_id' => $doc->id,
+            'record_no' => $doc->no,
+        ]);
+    }
 
     /**
      * Daftar dokumen mutasi stock — searchable by nomor/partner/note, filterable
@@ -567,6 +579,8 @@ class StockDocumentController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $this->auditDoc($document, 'Post');
+
         return new StockDocumentResource($document->load([
             'warehouse', 'destination', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines')->loadSum('lines as qty_total', 'qty')->loadSum('lines as value_total', DB::raw('qty * unit_cost'))->loadSum('lines as revenue_total', DB::raw('qty * unit_price')));
@@ -588,6 +602,8 @@ class StockDocumentController extends Controller
 
         $stockDocument->update(['status' => 'Dibatalkan', 'posted_at' => null]);
 
+        $this->auditDoc($stockDocument, 'Cancel');
+
         return new StockDocumentResource($stockDocument->load(['warehouse', 'destination']));
     }
 
@@ -604,6 +620,8 @@ class StockDocumentController extends Controller
             'status' => 'Menunggu Approval',
             'submitted_at' => now(),
         ]);
+
+        $this->auditDoc($stockDocument, 'Submit');
 
         return new StockDocumentResource($stockDocument->load(['warehouse', 'destination', 'requester', 'approver']));
     }
@@ -641,6 +659,8 @@ class StockDocumentController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $this->auditDoc($document, 'Approve');
+
         return new StockDocumentResource($document->load(['warehouse', 'destination', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack']));
     }
 
@@ -677,6 +697,8 @@ class StockDocumentController extends Controller
             'posted_at' => null,
         ]);
 
+        $this->auditDoc($stockDocument, 'Reject');
+
         return new StockDocumentResource($stockDocument->load(['warehouse', 'destination', 'requester', 'approver']));
     }
 
@@ -700,6 +722,8 @@ class StockDocumentController extends Controller
             'status' => 'Menunggu Approval',
             'submitted_at' => now(),
         ]);
+
+        $this->auditDoc($stockDocument, 'Submit');
 
         return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'requester', 'approver']));
     }
@@ -737,6 +761,8 @@ class StockDocumentController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $this->auditDoc($document, 'Approve');
+
         return new StockDocumentResource($document->load(['warehouse', 'destination', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack']));
     }
 
@@ -772,6 +798,8 @@ class StockDocumentController extends Controller
             'decision_note' => $request->input('decision_note'),
             'submitted_at' => null,
         ]);
+
+        $this->auditDoc($stockDocument, 'Reject');
 
         return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'requester', 'approver']));
     }

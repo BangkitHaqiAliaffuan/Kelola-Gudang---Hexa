@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Resources\RoleResource;
 use App\Models\RolePermission;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,14 @@ class RoleController extends Controller
                 ]);
             }
         });
+
+        AuditLogger::record([
+            'action' => 'Update',
+            'module' => 'System',
+            'auditable_type' => 'Role',
+            'record_no' => "Role: {$role}",
+            'new_values' => ['access' => $access],
+        ]);
 
         return new RoleResource($this->roleCatalog()->firstWhere('name', $role));
     }

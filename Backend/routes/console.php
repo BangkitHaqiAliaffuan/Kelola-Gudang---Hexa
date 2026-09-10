@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
+Schedule::command('audit:prune --days=180')->daily();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

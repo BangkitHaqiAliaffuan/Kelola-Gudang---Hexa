@@ -11,6 +11,7 @@ use App\Models\ProcDocApproval;
 use App\Models\ProcDocLine;
 use App\Models\RolePermission;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Support\ApprovalEngine;
 use App\Support\CodeGenerator;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,17 @@ class ProcDocController extends Controller
         'lines.item.unit',
         'lines.unit',
     ];
+
+    private function auditDoc(ProcDoc $doc, string $action): void
+    {
+        AuditLogger::record([
+            'action' => $action,
+            'module' => 'Pengadaan',
+            'auditable_type' => 'ProcDoc',
+            'auditable_id' => $doc->id,
+            'record_no' => $doc->no,
+        ]);
+    }
 
     /**
      * Daftar dokumen pengadaan (Purchase Request / Purchase Order) —
@@ -285,6 +297,8 @@ class ProcDocController extends Controller
 
         ApprovalEngine::start($procDoc);
 
+        $this->auditDoc($procDoc, 'Submit');
+
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
@@ -317,6 +331,8 @@ class ProcDocController extends Controller
 
         ApprovalEngine::reassign($procDoc, (int) $newApprover->id, (int) $user->id);
 
+        $this->auditDoc($procDoc, 'Reassign');
+
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
@@ -336,6 +352,8 @@ class ProcDocController extends Controller
         }
 
         ApprovalEngine::decide($procDoc, (int) $user->id, 'Disetujui', null);
+
+        $this->auditDoc($procDoc, 'Approve');
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
@@ -359,6 +377,8 @@ class ProcDocController extends Controller
         }
 
         ApprovalEngine::decide($procDoc, (int) $request->user()?->id, 'Ditolak', $data['decision_note'] ?? null);
+
+        $this->auditDoc($procDoc, 'Reject');
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
@@ -389,6 +409,8 @@ class ProcDocController extends Controller
                 ->where('status', 'Menunggu')
                 ->delete();
         }
+
+        $this->auditDoc($procDoc, 'Cancel');
 
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }

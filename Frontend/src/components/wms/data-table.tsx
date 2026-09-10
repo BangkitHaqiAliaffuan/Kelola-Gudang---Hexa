@@ -46,6 +46,10 @@ export function DataTable<T extends { id: string | number }>({
   onRowClick,
   initialSort,
   rowClassName,
+  serverPage,
+  serverTotalRows,
+  serverTotalPages,
+  onServerPageChange,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -60,14 +64,26 @@ export function DataTable<T extends { id: string | number }>({
   onRowClick?: (row: T) => void;
   initialSort?: SortState;
   rowClassName?: (row: T) => string | undefined;
+  /** Mode paginasi server: aktif bila onServerPageChange diisi (slice + total dari server). */
+  serverPage?: number;
+  serverTotalRows?: number;
+  serverTotalPages?: number;
+  onServerPageChange?: ((page: number) => void) | undefined;
 }) {
+  const isServer = onServerPageChange != null;
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
   useEffect(() => {
-    setPage(1);
-  }, [rows]);
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const current = Math.min(page, totalPages);
+    if (!isServer) setPage(1);
+  }, [rows, isServer]);
+  const totalRows = isServer ? (serverTotalRows ?? rows.length) : rows.length;
+  const totalPages = Math.max(
+    1,
+    isServer
+      ? (serverTotalPages ?? Math.ceil(totalRows / pageSize))
+      : Math.ceil(rows.length / pageSize),
+  );
+  const current = Math.min(isServer ? (serverPage ?? 1) : page, totalPages);
   const sorted = useMemo(() => {
     if (!sort) return rows;
     const { key, dir } = sort;
@@ -78,7 +94,15 @@ export function DataTable<T extends { id: string | number }>({
       return dir === "asc" ? cmp : -cmp;
     });
   }, [rows, sort, columns]);
-  const slice = sorted.slice((current - 1) * pageSize, current * pageSize);
+  const slice = isServer ? sorted : sorted.slice((current - 1) * pageSize, current * pageSize);
+
+  const goPage = (p: number) => {
+    if (isServer) {
+      onServerPageChange?.(p);
+    } else {
+      setPage(p);
+    }
+  };
 
   const toggleSort = (key: string) => {
     setSort((prev) => {
@@ -86,7 +110,7 @@ export function DataTable<T extends { id: string | number }>({
       if (prev.dir === "asc") return { key, dir: "desc" };
       return null;
     });
-    setPage(1);
+    goPage(1);
   };
 
   const SortIcon = ({ colKey }: { colKey: string }) => {
@@ -208,8 +232,8 @@ export function DataTable<T extends { id: string | number }>({
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
         <p className="truncate text-xs text-muted-foreground">
-          Menampilkan {(current - 1) * pageSize + 1}–{Math.min(current * pageSize, rows.length)}{" "}
-          dari {rows.length.toLocaleString("id-ID")} data
+          Menampilkan {totalRows === 0 ? 0 : (current - 1) * pageSize + 1}–
+          {Math.min(current * pageSize, totalRows)} dari {totalRows.toLocaleString("id-ID")} data
         </p>
         <div className="flex items-center gap-1.5">
           <Button
@@ -217,7 +241,7 @@ export function DataTable<T extends { id: string | number }>({
             size="icon"
             className="h-8 w-8 rounded-lg"
             disabled={current === 1}
-            onClick={() => setPage(current - 1)}
+            onClick={() => goPage(current - 1)}
             aria-label="Sebelumnya"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -230,7 +254,7 @@ export function DataTable<T extends { id: string | number }>({
             size="icon"
             className="h-8 w-8 rounded-lg"
             disabled={current === totalPages}
-            onClick={() => setPage(current + 1)}
+            onClick={() => goPage(current + 1)}
             aria-label="Berikutnya"
           >
             <ChevronRight className="h-4 w-4" />

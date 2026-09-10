@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\UserResource;
 use App\Models\RolePermission;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -38,6 +39,14 @@ class AuthController extends Controller
         $user->tokens()->where('created_at', '<', now()->subHours(24))->delete();
         $token = $user->createToken('kg-session')->plainTextToken;
 
+        AuditLogger::record([
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'role' => $user->role,
+            'action' => 'Login',
+            'module' => 'System',
+        ], $request);
+
         return response()->json([
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
@@ -47,6 +56,11 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        AuditLogger::record([
+            'action' => 'Logout',
+            'module' => 'System',
+        ], $request);
+
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Berhasil keluar.']);

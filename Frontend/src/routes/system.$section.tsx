@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Code2, Download, History, Search, Settings2, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,7 +20,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { themes, useTheme } from "@/components/wms/theme";
 import { cn } from "@/lib/utils";
-import { auditLogs, formatDate, type AuditLog } from "@/lib/wms-data";
+import { formatDateTime, formatNumber } from "@/lib/wms-data";
+import { AUDIT_ACTIONS, useAuditLogs, type AuditLogApi } from "@/hooks/use-audit";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { useAuth } from "@/hooks/use-auth";
 
 const meta: Record<string, { title: string; description: string }> = {
@@ -58,60 +60,139 @@ export const Route = createFileRoute("/system/$section")({
   component: SystemPage,
 });
 
-const actionTone = (a: AuditLog["action"]): Tone =>
-  a === "Create"
+const actionTone = (a: string): Tone =>
+  a === "Create" || a === "Approve" || a === "Post" || a === "Submit"
     ? "success"
-    : a === "Delete"
+    : a === "Delete" || a === "Reject"
       ? "danger"
-      : a === "Approve"
-        ? "brand"
-        : a === "Login"
+      : a === "Update" || a === "Cancel"
+        ? "warning"
+        : a === "Login" || a === "Logout"
           ? "info"
           : "neutral";
 
+const AUDIT_MODULES = [
+  "Master Data",
+  "Transaksi",
+  "Persediaan",
+  "Stock Opname",
+  "Pengadaan",
+  "Approval Pengadaan",
+  "Laporan",
+  "System",
+  "Audit Trails",
+];
+
+const PAGE_SIZE = 20;
+
+function diffSummary(r: AuditLogApi): string {
+  const changes = r.new_values ?? {};
+  const olds = r.old_values ?? {};
+  const keys = Object.keys(changes)
+    .filter((k) => k !== "updated_at")
+    .slice(0, 2);
+  if (keys.length === 0) {
+    if (r.action === "Delete") return "dihapus";
+    if (r.action === "Create") return "baru";
+    return "—";
+  }
+  return keys
+    .map((k) => {
+      const before = olds[k];
+      const after = (changes as Record<string, unknown>)[k];
+      const fmt = (v: unknown) => (v === null || v === undefined ? "—" : String(v).slice(0, 24));
+      return `${k}: ${fmt(before)} → ${fmt(after)}`;
+    })
+    .join("; ");
+}
+
 function AuditTrails() {
+  const { status: authStatus, hasModuleLevel } = useAuth();
+  const canView = hasModuleLevel("Audit Trails", "Baca");
+  const noAccess = authStatus === "authenticated" && !canView;
+
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [action, setAction] = useState(ALL);
   const [module, setModule] = useState(ALL);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
   const hasActiveFilters = useMemo(
-    () => q !== "" || action !== ALL || module !== ALL,
-    [q, action, module],
+    () => q !== "" || action !== ALL || module !== ALL || from !== "" || to !== "",
+    [q, action, module, from, to],
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
     setAction(ALL);
     setModule(ALL);
+    setFrom("");
+    setTo("");
+    setPage(1);
   }, []);
 
-  const actions = useMemo(() => Array.from(new Set(auditLogs.map((l) => l.action))), []);
-  const modules = useMemo(() => Array.from(new Set(auditLogs.map((l) => l.module))), []);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, action, module, from, to]);
 
-  const rows = useMemo(
-    () =>
-      auditLogs.filter((l) => {
-        const okQ =
-          !debouncedQ ||
-          [l.user, l.record, l.module, l.ip]
-            .join(" ")
-            .toLowerCase()
-            .includes(debouncedQ.toLowerCase());
-        return (
-          okQ && (action === ALL || l.action === action) && (module === ALL || l.module === module)
-        );
-      }),
-    [debouncedQ, action, module],
-  );
+  const rangeValid = !from || !to || from <= to;
 
-  const columns: Column<AuditLog>[] = [
-    { key: "time", label: "Waktu", render: (r) => formatDate(r.time) },
+  const { data, isLoading, isFetching, error, refetch } = useAuditLogs({
+    action: action === ALL ? null : action,
+    module: module === ALL ? null : module,
+    from: from || null,
+    to: to || null,
+    search: debouncedQ.trim() || null,
+    perPage: PAGE_SIZE,
+    page,
+    enabled: canView && rangeValid,
+  });
+
+  const rows = useMemo(() => data?.data ?? [], [data]);
+  const total = data?.meta?.total ?? 0;
+  const lastPage = data?.meta?.last_page ?? 1;
+
+  const handleExport = () => {
+    const content = toCsv(
+      rows.map((r) => ({
+        waktu: r.occurred_at ?? "",
+        pengguna: r.user_name ?? "",
+        role: r.role ?? "",
+        aksi: r.action,
+        modul: r.module ?? "",
+        record: r.record_no ?? "",
+        ip: r.ip_address ?? "",
+        detail: diffSummary(r),
+      })),
+      [
+        { key: "waktu", label: "Waktu" },
+        { key: "pengguna", label: "Pengguna" },
+        { key: "role", label: "Role" },
+        { key: "aksi", label: "Aksi" },
+        { key: "modul", label: "Modul" },
+        { key: "record", label: "Record" },
+        { key: "ip", label: "IP" },
+        { key: "detail", label: "Detail" },
+      ],
+    );
+    downloadCsv(`audit-trails-${new Date().toISOString().slice(0, 10)}.csv`, content);
+    toast.success(`Export ${formatNumber(rows.length)} baris`);
+  };
+
+  const columns: Column<AuditLogApi>[] = [
+    {
+      key: "time",
+      label: "Waktu",
+      className: "whitespace-nowrap",
+      render: (r) => (r.occurred_at ? formatDateTime(r.occurred_at) : "—"),
+    },
     {
       key: "user",
       label: "Pengguna",
       render: (r) => (
         <div>
-          <p className="font-medium text-foreground">{r.user}</p>
-          <p className="text-xs text-muted-foreground">{r.role}</p>
+          <p className="font-medium text-foreground">{r.user_name ?? "—"}</p>
+          <p className="text-xs text-muted-foreground">{r.role ?? ""}</p>
         </div>
       ),
     },
@@ -120,21 +201,57 @@ function AuditTrails() {
       label: "Aksi",
       render: (r) => <Pill tone={actionTone(r.action)}>{r.action}</Pill>,
     },
-    { key: "module", label: "Modul", render: (r) => r.module },
+    { key: "module", label: "Modul", render: (r) => r.module ?? "—" },
     {
       key: "record",
       label: "Record",
-      render: (r) => <span className="font-mono text-xs">{r.record}</span>,
+      render: (r) => <span className="font-mono text-xs">{r.record_no ?? "—"}</span>,
+    },
+    {
+      key: "detail",
+      label: "Detail",
+      render: (r) => (
+        <span
+          className="block max-w-[260px] truncate text-xs text-muted-foreground"
+          title={diffSummary(r)}
+        >
+          {diffSummary(r)}
+        </span>
+      ),
     },
     {
       key: "ip",
       label: "IP Address",
-      render: (r) => <span className="font-mono text-xs">{r.ip}</span>,
+      render: (r) => <span className="font-mono text-xs">{r.ip_address ?? "—"}</span>,
     },
   ];
 
+  if (noAccess) {
+    return (
+      <Panel title="Log Aktivitas">
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Akun Anda tidak memiliki akses Baca pada modul Audit Trails. Hubungi administrator untuk
+          mengatur hak akses.
+        </p>
+      </Panel>
+    );
+  }
+
   return (
-    <Panel title="Log Aktivitas" description={`${rows.length} entri tercatat`}>
+    <Panel
+      title="Log Aktivitas"
+      description={`${formatNumber(total)} entri tercatat${isFetching ? " · memperbarui..." : ""}`}
+      actions={
+        <Button
+          variant="outline"
+          className="rounded-xl"
+          onClick={handleExport}
+          disabled={rows.length === 0}
+        >
+          <Download className="h-4 w-4" /> Export
+        </Button>
+      }
+    >
       <div className="mb-4 flex flex-wrap items-end gap-2.5">
         <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -150,14 +267,28 @@ function AuditTrails() {
           value={action}
           onChange={setAction}
           placeholder="Semua Aksi"
-          options={actions}
+          options={[...AUDIT_ACTIONS]}
         />
         <FilterSelect
           className="w-full flex-1 min-w-[140px] max-w-[180px]"
           value={module}
           onChange={setModule}
           placeholder="Semua Modul"
-          options={modules}
+          options={AUDIT_MODULES}
+        />
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          aria-label="Dari tanggal"
+          className="rounded-xl"
+        />
+        <Input
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          aria-label="Sampai tanggal"
+          className="rounded-xl"
         />
         <div className="ml-auto flex shrink-0 items-end">
           <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
@@ -166,18 +297,27 @@ function AuditTrails() {
       <DataTable
         columns={columns}
         rows={rows}
+        pageSize={PAGE_SIZE}
+        loading={isLoading}
+        error={error}
+        onRetry={() => refetch()}
+        serverPage={page}
+        serverTotalRows={total}
+        serverTotalPages={lastPage}
+        onServerPageChange={setPage}
         mobileCard={(r) => (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-semibold">{r.user}</p>
+              <p className="truncate text-sm font-semibold">{r.user_name ?? "—"}</p>
               <Pill tone={actionTone(r.action)}>{r.action}</Pill>
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatDate(r.time)} · {r.module}
+              {r.occurred_at ? formatDateTime(r.occurred_at) : "—"} · {r.module ?? "—"}
             </p>
             <p className="font-mono text-xs text-muted-foreground">
-              {r.record} · {r.ip}
+              {r.record_no ?? "—"} · {r.ip_address ?? "—"}
             </p>
+            <p className="text-xs text-muted-foreground">{diffSummary(r)}</p>
           </div>
         )}
       />
