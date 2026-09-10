@@ -291,6 +291,7 @@ export function StockAdjustmentForm() {
   ): StockDocumentPayload => ({
     type: "Stock Adjustment",
     status,
+    source_module: "Persediaan",
     document_date: date || today(),
     warehouse_id: Number(warehouseId),
     partner: null,

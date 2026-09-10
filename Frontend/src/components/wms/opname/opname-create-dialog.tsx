@@ -88,6 +88,7 @@ export function OpnameCreateDialog({
       {
         type: "Stock Opname",
         status: "Draft",
+        source_module: "Stock Opname",
         document_date: date,
         warehouse_id: whId,
         partner: null,

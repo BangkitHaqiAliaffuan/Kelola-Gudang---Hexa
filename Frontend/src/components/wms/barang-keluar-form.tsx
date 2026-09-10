@@ -342,6 +342,7 @@ export function BarangKeluarForm() {
     return {
       type: "Pengeluaran",
       status,
+      source_module: "Transaksi",
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       customer_id: cid,

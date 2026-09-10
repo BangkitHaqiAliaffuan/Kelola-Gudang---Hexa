@@ -61,6 +61,7 @@ type BarangMasukFormProps = {
   requireReference?: boolean;
   referenceCombobox?: boolean;
   initialPoId?: string | undefined;
+  sourceModule?: string;
 };
 
 export function BarangMasukForm({
@@ -71,6 +72,7 @@ export function BarangMasukForm({
   requireReference = false,
   referenceCombobox = false,
   initialPoId,
+  sourceModule = "Transaksi",
 }: BarangMasukFormProps = {}) {
   const navigate = useNavigate();
   const { user, hasModuleLevel } = useAuth();
@@ -241,6 +243,7 @@ export function BarangMasukForm({
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
     type: "Penerimaan",
     status,
+    source_module: sourceModule,
     document_date: date || today(),
     warehouse_id: Number(warehouseId),
     partner: supplier || null,

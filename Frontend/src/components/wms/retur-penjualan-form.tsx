@@ -299,6 +299,7 @@ export function ReturPenjualanForm() {
     return {
       type: "Retur Penjualan",
       status,
+      source_module: "Transaksi",
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       source_document_id: sourceDocId ? Number(sourceDocId) : null,

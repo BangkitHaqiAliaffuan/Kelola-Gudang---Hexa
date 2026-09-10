@@ -121,9 +121,49 @@ class AuditLogTest extends TestCase
 
         $log = AuditLog::query()->where('action', 'Post')->latest('id')->first();
         $this->assertNotNull($log);
-        $this->assertEquals('Persediaan', $log->module);
+        $this->assertEquals('Transaksi', $log->module);
         $this->assertEquals('StockDocument', $log->auditable_type);
         $this->assertEquals($draft['no'], $log->record_no);
+    }
+
+    public function test_store_module_follows_source_and_type(): void
+    {
+        $this->actingAsPersistedAdmin();
+
+        $item = Item::factory()->create(['cost' => 1000]);
+        $wh = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+        $line = ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1000, 'to_bin_id' => $bin->id];
+
+        $base = [
+            'status' => 'Draft',
+            'document_date' => '2026-08-01',
+            'warehouse_id' => $wh->id,
+            'lines' => [$line],
+        ];
+
+        // Eksplisit dari form transaksi.
+        $this->postJson('/api/persediaan/stock-documents', $base + [
+            'type' => 'Penerimaan', 'source_module' => 'Transaksi',
+        ])->assertStatus(201);
+        // Receive Goods: Penerimaan dari menu Pengadaan.
+        $this->postJson('/api/persediaan/stock-documents', $base + [
+            'type' => 'Penerimaan', 'source_module' => 'Pengadaan',
+        ])->assertStatus(201);
+        // Tanpa source_module: fallback peta tipe.
+        $this->postJson('/api/persediaan/stock-documents', $base + ['type' => 'Penerimaan'])
+            ->assertStatus(201);
+        // Nilai tak dikenal: fallback, tidak 422.
+        $this->postJson('/api/persediaan/stock-documents', $base + [
+            'type' => 'Penerimaan', 'source_module' => 'Ngawur',
+        ])->assertStatus(201);
+
+        $modules = AuditLog::query()->where('action', 'Create')
+            ->where('auditable_type', 'StockDocument')
+            ->orderBy('id')->pluck('module')->all();
+
+        $this->assertEquals(['Transaksi', 'Pengadaan', 'Transaksi', 'Transaksi'], $modules);
     }
 
     public function test_index_requires_audit_trails_access(): void

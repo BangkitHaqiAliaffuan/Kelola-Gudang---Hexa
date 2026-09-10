@@ -56,6 +56,7 @@ function ReceiveGoodsNew() {
       requireReference
       referenceCombobox
       initialPoId={initialPoId}
+      sourceModule="Pengadaan"
     />
   );
 }

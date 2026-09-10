@@ -304,6 +304,7 @@ export function TransferGudangForm() {
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
     type: "Transfer Gudang",
     status,
+    source_module: "Transaksi",
     document_date: date || today(),
     warehouse_id: Number(warehouseId),
     destination_warehouse_id: Number(destinationId),

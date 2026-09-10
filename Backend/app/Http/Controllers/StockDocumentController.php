@@ -26,15 +26,36 @@ class StockDocumentController extends Controller
 {
     public function __construct(private readonly StockDocumentService $service) {}
 
-    private function auditDoc(StockDocument $doc, string $action): void
+    private const AUDIT_SOURCE_MODULES = ['Transaksi', 'Persediaan', 'Stock Opname', 'Pengadaan'];
+
+    private function auditDoc(StockDocument $doc, string $action, ?string $module = null): void
     {
         AuditLogger::record([
             'action' => $action,
-            'module' => 'Persediaan',
+            'module' => $module ?? $this->resolveAuditModule($doc),
             'auditable_type' => 'StockDocument',
             'auditable_id' => $doc->id,
             'record_no' => $doc->no,
         ]);
+    }
+
+    /**
+     * Modul asal dokumen untuk jejak audit: frontend mengirim source_module
+     * saat create (satu-satunya momen request pembuat tersedia); lifecycle
+     * berikutnya memakai peta tipe karena tipe dokumen tidak pernah berubah.
+     */
+    private function resolveAuditModule(StockDocument $doc): string
+    {
+        $fromRequest = request()->input('source_module');
+        if (is_string($fromRequest) && in_array($fromRequest, self::AUDIT_SOURCE_MODULES, true)) {
+            return $fromRequest;
+        }
+
+        return match ($doc->type) {
+            'Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan' => 'Transaksi',
+            'Stock Opname' => 'Stock Opname',
+            default => 'Persediaan',
+        };
     }
 
     /**

@@ -60,7 +60,7 @@ class StockDocumentAuditTest extends TestCase
         );
         $post = AuditLog::query()->where('action', 'Post')->where('record_no', $doc['no'])->first();
         $this->assertNotNull($post, 'auto-post inline harus mencatat Post');
-        $this->assertEquals('Persediaan', $post->module);
+        $this->assertEquals('Transaksi', $post->module);
         $this->assertEquals('StockDocument', $post->auditable_type);
     }
 
@@ -107,7 +107,7 @@ class StockDocumentAuditTest extends TestCase
 
         $log = AuditLog::query()->where('action', 'Update')->where('record_no', $doc['no'])->first();
         $this->assertNotNull($log, 'pembaruan dokumen opname harus mencatat Update');
-        $this->assertEquals('Persediaan', $log->module);
+        $this->assertEquals('Stock Opname', $log->module);
     }
 
     public function test_requester_can_cancel_own_draft(): void

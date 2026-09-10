@@ -407,6 +407,7 @@ export function ReturPembelianForm() {
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => ({
     type: "Retur Pembelian",
     status,
+    source_module: "Transaksi",
     document_date: date || today(),
     warehouse_id: Number(warehouseId),
     source_document_id: sourceDocId ? Number(sourceDocId) : null,

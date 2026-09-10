@@ -320,6 +320,8 @@ export type StockDocumentPayload = {
   note: string | null;
   blind_count?: boolean;
   lines: StockDocumentLinePayload[];
+  /** Modul menu asal (Transaksi/Persediaan/Stock Opname/Pengadaan) — hanya untuk label jejak audit, diabaikan validasi. */
+  source_module?: string;
 };
 
 // ---- Laporan Mutasi (GET /api/laporan/mutasi) ----
