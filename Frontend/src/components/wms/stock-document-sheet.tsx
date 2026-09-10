@@ -462,10 +462,12 @@ export function StockDocumentSheet({
               )}
             </div>
 
-            {isSelfBlocked && doc.status === "Draft" && (
+            {isSelfBlocked && (
               <div className="border-t border-border bg-destructive/10 px-5 py-2">
                 <p className="text-xs font-medium text-destructive">
-                  Pembuat dokumen tidak boleh memposting atau membatalkan laporannya sendiri.
+                  {doc.status === "Draft"
+                    ? "Pembuat dokumen tidak boleh memposting laporannya sendiri."
+                    : "Pembuat dokumen tidak boleh memposting atau membatalkan laporannya sendiri."}
                 </p>
               </div>
             )}
@@ -574,6 +576,29 @@ export function StockDocumentSheet({
                       </Button>
                     )}
                   </>
+                )}
+              {doc.type === "Stock Opname" &&
+                (doc.status === "Draft" || doc.status === "Menunggu Approval") &&
+                canCancel &&
+                onCancel && (
+                  <Button
+                    variant="outline"
+                    className="rounded-xl"
+                    onClick={onCancel}
+                    disabled={busy || (isSelfBlocked && doc.status !== "Draft")}
+                    title={
+                      isSelfBlocked && doc.status !== "Draft"
+                        ? "Pembuat tidak boleh membatalkan sendiri"
+                        : undefined
+                    }
+                  >
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Ban className="h-4 w-4" />
+                    )}{" "}
+                    Batalkan
+                  </Button>
                 )}
             </div>
           </>

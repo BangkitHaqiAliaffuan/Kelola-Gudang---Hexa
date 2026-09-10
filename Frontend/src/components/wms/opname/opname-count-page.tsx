@@ -84,6 +84,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   const [hasEditLock, setHasEditLock] = useState(false);
   const [lockBlockedBy, setLockBlockedBy] = useState<string | null>(null);
   const [lockLoading, setLockLoading] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceReason, setForceReason] = useState("");
 
@@ -112,8 +113,14 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         if (typeof window !== "undefined") {
           const raw = window.localStorage.getItem(storageKey);
           if (raw) {
-            const parsed = JSON.parse(raw) as { records?: Record<number, string>; savedAt?: number };
-            if (parsed.records && (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000)) {
+            const parsed = JSON.parse(raw) as {
+              records?: Record<number, string>;
+              savedAt?: number;
+            };
+            if (
+              parsed.records &&
+              (!parsed.savedAt || Date.now() - parsed.savedAt < 24 * 60 * 60 * 1000)
+            ) {
               local = parsed.records;
               localSavedAt = parsed.savedAt ?? null;
             } else if (parsed.savedAt) {
@@ -147,7 +154,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         } else if (localHash !== lastSent) {
           // unsynced draft -> preserve local
           const merged: Record<number, string> = { ...serverRecords };
-          for (const [k, v] of Object.entries(local)) if (v !== "" && v != null) merged[Number(k)] = v;
+          for (const [k, v] of Object.entries(local))
+            if (v !== "" && v != null) merged[Number(k)] = v;
           if (JSON.stringify(merged) !== JSON.stringify(serverRecords)) {
             setRecords(merged);
             toast.info("Draft lokal dipulihkan — simpan untuk sinkron ke server");
@@ -160,7 +168,9 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       }
       try {
         if (typeof window !== "undefined") {
-          const v = JSON.parse(window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}")?.revealed;
+          const v = JSON.parse(
+            window.localStorage.getItem(`kg-opname-revealed-${docId}`) || "{}",
+          )?.revealed;
           setRevealed(!!v);
         }
       } catch {
@@ -176,7 +186,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (!prevHash) return;
 
     const hasDirty = lines.some(
-      (l) => (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
+      (l) =>
+        (recordsRef.current[l.id] ?? "") !== (l.actual_qty != null ? String(l.actual_qty) : ""),
     );
 
     if (prevHash !== hash && hasDirty && lines.some((l) => l.actual_qty != null)) {
@@ -341,7 +352,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
 
   // keepalive flush for tab close (beacon)
   const flushKeepalive = useCallback(() => {
-    if (!session || session.status !== "Draft" || !dirty || !hasEditLock || hasValidationError()) return;
+    if (!session || session.status !== "Draft" || !dirty || !hasEditLock || hasValidationError())
+      return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
     const payload = buildLines();
     const hash = JSON.stringify(records);
@@ -404,11 +416,12 @@ export function OpnameCountPage({ docId }: { docId: number }) {
   }, [flushKeepalive]);
 
   // Lock eksklusif per dokumen (server-draft only, 10 menit)
-  useEffect(() => {
+  const acquireLock = () => {
     if (!session || session.status !== "Draft" || !canWrite) return;
     if (session.is_locked_by_me) {
       setHasEditLock(true);
       setLockBlockedBy(null);
+      setLockError(null);
       return;
     }
     if (session.locked_by && !session.is_locked_by_me) {
@@ -417,6 +430,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
       return;
     }
     setLockLoading(true);
+    setLockError(null);
     lock.mutate(docId, {
       onSuccess: (data) => {
         if (data.data.is_locked_by_me) {
@@ -434,9 +448,21 @@ export function OpnameCountPage({ docId }: { docId: number }) {
             : (session.locked_by ?? "User lain");
           setHasEditLock(false);
           setLockBlockedBy(name);
+        } else {
+          // Kegagalan non-423 (jaringan/server) sebelumnya diam-diam
+          // menghilangkan seluruh tombol aksi — tampilkan dan bisa retry.
+          const msg = isApiError(err) ? err.message : "Gagal mengambil akses edit";
+          setHasEditLock(false);
+          setLockError(msg);
+          toast.error(msg);
         }
       },
     });
+  };
+
+  useEffect(() => {
+    acquireLock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, session?.status, canWrite, docId]);
 
   useEffect(() => {
@@ -581,10 +607,25 @@ export function OpnameCountPage({ docId }: { docId: number }) {
             Sedang diisi oleh {lockBlockedBy}. Halaman ini hanya dapat dilihat.
           </p>
           {canForceUnlock && (
-            <Button size="sm" variant="outline" className="rounded-lg" onClick={() => setForceOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setForceOpen(true)}
+            >
               Ambil alih paksa
             </Button>
           )}
+        </div>
+      )}
+      {lockError && !lockBlockedBy && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
+          <p className="text-sm font-medium text-destructive">
+            {lockError}. Pencatatan fisik butuh akses edit.
+          </p>
+          <Button size="sm" variant="outline" className="rounded-lg" onClick={acquireLock}>
+            Coba lagi
+          </Button>
         </div>
       )}
       {lockLoading && (
@@ -597,11 +638,11 @@ export function OpnameCountPage({ docId }: { docId: number }) {
         title="Pencatatan Fisik"
         description={`${formatNumber(lines.length)} baris · selisih ${totalVariance > 0 ? "+" : ""}${formatNumber(totalVariance)}${!isOnline ? " · offline — belum tersimpan" : autoSaving ? " · menyimpan..." : lastSavedAt ? ` · tersimpan ${new Date(lastSavedAt).toLocaleTimeString("id-ID")}` : ""}${hasEditLock ? " · akses edit aktif" : lockBlockedBy ? " · terkunci" : ""}`}
         actions={
-          isDraft && canWrite && hasEditLock ? (
+          isDraft && canWrite ? (
             <div className="flex flex-wrap items-center gap-2">
-              {autoSaving && <Pill tone="neutral">Menyimpan...</Pill>}
+              {autoSaving && hasEditLock && <Pill tone="neutral">Menyimpan...</Pill>}
               {!isOnline && <Pill tone="warning">Offline</Pill>}
-              {blind && (
+              {blind && hasEditLock && (
                 <Button
                   variant="outline"
                   className="rounded-xl"
@@ -611,6 +652,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
                   <Eye className="h-4 w-4" /> Tampilkan Sistem
                 </Button>
               )}
+              {/* Batalkan adalah aksi level-dokumen (backend tak cek edit-lock),
+                  jadi tampil tanpa menunggu lock — Counting tetap butuh lock. */}
               <Button
                 variant="outline"
                 className="rounded-xl"
@@ -619,22 +662,26 @@ export function OpnameCountPage({ docId }: { docId: number }) {
               >
                 <X className="h-4 w-4" /> Batalkan
               </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                disabled={mutationsBusy || !dirty}
-                onClick={saveDraft}
-              >
-                Simpan Draft
-              </Button>
-              <Button
-                className="rounded-xl"
-                disabled={mutationsBusy || uncounted > 0}
-                onClick={finish}
-                title={uncounted > 0 ? `${uncounted} barang belum dihitung` : undefined}
-              >
-                Selesaikan Opname
-              </Button>
+              {hasEditLock && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="rounded-xl"
+                    disabled={mutationsBusy || !dirty}
+                    onClick={saveDraft}
+                  >
+                    Simpan Draft
+                  </Button>
+                  <Button
+                    className="rounded-xl"
+                    disabled={mutationsBusy || uncounted > 0}
+                    onClick={finish}
+                    title={uncounted > 0 ? `${uncounted} barang belum dihitung` : undefined}
+                  >
+                    Selesaikan Opname
+                  </Button>
+                </>
+              )}
             </div>
           ) : undefined
         }
@@ -757,7 +804,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
           <DialogHeader>
             <DialogTitle>Ambil alih paksa</DialogTitle>
             <DialogDescription>
-              Dokumen sedang dikunci oleh {lockBlockedBy ?? "user lain"}. Ambil alih akan mengalihkan akses edit ke Anda. Lanjutkan?
+              Dokumen sedang dikunci oleh {lockBlockedBy ?? "user lain"}. Ambil alih akan
+              mengalihkan akses edit ke Anda. Lanjutkan?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -787,7 +835,8 @@ export function OpnameCountPage({ docId }: { docId: number }) {
                       setForceOpen(false);
                       setForceReason("");
                     },
-                    onError: (err) => toast.error(isApiError(err) ? err.message : "Gagal ambil alih"),
+                    onError: (err) =>
+                      toast.error(isApiError(err) ? err.message : "Gagal ambil alih"),
                   },
                 );
               }}

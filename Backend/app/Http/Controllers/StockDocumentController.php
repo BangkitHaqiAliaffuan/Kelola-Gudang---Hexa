@@ -608,7 +608,14 @@ class StockDocumentController extends Controller
         }
 
         $authId = request()->user()?->id ?? request()->user('sanctum')?->id;
-        if (in_array($stockDocument->type, ['Stock Adjustment', 'Stock Opname'], true) && $stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
+        // Pemisahan tugas (SoD) untuk laporan: pembuat tidak boleh membatalkan
+        // laporannya sendiri SETELAH berjalan (non-Draft). Draft yang belum
+        // dieksekusi boleh dibatalkan siapa pun berhak Tulis/Kelola —
+        // termasuk pembuatnya (mis. jadwal opname yang batal dilaksanakan).
+        if ($stockDocument->status !== 'Draft'
+            && in_array($stockDocument->type, ['Stock Adjustment', 'Stock Opname'], true)
+            && $stockDocument->requester_user_id !== null
+            && $stockDocument->requester_user_id === $authId) {
             return response()->json(['message' => 'Pembuat dokumen tidak boleh membatalkan laporannya sendiri.'], 422);
         }
 

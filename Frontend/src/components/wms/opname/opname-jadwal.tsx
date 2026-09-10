@@ -11,11 +11,26 @@ import {
 } from "@/components/wms/opname/opname-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
-import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import {
+  useCancelStockDocument,
+  useStockDocument,
+  useStockDocuments,
+} from "@/hooks/use-persediaan";
 import { formatDate, formatNumber } from "@/lib/wms-data";
+import { toast } from "sonner";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
 
@@ -32,6 +47,21 @@ export function OpnameJadwalPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const cancelDoc = useCancelStockDocument();
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+
+  const doCancel = async () => {
+    if (confirmCancelId == null) return;
+    try {
+      const res = await cancelDoc.mutateAsync(confirmCancelId);
+      toast.success(`Dokumen ${res.data.no} dibatalkan`);
+      setSelectedId(null);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setConfirmCancelId(null);
+    }
+  };
 
   const sessions = useMemo(() => data?.data ?? [], [data]);
   const analytics = useOpnameAnalytics(sessions);
@@ -215,7 +245,29 @@ export function OpnameJadwalPage() {
         doc={detail?.data ?? null}
         isLoading={detailLoading}
         onOpenChange={(o) => !o && setSelectedId(null)}
+        onCancel={canWrite ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
+        busy={cancelDoc.isPending}
       />
+
+      <AlertDialog
+        open={confirmCancelId != null}
+        onOpenChange={(o) => !o && setConfirmCancelId(null)}
+      >
+        <AlertDialogContent className="rounded-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan sesi opname?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Jadwal opname akan dibatalkan dan tidak dapat diproses lagi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Kembali</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl" onClick={() => void doCancel()}>
+              Ya, Batalkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -109,4 +109,46 @@ class StockDocumentAuditTest extends TestCase
         $this->assertNotNull($log, 'pembaruan dokumen opname harus mencatat Update');
         $this->assertEquals('Persediaan', $log->module);
     }
+
+    public function test_requester_can_cancel_own_draft(): void
+    {
+        $this->actingAsPersediaanAdmin();
+        [$item, $wh, $bin] = $this->makeLocation();
+
+        // Pembuat jadwal opname harus bisa membatalkan jadwalnya sendiri
+        // selama masih Draft (pemisahan tugas hanya untuk laporan berjalan).
+        $doc = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-01',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data');
+
+        $this->postJson("/api/persediaan/stock-documents/{$doc['id']}/cancel")->assertOk();
+
+        $this->assertTrue(
+            AuditLog::query()->where('action', 'Cancel')->where('record_no', $doc['no'])->exists(),
+            'pembatalan jadwal oleh pembuatnya harus mencatat Cancel'
+        );
+    }
+
+    public function test_requester_cannot_cancel_own_submitted_report(): void
+    {
+        $this->actingAsPersediaanAdmin();
+        [$item, $wh, $bin] = $this->makeLocation();
+
+        $doc = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Menunggu Approval',
+            'document_date' => '2026-08-01',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data');
+
+        // Guard SoD tetap: laporan yang sudah diajukan tidak boleh
+        // dibatalkan pembuatnya sendiri.
+        $this->postJson("/api/persediaan/stock-documents/{$doc['id']}/cancel")
+            ->assertStatus(422);
+    }
 }
