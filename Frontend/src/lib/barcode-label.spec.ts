@@ -16,6 +16,7 @@ import {
   presetForSize,
   qrSideForTemplate,
   slugFilename,
+  svgNaturalSize,
   templateDims,
   validateTemplate,
   type LabelTemplate,
@@ -430,5 +431,21 @@ describe("slugFilename", () => {
   it("mengganti spasi dan karakter khusus", () => {
     expect(slugFilename("BRG 001")).toBe("BRG_001");
     expect(slugFilename("label-50x30")).toBe("label-50x30");
+  });
+});
+
+describe("svgNaturalSize", () => {
+  it("membaca W/H dari viewBox bwip-js asli", () => {
+    const svg = buildCodeSvg("8990000000001", "Barcode");
+    const nat = svgNaturalSize(svg);
+    expect(nat).not.toBeNull();
+    expect(nat!.w).toBeGreaterThan(0);
+    expect(nat!.h).toBeGreaterThan(0);
+  });
+
+  it("menolak viewBox tak valid", () => {
+    expect(svgNaturalSize("<svg></svg>")).toBeNull();
+    expect(svgNaturalSize('<svg viewBox="0 0 0 10"></svg>')).toBeNull();
+    expect(svgNaturalSize('<svg viewBox="0 0 abc 10"></svg>')).toBeNull();
   });
 });

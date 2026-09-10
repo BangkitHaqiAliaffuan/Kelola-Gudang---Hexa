@@ -551,10 +551,31 @@ export function downloadPng(blob: Blob, filename: string): void {
 }
 
 /**
+ * Ukuran natural SVG dari atribut viewBox (bwip-js hanya menulis viewBox
+ * tanpa width/height, sehingga naturalWidth browser tidak dapat diandalkan).
+ */
+export function svgNaturalSize(svg: string): { w: number; h: number } | null {
+  const m = svg.match(/viewBox="0\s+0\s+([\d.]+)\s+([\d.]+)"/);
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return null;
+  return { w, h };
+}
+
+/**
  * Render satu SVG string menjadi Blob PNG via <img> + <canvas> (client-only).
  * Resolusi mengikuti ukuran kanvas yang diminta.
+ * - fit "stretch" (default): gambar dipaksa mengisi penuh kanvas (perilaku lama).
+ * - fit "contain": aspek natural (dari viewBox) dikunci, gambar di tengah di
+ *   atas background putih — untuk barcode agar bars tidak gepeng/melebar.
  */
-export function svgToPngBlob(svg: string, widthPx: number, heightPx: number): Promise<Blob> {
+export function svgToPngBlob(
+  svg: string,
+  widthPx: number,
+  heightPx: number,
+  opts?: { fit?: "stretch" | "contain" },
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -572,7 +593,19 @@ export function svgToPngBlob(svg: string, widthPx: number, heightPx: number): Pr
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (opts?.fit === "contain") {
+        const nat = svgNaturalSize(svg) ?? { w: img.naturalWidth, h: img.naturalHeight };
+        if (nat.w > 0 && nat.h > 0) {
+          const scale = Math.min(canvas.width / nat.w, canvas.height / nat.h);
+          const dw = nat.w * scale;
+          const dh = nat.h * scale;
+          ctx.drawImage(img, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+        } else {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+      } else {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      }
       URL.revokeObjectURL(url);
       canvas.toBlob(
         (out) => {
@@ -613,7 +646,8 @@ export async function renderLabelToPng(
   const qrSideMm = qrSideForTemplate(template);
   const qrSidePx = Math.max(Math.round(qrSideMm * PX_PER_MM_300), Math.round(8 * PX_PER_MM_300));
 
-  // Raster kode SVG menjadi canvas sementara
+  // Raster kode SVG menjadi canvas sementara — contain agar aspek barcode
+  // dikunci (bars tidak gepeng); sisa slot menjadi margin putih simetris.
   const codeW = wPx - Math.round(4 * PX_PER_MM_300);
   const codeH =
     label.kind === "QR Code"
@@ -621,8 +655,8 @@ export async function renderLabelToPng(
       : Math.round(codeHeightForTemplate(template) * PX_PER_MM_300);
   const codeBlob =
     label.kind === "QR Code"
-      ? await svgToPngBlob(label.svg, qrSidePx, qrSidePx)
-      : await svgToPngBlob(label.svg, codeW, codeH);
+      ? await svgToPngBlob(label.svg, qrSidePx, qrSidePx, { fit: "contain" })
+      : await svgToPngBlob(label.svg, codeW, codeH, { fit: "contain" });
 
   const codeBitmap = await createImageBitmap(codeBlob);
 
