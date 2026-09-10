@@ -330,8 +330,21 @@ export function LaporanFastMoving() {
       </div>
 
       <Panel title="Filter">
-        <div className="grid gap-3 md:grid-cols-6">
-          <div className="relative md:col-span-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Periode:</span>
+          {PRESETS.map((p) => (
+            <Button
+              key={p.value}
+              variant={preset === p.value ? "default" : "outline"}
+              className="rounded-xl"
+              onClick={() => applyPreset(p.value)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-3 grid items-start gap-3 md:grid-cols-4">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={q}
@@ -339,18 +352,6 @@ export function LaporanFastMoving() {
               placeholder="Cari barang, SKU..."
               className="rounded-xl pl-9"
             />
-          </div>
-          <div className="flex gap-2">
-            {PRESETS.map((p) => (
-              <Button
-                key={p.value}
-                variant={preset === p.value ? "default" : "outline"}
-                className="rounded-xl"
-                onClick={() => applyPreset(p.value)}
-              >
-                {p.label}
-              </Button>
-            ))}
           </div>
           <Input
             type="date"
@@ -380,6 +381,8 @@ export function LaporanFastMoving() {
             options={categoryNames}
             loading={catsLoading}
           />
+        </div>
+        <div className="mt-3 grid items-start gap-3 md:grid-cols-4">
           <FilterSelect
             className="w-full"
             value={risiko}
@@ -387,8 +390,6 @@ export function LaporanFastMoving() {
             placeholder="Risiko"
             options={[...RISIKO_OPTIONS]}
           />
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-6">
           <FilterSelect
             className="w-full"
             value={whFilter.value}
@@ -397,7 +398,7 @@ export function LaporanFastMoving() {
             options={warehouseNames}
             loading={warehousesLoading}
           />
-          <div className="flex items-end">
+          <div className="flex items-start md:col-span-2">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>
         </div>

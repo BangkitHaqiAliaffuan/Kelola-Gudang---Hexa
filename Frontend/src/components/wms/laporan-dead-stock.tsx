@@ -277,7 +277,7 @@ export function LaporanDeadStock() {
         </div>
 
         <Panel title="Filter">
-          <div className="grid gap-3 md:grid-cols-5">
+          <div className="grid items-start gap-3 md:grid-cols-5">
             <div className="relative md:col-span-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -287,21 +287,14 @@ export function LaporanDeadStock() {
                 className="rounded-xl pl-9"
               />
             </div>
-            <div className="w-full">
-              <FilterSelect
-                className="w-full"
-                value={whFilter.value}
-                onChange={whFilter.onChange}
-                placeholder="Semua Gudang"
-                options={warehouseNames}
-                loading={warehousesLoading}
-              />
-              {whFilter.value !== ALL && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Stok & status hanya berdasarkan aktivitas di gudang ini
-                </p>
-              )}
-            </div>
+            <FilterSelect
+              className="w-full"
+              value={whFilter.value}
+              onChange={whFilter.onChange}
+              placeholder="Semua Gudang"
+              options={warehouseNames}
+              loading={warehousesLoading}
+            />
             <FilterSelect
               className="w-full"
               value={cat}
@@ -317,10 +310,15 @@ export function LaporanDeadStock() {
               placeholder="Kategori Umur"
               options={[...AGE_BUCKETS]}
             />
-            <div className="flex items-end">
+            <div className="flex items-start">
               <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
             </div>
           </div>
+          {whFilter.value !== ALL && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Stok & status hanya berdasarkan aktivitas di gudang ini
+            </p>
+          )}
         </Panel>
       </div>
 

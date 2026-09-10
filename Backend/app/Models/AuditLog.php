@@ -18,6 +18,7 @@ class AuditLog extends Model
         'Approve',
         'Reject',
         'Reassign',
+        'Force Unlock',
         'Export',
     ];
 

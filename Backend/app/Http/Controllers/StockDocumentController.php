@@ -362,6 +362,14 @@ class StockDocumentController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        // Jejak audit: pembuatan selalu dicatat; auto-post inline (status
+        // Selesai langsung dari form Transaksi) dicatat sebagai Post agar
+        // Audit Trails tidak bolong untuk alur satu-langkah.
+        $this->auditDoc($document, 'Create');
+        if (($data['status'] ?? null) === 'Selesai' && ($data['type'] ?? null) !== 'Stock Adjustment') {
+            $this->auditDoc($document->fresh() ?? $document, 'Post');
+        }
+
         return (new StockDocumentResource($document->load([
             'warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines')->loadSum('lines as qty_total', 'qty')->loadSum('lines as value_total', DB::raw('qty * unit_cost'))->loadSum('lines as revenue_total', DB::raw('qty * unit_price'))))->response()->setStatusCode(201);
@@ -448,7 +456,7 @@ class StockDocumentController extends Controller
 
         $data = $request->validated();
 
-        return DB::transaction(function () use ($data, $stockDocument, $request) {
+        $response = DB::transaction(function () use ($data, $stockDocument, $request) {
             $authIdForLockInner = $request->user('sanctum')?->id ?? $request->user()?->id;
             // Auto-acquire / refresh lock on successful update
             if (empty($stockDocument->locked_by_user_id) || $this->isLockExpired($stockDocument)) {
@@ -554,6 +562,10 @@ class StockDocumentController extends Controller
                 'warehouse', 'destination', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
             ])->loadCount('lines'));
         });
+
+        $this->auditDoc($stockDocument, 'Update');
+
+        return $response;
     }
 
     /**
@@ -913,8 +925,12 @@ class StockDocumentController extends Controller
             $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
             $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note."\n" : '')."Force unlock dari {$oldLocker} oleh {$user->name}".($reason ? ": {$reason}" : ''))]);
 
+            $response = new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+
+            $this->auditDoc($stockDocument, 'Force Unlock');
+
             // langsung acquire untuk forcer
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            return $response;
         });
     }
 }

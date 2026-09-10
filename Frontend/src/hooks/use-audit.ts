@@ -29,6 +29,7 @@ export const AUDIT_ACTIONS = [
   "Approve",
   "Reject",
   "Reassign",
+  "Force Unlock",
   "Export",
 ] as const;
 

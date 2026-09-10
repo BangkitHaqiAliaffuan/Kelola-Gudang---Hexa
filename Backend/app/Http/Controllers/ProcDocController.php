@@ -142,6 +142,8 @@ class ProcDocController extends Controller
             return $procDoc;
         });
 
+        $this->auditDoc($doc, 'Create');
+
         return new ProcDocResource($this->loadDetail($doc));
     }
 
@@ -251,6 +253,8 @@ class ProcDocController extends Controller
             $this->saveLines($procDoc, $data['lines']);
         });
 
+        $this->auditDoc($procDoc, 'Update');
+
         return new ProcDocResource($this->loadDetail($procDoc->fresh()));
     }
 
@@ -268,6 +272,8 @@ class ProcDocController extends Controller
         }
 
         $procDoc->delete();
+
+        $this->auditDoc($procDoc, 'Delete');
 
         return response()->json(['message' => 'Purchase Request berhasil dihapus.'], 200);
     }
