@@ -25,7 +25,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, EmptyState, FilterSelect, Panel, Pill, StatCard, type Tone } from "./kit";
+import { ALL, EmptyState, FilterSelect, HelpHint, Panel, Pill, StatCard, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useLaporanKeluarAnalytics } from "@/hooks/use-laporan";
@@ -259,6 +259,12 @@ export function LaporanKeluarAnalytics({
                 ? `Bulan ${a.ringkasan.mom.bulan} vs ${a.ringkasan.mom.bulan_lalu}`
                 : undefined
             }
+            help={
+              <HelpHint label="Penjelasan Tren MoM">
+                <p>Perbandingan periode ini dengan periode sebelumnya, dalam persen.</p>
+                <p>Contoh: +10% artinya periode ini 10% lebih besar dari sebelumnya.</p>
+              </HelpHint>
+            }
           />
           <StatCard
             label="Tingkat Retur"
@@ -267,6 +273,14 @@ export function LaporanKeluarAnalytics({
             tone={a && a.retur.rate_nilai > 5 ? "danger" : "warning"}
             loading={busy}
             valueTitle={a ? `${formatIDR(a.retur.nilai)} diretur` : undefined}
+            help={
+              <HelpHint label="Penjelasan Tingkat Retur">
+                <p>
+                  Persen barang yang dikembalikan dibanding yang keluar dalam periode yang sama.
+                </p>
+                <p>Contoh: retur Rp 5 jt dari keluar Rp 100 jt = 5%.</p>
+              </HelpHint>
+            }
           />
           <StatCard
             label="Tujuan At-Risk"
@@ -328,7 +342,18 @@ export function LaporanKeluarAnalytics({
         )}
       </Panel>
 
-      <Panel title="Top Tujuan" description="Peringkat penyerap nilai + share kumulatif (Pareto)">
+      <Panel
+        title="Top Tujuan"
+        description="Peringkat penyerap nilai + share kumulatif (Pareto)"
+        actions={
+          <HelpHint label="Penjelasan Share dan Kum.">
+            <p>
+              Share = porsi baris ini dari total, dalam persen. Kum. = total berjalan dari atas.
+            </p>
+            <p>Gunanya melihat berapa tujuan teratas yang menguasai sebagian besar nilai.</p>
+          </HelpHint>
+        }
+      >
         <DataTable
           columns={topColumns}
           rows={withRowId(topTujuan, (r, i) => `${r.jenis}:${r.id ?? r.nama}:${i}`)}
@@ -462,6 +487,18 @@ export function LaporanKeluarAnalytics({
         <Panel
           title="Analisis Retur"
           description={`Tingkat retur ${a.retur.rate_nilai}% nilai · ${a.retur.rate_qty}% qty (tertaut ke dokumen sumber)`}
+          actions={
+            <HelpHint label="Penjelasan Analisis Retur">
+              <p>
+                Tingkat % nilai = nilai retur dibagi nilai keluar. Tingkat % qty = qty retur dibagi
+                qty keluar.
+              </p>
+              <p>
+                Keduanya dalam periode yang sama dan hanya dari dokumen yang sudah selesai
+                (posting).
+              </p>
+            </HelpHint>
+          }
         >
           <div className="grid gap-4 lg:grid-cols-2">
             <div>

@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Boxes, FileSpreadsheet, Filter, Printer, Wallet, X } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Boxes,
+  FileSpreadsheet,
+  Filter,
+  Printer,
+  Wallet,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,6 +18,7 @@ import {
   ALL,
   ClearFiltersButton,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -473,9 +483,7 @@ export function LaporanKartuStock() {
                     <Checkbox
                       checked={jenis.includes(t)}
                       onCheckedChange={(checked) => {
-                        setJenis((prev) =>
-                          checked ? [...prev, t] : prev.filter((v) => v !== t),
-                        );
+                        setJenis((prev) => (checked ? [...prev, t] : prev.filter((v) => v !== t)));
                       }}
                     />
                     <Pill tone={typeTone(t)} className="text-[10px]">
@@ -562,7 +570,9 @@ export function LaporanKartuStock() {
                 </div>
                 <div className="flex items-center gap-3 text-xs font-semibold">
                   {tb.masuk > 0 && <span className="text-success">+{formatNumber(tb.masuk)}</span>}
-                  {tb.keluar > 0 && <span className="text-destructive">-{formatNumber(tb.keluar)}</span>}
+                  {tb.keluar > 0 && (
+                    <span className="text-destructive">-{formatNumber(tb.keluar)}</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -574,6 +584,17 @@ export function LaporanKartuStock() {
         title={item?.name ?? "Memuat…"}
         description={`${item?.sku ?? ""} · saldo akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${periodLabel}`}
         bodyClassName="p-0"
+        actions={
+          <HelpHint label="Penjelasan baris kuning">
+            <p>
+              Baris kuning = gerakannya jauh lebih besar dari biasanya, jadi perlu diperhatikan.
+            </p>
+            <p>
+              Dihitung dari rata-rata dan sebaran semua gerakan pada periode ini (butuh minimal 3
+              baris).
+            </p>
+          </HelpHint>
+        }
       >
         <DataTable
           columns={columns}

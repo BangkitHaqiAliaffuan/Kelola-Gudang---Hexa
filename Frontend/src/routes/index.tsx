@@ -28,7 +28,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader, Panel, Pill, StatCard, TableSkeleton, type Tone } from "@/components/wms/kit";
+import {
+  HelpHint,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+  TableSkeleton,
+  type Tone,
+} from "@/components/wms/kit";
 import { Progress } from "@/components/ui/progress";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -115,7 +123,13 @@ const quickActions = [
     icon: Package,
     module: "Master Data",
   },
-  { label: "Stock", to: "/persediaan/kartu-stock", params: undefined, icon: Archive, module: "Persediaan" },
+  {
+    label: "Stock",
+    to: "/persediaan/kartu-stock",
+    params: undefined,
+    icon: Archive,
+    module: "Persediaan",
+  },
 ] as const;
 
 const chartTooltip = {
@@ -331,6 +345,15 @@ function Dashboard() {
       icon: Wallet,
       tone: "brand" as const,
       loading: valLoading,
+      help: (
+        <HelpHint label="Penjelasan Nilai Persediaan">
+          <p>
+            Total nilai seluruh gudang memakai metode FIFO (harga barang masuk pertama dipakai
+            dulu).
+          </p>
+          <p>Dokumen yang masih draft tidak ikut dihitung.</p>
+        </HelpHint>
+      ),
     },
     {
       label: "Pending Approval",

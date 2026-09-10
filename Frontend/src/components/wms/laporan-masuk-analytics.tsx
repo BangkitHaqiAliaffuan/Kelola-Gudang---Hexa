@@ -8,7 +8,16 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, StatCard } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  HelpHint,
+  PageHeader,
+  Panel,
+  Pill,
+  StatCard,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useTransaksiAnalytics } from "@/hooks/use-laporan";
@@ -197,6 +206,12 @@ export function LaporanMasukAnalytics({
           icon={momPct != null && momPct < 0 ? ArrowDownRight : ArrowUpRight}
           tone={momPct != null && momPct < 0 ? "danger" : "success"}
           loading={busy}
+          help={
+            <HelpHint label="Penjelasan Tren MoM">
+              <p>Perbandingan periode ini dengan periode sebelumnya, dalam persen.</p>
+              <p>Contoh: +10% artinya periode ini 10% lebih besar dari sebelumnya.</p>
+            </HelpHint>
+          }
         />
       </div>
 
@@ -208,7 +223,18 @@ export function LaporanMasukAnalytics({
         )}
       </Panel>
 
-      <Panel title="Top Supplier" description="Peringkat penyerap nilai + share kumulatif (Pareto)">
+      <Panel
+        title="Top Supplier"
+        description="Peringkat penyerap nilai + share kumulatif (Pareto)"
+        actions={
+          <HelpHint label="Penjelasan Share dan Kum.">
+            <p>
+              Share = porsi baris ini dari total, dalam persen. Kum. = total berjalan dari atas.
+            </p>
+            <p>Gunanya melihat berapa pihak teratas yang menguasai sebagian besar nilai.</p>
+          </HelpHint>
+        }
+      >
         <TopPihakTable rows={topRows} loading={busy} error={error} onRetry={() => refetch()} />
       </Panel>
 

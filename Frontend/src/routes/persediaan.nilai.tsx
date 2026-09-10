@@ -327,7 +327,7 @@ function NilaiPersediaan() {
             {drifted && (
               <span
                 className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-warning"
-                title={`HPP ${valuationMethodLabels[method]} menyimpang ${drift}% dari HPP master — cek harga beli terakhir`}
+                title={`Rata-rata harga pokok di semua lokasi menyimpang ${drift}% dari harga master — cek harga beli terakhir`}
               >
                 <TriangleAlert className="h-3 w-3" /> Drift {drift}%
               </span>

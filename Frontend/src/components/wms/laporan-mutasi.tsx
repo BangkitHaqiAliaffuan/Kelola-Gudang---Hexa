@@ -18,6 +18,7 @@ import {
   ClearFiltersButton,
   EmptyState,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -81,7 +82,14 @@ export function LaporanMutasi() {
   const hasActiveFilters = useMemo(() => {
     const defaultFrom = toISODate(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1));
     const defaultTo = toISODate(new Date());
-    return q !== "" || wh !== ALL || cat !== ALL || statusFilter !== ALL || from !== defaultFrom || to !== defaultTo;
+    return (
+      q !== "" ||
+      wh !== ALL ||
+      cat !== ALL ||
+      statusFilter !== ALL ||
+      from !== defaultFrom ||
+      to !== defaultTo
+    );
   }, [q, wh, cat, statusFilter, from, to]);
   const handleClearFilters = useCallback(() => {
     setQ("");
@@ -387,6 +395,18 @@ export function LaporanMutasi() {
           tone="success"
           {...(isLoading || isFetching ? {} : { valueTitle: formatIDR(stats.nilaiMasuk) })}
           loading={isLoading || isFetching}
+          help={
+            <HelpHint label="Penjelasan Nilai Masuk dan Keluar">
+              <p>
+                Nilai Masuk = jumlah masuk × harga pokok rata-rata. Nilai Keluar = jumlah keluar ×
+                harga pokok rata-rata.
+              </p>
+              <p>
+                Status: Habis = saldo nol. Kritis = saldo di bawah Batas Min. Menipis = di bawah
+                Batas Maks. Normal = aman.
+              </p>
+            </HelpHint>
+          }
         />
         <StatCard
           label="Nilai Keluar"

@@ -6,6 +6,7 @@ import {
   ALL,
   ClearFiltersButton,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -257,17 +258,27 @@ function StockSaatIni() {
         title="Posisi Stock"
         description={`${formatNumber(rows.length)} baris`}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl"
-            aria-pressed={fullscreen}
-            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
-            onClick={() => setFullscreen((f) => !f)}
-          >
-            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            {fullscreen ? "Keluar" : "Fullscreen"}
-          </Button>
+          <>
+            <HelpHint label="Penjelasan kolom">
+              <p>Available = total stok dikurangi yang sudah dipesan orang (reservasi).</p>
+              <p>Nilai Stock = stok × harga pokok master.</p>
+              <p>
+                Status: Habis = stok nol. Menipis = di bawah Batas Min. Overstock =
+                mencapai/melebihi Batas Maks. Normal = aman.
+              </p>
+            </HelpHint>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
         }
         className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
         bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}

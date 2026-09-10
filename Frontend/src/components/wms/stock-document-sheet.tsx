@@ -1,6 +1,6 @@
 import { Ban, CheckCheck, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
-import { Pill, type Tone } from "./kit";
+import { HelpHint, Pill, type Tone } from "./kit";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -211,6 +211,35 @@ export function StockDocumentSheet({
               <div className="flex flex-wrap items-center gap-2">
                 <SheetTitle className="font-mono text-base">{doc.no}</SheetTitle>
                 <Pill tone={statusTone(doc.status)}>{doc.status}</Pill>
+                <HelpHint label="Penjelasan total">
+                  {mode === "adjustment" ? (
+                    <>
+                      <p>
+                        Total Bertambah = semua barang yang masuk. Total Berkurang = semua barang
+                        yang keluar.
+                      </p>
+                      <p>Nilai Bersih = nilai yang masuk dikurangi yang keluar (× harga pokok).</p>
+                    </>
+                  ) : mode === "opname" ? (
+                    <>
+                      <p>
+                        Selisih = Fisik dikurangi Sistem. Plus (+) = fisik lebih banyak. Minus (−) =
+                        fisik kurang.
+                      </p>
+                      <p>Subtotal tiap baris = selisih × harga pokok.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>Total Nilai (HPP) = jumlah × harga pokok per baris.</p>
+                      {showRevenue && (
+                        <p>
+                          Total Omzet = jumlah × harga jual. Margin Kotor = omzet dikurangi HPP
+                          (hanya untuk Barang Keluar dan Retur Penjualan).
+                        </p>
+                      )}
+                    </>
+                  )}
+                </HelpHint>
               </div>
               <SheetDescription>
                 {doc.type} · {formatDate(doc.document_date)} · PIC {doc.pic ?? "—"}

@@ -14,6 +14,7 @@ import {
   ALL,
   ClearFiltersButton,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -331,6 +332,16 @@ function StockMinimum() {
               : { valueTitle: formatIDR(stats.nilai), hint: "total usulan restock" })}
             icon={PackageX}
             tone="brand"
+            help={
+              <HelpHint label="Penjelasan Nilai Kebutuhan">
+                <p>Saran jumlah beli: Batas Maks dikurangi Stok Tersedia.</p>
+                <p>
+                  Bila barang tak punya Batas Maks: rata-rata pakai × waktu tunggu + Batas Min
+                  dikurangi Stok Tersedia. Negatif dianggap nol.
+                </p>
+                <p>Nilai Kebutuhan = jumlah usulan × harga pokok.</p>
+              </HelpHint>
+            }
           />
           <StatCard
             loading={isLoading}
@@ -402,17 +413,30 @@ function StockMinimum() {
         title="Daftar Stock Minimum"
         description={`${formatNumber(rows.length)} barang`}
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-xl"
-            aria-pressed={fullscreen}
-            aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
-            onClick={() => setFullscreen((f) => !f)}
-          >
-            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            {fullscreen ? "Keluar" : "Fullscreen"}
-          </Button>
+          <>
+            <HelpHint label="Penjelasan kolom">
+              <p>Rata-rata pakai harian = total barang keluar dibagi jumlah hari periode.</p>
+              <p>
+                Hari Sisa = total stok dibagi rata-rata pakai harian. Tanda "—" artinya tidak bisa
+                dihitung (tanpa pemakaian atau stok nol).
+              </p>
+              <p>
+                Status: Habis = stok nol. Kritis = sisa bisa-pakai di bawah Batas Min. Menipis = di
+                bawah Batas Maks. Normal = aman.
+              </p>
+            </HelpHint>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
         }
         className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
         bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}

@@ -9,7 +9,15 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, StatCard } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  HelpHint,
+  PageHeader,
+  Panel,
+  StatCard,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useTransaksiAnalytics } from "@/hooks/use-laporan";
@@ -205,6 +213,12 @@ export function LaporanTransferAnalytics({
           icon={momPct != null && momPct < 0 ? ArrowDownRight : ArrowUpRight}
           tone={momPct != null && momPct < 0 ? "danger" : "success"}
           loading={busy}
+          help={
+            <HelpHint label="Penjelasan Tren MoM">
+              <p>Perbandingan periode ini dengan periode sebelumnya, dalam persen.</p>
+              <p>Contoh: +10% artinya periode ini 10% lebih besar dari sebelumnya.</p>
+            </HelpHint>
+          }
         />
       </div>
 
@@ -238,7 +252,16 @@ export function LaporanTransferAnalytics({
         />
       </Panel>
 
-      <Panel title="Net Flow per Gudang" description="Surplus (+) / defisit (−) periode ini">
+      <Panel
+        title="Net Flow per Gudang"
+        description="Surplus (+) / defisit (−) periode ini"
+        actions={
+          <HelpHint label="Penjelasan Net Flow">
+            <p>Net = barang masuk dikurangi barang keluar per gudang.</p>
+            <p>Plus (+) = gudang kelebihan stok. Minus (−) = gudang kekurangan.</p>
+          </HelpHint>
+        }
+      >
         <DataTable
           columns={netColumns}
           rows={(a?.arus?.net ?? []).map((r, i) => ({
@@ -261,7 +284,18 @@ export function LaporanTransferAnalytics({
         />
       </Panel>
 
-      <Panel title="Top Gudang Tujuan" description="Peringkat penerima + share kumulatif (Pareto)">
+      <Panel
+        title="Top Gudang Tujuan"
+        description="Peringkat penerima + share kumulatif (Pareto)"
+        actions={
+          <HelpHint label="Penjelasan Share dan Kum.">
+            <p>
+              Share = porsi baris ini dari total, dalam persen. Kum. = total berjalan dari atas.
+            </p>
+            <p>Gunanya melihat berapa gudang teratas yang menguasai sebagian besar nilai.</p>
+          </HelpHint>
+        }
+      >
         <TopPihakTable
           rows={(a?.top_pihak ?? []).filter((r) => f(r.jenis, r.id, r.nama))}
           loading={busy}

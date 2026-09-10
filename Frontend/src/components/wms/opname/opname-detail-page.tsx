@@ -17,6 +17,7 @@ import {
   ALL,
   EmptyState,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -407,6 +408,15 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
           icon={TriangleAlert}
           {...(isLoading ? {} : { valueTitle: formatIDR(summary.value) })}
           loading={isLoading}
+          help={
+            <HelpHint label="Penjelasan Nilai Selisih">
+              <p>
+                Selisih = Fisik dikurangi Sistem. Plus (+) = fisik lebih banyak. Minus (−) = fisik
+                kurang.
+              </p>
+              <p>Nilai Selisih = total selisih × harga pokok masing-masing barang.</p>
+            </HelpHint>
+          }
         />
       </div>
 
@@ -441,6 +451,15 @@ export function OpnameDetailPage({ docId }: { docId: number }) {
       <Panel
         title="Detail Selisih"
         description={`${formatNumber(rows.length)} dari ${formatNumber(lines.length)} baris`}
+        actions={
+          <HelpHint label="Penjelasan kolom">
+            <p>
+              Selisih = Fisik dikurangi Sistem. Plus (+) = fisik lebih banyak. Minus (−) = fisik
+              kurang.
+            </p>
+            <p>Nilai Selisih = selisih jumlah × harga pokok.</p>
+          </HelpHint>
+        }
       >
         <DataTable
           columns={columns}

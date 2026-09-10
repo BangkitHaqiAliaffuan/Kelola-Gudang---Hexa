@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   FilterX,
   Loader2,
   Warehouse,
@@ -11,6 +12,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -155,6 +157,7 @@ export function StatCard({
   tone = "brand",
   valueTitle,
   loading = false,
+  help,
 }: {
   label: string;
   value: string;
@@ -163,12 +166,16 @@ export function StatCard({
   tone?: Tone;
   valueTitle?: string | undefined;
   loading?: boolean;
+  help?: ReactNode;
 }) {
   return (
     <div className="card-soft card-hover p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="flex items-center gap-1 truncate text-xs font-medium text-muted-foreground">
+            <span className="truncate">{label}</span>
+            {help}
+          </p>
           {loading ? (
             <Skeleton className="mt-1.5 h-7 w-24 rounded-lg" />
           ) : valueTitle ? (
@@ -201,6 +208,46 @@ export function StatCard({
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Tombol "?" penjelas untuk section ber-rumus: klik (ramah sentuh) membuka
+ * popover Bahasa Indonesia yang awam. Maksimal 3 kalimat per konten;
+ * `formula` opsional dirender mono untuk rumus baku (mis. margin = omzet − HPP).
+ */
+export function HelpHint({
+  label = "Penjelasan",
+  children,
+  formula,
+  align = "end",
+}: {
+  label?: string;
+  children: ReactNode;
+  formula?: string;
+  align?: "start" | "center" | "end";
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          title={label}
+          className="inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <CircleHelp className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align={align} className="w-[280px] rounded-xl p-3">
+        <div className="space-y-1.5 text-xs leading-relaxed text-foreground">{children}</div>
+        {formula && (
+          <p className="mt-2 rounded-lg bg-muted/70 px-2 py-1.5 font-mono text-[11px] text-foreground">
+            {formula}
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 

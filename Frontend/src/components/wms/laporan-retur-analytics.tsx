@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
 import { ClipboardList, FileSpreadsheet, Package, Undo2, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, StatCard } from "./kit";
+import {
+  ALL,
+  ClearFiltersButton,
+  FilterSelect,
+  HelpHint,
+  PageHeader,
+  Panel,
+  StatCard,
+} from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { Button } from "@/components/ui/button";
 import { useTransaksiAnalytics } from "@/hooks/use-laporan";
@@ -56,7 +64,7 @@ export function LaporanReturAnalytics({
   const masterLoading = kind === "pembelian" ? suppliersLoading : customersLoading;
 
   const options = useMemo(() => {
-    const list = kind === "pembelian" ? suppliersData?.data ?? [] : customersData?.data ?? [];
+    const list = kind === "pembelian" ? (suppliersData?.data ?? []) : (customersData?.data ?? []);
     const jenis = kind === "pembelian" ? "supplier" : "customer";
     return list.map((s: { id: number; name: string }) => ({
       value: `${jenis}:${s.id}:${s.name}`,
@@ -203,6 +211,14 @@ export function LaporanReturAnalytics({
           icon={Undo2}
           tone={filteredStats.rateQty > 5 ? "danger" : "warning"}
           loading={busy}
+          help={
+            <HelpHint label="Penjelasan Tingkat Retur">
+              <p>Persen jumlah yang dikembalikan dibanding yang keluar dalam periode yang sama.</p>
+              <p>
+                Halaman ini menghitung jumlah (qty), bukan nilai uang, dirata-rata dari tiap pihak.
+              </p>
+            </HelpHint>
+          }
         />
       </div>
 

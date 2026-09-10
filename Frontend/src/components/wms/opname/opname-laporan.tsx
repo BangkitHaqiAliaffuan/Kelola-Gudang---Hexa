@@ -6,6 +6,7 @@ import {
   ALL,
   ClearFiltersButton,
   FilterSelect,
+  HelpHint,
   PageHeader,
   Panel,
   Pill,
@@ -182,6 +183,15 @@ export function OpnameLaporanPage() {
       <Panel
         title="Summary per Sesi"
         description={isLoading ? "Memuat sesi..." : `${formatNumber(filtered.length)} sesi`}
+        actions={
+          <HelpHint label="Penjelasan ringkasan">
+            <p>
+              Tercatat = baris yang sudah dihitung fisiknya. Lebih = fisik lebih banyak. Kurang =
+              fisik kurang.
+            </p>
+            <p>Nilai selisih = total (fisik − sistem) × harga pokok masing-masing barang.</p>
+          </HelpHint>
+        }
       >
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <Input
