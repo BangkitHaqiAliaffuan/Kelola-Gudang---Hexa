@@ -62,7 +62,8 @@ class RoleApiTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        $this->getJson('/api/master/roles')
+        $response = $this->getJson('/api/master/roles');
+        $response
             ->assertOk()
             ->assertJsonPath('data.0.access.0.module', 'Master Data')
             ->assertJsonPath('data.0.access.0.level', 'Kelola')
@@ -70,9 +71,13 @@ class RoleApiTest extends TestCase
             ->assertJsonPath('data.1.access.0.level', 'Baca')
             ->assertJsonPath('data.2.access.0.module', 'Master Data')
             ->assertJsonPath('data.2.access.0.level', 'Baca')
-            ->assertJsonCount(8, 'data.3.access')
+            ->assertJsonCount(7, 'data.3.access')
             ->assertJsonPath('data.3.access.0.module', 'Master Data')
             ->assertJsonPath('data.3.access.0.level', 'Baca');
+
+        // Auditor tanpa modul System (Tidak Ada = tanpa baris).
+        $auditorAccess = collect($response->json('data'))->firstWhere('name', 'Auditor')['access'];
+        $this->assertNotContains('System', array_column($auditorAccess, 'module'));
     }
 
     public function test_update_sets_access_for_role(): void

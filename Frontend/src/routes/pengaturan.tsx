@@ -28,12 +28,20 @@ export const Route = createFileRoute("/pengaturan")({
 
 function Pengaturan() {
   const { theme, setTheme } = useTheme();
-  const { hasModuleLevel } = useAuth();
+  const { hasModuleLevel, hasModule } = useAuth();
   const canWrite = hasModuleLevel("System", "Tulis");
+  const canRead = hasModule("System");
   // Profil perusahaan tersimpan di server (PUT /system/settings); hanya key
   // yang dikenal backend yang dikirim (name, address). Kode perusahaan dan
   // switch operasional tidak punya key backend — tidak ikut tersimpan.
-  const { data: settings, isLoading: settingsLoading } = useCompanySettings();
+  const {
+    data: settings,
+    isLoading: settingsLoading,
+    error: settingsError,
+  } = useCompanySettings(canRead);
+  // Tanpa akses System (atau fetch gagal), profil tak termuat — tampilkan
+  // pemberitahuan jujur alih-alih kolom kosong melompong.
+  const profileBlocked = !canRead || !!settingsError;
   const [draft, setDraft] = useState<{ name: string; address: string } | null>(null);
   useEffect(() => {
     if (settings && draft === null)
@@ -95,6 +103,12 @@ function Pengaturan() {
       </Panel>
 
       <Panel title="Profil Perusahaan" description="Tampil pada kop dokumen cetakan">
+        {profileBlocked && (
+          <p className="mb-3 rounded-xl border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            Data profil tidak dapat dimuat (butuh akses modul System) — kolom di bawah hanya
+            tampilan.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Nama Perusahaan</Label>

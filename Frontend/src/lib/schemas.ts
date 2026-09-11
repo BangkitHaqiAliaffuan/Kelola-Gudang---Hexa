@@ -309,7 +309,7 @@ export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
     { module: "Stock Opname", level: "Baca" },
     { module: "Pengadaan", level: "Baca" },
     { module: "Laporan", level: "Baca" },
-    { module: "System", level: "Baca" },
+    // System: Tidak Ada (tanpa baris) — mirror seeder, non-admin tak melihat System.
     { module: "Audit Trails", level: "Baca" },
   ],
 };

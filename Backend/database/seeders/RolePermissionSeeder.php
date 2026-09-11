@@ -43,7 +43,8 @@ class RolePermissionSeeder extends Seeder
                 ['module' => 'Stock Opname', 'level' => 'Baca'],
                 ['module' => 'Pengadaan', 'level' => 'Baca'],
                 ['module' => 'Laporan', 'level' => 'Baca'],
-                ['module' => 'System', 'level' => 'Baca'],
+                // System: Tidak Ada (tanpa baris = tanpa akses; grup System
+                // + /system/* + API System tak terlihat oleh non-admin).
                 ['module' => 'Audit Trails', 'level' => 'Baca'],
             ],
         ];

@@ -393,10 +393,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         })
         .filter((g) => {
           if (g.label === "Dashboard" || g.label === "Barcode") return true;
-          const groupModule = g.module ?? g.label;
-          if (!hasModule(groupModule)) return false;
-          // A group only renders when it has at least one visible child (or is a plain link).
-          return !g.children || g.children.length > 0;
+          // Grup tampil bila ada ≥1 anak yang boleh diakses — modul grup
+          // sendiri tidak boleh membuang anak bermodul lain (mis. Audit Trails
+          // di bawah grup System untuk Auditor tanpa akses System).
+          if (g.children) return g.children.length > 0;
+          return hasModule(g.module ?? g.label);
         }),
     [hasModule],
   );
