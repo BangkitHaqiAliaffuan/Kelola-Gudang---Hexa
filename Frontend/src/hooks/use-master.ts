@@ -76,11 +76,11 @@ export function useUnits() {
   });
 }
 
-export function useWarehouses() {
+export function useWarehouses(enabled = true) {
   return useQuery({
     queryKey: keys.warehouses,
     queryFn: () => fetchAll<Warehouse>("/master/warehouses"),
-    enabled: typeof window !== "undefined",
+    enabled: typeof window !== "undefined" && enabled,
   });
 }
 
@@ -100,19 +100,19 @@ export function useBins() {
   });
 }
 
-export function useItems() {
+export function useItems(enabled = true) {
   return useQuery({
     queryKey: keys.items,
     queryFn: () => fetchAll<ItemApi>("/master/items"),
-    enabled: typeof window !== "undefined",
+    enabled: typeof window !== "undefined" && enabled,
   });
 }
 
-export function useSuppliers() {
+export function useSuppliers(enabled = true) {
   return useQuery({
     queryKey: keys.suppliers,
     queryFn: () => fetchAll<Supplier>("/master/suppliers"),
-    enabled: typeof window !== "undefined",
+    enabled: typeof window !== "undefined" && enabled,
   });
 }
 

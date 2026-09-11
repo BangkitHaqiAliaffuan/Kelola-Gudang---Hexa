@@ -3,6 +3,8 @@ import { Check, LogOut, Mail, ShieldCheck, Building2, Warehouse } from "lucide-r
 import { toast } from "sonner";
 import { Pill } from "./kit";
 import { themes, useTheme } from "./theme";
+import { useCompanySettings } from "@/hooks/use-settings";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
 import type { AuthUser } from "@/lib/auth-api";
 import { ROLE_ACCESS, type RoleAccessEntry, type UserRole } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -85,6 +87,13 @@ export function ProfileHelpDialog({
 }) {
   const [open, setOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: company } = useCompanySettings();
+  const { prefs, update: updatePrefs } = useUserPreferences();
+  const prefRows: { key: "notifStok" | "emailDaily" | "densityMode"; label: string }[] = [
+    { key: "notifStok", label: "Notifikasi stok minimum" },
+    { key: "emailDaily", label: "Ringkasan harian via email" },
+    { key: "densityMode", label: "Mode tabel padat" },
+  ];
 
   const name = user?.name ?? "Pengguna";
   const role = user?.role ?? "";
@@ -140,7 +149,7 @@ export function ProfileHelpDialog({
                 <Row icon={Mail} label="Email" value={email} />
                 <Row icon={ShieldCheck} label="Role" value={role} />
                 <Row icon={Warehouse} label="Gudang Default" value={user?.warehouse ?? "—"} />
-                <Row icon={Building2} label="Perusahaan" value="PT Kelola Nusantara" />
+                <Row icon={Building2} label="Perusahaan" value={company?.["company.name"] ?? "—"} />
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs font-semibold text-muted-foreground">Hak Akses</p>
@@ -183,17 +192,16 @@ export function ProfileHelpDialog({
                 </div>
               </div>
               <div className="space-y-2">
-                {[
-                  ["Notifikasi stok minimum", true],
-                  ["Ringkasan harian via email", false],
-                  ["Mode tabel padat", false],
-                ].map(([label, def]) => (
+                {prefRows.map(({ key, label }) => (
                   <div
-                    key={label as string}
+                    key={key}
                     className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5"
                   >
-                    <Label className="text-sm font-medium">{label as string}</Label>
-                    <Switch defaultChecked={def as boolean} />
+                    <Label className="text-sm font-medium">{label}</Label>
+                    <Switch
+                      checked={prefs[key]}
+                      onCheckedChange={(v) => updatePrefs({ [key]: v === true })}
+                    />
                   </div>
                 ))}
               </div>
@@ -220,7 +228,7 @@ export function ProfileHelpDialog({
             className="rounded-xl"
             onClick={() => {
               setOpen(false);
-              toast.success("Perubahan preferensi disimpan");
+              toast.success("Preferensi tersimpan di perangkat ini");
             }}
           >
             Simpan

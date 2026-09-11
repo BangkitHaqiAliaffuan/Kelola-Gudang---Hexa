@@ -310,9 +310,12 @@ export function useStockMinimum(
     days?: number;
     warehouseId?: number | null;
     categoryId?: number | null;
+    enabled?: boolean;
+    staleTime?: number;
+    refetchOnWindowFocus?: boolean;
   } = {},
 ) {
-  const { days, warehouseId, categoryId } = params;
+  const { days, warehouseId, categoryId, enabled = true } = params;
   return useQuery({
     queryKey: ["persediaan", "stock-minimum", days, warehouseId ?? null, categoryId ?? null],
     queryFn: () => {
@@ -322,7 +325,11 @@ export function useStockMinimum(
       if (categoryId != null) params["category_id"] = String(categoryId);
       return fetchAll<StockMinimumApi>("/persediaan/stock-minimum", params);
     },
-    enabled: typeof window !== "undefined",
+    enabled: typeof window !== "undefined" && enabled,
+    ...(params.staleTime != null ? { staleTime: params.staleTime } : {}),
+    ...(params.refetchOnWindowFocus != null
+      ? { refetchOnWindowFocus: params.refetchOnWindowFocus }
+      : {}),
   });
 }
 

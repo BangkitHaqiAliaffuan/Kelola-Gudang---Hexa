@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { GenericMasterPage, masterDatasets } from "@/components/wms/generic-master";
 import {
   BinPage,
@@ -35,7 +35,12 @@ const apiTitles: Record<string, { title: string; description: string }> = {
   user: { title: "User", description: "Pengguna aplikasi gudang" },
 };
 
+const knownSections = new Set([...Object.keys(apiTitles), "role"]);
+
 export const Route = createFileRoute("/master/$section")({
+  beforeLoad: ({ params }) => {
+    if (!knownSections.has(params.section)) throw notFound();
+  },
   head: ({ params }) => {
     const ds = masterDatasets[params.section] ?? apiTitles[params.section];
     const title = `${ds?.title ?? "Master Data"} — KelolaGudang`;

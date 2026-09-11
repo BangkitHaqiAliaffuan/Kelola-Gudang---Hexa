@@ -40,7 +40,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { items, suppliers, transactions, warehouses, notifications } from "@/lib/wms-data";
+import { useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
+import { useStockDocuments, useStockMinimum } from "@/hooks/use-persediaan";
+import { formatNumber } from "@/lib/wms-data";
 import { toast } from "sonner";
 
 type QuickAction = { label: string; to: string; icon: typeof Package; module?: string };
@@ -211,6 +213,19 @@ function GlobalSearch({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
 
+  // Data API riil — fetch hanya saat dialog dibuka + modul diizinkan (di-cache
+  // react-query antar buka). Tanpa gate, query fired di setiap mount AppShell.
+  const canMaster = canAccess("Master Data");
+  const canTrx = canAccess("Transaksi");
+  const itemsQ = useItems(open && canMaster);
+  const warehousesQ = useWarehouses(open && canMaster);
+  const suppliersQ = useSuppliers(open && canMaster);
+  const docsQ = useStockDocuments({ perPage: 8, enabled: open && canTrx });
+  const apiItems = useMemo(() => itemsQ.data?.data ?? [], [itemsQ.data]);
+  const apiWarehouses = useMemo(() => warehousesQ.data?.data ?? [], [warehousesQ.data]);
+  const apiSuppliers = useMemo(() => suppliersQ.data?.data ?? [], [suppliersQ.data]);
+  const apiDocs = useMemo(() => docsQ.data?.data ?? [], [docsQ.data]);
+
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Cari barang, SKU, barcode, supplier, gudang, nomor transaksi..." />
@@ -228,14 +243,14 @@ function GlobalSearch({
         </CommandGroup>
         {canAccess("Master Data") && (
           <CommandGroup heading="Barang / SKU / Barcode">
-            {items.slice(0, 24).map((it) => (
+            {apiItems.slice(0, 24).map((it) => (
               <CommandItem
                 key={it.id}
-                value={`${it.name} ${it.sku} ${it.barcode}`}
+                value={`${it.name} ${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`}
                 onSelect={() => setOpen(false)}
                 asChild
               >
-                <Link to="/master/barang/$id" params={{ id: it.id }}>
+                <Link to="/master/barang/$id" params={{ id: String(it.id) }}>
                   <Package className="h-4 w-4" />
                   <span className="truncate">{it.name}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{it.sku}</span>
@@ -246,11 +261,11 @@ function GlobalSearch({
         )}
         {canAccess("Transaksi") && (
           <CommandGroup heading="Nomor Transaksi">
-            {transactions.slice(0, 8).map((t) => (
-              <CommandItem key={t.id} value={t.no} onSelect={() => setOpen(false)}>
+            {apiDocs.slice(0, 8).map((d) => (
+              <CommandItem key={d.id} value={d.no} onSelect={() => setOpen(false)}>
                 <ArrowLeftRight className="h-4 w-4" />
-                {t.no}
-                <span className="ml-auto text-xs text-muted-foreground">{t.type}</span>
+                {d.no}
+                <span className="ml-auto text-xs text-muted-foreground">{d.type}</span>
               </CommandItem>
             ))}
           </CommandGroup>
@@ -258,7 +273,7 @@ function GlobalSearch({
         {canAccess("Master Data") && (
           <>
             <CommandGroup heading="Gudang">
-              {warehouses.map((w) => (
+              {apiWarehouses.map((w) => (
                 <CommandItem key={w.id} value={w.name} onSelect={() => setOpen(false)}>
                   <Boxes className="h-4 w-4" />
                   {w.name}
@@ -266,7 +281,7 @@ function GlobalSearch({
               ))}
             </CommandGroup>
             <CommandGroup heading="Supplier">
-              {suppliers.slice(0, 8).map((s) => (
+              {apiSuppliers.slice(0, 8).map((s) => (
                 <CommandItem key={s.id} value={s.name} onSelect={() => setOpen(false)}>
                   <Package className="h-4 w-4" />
                   {s.name}
@@ -314,40 +329,67 @@ function ThemePicker() {
 }
 
 function NotificationCenter() {
+  const [open, setOpen] = useState(false);
+  // Data riil stock kritis — fetch saat popover dibuka, cache 60 detik agar
+  // header permanen tidak membanjiri API di setiap pindah halaman/fokus.
+  const minQ = useStockMinimum({
+    enabled: open,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const critical = useMemo(
+    () =>
+      (minQ.data?.data ?? [])
+        .filter((r) => r.status === "Habis" || r.status === "Kritis")
+        .slice(0, 5),
+    [minQ.data],
+  );
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative rounded-xl" aria-label="Notifikasi">
           <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+          {critical.length > 0 && (
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[330px] rounded-xl p-0">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <p className="text-sm font-semibold">Notifikasi</p>
-          <Pill tone="brand">{notifications.length} baru</Pill>
+          <Pill tone="brand">{minQ.isLoading ? "…" : `${critical.length} perlu perhatian`}</Pill>
         </div>
         <div className="max-h-[340px] overflow-y-auto">
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              className="flex gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-0 hover:bg-accent/50"
-            >
-              <span
-                className={cn(
-                  "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                  n.tone === "warning" && "bg-warning",
-                  n.tone === "success" && "bg-success",
-                  n.tone === "info" && "bg-info",
-                )}
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{n.title}</p>
-                <p className="text-xs text-muted-foreground">{n.body}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground/80">{n.time}</p>
+          {minQ.isLoading ? (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+              Memuat status stok…
+            </p>
+          ) : critical.length === 0 ? (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+              Semua stok dalam kondisi baik.
+            </p>
+          ) : (
+            critical.map((r) => (
+              <div
+                key={r.id}
+                className="flex gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-0 hover:bg-accent/50"
+              >
+                <span
+                  className={cn(
+                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                    r.status === "Habis" ? "bg-destructive" : "bg-warning",
+                  )}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{r.name ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.status} · stok {formatNumber(r.total_stock)} / min {formatNumber(r.min)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground/80">{r.sku ?? ""}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -534,7 +576,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <div className="flex items-center gap-0.5 sm:gap-1">
               <ThemePicker />
-              <NotificationCenter />
+              {hasModule("Persediaan") && <NotificationCenter />}
               <ProfileHelpDialog
                 user={user ?? undefined}
                 access={access}

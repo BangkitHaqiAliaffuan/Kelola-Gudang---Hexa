@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   CheckCheck,
@@ -9,7 +9,6 @@ import {
   Printer,
   Search,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import {
   ALL,
@@ -39,18 +38,8 @@ import { LaporanDeadStock } from "@/components/wms/laporan-dead-stock";
 import { LaporanFastMoving } from "@/components/wms/laporan-fast-moving";
 import { LaporanNilaiPersediaan } from "@/components/wms/laporan-nilai-persediaan";
 import type { StockDocumentApi } from "@/lib/persediaan-types";
-import {
-  formatDate,
-  formatIDR,
-  formatIDRCompact,
-  formatNumber,
-  items,
-  monthly,
-  totalValue,
-  transactions,
-  warehouses,
-} from "@/lib/wms-data";
-import { Boxes, Wallet, TrendingUp } from "lucide-react";
+import { formatDate, formatNumber, warehouses } from "@/lib/wms-data";
+import { Boxes } from "lucide-react";
 
 const titles: Record<string, string> = {
   stock: "Laporan Stock",
@@ -69,6 +58,9 @@ const titles: Record<string, string> = {
 };
 
 export const Route = createFileRoute("/laporan/$report")({
+  beforeLoad: ({ params }) => {
+    if (!(params.report in titles)) throw notFound();
+  },
   head: ({ params }) => {
     const title = `${titles[params.report] ?? "Laporan"} — KelolaGudang`;
     return {
@@ -122,9 +114,6 @@ function Laporan() {
   }, [whFilter]);
 
   const isStockOpname = report === "stock-opname";
-  const isItemReport = ["stock-minimum", "dead-stock", "fast-moving", "nilai-persediaan"].includes(
-    report,
-  );
 
   const {
     data: opnameDocs,
@@ -149,6 +138,8 @@ function Laporan() {
   if (report === "fast-moving") return <LaporanFastMoving />;
   if (report === "nilai-persediaan") return <LaporanNilaiPersediaan />;
 
+  // Cabang non-opname tak terjangkau (slug dikenal selain stock-opname
+  // didelegasikan ke komponen riil; slug asing → notFound di beforeLoad).
   const source: Row[] = isStockOpname
     ? opnameRows.map((d) => ({
         id: String(d.id),
@@ -160,33 +151,7 @@ function Laporan() {
         f: d.status,
         g: d.pic ?? "—",
       }))
-    : isItemReport
-      ? items
-          .filter((i) =>
-            report === "dead-stock"
-              ? i.moving === "Dead"
-              : report === "fast-moving"
-                ? i.moving === "Fast"
-                : report === "stock-minimum"
-                  ? i.stock <= i.min
-                  : true,
-          )
-          .map((i) => ({
-            id: i.id,
-            a: i.name,
-            b: i.sku,
-            c: i.warehouse,
-            d: `${formatNumber(i.stock)} ${i.unit}`,
-            e: formatIDR(i.stock * i.cost),
-          }))
-      : transactions.slice(0, 500).map((t) => ({
-          id: t.id,
-          a: t.no,
-          b: formatDate(t.date),
-          c: t.warehouse,
-          d: formatNumber(t.qty),
-          e: formatIDR(t.value),
-        }));
+    : [];
 
   const rows = source.filter(
     (r) =>
@@ -196,9 +161,7 @@ function Laporan() {
 
   const headers = isStockOpname
     ? ["Nomor", "Tanggal", "Gudang", "SKU", "Tercatat", "Status", "PIC"]
-    : isItemReport
-      ? ["Barang", "SKU", "Gudang", "Stock", "Nilai"]
-      : ["Nomor", "Tanggal", "Gudang", "Qty", "Nilai"];
+    : ["Nomor", "Tanggal", "Gudang", "Qty", "Nilai"];
 
   const columns: Column<Row>[] = headers.map((h, i) => ({
     key: String(i),
@@ -347,23 +310,10 @@ ${companyKopHtml(company)}
           <>
             <StatCard label="Total Baris" value={formatNumber(rows.length)} icon={Boxes} />
             <StatCard
-              label="Total SKU"
-              value={formatNumber(items.length)}
+              label="Gudang Terlibat"
+              value={formatNumber(new Set(rows.map((r) => r.c)).size)}
               icon={Boxes}
               tone="info"
-            />
-            <StatCard
-              label="Nilai Persediaan"
-              value={formatIDRCompact(totalValue)}
-              valueTitle={formatIDR(totalValue)}
-              icon={Wallet}
-              tone="success"
-            />
-            <StatCard
-              label="Rata-rata Bulanan"
-              value={formatNumber(Math.round(monthly.reduce((a, b) => a + b.masuk, 0) / 12))}
-              icon={TrendingUp}
-              tone="warning"
             />
           </>
         )}
@@ -399,32 +349,7 @@ ${companyKopHtml(company)}
         </div>
       </Panel>
 
-      {!isStockOpname && (
-        <Panel title="Grafik Ringkasan">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis fontSize={12} tickLine={false} axisLine={false} width={44} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "1px solid var(--border)",
-                  background: "var(--card)",
-                  fontSize: 12,
-                }}
-              />
-              <Bar dataKey="masuk" name="Masuk" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-              <Bar
-                dataKey="keluar"
-                name="Keluar"
-                fill="var(--primary-glow)"
-                radius={[6, 6, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </Panel>
-      )}
+      {/* Grafik mock dihapus: slug non-opname tak terjangkau (didelegasikan/404). */}
 
       <Panel title="Detail Laporan" description={`${formatNumber(rows.length)} baris`}>
         <DataTable
