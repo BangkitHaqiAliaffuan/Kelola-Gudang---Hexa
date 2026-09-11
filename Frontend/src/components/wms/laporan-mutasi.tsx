@@ -30,6 +30,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { MutasiStockSheet } from "@/components/wms/mutasi-stock-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
@@ -40,14 +41,14 @@ import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { LaporanMutasiRowApi } from "@/lib/persediaan-types";
 
-const STATUS_OPTIONS = [
-  { value: ALL, label: "Semua Status" },
+const STATUS_ITEMS = [
   { value: "Habis", label: "Habis" },
+  { value: "Kritis", label: "Kritis" },
   { value: "Menipis", label: "Menipis" },
   { value: "Normal", label: "Normal" },
 ] as const;
 
-type StatusFilter = (typeof STATUS_OPTIONS)[number]["value"];
+type StatusFilter = typeof ALL | (typeof STATUS_ITEMS)[number]["value"];
 
 function stockStatus(r: LaporanMutasiRowApi): string {
   if (r.saldo_akhir <= 0) return "Habis";
@@ -460,23 +461,31 @@ ${companyKopHtml(company)}
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={statusFilter}
             onChange={(v) => setStatusFilter(v as StatusFilter)}
-            placeholder="Status Stok"
-            options={[...STATUS_OPTIONS]}
+            placeholder="Semua Status"
+            options={[...STATUS_ITEMS]}
           />
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            aria-label="Dari tanggal"
-            className="rounded-xl"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            aria-label="Sampai tanggal"
-            className="rounded-xl"
-          />
+          <div className="min-w-[160px] flex-1 space-y-1.5">
+            <Label>Dari tanggal</Label>
+            <Input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="Dari tanggal"
+              className="rounded-xl"
+            />
+          </div>
+          <div className="min-w-[160px] flex-1 space-y-1.5">
+            <Label>Sampai tanggal</Label>
+            <Input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="Sampai tanggal"
+              className="rounded-xl"
+            />
+          </div>
           <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>

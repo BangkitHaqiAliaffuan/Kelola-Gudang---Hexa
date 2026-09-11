@@ -177,6 +177,58 @@ class StockValuationApiTest extends TestCase
         );
     }
 
+    public function test_average_mengikuti_moving_average_bukan_simple_average_in(): void
+    {
+        // IN 10@100 → OUT 10 → IN 10@200. Simple-average-IN = 150, tetapi
+        // moving-average yang benar = 200 (stok lama sudah habis terjual).
+        // Test ini mengunci semantik Fase 2.1: Average TETAP dihitung via fold.
+        $unique = random_int(10000, 99999);
+        $item = Item::factory()->create([
+            'sku' => "SKU-VAL-AVG-{$unique}",
+            'barcode' => '899'.str_pad((string) $unique, 10, '0', STR_PAD_LEFT),
+            'internal_barcode' => "IB-VAL-AVG-{$unique}",
+            'cost' => 100,
+        ]);
+        $wh = $item->default_warehouse ?? Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        $base = CarbonImmutable::parse('2026-08-01 08:00:00');
+        foreach ([
+            ['IN', 10, 100.0, $base],
+            ['OUT', 10, 100.0, $base->addHour()],
+            ['IN', 10, 200.0, $base->addHours(2)],
+        ] as [$direction, $qty, $cost, $when]) {
+            StockMovement::create([
+                'item_id' => $item->id,
+                'warehouse_id' => $wh->id,
+                'rack_id' => $rack->id,
+                'bin_id' => $bin->id,
+                'direction' => $direction,
+                'qty' => $qty,
+                'movement_type' => $direction === 'IN' ? 'Penerimaan' : 'Pengeluaran',
+                'reference_no' => 'BM/2026/'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+                'partner' => 'Test',
+                'unit_cost' => $cost,
+                'pic' => 'Test',
+                'note' => 'Test',
+                'occurred_at' => $when,
+            ]);
+        }
+
+        (new StockLedger)->rebuildForItem($item->id);
+
+        $row = $this->getJson('/api/persediaan/valuation?search='.urlencode($item->sku).'&per_page=500')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->json('data.0');
+
+        $this->assertSame(10, $row['stock']);
+        $this->assertEqualsWithDelta(200.0, $row['unit_cost_avg'], 0.01);
+        $this->assertEqualsWithDelta(200.0, $row['unit_cost_fifo'], 0.01);
+        $this->assertEqualsWithDelta(2000.0, $row['nilai_avg'], 0.01);
+    }
+
     private function makeValuationItem(int $qty = 200, float $cost = 1000): Item
     {
         $unique = random_int(10000, 99999);

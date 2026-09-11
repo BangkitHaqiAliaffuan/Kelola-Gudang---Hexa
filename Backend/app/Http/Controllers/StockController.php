@@ -8,10 +8,9 @@ use App\Http\Resources\StockValuationResource;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMovement;
+use App\Support\FifoFold;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Validation\Rule;
 
 class StockController extends Controller
@@ -184,7 +183,7 @@ class StockController extends Controller
         // carry across the `from` boundary, but only emit rows inside [from, to].
         $opening = 0;
         $saldo = 0;
-        $fifoLayers = [];
+        $fifo = new FifoFold;
         $onHandQty = 0;
         $onHandValue = 0.0;
         $maxCost = null;
@@ -202,21 +201,12 @@ class StockController extends Controller
             $saldo += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
 
             if ($movement->direction === 'IN') {
-                $fifoLayers[] = ['qty' => $movement->qty, 'cost' => $movement->unit_cost];
+                $fifo->push($movement->qty, (float) $movement->unit_cost);
                 $onHandQty += $movement->qty;
                 $onHandValue += $movement->qty * $movement->unit_cost;
                 $maxCost = $maxCost === null ? $movement->unit_cost : max($maxCost, $movement->unit_cost);
             } else {
-                $remaining = $movement->qty;
-                while ($remaining > 0 && $fifoLayers !== []) {
-                    $take = min($remaining, $fifoLayers[0]['qty']);
-                    $fifoLayers[0]['qty'] -= $take;
-                    $remaining -= $take;
-
-                    if ($fifoLayers[0]['qty'] === 0) {
-                        array_shift($fifoLayers);
-                    }
-                }
+                $fifo->consume($movement->qty);
 
                 $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
                 $onHandValue -= $movement->qty * $avg;
@@ -234,7 +224,7 @@ class StockController extends Controller
             // awal via saldo_awal. Tampilan UX/Global (termasuk transfer IN) harus sepenuhnya
             // di-emit agar baris row.saldo === saldo_akhir, sehingga chart dan total FE akurat.
 
-            $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
+            $fifoValue = $fifo->value();
             $unitCost = match ($method) {
                 'Average' => $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0),
                 'Maximum Cost' => $maxCost ?? $item->cost ?? 0,
@@ -322,11 +312,17 @@ class StockController extends Controller
             });
         }
 
-        $items = $query->orderBy('items.name')->get();
-        $itemIds = $items->pluck('id');
+        // Fase 2.1: paginasi items di SQL dulu, lalu fold ledger HANYA untuk id
+        // di halaman aktif (dulu: load semua item + semua movement ke memori PHP).
+        // Urutan (items.name), envelope, dan meta.total dipertahankan persis agar
+        // konsumen per_page=500 (FE + test) melihat halaman-1 yang sama.
+        // Average tetap moving-average fold (bukan item_stock.unit_cost_avg yang
+        // merupakan simple-average-IN) — paritas angka dengan implementasi lama.
+        $paginator = $query->orderBy('items.name')->paginate($request->integer('per_page', 20));
+        $pageIds = $paginator->getCollection()->pluck('id');
 
         $movements = StockMovement::query()
-            ->whereIn('item_id', $itemIds)
+            ->whereIn('item_id', $pageIds)
             ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->orderBy('occurred_at')
             ->orderBy('id')
@@ -334,7 +330,7 @@ class StockController extends Controller
             ->groupBy('item_id');
 
         $reservedByItem = ItemStock::query()
-            ->whereIn('item_id', $itemIds)
+            ->whereIn('item_id', $pageIds)
             ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->selectRaw('item_id, COALESCE(SUM(reserved), 0) AS reserved')
             ->groupBy('item_id')
@@ -342,82 +338,65 @@ class StockController extends Controller
 
         $now = now();
 
-        $items = $items->map(function (Item $item) use ($movements, $reservedByItem, $now) {
-            $fifoLayers = [];
-            $onHandQty = 0;
-            $onHandValue = 0.0;
-            $maxCost = null;
-            $saldo = 0;
-            $lastMove = null;
+        $paginator->setCollection(
+            $paginator->getCollection()->map(function (Item $item) use ($movements, $reservedByItem, $now) {
+                $fifo = new FifoFold;
+                $onHandQty = 0;
+                $onHandValue = 0.0;
+                $maxCost = null;
+                $saldo = 0;
+                $lastMove = null;
 
-            foreach ($movements->get($item->id, collect()) as $movement) {
-                $lastMove = $movement->occurred_at;
-                $saldo += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
+                foreach ($movements->get($item->id, collect()) as $movement) {
+                    $lastMove = $movement->occurred_at;
+                    $saldo += $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
 
-                if ($movement->direction === 'IN') {
-                    $fifoLayers[] = ['qty' => $movement->qty, 'cost' => $movement->unit_cost];
-                    $onHandQty += $movement->qty;
-                    $onHandValue += $movement->qty * $movement->unit_cost;
-                    $maxCost = $maxCost === null ? $movement->unit_cost : max($maxCost, $movement->unit_cost);
-                } else {
-                    $remaining = $movement->qty;
-                    while ($remaining > 0 && $fifoLayers !== []) {
-                        $take = min($remaining, $fifoLayers[0]['qty']);
-                        $fifoLayers[0]['qty'] -= $take;
-                        $remaining -= $take;
+                    if ($movement->direction === 'IN') {
+                        $fifo->push($movement->qty, (float) $movement->unit_cost);
+                        $onHandQty += $movement->qty;
+                        $onHandValue += $movement->qty * $movement->unit_cost;
+                        $maxCost = $maxCost === null ? $movement->unit_cost : max($maxCost, $movement->unit_cost);
+                    } else {
+                        $fifo->consume($movement->qty);
 
-                        if ($fifoLayers[0]['qty'] === 0) {
-                            array_shift($fifoLayers);
-                        }
+                        $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
+                        $onHandValue -= $movement->qty * $avg;
+                        $onHandQty -= $movement->qty;
                     }
-
-                    $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
-                    $onHandValue -= $movement->qty * $avg;
-                    $onHandQty -= $movement->qty;
                 }
-            }
 
-            $fifoValue = array_sum(array_map(fn ($layer) => $layer['qty'] * $layer['cost'], $fifoLayers));
-            $stock = max(0, $saldo);
-            $reserved = (int) ($reservedByItem[$item->id] ?? 0);
+                $fifoValue = $fifo->value();
+                $stock = max(0, $saldo);
+                $reserved = (int) ($reservedByItem[$item->id] ?? 0);
 
-            $unitCostFifo = round($stock > 0 ? $fifoValue / $stock : ($item->cost ?? 0), 2);
-            $unitCostAvg = round($onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0), 2);
-            $unitCostMax = round($maxCost ?? $item->cost ?? 0, 2);
+                $unitCostFifo = round($stock > 0 ? $fifoValue / $stock : ($item->cost ?? 0), 2);
+                $unitCostAvg = round($onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0), 2);
+                $unitCostMax = round($maxCost ?? $item->cost ?? 0, 2);
 
-            $daysAgo = $lastMove !== null ? (int) $lastMove->diffInDays($now) : PHP_INT_MAX;
-            $moving = match (true) {
-                $daysAgo > 150 => 'Dead',
-                $daysAgo > 60 => 'Slow',
-                $daysAgo > 20 => 'Medium',
-                default => 'Fast',
-            };
+                $daysAgo = $lastMove !== null ? (int) $lastMove->diffInDays($now) : PHP_INT_MAX;
+                $moving = match (true) {
+                    $daysAgo > 150 => 'Dead',
+                    $daysAgo > 60 => 'Slow',
+                    $daysAgo > 20 => 'Medium',
+                    default => 'Fast',
+                };
 
-            $item->stock = $stock;
-            $item->reserved = $reserved;
-            $item->available = max(0, $stock - $reserved);
-            $item->unit_cost_fifo = $unitCostFifo;
-            $item->unit_cost_avg = $unitCostAvg;
-            $item->unit_cost_max = $unitCostMax;
-            $item->nilai_fifo = round($stock * $unitCostFifo, 2);
-            $item->nilai_avg = round($stock * $unitCostAvg, 2);
-            $item->nilai_max = round($stock * $unitCostMax, 2);
-            $item->last_move_at = $lastMove?->toIso8601String();
-            $item->moving = $moving;
+                $item->stock = $stock;
+                $item->reserved = $reserved;
+                $item->available = max(0, $stock - $reserved);
+                $item->unit_cost_fifo = $unitCostFifo;
+                $item->unit_cost_avg = $unitCostAvg;
+                $item->unit_cost_max = $unitCostMax;
+                $item->nilai_fifo = round($stock * $unitCostFifo, 2);
+                $item->nilai_avg = round($stock * $unitCostAvg, 2);
+                $item->nilai_max = round($stock * $unitCostMax, 2);
+                $item->last_move_at = $lastMove?->toIso8601String();
+                $item->moving = $moving;
 
-            return $item;
-        });
-
-        $perPage = (int) ($data['per_page'] ?? 20);
-        $page = Paginator::resolveCurrentPage('page');
-        $items = new LengthAwarePaginator(
-            $items->forPage($page, $perPage),
-            $items->count(),
-            $perPage,
-            $page,
-            ['path' => Paginator::resolveCurrentPath()],
+                return $item;
+            })
         );
 
-        return StockValuationResource::collection($items);
+        return StockValuationResource::collection($paginator);
     }
 }

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ALL,
@@ -503,20 +504,28 @@ export function LaporanKartuStock() {
               )}
             </PopoverContent>
           </Popover>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-9 rounded-xl"
-            aria-label="Dari tanggal"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-9 rounded-xl"
-            aria-label="Sampai tanggal"
-          />
+          <div className="space-y-1.5">
+            <Label>Dari tanggal</Label>
+            <Input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-9 rounded-xl"
+              aria-label="Dari tanggal"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sampai tanggal</Label>
+            <Input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-9 rounded-xl"
+              aria-label="Sampai tanggal"
+            />
+          </div>
           <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>

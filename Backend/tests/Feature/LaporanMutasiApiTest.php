@@ -86,6 +86,45 @@ class LaporanMutasiApiTest extends TestCase
         $this->assertEquals($itemA->id, $res->json('data.0.item_id'));
     }
 
+    public function test_mutasi_dengan_keluar_dan_nilai_moving_average(): void
+    {
+        // IN 10@1000 (sebelum periode) → OUT 4 + IN 2@2000 (dalam periode).
+        // Moving average: (6000 + 4000) / 8 = 1250 → nilai_akhir = 8 × 1250.
+        // Mengunci paritas Fase 2.2: kolom qty via agregat SQL, nilai via fold.
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 10, 1000.0);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-15',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT B',
+            'lines' => [['item_id' => $item->id, 'qty' => 4, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-16',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT A',
+            'lines' => [['item_id' => $item->id, 'qty' => 2, 'unit_cost' => 2000, 'to_bin_id' => $bin->id]],
+        ])->assertStatus(201);
+
+        $res = $this->getJson('/api/laporan/mutasi?from=2026-07-10&to=2026-07-20&per_page=500')->assertOk();
+
+        $row = collect($res->json('data'))->firstWhere('item_id', $item->id);
+        $this->assertNotNull($row);
+        $this->assertEquals(10, $row['saldo_awal']);
+        $this->assertEquals(2, $row['masuk']);
+        $this->assertEquals(4, $row['keluar']);
+        $this->assertEquals(8, $row['saldo_akhir']);
+        $this->assertEqualsWithDelta(1250.0, $row['unit_cost_avg'], 0.01);
+        $this->assertEqualsWithDelta(10000.0, $row['nilai_akhir'], 0.01);
+    }
+
     private function makeItem(array $overrides = []): Item
     {
         return Item::factory()->create(array_merge([

@@ -20,8 +20,6 @@ use App\Models\WorkOrder;
 use App\Support\TransaksiAnalytics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -52,115 +50,84 @@ class LaporanController extends Controller
             });
         }
 
-        $items = $query->orderBy('items.name')->get();
-        $itemIds = $items->pluck('id');
+        // Fase 2.2: paginasi Item di SQL, agregat qty per halaman via GROUP BY +
+        // CASE (dulu: load semua item + semua movement lalu fold di PHP).
+        // Partisi temporal memakai occurred_at persis seperti fold lama
+        // (occurred_at = document_date). Nilai akhir tetap via moving-average
+        // fold per halaman (GROUP BY tidak bisa mereproduksinya).
+        $paginator = $query->orderBy('items.name')->paginate((int) ($data['per_page'] ?? 20));
+        $paginator->appends($request->query());
+        $pageIds = $paginator->getCollection()->pluck('id');
 
-        if ($itemIds->isEmpty()) {
-            $paginator = new LengthAwarePaginator([], 0, (int) ($data['per_page'] ?? 20), 1, ['path' => Paginator::resolveCurrentPath()]);
+        $fromStr = $from->toDateTimeString();
+        $toStr = $to->toDateTimeString();
+        $signed = "CASE WHEN direction = 'IN' THEN qty ELSE -qty END";
 
-            return LaporanMutasiResource::collection($paginator);
-        }
-
-        // Batch movements for all items, scoped by warehouse if filter, ordered for FIFO fold.
-        $movements = StockMovement::query()
-            ->whereIn('item_id', $itemIds)
+        $agg = StockMovement::query()
+            ->whereIn('item_id', $pageIds)
             ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
+            ->selectRaw(
+                'item_id, '.
+                "SUM(CASE WHEN occurred_at < ? THEN ({$signed}) ELSE 0 END) AS opening, ".
+                "SUM(CASE WHEN occurred_at BETWEEN ? AND ? AND direction = 'IN' THEN qty ELSE 0 END) AS masuk, ".
+                "SUM(CASE WHEN occurred_at BETWEEN ? AND ? AND direction = 'OUT' THEN qty ELSE 0 END) AS keluar",
+                [$fromStr, $fromStr, $toStr, $fromStr, $toStr]
+            )
+            ->groupBy('item_id')
+            ->get()
+            ->keyBy('item_id');
+
+        // Basis moving-average untuk nilai_akhir: full history ≤ to per item halaman.
+        $movements = StockMovement::query()
+            ->whereIn('item_id', $pageIds)
+            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
+            ->where('occurred_at', '<=', $toStr)
             ->orderBy('occurred_at')
             ->orderBy('id')
             ->get()
             ->groupBy('item_id');
 
-        // Reserved per item (current, for available calc if needed — not used for mutasi qty but for consistency)
         // Nilai akhir via moving average (unit_cost_avg) per warehouse scope.
 
-        $items = $items->map(function (Item $item) use ($movements, $from, $to) {
-            $fifoLayers = [];
-            $onHandQty = 0;
-            $onHandValue = 0.0;
-            $saldo = 0;
-            $saldoAwal = 0;
-            $masuk = 0;
-            $keluar = 0;
+        $paginator->setCollection(
+            $paginator->getCollection()->map(function (Item $item) use ($agg, $movements) {
+                $row = $agg->get($item->id);
 
-            foreach ($movements->get($item->id, collect()) as $movement) {
-                $when = $movement->occurred_at;
+                $saldoAwal = max(0, (int) ($row?->opening ?? 0));
+                $masuk = (int) ($row?->masuk ?? 0);
+                $keluar = (int) ($row?->keluar ?? 0);
+                $saldoAkhir = max(0, $saldoAwal + $masuk - $keluar);
 
-                // Beyond window -> stop (movements ordered)
-                if ($when->gt($to)) {
-                    break;
-                }
+                $onHandQty = 0;
+                $onHandValue = 0.0;
 
-                $beforeFrom = $when->lt($from);
-
-                // FIFO / avg bookkeeping (same as stockCard/valuation)
-                if ($movement->direction === 'IN') {
-                    $fifoLayers[] = ['qty' => $movement->qty, 'cost' => $movement->unit_cost];
-                    $onHandQty += $movement->qty;
-                    $onHandValue += $movement->qty * $movement->unit_cost;
-                } else {
-                    $remaining = $movement->qty;
-                    while ($remaining > 0 && $fifoLayers !== []) {
-                        $take = min($remaining, $fifoLayers[0]['qty']);
-                        $fifoLayers[0]['qty'] -= $take;
-                        $remaining -= $take;
-                        if ($fifoLayers[0]['qty'] === 0) {
-                            array_shift($fifoLayers);
-                        }
+                foreach ($movements->get($item->id, collect()) as $movement) {
+                    if ($movement->direction === 'IN') {
+                        $onHandQty += $movement->qty;
+                        $onHandValue += $movement->qty * $movement->unit_cost;
+                    } else {
+                        $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
+                        $onHandValue -= $movement->qty * $avg;
+                        $onHandQty -= $movement->qty;
                     }
-                    $avg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
-                    $onHandValue -= $movement->qty * $avg;
-                    $onHandQty -= $movement->qty;
                 }
 
-                // Saldo running
-                $delta = $movement->direction === 'IN' ? $movement->qty : -$movement->qty;
-                $saldo += $delta;
+                // Nilai akhir via average (consistent with ItemStock unit_cost_avg)
+                // If no movements, fallback to item cost.
+                $unitCostAvg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
+                $unitCostAvg = round($unitCostAvg, 2);
+                $nilaiAkhir = round(max(0, $saldoAkhir) * $unitCostAvg, 2);
 
-                if ($beforeFrom) {
-                    $saldoAwal += $delta;
+                // Attach computed fields for resource
+                $item->saldo_awal = $saldoAwal;
+                $item->masuk = $masuk;
+                $item->keluar = $keluar;
+                $item->saldo_akhir = $saldoAkhir;
+                $item->nilai_akhir = $nilaiAkhir;
+                $item->unit_cost_avg = $unitCostAvg;
 
-                    continue;
-                }
-
-                // Inside window [from, to]
-                if ($movement->direction === 'IN') {
-                    $masuk += $movement->qty;
-                } else {
-                    $keluar += $movement->qty;
-                }
-            }
-
-            $saldoAkhir = $saldo; // saldo after folding up to $to
-
-            // Nilai akhir via average (consistent with ItemStock unit_cost_avg)
-            // If no movements, fallback to item cost.
-            $unitCostAvg = $onHandQty > 0 ? $onHandValue / $onHandQty : ($item->cost ?? 0);
-            $unitCostAvg = round($unitCostAvg, 2);
-            $nilaiAkhir = round(max(0, $saldoAkhir) * $unitCostAvg, 2);
-
-            // Attach computed fields for resource
-            $item->saldo_awal = max(0, $saldoAwal);
-            // saldo_awal should not be negative (opening can't be negative due to ledger guard)
-            if ($item->saldo_awal < 0) {
-                $item->saldo_awal = 0;
-            }
-            $item->masuk = $masuk;
-            $item->keluar = $keluar;
-            $item->saldo_akhir = max(0, $saldoAkhir);
-            $item->nilai_akhir = $nilaiAkhir;
-            $item->unit_cost_avg = $unitCostAvg;
-
-            return $item;
-        });
-
-        $perPage = (int) ($data['per_page'] ?? 20);
-        $page = Paginator::resolveCurrentPage('page');
-        $paginator = new LengthAwarePaginator(
-            $items->forPage($page, $perPage)->values(),
-            $items->count(),
-            $perPage,
-            $page,
-            ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()],
+                return $item;
+            })
         );
 
         return LaporanMutasiResource::collection($paginator);
@@ -466,9 +433,20 @@ class LaporanController extends Controller
         })->sortByDesc('nilai')->values()->all();
 
         // ---- Aktivitas tujuan (baru vs berulang, at-risk vs acuan akhir periode) ----
+        // Fase 2.3: tanggal terakhir per tujuan dihitung dalam satu pass O(T)
+        // (dulu: $posted->filter per tujuan = O(D×T)). Key klasifikasi tetap
+        // dari PHP — tidak direplikasi ke SQL agar semantik identik.
+        $terakhirPerTujuan = [];
+        foreach ($posted as $d) {
+            $k = $tujuanKey($d->getAttribute('_tujuan'));
+            $tgl = $d->document_date;
+            if (! isset($terakhirPerTujuan[$k]) || $tgl->gt($terakhirPerTujuan[$k])) {
+                $terakhirPerTujuan[$k] = $tgl;
+            }
+        }
         $aktivitas = [];
         foreach ($aggTujuan as $key => $a) {
-            $last = $posted->filter(fn (StockDocument $d) => $tujuanKey($d->getAttribute('_tujuan')) === $key)->max('document_date');
+            $last = $terakhirPerTujuan[$key] ?? null;
             $days = $last ? $to->diffInDays($last, true) : null;
             $aktivitas[] = [
                 'jenis' => $a['jenis'],
@@ -514,21 +492,62 @@ class LaporanController extends Controller
         $projKeys = collect($aggTujuan)->filter(fn ($a) => $a['jenis'] === 'proyek')->values();
         if ($projKeys->isNotEmpty()) {
             $projModels = Project::whereIn('id', $projKeys->pluck('id')->filter()->values())->get()->keyBy('id');
+
+            // Fase 2.3: petakan dokumen posted ke key proyek dalam satu pass O(T)
+            // (dulu: $posted->filter per proyek), lalu 3 query batch untuk SEMUA
+            // proyek (dulu: 3 query PER proyek). Klasifikasi key tetap di PHP.
+            $docIdsByProjKey = [];
+            foreach ($posted as $d) {
+                $docIdsByProjKey[$tujuanKey($d->getAttribute('_tujuan'))][] = $d->id;
+            }
+            $projKeyByDocId = [];
             foreach ($projKeys as $a) {
-                $docIds = $posted->filter(fn (StockDocument $d) => $tujuanKey($d->getAttribute('_tujuan')) === $tujuanKey($a))->pluck('id');
-                $keluarPerItem = $docIds->isNotEmpty()
-                    ? StockDocumentLine::query()->whereIn('document_id', $docIds)
-                        ->selectRaw('item_id, SUM(ABS(qty)) as qty, SUM(ABS(qty) * unit_cost) as nilai')
-                        ->groupBy('item_id')->get()->keyBy('item_id')
-                    : collect();
+                foreach ($docIdsByProjKey[$tujuanKey($a)] ?? [] as $docId) {
+                    $projKeyByDocId[$docId] = $tujuanKey($a);
+                }
+            }
+            // [projKey][item_id] => ['qty', 'nilai'] — diakumulasi per chunk agar
+            // whereIn tetap kecil; pembulatan akhir 2 desimal sama seperti dulu.
+            $linesByProjItem = [];
+            foreach (array_chunk(array_keys($projKeyByDocId), 1000) as $chunk) {
+                if ($chunk === []) {
+                    continue;
+                }
+                $rows = StockDocumentLine::query()->whereIn('document_id', $chunk)
+                    ->selectRaw('document_id, item_id, SUM(ABS(qty)) as qty, SUM(ABS(qty) * unit_cost) as nilai')
+                    ->groupBy('document_id', 'item_id')
+                    ->get();
+                foreach ($rows as $r) {
+                    $pk = $projKeyByDocId[$r->document_id] ?? null;
+                    if ($pk === null) {
+                        continue;
+                    }
+                    $linesByProjItem[$pk][$r->item_id] ??= ['qty' => 0, 'nilai' => 0.0];
+                    $linesByProjItem[$pk][$r->item_id]['qty'] += (int) $r->qty;
+                    $linesByProjItem[$pk][$r->item_id]['nilai'] += (float) $r->nilai;
+                }
+            }
+            $woByProject = WorkOrder::with('item.unit')
+                ->whereIn('project_id', $projKeys->pluck('id')->filter()->values())
+                ->get()
+                ->groupBy('project_id');
+            $neededItemIds = collect($linesByProjItem)->flatMap(fn ($perItem) => array_keys($perItem))
+                ->merge($woByProject->flatten()->pluck('item_id'))
+                ->unique()->values();
+            $itemMasterAll = $neededItemIds->isNotEmpty()
+                ? Item::with('unit')->whereIn('id', $neededItemIds)->get()->keyBy('id')
+                : collect();
+
+            foreach ($projKeys as $a) {
+                $keluarPerItem = collect($linesByProjItem[$tujuanKey($a)] ?? []);
                 $pm = $a['id'] !== null ? $projModels->get($a['id']) : null;
                 $targets = $a['id'] !== null
-                    ? WorkOrder::with('item.unit')->where('project_id', $a['id'])->get()
+                    ? ($woByProject->get($a['id']) ?? collect())
                     : collect();
                 $items = [];
                 foreach ($targets as $wo) {
                     $kel = $keluarPerItem->get($wo->item_id);
-                    $kelQty = $kel ? (int) $kel->qty : 0;
+                    $kelQty = $kel ? (int) $kel['qty'] : 0;
                     $tgt = (int) ($wo->target_qty ?? 0);
                     $var = $tgt > 0 ? round(($kelQty - $tgt) / $tgt * 100, 1) : null;
                     $items[] = [
@@ -538,7 +557,7 @@ class LaporanController extends Controller
                         'satuan' => $wo->item?->unit?->name,
                         'target_qty' => $tgt,
                         'keluar_qty' => $kelQty,
-                        'nilai_keluar' => $kel ? round((float) $kel->nilai, 2) : 0.0,
+                        'nilai_keluar' => $kel ? round((float) $kel['nilai'], 2) : 0.0,
                         'varians_pct' => $var,
                         'flag' => $var !== null && abs($var) > $band,
                         'work_order' => $wo->no,
@@ -546,7 +565,7 @@ class LaporanController extends Controller
                 }
                 // Item keluar tanpa WO tercatat (serapan tak terencana).
                 $woItemIds = $targets->pluck('item_id')->map(fn ($v) => (int) $v)->all();
-                $itemMaster = Item::with('unit')->whereIn('id', $keluarPerItem->keys())->get()->keyBy('id');
+                $itemMaster = $itemMasterAll;
                 foreach ($keluarPerItem as $iid => $kel) {
                     if (in_array((int) $iid, $woItemIds, true)) {
                         continue;
@@ -558,8 +577,8 @@ class LaporanController extends Controller
                         'nama' => $it?->name ?? "Item #{$iid}",
                         'satuan' => $it?->unit?->name,
                         'target_qty' => 0,
-                        'keluar_qty' => (int) $kel->qty,
-                        'nilai_keluar' => round((float) $kel->nilai, 2),
+                        'keluar_qty' => (int) $kel['qty'],
+                        'nilai_keluar' => round((float) $kel['nilai'], 2),
                         'varians_pct' => null,
                         'flag' => true,
                         'work_order' => null,
@@ -805,19 +824,41 @@ class LaporanController extends Controller
             $postedIds = $posted->pluck('id');
             $variansHarga = [];
             if ($postedIds->isNotEmpty()) {
-                $docPihak = $posted->mapWithKeys(fn (StockDocument $d) => [$d->id => $d->getAttribute('_pihak')]);
-                $lines = StockDocumentLine::query()->whereIn('document_id', $postedIds)->get();
-                $itemMaster = Item::whereIn('id', $lines->pluck('item_id')->unique()->values())->get()->keyBy('id');
-                $agg = [];
-                foreach ($lines as $ln) {
-                    $t = $docPihak->get($ln->document_id);
-                    if ($t === null) {
+                // Fase 2.3: agregat per (partner, item) di SQL — dulu load SEMUA
+                // baris sebagai model Eloquent lalu fold di PHP (bom memori
+                // terbesar endpoint ini). Pemetaan partner→supplier tetap via
+                // $matchSupplier di PHP agar semantik name-match identik
+                // (untuk Penerimaan, klasifikasi dokumen = matchSupplier(partner)).
+                $grouped = [];
+                foreach (array_chunk($postedIds->all(), 1000) as $chunk) {
+                    $rows = StockDocumentLine::query()->whereIn('document_id', $chunk)
+                        ->join('stock_documents', 'stock_documents.id', '=', 'stock_document_lines.document_id')
+                        ->selectRaw('stock_documents.partner as partner, stock_document_lines.item_id as item_id, SUM(ABS(stock_document_lines.qty)) as qty, SUM(ABS(stock_document_lines.qty) * stock_document_lines.unit_cost) as nilai')
+                        ->groupBy('stock_documents.partner', 'stock_document_lines.item_id')
+                        ->get();
+                    foreach ($rows as $r) {
+                        $gk = ($r->partner ?? '').'|'.$r->item_id;
+                        $grouped[$gk] ??= ['partner' => $r->partner, 'item_id' => (int) $r->item_id, 'qty' => 0, 'nilai' => 0.0];
+                        $grouped[$gk]['qty'] += (int) $r->qty;
+                        $grouped[$gk]['nilai'] += (float) $r->nilai;
+                    }
+                }
+                $itemMaster = collect();
+                foreach (array_chunk(collect($grouped)->pluck('item_id')->unique()->values()->all(), 5000) as $chunk) {
+                    if ($chunk === []) {
                         continue;
                     }
-                    $k = $pihakKey($t).'|'.$ln->item_id;
-                    $agg[$k] ??= ['jenis' => $t['jenis'], 'supplier_id' => $t['id'], 'supplier' => $t['nama'], 'item_id' => (int) $ln->item_id, 'qty' => 0, 'nilai' => 0.0];
-                    $agg[$k]['qty'] += abs((int) ($ln->qty ?? 0));
-                    $agg[$k]['nilai'] = round($agg[$k]['nilai'] + abs((int) ($ln->qty ?? 0)) * (float) ($ln->unit_cost ?? 0), 2);
+                    foreach (Item::whereIn('id', $chunk)->get()->keyBy('id') as $id => $it) {
+                        $itemMaster[$id] = $it;
+                    }
+                }
+                $agg = [];
+                foreach ($grouped as $g) {
+                    $t = $matchSupplier($g['partner']);
+                    $k = $pihakKey($t).'|'.$g['item_id'];
+                    $agg[$k] ??= ['jenis' => $t['jenis'], 'supplier_id' => $t['id'], 'supplier' => $t['nama'], 'item_id' => (int) $g['item_id'], 'qty' => 0, 'nilai' => 0.0];
+                    $agg[$k]['qty'] += $g['qty'];
+                    $agg[$k]['nilai'] = round($agg[$k]['nilai'] + $g['nilai'], 2);
                 }
                 foreach ($agg as $row) {
                     $master = $itemMaster->get($row['item_id']);
@@ -866,9 +907,18 @@ class LaporanController extends Controller
         }
 
         // ---- Aktivitas pihak ----
+        // Fase 2.3: satu pass O(T) seperti aktivitas tujuan di keluarAnalytics.
+        $terakhirPerPihak = [];
+        foreach ($posted as $d) {
+            $k = $pihakKey($d->getAttribute('_pihak'));
+            $tgl = $d->document_date;
+            if (! isset($terakhirPerPihak[$k]) || $tgl->gt($terakhirPerPihak[$k])) {
+                $terakhirPerPihak[$k] = $tgl;
+            }
+        }
         $aktivitas = [];
         foreach ($aggPihak as $key => $ap) {
-            $last = $posted->filter(fn (StockDocument $d) => $pihakKey($d->getAttribute('_pihak')) === $key)->max('document_date');
+            $last = $terakhirPerPihak[$key] ?? null;
             $days = $last ? $to->diffInDays($last, true) : null;
             $aktivitas[] = [
                 'jenis' => $ap['jenis'],

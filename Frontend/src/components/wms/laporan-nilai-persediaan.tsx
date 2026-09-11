@@ -28,6 +28,7 @@ import {
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
@@ -47,14 +48,13 @@ const METHOD_NOTE =
   "Arus dinilai dengan HPP Average kini (sama seperti Laporan Mutasi). Nilai awal adalah estimasi.";
 
 const AGE_BUCKETS = [
-  { value: ALL, label: "Semua Umur" },
   { value: "0-30", label: "≤ 30 hari" },
   { value: "31-60", label: "31–60 hari" },
   { value: "61-150", label: "61–150 hari" },
   { value: "150+", label: "> 150 hari" },
 ] as const;
 
-type AgeBucket = (typeof AGE_BUCKETS)[number]["value"];
+type AgeBucket = typeof ALL | (typeof AGE_BUCKETS)[number]["value"];
 
 function daysSince(iso: string | null): number {
   if (!iso) return Infinity;
@@ -185,12 +185,7 @@ export function LaporanNilaiPersediaan() {
 
   const aging = useMemo(
     () =>
-      (
-        AGE_BUCKETS.filter((b) => b.value !== ALL) as Array<{
-          value: Exclude<AgeBucket, typeof ALL>;
-          label: string;
-        }>
-      ).map((b) => {
+      AGE_BUCKETS.map((b) => {
         const list = allRows.filter(
           (r) => ageBucket(daysSince(lastMoveById.get(r.item_id) ?? null)) === b.value,
         );
@@ -526,20 +521,28 @@ ${companyKopHtml(company)}
             placeholder="Semua Umur"
             options={[...AGE_BUCKETS]}
           />
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            aria-label="Dari tanggal"
-            className="rounded-xl"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            aria-label="Sampai tanggal"
-            className="rounded-xl"
-          />
+          <div className="min-w-[160px] flex-1 space-y-1.5">
+            <Label>Dari tanggal</Label>
+            <Input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="Dari tanggal"
+              className="rounded-xl"
+            />
+          </div>
+          <div className="min-w-[160px] flex-1 space-y-1.5">
+            <Label>Sampai tanggal</Label>
+            <Input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="Sampai tanggal"
+              className="rounded-xl"
+            />
+          </div>
           <div className="ml-auto flex shrink-0 items-end">
             <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
           </div>

@@ -33,14 +33,13 @@ import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { FastMovingRowApi } from "@/lib/persediaan-types";
 
 const RISIKO_OPTIONS = [
-  { value: ALL, label: "Semua Risiko" },
   { value: "Habis", label: "Habis" },
   { value: "Kritis", label: "Kritis" },
   { value: "Menipis", label: "Menipis" },
   { value: "Aman", label: "Aman" },
 ] as const;
 
-type RisikoFilter = (typeof RISIKO_OPTIONS)[number]["value"];
+type RisikoFilter = typeof ALL | (typeof RISIKO_OPTIONS)[number]["value"];
 
 const PRESETS = [
   { value: 30, label: "30 hari" },
@@ -388,7 +387,7 @@ export function LaporanFastMoving() {
             className="w-full"
             value={risiko}
             onChange={(v) => setRisiko(v as RisikoFilter)}
-            placeholder="Risiko"
+            placeholder="Semua Risiko"
             options={[...RISIKO_OPTIONS]}
           />
           <FilterCombobox

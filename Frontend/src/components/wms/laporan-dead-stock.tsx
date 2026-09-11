@@ -26,13 +26,12 @@ import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { StockValuationApi } from "@/lib/persediaan-types";
 
 const AGE_BUCKETS = [
-  { value: ALL, label: "Semua Umur" },
   { value: "150-180", label: "150–180 hari" },
   { value: "180-365", label: "180–365 hari" },
   { value: "365+", label: "> 365 hari" },
 ] as const;
 
-type AgeBucket = (typeof AGE_BUCKETS)[number]["value"];
+type AgeBucket = typeof ALL | (typeof AGE_BUCKETS)[number]["value"];
 
 function daysSince(iso: string | null): number {
   if (!iso) return Infinity;
@@ -308,7 +307,7 @@ export function LaporanDeadStock() {
               className="w-full"
               value={ageFilter}
               onChange={(v) => setAgeFilter(v as AgeBucket)}
-              placeholder="Kategori Umur"
+              placeholder="Semua Umur"
               options={[...AGE_BUCKETS]}
             />
             <div className="flex items-start">

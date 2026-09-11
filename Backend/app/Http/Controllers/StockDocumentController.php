@@ -51,11 +51,7 @@ class StockDocumentController extends Controller
             return $fromRequest;
         }
 
-        return match ($doc->type) {
-            'Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan' => 'Transaksi',
-            'Stock Opname' => 'Stock Opname',
-            default => 'Persediaan',
-        };
+        return AuditLogger::moduleForStockDocumentType($doc->type);
     }
 
     /**

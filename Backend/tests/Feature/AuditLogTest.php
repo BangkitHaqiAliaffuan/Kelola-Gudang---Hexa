@@ -10,6 +10,7 @@ use App\Models\Rack;
 use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\AuditLogger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -201,5 +202,60 @@ class AuditLogTest extends TestCase
         $this->artisan('audit:prune', ['--days' => 180])->assertSuccessful();
 
         $this->assertEquals(1, AuditLog::query()->count());
+    }
+
+    public function test_backfill_modules_dry_run_then_apply(): void
+    {
+        $this->actingAsPersistedAdmin();
+
+        $item = Item::factory()->create(['cost' => 1000]);
+        $wh = Warehouse::factory()->create();
+        $rack = Rack::factory()->create(['warehouse_id' => $wh->id]);
+        $bin = Bin::factory()->create(['rack_id' => $rack->id]);
+
+        // Dokumen baru otomatis Transaksi; paksa jadi Persediaan ala data lama.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-01',
+            'warehouse_id' => $wh->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1000, 'to_bin_id' => $bin->id]],
+        ])->assertStatus(201);
+
+        AuditLog::query()->where('auditable_type', 'StockDocument')->update(['module' => 'Persediaan']);
+        // Baris yatim (dokumen sudah dihapus) — harus dilewati.
+        AuditLog::query()->create([
+            'occurred_at' => now(),
+            'action' => 'Create',
+            'module' => 'Persediaan',
+            'auditable_type' => 'StockDocument',
+            'auditable_id' => 999999,
+        ]);
+
+        $this->artisan('audit:backfill-modules')->assertSuccessful();
+        $this->assertEquals(0, AuditLog::query()->where('module', 'Transaksi')->count());
+
+        $this->artisan('audit:backfill-modules', ['--apply' => true])->assertSuccessful();
+
+        $this->assertEquals(1, AuditLog::query()->where('module', 'Transaksi')->count());
+        $this->assertTrue(
+            AuditLog::query()->where('auditable_id', 999999)->where('module', 'Persediaan')->exists()
+        );
+        $this->assertTrue(
+            AuditLog::query()->where('record_no', 'Backfill modul audit')->exists()
+        );
+    }
+
+    public function test_module_map_covers_all_types(): void
+    {
+        $this->assertEquals('Transaksi', AuditLogger::moduleForStockDocumentType('Penerimaan'));
+        $this->assertEquals('Transaksi', AuditLogger::moduleForStockDocumentType('Pengeluaran'));
+        $this->assertEquals('Transaksi', AuditLogger::moduleForStockDocumentType('Transfer Gudang'));
+        $this->assertEquals('Transaksi', AuditLogger::moduleForStockDocumentType('Retur Pembelian'));
+        $this->assertEquals('Transaksi', AuditLogger::moduleForStockDocumentType('Retur Penjualan'));
+        $this->assertEquals('Persediaan', AuditLogger::moduleForStockDocumentType('Stock Adjustment'));
+        $this->assertEquals('Stock Opname', AuditLogger::moduleForStockDocumentType('Stock Opname'));
+        $this->assertEquals('Persediaan', AuditLogger::moduleForStockDocumentType('Tipe Aneh'));
+        $this->assertEquals('Persediaan', AuditLogger::moduleForStockDocumentType(null));
     }
 }

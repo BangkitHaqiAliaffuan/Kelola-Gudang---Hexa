@@ -199,24 +199,28 @@ class StockDocumentService
         }
 
         $frozenAt = $document->frozen_at ?? $document->created_at;
-        $moved = $lines->filter(function ($line) use ($document, $frozenAt) {
-            $q = StockMovement::where('item_id', $line->item_id)
-                ->where(function ($qTime) use ($frozenAt) {
-                    $qTime->where('created_at', '>', $frozenAt)
-                        ->orWhere('occurred_at', '>', $frozenAt);
-                })
-                ->where(function ($query) use ($document) {
-                    $query->whereNull('stock_document_id')
-                        ->orWhere('stock_document_id', '!=', $document->id);
-                });
-            if ($line->from_bin_id === null) {
-                $q->whereNull('bin_id');
-            } else {
-                $q->where('bin_id', $line->from_bin_id);
-            }
 
-            return $q->exists();
-        });
+        // Fase 2.4: satu query menggantikan N×EXISTS. Predikat per pasangan
+        // (item_id, from_bin_id) NULL-aware dipertahankan persis: from_bin NULL
+        // hanya cocok dengan movement bin NULL (K4 — versi tanpa bin akan
+        // over-blocking opname sah). Syarat waktu + eksklusi dokumen sendiri
+        // juga identik; pencocokan akhir di PHP agar NULL-aware.
+        $movedKeys = StockMovement::query()
+            ->whereIn('item_id', $lines->pluck('item_id')->unique()->values())
+            ->where(function ($qTime) use ($frozenAt) {
+                $qTime->where('created_at', '>', $frozenAt)
+                    ->orWhere('occurred_at', '>', $frozenAt);
+            })
+            ->where(function ($query) use ($document) {
+                $query->whereNull('stock_document_id')
+                    ->orWhere('stock_document_id', '!=', $document->id);
+            })
+            ->get(['item_id', 'bin_id'])
+            ->mapWithKeys(fn ($m) => [$m->item_id.':'.($m->bin_id ?? 'NULL') => true]);
+
+        $moved = $lines->filter(
+            fn ($line) => isset($movedKeys[$line->item_id.':'.($line->from_bin_id ?? 'NULL')])
+        );
 
         if ($moved->isNotEmpty()) {
             $labels = $this->labelsFor($moved);

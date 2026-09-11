@@ -15,6 +15,19 @@ use Illuminate\Http\Request;
  */
 class AuditLogger
 {
+    /**
+     * Modul menu asal dokumen stock — satu sumber kebenaran untuk pencatatan
+     * baru (resolveAuditModule) dan backfill baris lama (audit:backfill-modules).
+     */
+    public static function moduleForStockDocumentType(?string $type): string
+    {
+        return match ($type) {
+            'Penerimaan', 'Pengeluaran', 'Transfer Gudang', 'Retur Pembelian', 'Retur Penjualan' => 'Transaksi',
+            'Stock Opname' => 'Stock Opname',
+            default => 'Persediaan',
+        };
+    }
+
     public static function record(array $attrs, ?Request $request = null): ?AuditLog
     {
         if (app()->runningInConsole() && ! app()->runningUnitTests()) {

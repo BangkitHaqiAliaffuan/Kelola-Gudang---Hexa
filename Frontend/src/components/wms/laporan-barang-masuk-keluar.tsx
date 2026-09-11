@@ -30,6 +30,7 @@ import { LaporanTransferAnalytics } from "./laporan-transfer-analytics";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
@@ -530,20 +531,28 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
           />
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            aria-label="Dari tanggal"
-            className="rounded-xl"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            aria-label="Sampai tanggal"
-            className="rounded-xl"
-          />
+          <div className="space-y-1.5">
+            <Label>Dari tanggal</Label>
+            <Input
+              type="date"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="Dari tanggal"
+              className="rounded-xl"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sampai tanggal</Label>
+            <Input
+              type="date"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="Sampai tanggal"
+              className="rounded-xl"
+            />
+          </div>
         </div>
         <div className="mt-3 flex justify-end">
           <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />

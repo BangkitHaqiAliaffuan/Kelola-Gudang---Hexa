@@ -666,6 +666,47 @@ class StockOpnameApiTest extends TestCase
             ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'wajib dihitung ulang'));
     }
 
+    public function test_opname_tidak_terblokir_movement_di_bin_lain(): void
+    {
+        // K4 / Fase 2.4: guard batch wajib mempertahankan predikat bin
+        // (NULL-aware). Movement ke binB setelah freeze TIDAK boleh memblokir
+        // opname yang menghitung binA.
+        $item = $this->makeItem();
+        [$wh, $rack, $binA] = $this->makeLocation();
+        $binB = Bin::factory()->create(['rack_id' => $rack->id]);
+        $this->seedInbound($item, $wh, $binA, 10);
+        $this->seedInbound($item, $wh, $binB, 10);
+
+        $docId = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $binA->id],
+            ],
+        ])->assertStatus(201)->json('data.id');
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Selesai',
+            'document_date' => '2099-01-01',
+            'warehouse_id' => $wh->id,
+            'partner' => 'PT Bin Lain',
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 5, 'unit_cost' => 1000, 'to_bin_id' => $binB->id],
+            ],
+        ])->assertStatus(201);
+
+        $this->putJson("/api/persediaan/stock-documents/{$docId}", [
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $binA->id, 'actual_qty' => 10],
+            ],
+        ])->assertOk();
+
+        $this->postJson("/api/persediaan/stock-documents/{$docId}/post")->assertOk();
+    }
+
     public function test_update_preserves_line_audit_and_saves_reason_code(): void
     {
         // Audit trail butuh user ter-persist (id real) agar counted_by terisi.
