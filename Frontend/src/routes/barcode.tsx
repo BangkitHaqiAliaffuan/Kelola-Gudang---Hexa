@@ -469,7 +469,11 @@ function BarcodePage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+      {/* items-start: tiap Panel setinggi kontennya masing-masing.
+          Tanpa ini grid stretch membuat Panel Preview meregang mengikuti
+          Panel Pengaturan (yang berisi daftar barang) sehingga muncul
+          whitespace besar di bawah caption preview. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <Panel title="Pengaturan Label">
           <div className="space-y-4">
             <div className="space-y-1.5">
