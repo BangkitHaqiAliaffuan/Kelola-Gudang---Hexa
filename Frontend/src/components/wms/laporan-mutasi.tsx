@@ -232,6 +232,7 @@ export function LaporanMutasi() {
   h1{font-size:18px;margin:0}
   .mono{font-family:Consolas,monospace}
   .muted{color:#64748b;font-size:12px}
+  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
   table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
   th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
   th{background:#f1f5f9;font-size:12px}

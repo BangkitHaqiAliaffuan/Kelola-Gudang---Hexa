@@ -18,6 +18,7 @@ class SettingService
         'company.phone',
         'company.email',
         'company.currency',
+        'company.logo',
     ];
 
     public static function defaults(): array
@@ -29,6 +30,7 @@ class SettingService
             'company.phone' => '021-8899-2233',
             'company.email' => 'ops@kelolagudang.id',
             'company.currency' => 'IDR',
+            'company.logo' => '',
         ];
     }
 

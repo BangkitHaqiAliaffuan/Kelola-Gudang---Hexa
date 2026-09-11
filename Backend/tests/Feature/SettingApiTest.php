@@ -32,6 +32,31 @@ class SettingApiTest extends TestCase
         $this->getJson('/api/system/settings')->assertUnauthorized();
     }
 
+    public function test_update_logo_persists_and_appears_in_index(): void
+    {
+        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $logo = 'data:image/png;base64,'.base64_encode(random_bytes(1024));
+
+        $this->putJson('/api/system/settings', ['company' => ['logo' => $logo]])->assertOk();
+
+        $this->assertEquals($logo, SettingService::get('company.logo'));
+
+        $rows = collect($this->getJson('/api/system/settings')->json('data'));
+        $this->assertEquals($logo, $rows->firstWhere('key', 'company.logo')['value']);
+    }
+
+    public function test_update_logo_rejects_non_image_and_oversize(): void
+    {
+        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+
+        $this->putJson('/api/system/settings', ['company' => ['logo' => 'data:text/html;base64,PGI+']])
+            ->assertStatus(422);
+
+        $this->putJson('/api/system/settings', [
+            'company' => ['logo' => 'data:image/png;base64,'.str_repeat('A', 700000)],
+        ])->assertStatus(422);
+    }
+
     public function test_index_returns_defaults_for_system_baca(): void
     {
         $this->actingAsRole('SysReader', 'System', 'Baca');
@@ -40,6 +65,7 @@ class SettingApiTest extends TestCase
         $rows = collect($res->json('data'));
         $this->assertEquals('PT Kelola Nusantara', $rows->firstWhere('key', 'company.name')['value']);
         $this->assertTrue($rows->pluck('key')->contains('company.currency'));
+        $this->assertEquals('', $rows->firstWhere('key', 'company.logo')['value']);
     }
 
     public function test_update_requires_system_tulis(): void

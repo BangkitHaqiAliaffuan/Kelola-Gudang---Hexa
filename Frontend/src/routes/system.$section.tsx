@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Code2, Download, History, Search, Settings2, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -16,10 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { themes, useTheme } from "@/components/wms/theme";
-import { cn } from "@/lib/utils";
 import { formatDateTime, formatNumber } from "@/lib/wms-data";
 import { AUDIT_ACTIONS, useAuditLogs, type AuditLogApi } from "@/hooks/use-audit";
 import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/use-settings";
@@ -35,7 +31,7 @@ const meta: Record<string, { title: string; description: string }> = {
   },
   "general-setting": {
     title: "General Setting",
-    description: "Profil perusahaan, penomoran dokumen, dan preferensi sistem",
+    description: "Profil perusahaan untuk kop dokumen cetakan",
   },
   developer: {
     title: "Developer",
@@ -338,7 +334,6 @@ const PROFILE_FIELDS: Array<{ label: string; fieldKey: string; placeholder?: str
 ];
 
 function GeneralSetting() {
-  const { theme, setTheme } = useTheme();
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("System", "Tulis");
 
@@ -349,12 +344,32 @@ function GeneralSetting() {
   }, [settings, draft]);
   const save = useUpdateCompanySettings();
   const values = draft ?? settings ?? {};
+  const fileRef = useRef<HTMLInputElement>(null);
+  const logoValue = values["company.logo"] ?? "";
+  const handleLogoFile = (file: File | undefined) => {
+    if (!file) return;
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      toast.error("Logo harus berupa PNG atau JPEG.");
+      return;
+    }
+    if (file.size > 500 * 1024) {
+      toast.error("Ukuran logo maksimal 500 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      setDraft((d) => ({ ...(d ?? values), ["company.logo"]: String(reader.result ?? "") }));
+    reader.onerror = () => toast.error("Gagal membaca file logo.");
+    reader.readAsDataURL(file);
+  };
   const handleSave = () => {
     const company: Record<string, string | null> = {};
     for (const f of PROFILE_FIELDS) {
       const v = (values[f.fieldKey] ?? "").trim();
       company[f.fieldKey.replace("company.", "")] = v === "" ? null : v;
     }
+    const logo = logoValue.trim();
+    company["logo"] = logo === "" ? null : logo;
     save.mutate(company, {
       onSuccess: (res) => {
         setDraft(null);
@@ -393,6 +408,62 @@ function GeneralSetting() {
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Logo Perusahaan</Label>
+              <div className="flex flex-wrap items-center gap-3">
+                {logoValue ? (
+                  <img
+                    src={logoValue}
+                    alt="Logo perusahaan"
+                    className="h-12 w-auto rounded-lg border border-border object-contain"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground">
+                    —
+                  </div>
+                )}
+                {canWrite && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      Unggah
+                    </Button>
+                    {logoValue && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="rounded-xl"
+                        onClick={() =>
+                          setDraft((d) => ({ ...(d ?? values), ["company.logo"]: "" }))
+                        }
+                      >
+                        Hapus
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                className="hidden"
+                onChange={(e) => {
+                  handleLogoFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                PNG/JPEG maksimal 500 KB — tampil pada kop dokumen cetakan.
+              </p>
+              {fieldError(save.error, "company.logo") && (
+                <p className="text-xs text-destructive">{fieldError(save.error, "company.logo")}</p>
+              )}
+            </div>
             {PROFILE_FIELDS.map((f) => {
               const err = fieldError(save.error, f.fieldKey);
               return (
@@ -413,43 +484,6 @@ function GeneralSetting() {
             })}
           </div>
         )}
-      </Panel>
-
-      <Panel title="Preferensi Operasional" actions={<Pill tone="neutral">Segera</Pill>}>
-        <div className="space-y-2">
-          {[
-            ["Aktifkan approval berjenjang", true],
-            ["Izinkan stok negatif", false],
-            ["Wajib scan barcode saat penerimaan", true],
-            ["Kunci periode setelah tutup bulan", true],
-          ].map(([label, def]) => (
-            <div
-              key={label as string}
-              className="flex items-center justify-between rounded-xl border border-border px-3 py-3"
-            >
-              <Label className="text-sm font-medium">{label as string}</Label>
-              <Switch defaultChecked={def as boolean} disabled={!canWrite} />
-            </div>
-          ))}
-        </div>
-        <Separator className="my-5" />
-        <p className="mb-2 text-xs font-semibold text-muted-foreground">Tema Pastel Default</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {themes.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTheme(t.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium transition-colors hover:bg-accent",
-                theme === t.id ? "border-primary/40 bg-primary-soft" : "border-border",
-              )}
-            >
-              <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: t.swatch }} />
-              <span className="truncate">{t.label}</span>
-            </button>
-          ))}
-        </div>
       </Panel>
     </>
   );

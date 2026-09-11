@@ -34,5 +34,8 @@ export function companyKopHtml(company: CompanySettings | undefined): string {
   const meta = [company?.["company.address"]?.trim(), company?.["company.phone"]?.trim()]
     .filter(Boolean)
     .join(" · ");
-  return `<p class="mono muted">${escHtml(name)}${meta ? ` · ${escHtml(meta)}` : ""}</p>`;
+  const logo = company?.["company.logo"]?.trim() || "";
+  // data-URL aman di src="..." kutip-ganda (base64 tak mengandung & < > ").
+  const logoImg = logo ? `<img class="kop-logo" src="${logo}" alt="" />` : "";
+  return `${logoImg}<p class="mono muted">${escHtml(name)}${meta ? ` · ${escHtml(meta)}` : ""}</p>`;
 }

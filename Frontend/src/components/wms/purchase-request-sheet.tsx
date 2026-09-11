@@ -102,6 +102,7 @@ function printProcDoc(doc: ProcDocApi, kopHtml: string) {
   h1{font-size:18px;margin:0}
   .mono{font-family:Consolas,monospace}
   .muted{color:#64748b;font-size:12px}
+  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
   .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}
   .field{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
   .field b{display:block;font-size:13px}
