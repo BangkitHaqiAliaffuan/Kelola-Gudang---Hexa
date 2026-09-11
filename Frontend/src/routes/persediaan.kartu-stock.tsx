@@ -424,7 +424,7 @@ function KartuStock() {
         />
 
         <Panel title="Pilih Barang">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <FormCombobox
               value={activeId != null ? String(activeId) : ""}
               onValueChange={(v) => setId(Number(v))}
@@ -449,6 +449,14 @@ function KartuStock() {
             >
               <ScanLine className="h-4 w-4" />
             </Button>
+            <FilterSelect
+              className="w-full sm:w-48"
+              value={wh}
+              onChange={handleWhChange}
+              placeholder="Semua Gudang"
+              options={warehouses?.data.map((w) => w.name) ?? []}
+              loading={warehousesLoading}
+            />
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             Scan dengan kamera atau scanner fisik untuk memilih otomatis
@@ -640,14 +648,6 @@ function KartuStock() {
             placeholder="Semua PIC"
             options={picOptions}
             loading={card.isLoading}
-          />
-          <FilterSelect
-            className="w-full"
-            value={wh}
-            onChange={handleWhChange}
-            placeholder="Semua Gudang"
-            options={warehouses?.data.map((w) => w.name) ?? []}
-            loading={warehousesLoading}
           />
           <div className="flex w-full flex-col gap-1 col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2">
             <label className="text-xs text-muted-foreground mb-1 block">
