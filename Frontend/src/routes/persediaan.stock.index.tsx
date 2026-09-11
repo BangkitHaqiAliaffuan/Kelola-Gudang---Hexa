@@ -20,6 +20,7 @@ import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
 import { cn } from "@/lib/utils";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockRowApi } from "@/lib/persediaan-types";
 
@@ -82,6 +83,44 @@ function StockSaatIni() {
       ),
     [data, debouncedQ, wh, cat, itemCat],
   );
+
+  const handleExport = useCallback(() => {
+    const content = toCsv(
+      rows.map((it) => ({
+        nama: it.name ?? "—",
+        sku: it.sku ?? "—",
+        satuan: it.unit ?? "—",
+        gudang: it.warehouse ?? "—",
+        rak: it.rack ?? "—",
+        bin: it.bin ?? "—",
+        stock: it.stock,
+        reserved: it.reserved,
+        available: it.available,
+        min: it.min,
+        max: it.max ?? "—",
+        cost: it.cost,
+        status: it.status,
+      })),
+      [
+        { key: "nama", label: "Barang" },
+        { key: "sku", label: "SKU" },
+        { key: "satuan", label: "Satuan" },
+        { key: "gudang", label: "Gudang" },
+        { key: "rak", label: "Rak" },
+        { key: "bin", label: "Bin" },
+        { key: "stock", label: "Stock" },
+        { key: "reserved", label: "Reserved" },
+        { key: "available", label: "Available" },
+        { key: "min", label: "Min" },
+        { key: "max", label: "Max" },
+        { key: "cost", label: "HPP" },
+        { key: "status", label: "Status" },
+      ],
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    downloadCsv(`stock-saat-ini-${today}.csv`, content);
+    toast.success(`Export ${rows.length} baris`);
+  }, [rows]);
 
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
@@ -214,7 +253,8 @@ function StockSaatIni() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Export Excel diproses")}
+              onClick={handleExport}
+              disabled={rows.length === 0 || isLoading}
             >
               <Download className="h-4 w-4" /> Export
             </Button>

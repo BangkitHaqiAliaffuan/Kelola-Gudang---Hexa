@@ -19,6 +19,7 @@ import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatNumber } from "@/lib/wms-data";
 import {
   stockDocumentStatuses,
@@ -99,6 +100,34 @@ function MutasiStock() {
     [data, debouncedQ, type, status, wh],
   );
 
+  const handleExport = useCallback(() => {
+    const content = toCsv(
+      rows.map((d) => ({
+        no: d.no,
+        tanggal: formatDate(d.document_date),
+        jenis: d.type,
+        gudang: d.destination ? `${d.warehouse ?? "—"} → ${d.destination}` : (d.warehouse ?? "—"),
+        baris: d.line_count,
+        status: d.status,
+        partner: d.partner ?? "—",
+        catatan: d.note ?? "—",
+      })),
+      [
+        { key: "no", label: "Nomor" },
+        { key: "tanggal", label: "Tanggal" },
+        { key: "jenis", label: "Jenis" },
+        { key: "gudang", label: "Gudang" },
+        { key: "baris", label: "Baris" },
+        { key: "status", label: "Status" },
+        { key: "partner", label: "Partner" },
+        { key: "catatan", label: "Catatan" },
+      ],
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    downloadCsv(`mutasi-stock-${today}.csv`, content);
+    toast.success(`Export ${rows.length} dokumen`);
+  }, [rows]);
+
   const columns: Column<StockDocumentApi>[] = [
     {
       key: "no",
@@ -154,7 +183,8 @@ function MutasiStock() {
           <Button
             variant="outline"
             className="rounded-xl"
-            onClick={() => toast.success("Export Excel diproses")}
+            onClick={handleExport}
+            disabled={rows.length === 0 || isLoading}
           >
             <Download className="h-4 w-4" /> Export
           </Button>

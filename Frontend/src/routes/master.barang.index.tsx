@@ -550,7 +550,16 @@ function MasterBarang() {
               size="sm"
               variant="outline"
               className="rounded-lg"
-              onClick={() => toast.success("Label barcode dicetak")}
+              onClick={() => {
+                const skus = rows.filter((r) => selected.includes(r.id)).map((r) => r.sku);
+                const first = skus[0];
+                if (!first) return;
+                void navigate({ to: "/barcode", search: { sku: first } });
+                if (skus.length > 1)
+                  toast.info(
+                    `+${skus.length - 1} barang lain tidak ikut — halaman Barcode menerima 1 SKU`,
+                  );
+              }}
             >
               Cetak Barcode
             </Button>

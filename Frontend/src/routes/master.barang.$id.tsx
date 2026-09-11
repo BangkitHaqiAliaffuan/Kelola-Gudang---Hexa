@@ -421,7 +421,13 @@ function DetailBarang() {
                 >
                   <Paperclip className="h-4 w-4 text-muted-foreground" />
                   <span className="truncate">{f}</span>
-                  <Button size="sm" variant="ghost" className="ml-auto rounded-lg">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto rounded-lg"
+                    disabled
+                    title="Lampiran belum tersedia — unduhan belum didukung"
+                  >
                     Unduh
                   </Button>
                 </div>

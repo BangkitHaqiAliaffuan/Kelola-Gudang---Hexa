@@ -39,6 +39,7 @@ import {
   useSubmitStockDocumentApproval,
 } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatNumber } from "@/lib/wms-data";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
 
@@ -143,6 +144,35 @@ function StockAdjustment() {
     [data, debouncedQ, status, wh, dateFrom, dateTo],
   );
 
+  const handleExport = useCallback(() => {
+    const content = toCsv(
+      rows.map((d) => ({
+        no: d.no,
+        tanggal: formatDate(d.document_date),
+        gudang: d.warehouse ?? "—",
+        sumber:
+          d.source_document ?? (d.source_document_id ? `SO#${d.source_document_id}` : "Manual"),
+        baris: d.line_count,
+        status: d.status,
+        partner: d.partner ?? "—",
+        catatan: d.note ?? "—",
+      })),
+      [
+        { key: "no", label: "Nomor" },
+        { key: "tanggal", label: "Tanggal" },
+        { key: "gudang", label: "Gudang" },
+        { key: "sumber", label: "Sumber" },
+        { key: "baris", label: "Baris" },
+        { key: "status", label: "Status" },
+        { key: "partner", label: "Partner" },
+        { key: "catatan", label: "Catatan" },
+      ],
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    downloadCsv(`stock-adjustment-${today}.csv`, content);
+    toast.success(`Export ${rows.length} dokumen`);
+  }, [rows]);
+
   const columns: Column<StockDocumentApi>[] = [
     {
       key: "no",
@@ -210,7 +240,8 @@ function StockAdjustment() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Export Excel diproses")}
+              onClick={handleExport}
+              disabled={rows.length === 0}
             >
               <Download className="h-4 w-4" /> Export
             </Button>

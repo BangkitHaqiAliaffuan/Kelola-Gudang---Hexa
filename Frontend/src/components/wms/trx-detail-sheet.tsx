@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDate, formatIDR, formatNumber, type Trx } from "@/lib/wms-data";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 
 const statusTone = (s: Trx["status"]): Tone =>
   s === "Selesai"
@@ -51,6 +52,56 @@ export function TrxDetailSheet({
   editable?: boolean;
 }) {
   const steps = ["Dibuat", "Diverifikasi", "Diproses", "Selesai"];
+  const { data: company } = useCompanySettings();
+
+  const handlePrint = () => {
+    if (!trx) return;
+    const win = window.open("", "_blank", "width=900,height=650");
+    if (!win) {
+      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
+      return;
+    }
+    const tbody = trx.lines
+      .map(
+        (l, i) => `
+      <tr>
+        <td class="mono">${i + 1}</td>
+        <td>${l.name}</td>
+        <td class="mono">${l.sku}</td>
+        <td class="right">${formatNumber(l.qty)} ${l.unit}</td>
+        <td class="right">${formatIDR(l.price)}</td>
+        <td class="right">${formatIDR(l.qty * l.price)}</td>
+      </tr>`,
+      )
+      .join("");
+    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
+<title>Dokumen ${trx.no}</title>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
+  h1{font-size:18px;margin:0}
+  .mono{font-family:Consolas,monospace}
+  .muted{color:#64748b;font-size:12px}
+  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
+  th{background:#f1f5f9;font-size:12px}
+  .right{text-align:right}
+  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
+</style></head><body>
+<h1>${trx.type} — ${trx.no}</h1>
+${companyKopHtml(company)}
+<p class="mono muted">Tanggal: ${formatDate(trx.date)} · Gudang: ${trx.warehouse} · ${trx.destination ? `Tujuan: ${trx.destination}` : `Partner: ${trx.partner}`} · Ref: ${trx.reference} · PIC: ${trx.pic} · Status: ${trx.status}</p>
+<table>
+  <thead><tr><th>No</th><th>Barang</th><th>SKU</th><th class="right">Qty</th><th class="right">Harga</th><th class="right">Subtotal</th></tr></thead>
+  <tbody>${tbody}</tbody>
+</table>
+<p class="mono muted">Total qty: ${formatNumber(trx.qty)} · Total nilai: ${formatIDR(trx.value)}</p>
+<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 150);
+  };
   const activeStep =
     trx?.status === "Selesai"
       ? 4
@@ -175,7 +226,8 @@ export function TrxDetailSheet({
               <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => toast.success("Dokumen dikirim ke printer")}
+                onClick={handlePrint}
+                disabled={trx.lines.length === 0}
               >
                 <Printer className="h-4 w-4" /> Cetak
               </Button>

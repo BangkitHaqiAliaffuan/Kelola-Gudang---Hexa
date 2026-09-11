@@ -109,7 +109,8 @@ export function GenericMasterPage({ slug }: { slug: string }) {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Export berhasil")}
+              disabled
+              title="Halaman demo — export belum didukung"
             >
               <Download className="h-4 w-4" /> Export
             </Button>

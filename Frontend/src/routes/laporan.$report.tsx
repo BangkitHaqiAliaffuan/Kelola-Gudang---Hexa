@@ -26,8 +26,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocuments } from "@/hooks/use-persediaan";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { LaporanBarangMasukKeluar } from "@/components/wms/laporan-barang-masuk-keluar";
 import { LaporanKartuStock } from "@/components/wms/laporan-kartu-stock";
 import { LaporanMutasi } from "@/components/wms/laporan-mutasi";
@@ -132,8 +134,8 @@ function Laporan() {
   } = useStockDocuments({
     type: "Stock Opname",
   });
+  const { data: company } = useCompanySettings();
   const opnameRows: OpnameDoc[] = isStockOpname ? ((opnameDocs?.data ?? []) as OpnameDoc[]) : [];
-
   if (report === "stock") return <LaporanStock />;
   if (report === "barang-masuk") return <LaporanBarangMasukKeluar type="Penerimaan" />;
   if (report === "barang-keluar") return <LaporanBarangMasukKeluar type="Pengeluaran" />;
@@ -215,6 +217,63 @@ function Laporan() {
     },
   }));
 
+  const reportTitle = titles[report] ?? "Laporan";
+  const reportSlug = report.replace(/[^a-z0-9-]+/gi, "-");
+
+  const handleExport = () => {
+    const keys = headers.map((_, i) => `k${i}`);
+    const content = toCsv(
+      rows.map((r) => {
+        const cells = [r.a, r.b, r.c, r.d, r.e, r.f ?? "", r.g ?? ""].slice(0, headers.length);
+        return Object.fromEntries(keys.map((k, i) => [k, cells[i] ?? ""]));
+      }),
+      headers.map((label, i) => ({ key: `k${i}`, label })),
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    downloadCsv(`${reportSlug}-${today}.csv`, content);
+    toast.success(`Export ${rows.length} baris`);
+  };
+
+  const handlePrint = () => {
+    const win = window.open("", "_blank", "width=900,height=650");
+    if (!win) {
+      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
+      return;
+    }
+    const thead = headers.map((h) => `<th>${h}</th>`).join("");
+    const tbody = rows
+      .map((r) => {
+        const cells = [r.a, r.b, r.c, r.d, r.e, r.f ?? "", r.g ?? ""].slice(0, headers.length);
+        return `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+      })
+      .join("");
+    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
+<title>${reportTitle}</title>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
+  h1{font-size:18px;margin:0}
+  .mono{font-family:Consolas,monospace}
+  .muted{color:#64748b;font-size:12px}
+  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
+  th{background:#f1f5f9;font-size:12px}
+  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
+</style></head><body>
+<h1>${reportTitle}</h1>
+${companyKopHtml(company)}
+<p class="mono muted">Periode Agustus 2025 – Juli 2026 · ${formatNumber(rows.length)} baris</p>
+<table>
+  <thead><tr>${thead}</tr></thead>
+  <tbody>${tbody}</tbody>
+</table>
+<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 150);
+  };
+
   const whOptions = isStockOpname
     ? Array.from(new Set(opnameRows.map((d) => d.warehouse).filter((w): w is string => Boolean(w))))
     : warehouses.map((w) => w.name);
@@ -233,18 +292,20 @@ function Laporan() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Excel diunduh")}
+              onClick={handleExport}
+              disabled={rows.length === 0}
             >
               <FileSpreadsheet className="h-4 w-4" /> Excel
             </Button>
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("PDF diunduh")}
+              disabled
+              title="Export PDF belum didukung — gunakan Excel atau Print"
             >
               <Download className="h-4 w-4" /> PDF
             </Button>
-            <Button className="rounded-xl" onClick={() => toast.success("Dikirim ke printer")}>
+            <Button className="rounded-xl" onClick={handlePrint} disabled={rows.length === 0}>
               <Printer className="h-4 w-4" /> Print
             </Button>
           </>

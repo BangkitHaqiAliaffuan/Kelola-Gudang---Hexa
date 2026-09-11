@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { opnameReasonLabel } from "@/lib/persediaan-types";
 import type {
@@ -151,6 +152,7 @@ export function StockDocumentSheet({
   busy?: boolean;
 }) {
   const { user, hasModuleLevel } = useAuth();
+  const { data: company } = useCompanySettings();
   const canPost = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const canSubmit = hasModuleLevel("Persediaan", "Tulis");
@@ -178,6 +180,58 @@ export function StockDocumentSheet({
   const showRevenue = doc?.type === "Pengeluaran" || doc?.type === "Retur Penjualan" ? true : false;
   const totalOmzet = lines.reduce((s, l) => s + Math.abs(l.qty ?? 0) * (l.unit_price ?? 0), 0);
   const totalHpp = lines.reduce((s, l) => s + lineValue(l), 0);
+
+  const handlePrint = () => {
+    if (!doc) return;
+    const win = window.open("", "_blank", "width=900,height=650");
+    if (!win) {
+      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
+      return;
+    }
+    const gudang = doc.destination
+      ? `${doc.warehouse ?? "—"} → ${doc.destination}`
+      : (doc.warehouse ?? "—");
+    const tbody = lines
+      .map(
+        (l, i) => `
+      <tr>
+        <td class="mono">${i + 1}</td>
+        <td>${l.name ?? "—"}</td>
+        <td class="mono">${l.sku ?? "—"}</td>
+        <td>${l.unit ?? "—"}</td>
+        <td class="right">${lineQty(l)}</td>
+        <td class="right">${formatIDR(lineValue(l))}</td>
+      </tr>`,
+      )
+      .join("");
+    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
+<title>Dokumen ${doc.no}</title>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
+  h1{font-size:18px;margin:0}
+  .mono{font-family:Consolas,monospace}
+  .muted{color:#64748b;font-size:12px}
+  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
+  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
+  th{background:#f1f5f9;font-size:12px}
+  .right{text-align:right}
+  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
+</style></head><body>
+<h1>${doc.type} — ${doc.no}</h1>
+${companyKopHtml(company)}
+<p class="mono muted">Tanggal: ${formatDate(doc.document_date)} · Gudang: ${gudang} · Status: ${doc.status}${doc.partner ? ` · Partner: ${doc.partner}` : ""}${doc.reference_no ? ` · Ref: ${doc.reference_no}` : ""}${doc.pic ? ` · PIC: ${doc.pic}` : ""}</p>
+<table>
+  <thead><tr><th>No</th><th>Barang</th><th>SKU</th><th>Satuan</th><th class="right">Qty</th><th class="right">Nilai (HPP)</th></tr></thead>
+  <tbody>${tbody}</tbody>
+</table>
+<p class="mono muted">Total nilai: ${formatIDR(netValue)}</p>
+<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
+</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 150);
+  };
 
   if (isLoading && !doc) {
     return (
@@ -475,7 +529,8 @@ export function StockDocumentSheet({
               <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => toast.success("Dokumen dikirim ke printer")}
+                onClick={handlePrint}
+                disabled={lines.length === 0}
               >
                 <Printer className="h-4 w-4" /> Cetak
               </Button>

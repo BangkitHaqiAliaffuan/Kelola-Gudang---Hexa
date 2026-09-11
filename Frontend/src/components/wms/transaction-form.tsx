@@ -330,18 +330,20 @@ export function TransactionFormPage({
         <Button
           variant="outline"
           className="rounded-xl"
-          onClick={() => toast.success("Disimpan sebagai draft")}
+          disabled
+          title="Form demo — simpan draft belum didukung"
         >
           Simpan Draft
         </Button>
         <Button
           variant="outline"
           className="rounded-xl"
-          onClick={() => toast.success("Dokumen dikirim ke printer")}
+          disabled
+          title="Form demo — cetak belum didukung"
         >
           <Printer className="h-4 w-4" /> Cetak
         </Button>
-        <Button className="rounded-xl" onClick={() => toast.success("Transaksi berhasil disimpan")}>
+        <Button className="rounded-xl" disabled title="Form demo — simpan transaksi belum didukung">
           <Save className="h-4 w-4" /> Simpan
         </Button>
       </div>

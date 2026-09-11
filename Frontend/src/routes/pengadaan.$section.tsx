@@ -189,7 +189,8 @@ function ProcDetailSheet({
               <Button
                 variant="outline"
                 className="rounded-xl"
-                onClick={() => toast.success(`Dokumen ${doc.no} dikirim ke printer`)}
+                disabled
+                title="Dokumen demo — cetak belum didukung"
               >
                 <Printer className="h-4 w-4" />
                 Cetak
@@ -279,7 +280,8 @@ function PengadaanPage() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => toast.success("Data diekspor ke Excel")}
+              disabled
+              title="Halaman demo — export belum didukung"
             >
               <Download className="h-4 w-4" />
               Export

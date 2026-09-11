@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader, Panel } from "@/components/wms/kit";
 import { themes, useTheme } from "@/components/wms/theme";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/use-settings";
 
 export const Route = createFileRoute("/pengaturan")({
   head: () => ({
@@ -28,6 +30,47 @@ function Pengaturan() {
   const { theme, setTheme } = useTheme();
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("System", "Tulis");
+  // Profil perusahaan tersimpan di server (PUT /system/settings); hanya key
+  // yang dikenal backend yang dikirim (name, address). Kode perusahaan dan
+  // switch operasional tidak punya key backend — tidak ikut tersimpan.
+  const { data: settings, isLoading: settingsLoading } = useCompanySettings();
+  const [draft, setDraft] = useState<{ name: string; address: string } | null>(null);
+  useEffect(() => {
+    if (settings && draft === null)
+      setDraft({
+        name: settings["company.name"] ?? "",
+        address: settings["company.address"] ?? "",
+      });
+  }, [settings, draft]);
+  const save = useUpdateCompanySettings();
+  const shownName =
+    draft?.name ??
+    (settingsLoading ? "PT Kelola Gudang Nusantara" : (settings?.["company.name"] ?? ""));
+  const shownAddress =
+    draft?.address ??
+    (settingsLoading
+      ? "Jl. Industri Raya No. 88, Jakarta Timur"
+      : (settings?.["company.address"] ?? ""));
+  const handleSave = () => {
+    const n = shownName.trim();
+    const a = shownAddress.trim();
+    if (!n) {
+      toast.error("Nama perusahaan wajib diisi.");
+      return;
+    }
+    save.mutate(
+      { name: n, address: a === "" ? null : a },
+      {
+        onSuccess: (res) => {
+          setDraft(null);
+          toast.success(res.message || "Pengaturan disimpan");
+        },
+        onError: () => {
+          toast.error("Gagal menyimpan — periksa kembali isian.");
+        },
+      },
+    );
+  };
   return (
     <>
       <PageHeader title="Pengaturan" description="Preferensi aplikasi dan tampilan" />
@@ -51,29 +94,44 @@ function Pengaturan() {
         </div>
       </Panel>
 
-      <Panel title="Profil Perusahaan">
+      <Panel title="Profil Perusahaan" description="Tampil pada kop dokumen cetakan">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Nama Perusahaan</Label>
             <Input
-              defaultValue="PT Kelola Gudang Nusantara"
+              value={shownName}
+              onChange={(e) => setDraft({ name: e.target.value, address: shownAddress })}
               readOnly={!canWrite}
               className="rounded-xl"
             />
           </div>
           <div className="space-y-1.5">
             <Label>Kode Perusahaan</Label>
-            <Input defaultValue="KGN-001" readOnly={!canWrite} className="rounded-xl" />
+            <Input
+              defaultValue="KGN-001"
+              readOnly
+              disabled
+              title="Kode hanya label tampilan — tidak tersimpan di server"
+              className="rounded-xl"
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Alamat</Label>
             <Input
-              defaultValue="Jl. Industri Raya No. 88, Jakarta Timur"
+              value={shownAddress}
+              onChange={(e) => setDraft({ name: shownName, address: e.target.value })}
               readOnly={!canWrite}
               className="rounded-xl"
             />
           </div>
         </div>
+        {canWrite && (
+          <div className="mt-4 flex justify-end">
+            <Button className="rounded-xl" onClick={handleSave} disabled={save.isPending}>
+              {save.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </div>
+        )}
       </Panel>
 
       <Panel title="Preferensi Operasional">
@@ -96,13 +154,6 @@ function Pengaturan() {
             </div>
           ))}
         </div>
-        {canWrite && (
-          <div className="mt-4 flex justify-end">
-            <Button className="rounded-xl" onClick={() => toast.success("Pengaturan disimpan")}>
-              Simpan Perubahan
-            </Button>
-          </div>
-        )}
       </Panel>
     </>
   );
