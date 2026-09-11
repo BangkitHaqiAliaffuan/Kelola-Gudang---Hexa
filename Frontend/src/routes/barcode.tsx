@@ -777,7 +777,7 @@ function BarcodePage() {
                 </div>
               )}
               {preview.html !== "" && (
-                <div className="overflow-hidden rounded-xl border border-border bg-white">
+                <div className="overflow-hidden rounded-xl border border-border h-full bg-white">
                   {/* Skala via transform (bukan properti non-standar zoom):
                       tinggi wrapper mengikuti viewport (lantai 336px, langit
                       600px); tinggi konten = wrapper / skala; lebar 166.67%
