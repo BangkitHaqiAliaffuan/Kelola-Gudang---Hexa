@@ -23,6 +23,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import {
+  isRowFatalError,
+  normalizeHeaderKey,
+  numberAmbiguityWarning,
+  parseLocalizedNumber,
+  REQUIRED_CSV_HEADERS,
+  resolveImportRowStatus,
+  type ImportAutoCreateField,
+} from "@/lib/import-parse";
 import { formatNumber } from "@/lib/wms-data";
 import { nextSku } from "@/lib/sku";
 import {
@@ -49,7 +58,7 @@ type AutoCreateEntry = {
 type ParsedRow = {
   raw: RawRow;
   resolved: Partial<BulkImportItem>;
-  status: "valid" | "error" | "auto_create";
+  status: "valid" | "error" | "auto_create" | "skipped";
   errors: string[];
   warnings: string[];
   action: "create";
@@ -159,12 +168,6 @@ function findBinId(
   return match?.id ?? null;
 }
 
-function parseNumber(val: string | undefined): number | null {
-  if (!val?.trim()) return null;
-  const n = Number(val.replace(/[.,\s]/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
 export function ImportBarangDialog({
   open,
   onOpenChange,
@@ -214,7 +217,19 @@ export function ImportBarangDialog({
         header: true,
         skipEmptyLines: true,
         complete(results) {
-          const rows = results.data;
+          const knownLabels = CSV_HEADERS.map((h) => h.label);
+          const rows = (results.data as RawRow[]).map(
+            (r) =>
+              Object.fromEntries(
+                Object.entries(r).map(([k, v]) => [normalizeHeaderKey(k, knownLabels), v]),
+              ) as RawRow,
+          );
+          const have = new Set(Object.keys(rows[0] ?? {}));
+          const missing = REQUIRED_CSV_HEADERS.filter((h) => !have.has(h));
+          if (missing.length > 0) {
+            toast.error(`Header CSV tidak lengkap: ${missing.join(", ")}. Download template dulu.`);
+            return;
+          }
 
           // Pre-pass: collect unique names for auto-create entities
           const uniqueCatNames = new Set<string>();
@@ -330,24 +345,55 @@ export function ImportBarangDialog({
             else if (row["Bin Default"]?.trim())
               errors.push(`Bin '${row["Bin Default"]!.trim()}' tidak ditemukan`);
 
-            const cost = parseNumber(row["Harga Pokok"]);
+            const costRaw = row["Harga Pokok"];
+            const costAmb = numberAmbiguityWarning(costRaw ?? "", "money");
+            if (costAmb) warnings.push(costAmb);
+            const cost = parseLocalizedNumber(costRaw, "money");
             if (cost == null || cost < 100) errors.push("Harga Pokok minimal Rp 100");
             else resolved.cost = cost;
 
-            const price = parseNumber(row["Harga Jual"]);
+            const priceRaw = row["Harga Jual"];
+            const priceAmb = numberAmbiguityWarning(priceRaw ?? "", "money");
+            if (priceAmb) warnings.push(priceAmb);
+            const price = parseLocalizedNumber(priceRaw, "money");
             if (price == null || price < 100) errors.push("Harga Jual minimal Rp 100");
             else resolved.price = price;
 
-            resolved.min_stock = parseNumber(row["Stock Minimum"]) ?? 0;
+            const minRaw = row["Stock Minimum"];
+            const minAmb = numberAmbiguityWarning(minRaw ?? "", "int");
+            if (minAmb) warnings.push(minAmb);
+            const minStock = parseLocalizedNumber(minRaw, "int");
+            if (minStock != null && !Number.isInteger(minStock))
+              errors.push("Stock Minimum harus bilangan bulat");
+            else if (minStock != null && minStock < 0)
+              errors.push("Stock Minimum tidak boleh negatif");
+            else resolved.min_stock = minStock ?? 0;
 
-            const maxStock = parseNumber(row["Stock Maksimum"]);
-            if (maxStock != null) resolved.max_stock = maxStock;
+            const maxRaw = row["Stock Maksimum"];
+            const maxAmb = numberAmbiguityWarning(maxRaw ?? "", "int");
+            if (maxAmb) warnings.push(maxAmb);
+            const maxStock = parseLocalizedNumber(maxRaw, "int");
+            if (maxStock != null && !Number.isInteger(maxStock))
+              errors.push("Stock Maksimum harus bilangan bulat");
+            else if (maxStock != null && maxStock < 0)
+              errors.push("Stock Maksimum tidak boleh negatif");
+            else if (maxStock != null) resolved.max_stock = maxStock;
 
-            const leadTime = parseNumber(row["Lead Hari"]);
-            if (leadTime != null) resolved.lead_time = leadTime;
+            const leadRaw = row["Lead Hari"];
+            const leadAmb = numberAmbiguityWarning(leadRaw ?? "", "int");
+            if (leadAmb) warnings.push(leadAmb);
+            const leadTime = parseLocalizedNumber(leadRaw, "int");
+            if (leadTime != null && !Number.isInteger(leadTime))
+              errors.push("Lead Hari harus bilangan bulat");
+            else if (leadTime != null && leadTime < 0) errors.push("Lead Hari tidak boleh negatif");
+            else if (leadTime != null) resolved.lead_time = leadTime;
 
-            const weight = parseNumber(row["Berat"]);
-            if (weight != null) resolved.weight = weight;
+            const weightRaw = row["Berat"];
+            const weightAmb = numberAmbiguityWarning(weightRaw ?? "", "weight");
+            if (weightAmb) warnings.push(weightAmb);
+            const weight = parseLocalizedNumber(weightRaw, "weight");
+            if (weight != null && weight < 0) errors.push("Berat tidak boleh negatif");
+            else if (weight != null) resolved.weight = weight;
 
             const dimension = row["Dimensi"]?.trim() ?? null;
             if (dimension) resolved.dimension = dimension;
@@ -377,27 +423,12 @@ export function ImportBarangDialog({
             const action = "create" as const;
 
             // Determine row-level status
-            const hasAutoCreate = autoCreateCat || autoCreateMerk || autoCreateUnit;
-            const hasFatalError = errors.some(
-              (e) =>
-                !e.startsWith("Duplikat SKU") &&
-                !e.startsWith("Kategori '") &&
-                !e.startsWith("Merk '") &&
-                !e.startsWith("Satuan '") &&
-                !e.startsWith("Supplier '") &&
-                !e.startsWith("Gudang '") &&
-                !e.startsWith("Rak '") &&
-                !e.startsWith("Bin '"),
-            );
-
-            let status: ParsedRow["status"];
-            if (hasFatalError) {
-              status = "error";
-            } else if (hasAutoCreate) {
-              status = "auto_create";
-            } else {
-              status = "valid";
-            }
+            const status = resolveImportRowStatus({
+              errors,
+              autoCreateCat,
+              autoCreateMerk,
+              autoCreateUnit,
+            });
 
             return {
               raw: row,
@@ -432,86 +463,16 @@ export function ImportBarangDialog({
     [processFile],
   );
 
-  const toggleAutoCreate = useCallback(
-    (index: number, field: "autoCreateCat" | "autoCreateMerk" | "autoCreateUnit") => {
-      setParsedRows((prev) =>
-        prev
-          ? prev.map((row, i) => {
-              if (i !== index) return row;
-              const entry = row[field];
-              if (!entry) return row;
-              const updated = { ...entry, checked: !entry.checked };
-              const updatedRow = { ...row, [field]: updated };
-
-              // Recalculate status based on remaining auto-creates and errors
-              const hasAutoCreate =
-                (field === "autoCreateCat" ? updated.checked : row.autoCreateCat?.checked) ||
-                (field === "autoCreateMerk" ? updated.checked : row.autoCreateMerk?.checked) ||
-                (field === "autoCreateUnit" ? updated.checked : row.autoCreateUnit?.checked);
-
-              const fatalErrors = row.errors.filter(
-                (e) =>
-                  !e.startsWith("Duplikat SKU") &&
-                  !e.startsWith("Kategori '") &&
-                  !e.startsWith("Merk '") &&
-                  !e.startsWith("Satuan '") &&
-                  !e.startsWith("Supplier '") &&
-                  !e.startsWith("Gudang '") &&
-                  !e.startsWith("Rak '") &&
-                  !e.startsWith("Bin '"),
-              );
-
-              if (fatalErrors.length > 0) {
-                updatedRow.status = "error";
-              } else if (hasAutoCreate) {
-                updatedRow.status = "auto_create";
-              } else {
-                updatedRow.status = "valid";
-              }
-
-              return updatedRow;
-            })
-          : prev,
-      );
-    },
-    [],
-  );
-
   const toggleAllAutoCreate = useCallback(
-    (field: "autoCreateCat" | "autoCreateMerk" | "autoCreateUnit", checked: boolean) => {
+    (field: ImportAutoCreateField, checked: boolean, name?: string) => {
       setParsedRows((prev) =>
         prev
           ? prev.map((row) => {
               const entry = row[field];
               if (!entry) return row;
-              const updated = { ...entry, checked };
-              const updatedRow = { ...row, [field]: updated };
-
-              const hasAutoCreate =
-                (field === "autoCreateCat" ? updated.checked : row.autoCreateCat?.checked) ||
-                (field === "autoCreateMerk" ? updated.checked : row.autoCreateMerk?.checked) ||
-                (field === "autoCreateUnit" ? updated.checked : row.autoCreateUnit?.checked);
-
-              const fatalErrors = row.errors.filter(
-                (e) =>
-                  !e.startsWith("Duplikat SKU") &&
-                  !e.startsWith("Kategori '") &&
-                  !e.startsWith("Merk '") &&
-                  !e.startsWith("Satuan '") &&
-                  !e.startsWith("Supplier '") &&
-                  !e.startsWith("Gudang '") &&
-                  !e.startsWith("Rak '") &&
-                  !e.startsWith("Bin '"),
-              );
-
-              if (fatalErrors.length > 0) {
-                updatedRow.status = "error";
-              } else if (hasAutoCreate) {
-                updatedRow.status = "auto_create";
-              } else {
-                updatedRow.status = "valid";
-              }
-
+              if (name != null && entry.name !== name) return row;
+              const updatedRow = { ...row, [field]: { ...entry, checked } };
+              updatedRow.status = resolveImportRowStatus(updatedRow);
               return updatedRow;
             })
           : prev,
@@ -572,11 +533,12 @@ export function ImportBarangDialog({
   }, [parsedRows, bulkImport, onOpenChange]);
 
   const stats = useMemo(() => {
-    if (!parsedRows) return { valid: 0, autoCreate: 0, error: 0, total: 0 };
+    if (!parsedRows) return { valid: 0, autoCreate: 0, error: 0, skipped: 0, total: 0 };
     return {
       valid: parsedRows.filter((r) => r.status === "valid").length,
       autoCreate: parsedRows.filter((r) => r.status === "auto_create").length,
       error: parsedRows.filter((r) => r.status === "error").length,
+      skipped: parsedRows.filter((r) => r.status === "skipped").length,
       total: parsedRows.length,
     };
   }, [parsedRows]);
@@ -617,7 +579,9 @@ export function ImportBarangDialog({
           <DialogTitle>Import Barang</DialogTitle>
           <DialogDescription>
             Upload file CSV untuk import barang secara massal. Download template terlebih dahulu
-            untuk memastikan format benar.
+            untuk memastikan format benar. Tulis ribuan gaya Indonesia (50.000) atau desimal (0,5
+            atau 0.5); penulisan ambigu seperti 1.234 dibaca sebagai ribuan kecuali kolom Berat
+            (desimal) — tafsirnya tampil di kolom Catatan.
           </DialogDescription>
         </DialogHeader>
 
@@ -673,6 +637,11 @@ export function ImportBarangDialog({
                 <span className="flex items-center gap-1">
                   <XCircle className="h-3.5 w-3.5 text-destructive" /> {stats.error} Error
                 </span>
+                {stats.skipped > 0 && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    {stats.skipped} Dilewati
+                  </span>
+                )}
                 <span className="text-muted-foreground">/ {stats.total} total</span>
               </div>
 
@@ -694,13 +663,9 @@ export function ImportBarangDialog({
                         >
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={() => {
-                              // Find first row with this cat name and toggle
-                              const idx = parsedRows.findIndex(
-                                (r) => r.autoCreateCat?.name === name,
-                              );
-                              if (idx >= 0) toggleAutoCreate(idx, "autoCreateCat");
-                            }}
+                            onCheckedChange={(v) =>
+                              toggleAllAutoCreate("autoCreateCat", v === true, name)
+                            }
                           />
                           {name}
                         </label>
@@ -717,12 +682,9 @@ export function ImportBarangDialog({
                         >
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={() => {
-                              const idx = parsedRows.findIndex(
-                                (r) => r.autoCreateMerk?.name === name,
-                              );
-                              if (idx >= 0) toggleAutoCreate(idx, "autoCreateMerk");
-                            }}
+                            onCheckedChange={(v) =>
+                              toggleAllAutoCreate("autoCreateMerk", v === true, name)
+                            }
                           />
                           {name}
                         </label>
@@ -739,12 +701,9 @@ export function ImportBarangDialog({
                         >
                           <Checkbox
                             checked={checked}
-                            onCheckedChange={() => {
-                              const idx = parsedRows.findIndex(
-                                (r) => r.autoCreateUnit?.name === name,
-                              );
-                              if (idx >= 0) toggleAutoCreate(idx, "autoCreateUnit");
-                            }}
+                            onCheckedChange={(v) =>
+                              toggleAllAutoCreate("autoCreateUnit", v === true, name)
+                            }
                           />
                           {name}
                         </label>
@@ -808,10 +767,15 @@ export function ImportBarangDialog({
                               <XCircle className="h-3.5 w-3.5" /> Error
                             </span>
                           )}
+                          {row.status === "skipped" && (
+                            <span className="text-muted-foreground">Dilewati</span>
+                          )}
                         </td>
                         <td className="border-b border-border/50 px-2 py-1.5">
                           {row.status === "valid" || row.status === "auto_create" ? (
                             <span className="text-muted-foreground">Create</span>
+                          ) : row.status === "skipped" ? (
+                            <span className="text-muted-foreground">Dilewati</span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
@@ -835,6 +799,10 @@ export function ImportBarangDialog({
                                     <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
                                   </span>
                                 ))}
+                            </span>
+                          ) : row.status === "skipped" ? (
+                            <span className="text-muted-foreground">
+                              Auto-create dimatikan — baris dilewati impor.
                             </span>
                           ) : row.warnings.length > 0 ? (
                             <span className="text-warning">
