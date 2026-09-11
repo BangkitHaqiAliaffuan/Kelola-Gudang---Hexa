@@ -7,6 +7,7 @@ use App\Models\RolePermission;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\SettingService;
+use App\Support\Npwp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -25,6 +26,27 @@ class SettingApiTest extends TestCase
         Sanctum::actingAs($user, ['*'], 'sanctum');
 
         return $user;
+    }
+
+    public function test_shipped_defaults_pass_validation(): void
+    {
+        // Guard: default bawaan harus lolos rule-nya sendiri agar Simpan
+        // tanpa mengubah apa pun tidak pernah 422.
+        $this->assertTrue(Npwp::isValid(SettingService::defaults()['company.npwp']));
+    }
+
+    public function test_update_with_untouched_defaults_succeeds(): void
+    {
+        // Regresi: Simpan tanpa mengubah apa pun (seperti form General Setting)
+        // tidak boleh 422 — dulu gagal karena default NPWP tidak lolos checksum.
+        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+
+        $company = [];
+        foreach (SettingService::defaults() as $key => $value) {
+            $company[str_replace('company.', '', $key)] = $value;
+        }
+
+        $this->putJson('/api/system/settings', ['company' => $company])->assertOk();
     }
 
     public function test_index_requires_auth(): void

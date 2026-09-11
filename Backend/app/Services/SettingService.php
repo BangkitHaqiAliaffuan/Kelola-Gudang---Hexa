@@ -25,7 +25,7 @@ class SettingService
     {
         return [
             'company.name' => 'PT Kelola Nusantara',
-            'company.npwp' => '01.234.567.8-091.000',
+            'company.npwp' => '36.558.442.4-175.225',
             'company.address' => 'Jl. Industri Raya No. 88, Bekasi',
             'company.phone' => '021-8899-2233',
             'company.email' => 'ops@kelolagudang.id',

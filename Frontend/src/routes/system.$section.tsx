@@ -326,7 +326,11 @@ function AuditTrails() {
 
 const PROFILE_FIELDS: Array<{ label: string; fieldKey: string; placeholder?: string }> = [
   { label: "Nama Perusahaan", fieldKey: "company.name" },
-  { label: "NPWP", fieldKey: "company.npwp", placeholder: "15/16 digit" },
+  {
+    label: "NPWP",
+    fieldKey: "company.npwp",
+    placeholder: "15/16 digit, digit terakhir verifikasi otomatis",
+  },
   { label: "Alamat", fieldKey: "company.address" },
   { label: "Telepon", fieldKey: "company.phone" },
   { label: "Email", fieldKey: "company.email" },
