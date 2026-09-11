@@ -9,6 +9,8 @@ use App\Models\Item;
 use App\Models\Project;
 use App\Models\Rack;
 use App\Models\RolePermission;
+use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WorkOrder;
@@ -145,6 +147,128 @@ class LaporanKeluarAnalyticsTest extends TestCase
 
         $filter = $this->getJson('/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&jenis_tujuan=proyek')->assertOk();
         $this->assertEquals(6000.0, (float) $filter->json('data.ringkasan.nilai'));
+    }
+
+    public function test_filter_customer_id_menyaring_agregat(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 100, 1000);
+        $custA = Customer::factory()->create(['name' => 'PT A']);
+        $custB = Customer::factory()->create(['name' => 'PT B']);
+
+        foreach ([$custA->id => 10, $custB->id => 20] as $custId => $qty) {
+            $cust = $custId === $custA->id ? $custA : $custB;
+            $this->postJson('/api/persediaan/stock-documents', [
+                'type' => 'Pengeluaran',
+                'status' => 'Selesai',
+                'document_date' => '2026-07-10',
+                'warehouse_id' => $wh->id,
+                'customer_id' => $cust->id,
+                'partner' => $cust->name,
+                'lines' => [['item_id' => $item->id, 'qty' => $qty, 'from_bin_id' => $bin->id]],
+            ])->assertStatus(201);
+        }
+
+        $res = $this->getJson("/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&customer_id={$custA->id}")->assertOk();
+        $data = $res->json('data');
+
+        $this->assertEquals(10000.0, (float) $data['ringkasan']['nilai']);
+        $this->assertEquals(10, $data['ringkasan']['qty']);
+        $this->assertEquals(1, $data['ringkasan']['dokumen']);
+        $this->assertCount(1, $data['top_tujuan']);
+        $this->assertEquals('PT A', $data['top_tujuan'][0]['nama']);
+        $this->assertCount(1, $data['aktivitas']);
+        // Omzet ikut tersaring karena hanya dihitung dari dokumen scope.
+        $this->assertEquals(15000.0, (float) $data['omzet']['total']);
+    }
+
+    public function test_filter_department_id_menyaring_agregat(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 100, 1000);
+        $dept = Department::factory()->create(['name' => 'Produksi']);
+        $cust = Customer::factory()->create(['name' => 'PT Beli']);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-10',
+            'warehouse_id' => $wh->id,
+            'department_id' => $dept->id,
+            'partner' => $dept->name,
+            'lines' => [['item_id' => $item->id, 'qty' => 4, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201);
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-11',
+            'warehouse_id' => $wh->id,
+            'customer_id' => $cust->id,
+            'partner' => $cust->name,
+            'lines' => [['item_id' => $item->id, 'qty' => 6, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201);
+
+        $res = $this->getJson("/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&department_id={$dept->id}")->assertOk();
+        $data = $res->json('data');
+
+        $this->assertEquals(4000.0, (float) $data['ringkasan']['nilai']);
+        $this->assertEquals(1, $data['ringkasan']['dokumen']);
+        $this->assertCount(1, $data['top_tujuan']);
+        $this->assertEquals('departemen', $data['top_tujuan'][0]['jenis']);
+        // Dept/proyek at-cost: omzet hanya untuk customer → nol dalam scope ini.
+        $this->assertEquals(0.0, (float) $data['omzet']['total']);
+    }
+
+    public function test_retur_tersaring_oleh_filter_tujuan(): void
+    {
+        // DITUNDA: query $returs di LaporanController::keluarAnalytics belum
+        // mengenal customer_id/department_id/project_id/jenis_tujuan (hanya
+        // gudang+periode), sehingga pembilang rate tetap global. Frontend
+        // untuk sementara menghitung rate tersaring dari retur.per_tujuan
+        // (lihat returScoped di laporan-keluar-analytics.tsx). Aktifkan test
+        // ini setelah scope retur diperbaiki di controller.
+        $this->markTestSkipped('menunggu scope $returs per tujuan di LaporanController (terklaim sesi scale-fase2-laporan).');
+    }
+
+    public function test_dokumen_legacy_tanpa_fk_tidak_ikut_filter_id(): void
+    {
+        // Keterbatasan disengaja: filter ID bekerja di level query FK, sedang
+        // klasifikasi name-match (dokumen legacy tanpa FK) hanya terjadi di
+        // PHP pasca-query. Dokumen legacy tetap muncul global, tapi tidak ikut
+        // saat filter ID diminta. Penyimpanan baru selalu me-resolve FK
+        // (StoreStockDocumentRequest::prepareForValidation), jadi celah ini
+        // hanya menyangkut data legacy.
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 100, 1000);
+        $dept = Department::factory()->create(['name' => 'Gudang Legacy']);
+
+        $legacy = StockDocument::create([
+            'no' => 'BK/2026/99901',
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-12',
+            'warehouse_id' => $wh->id,
+            'partner' => $dept->name,
+            'posted_at' => '2026-07-12 10:00:00',
+        ]);
+        StockDocumentLine::create([
+            'document_id' => $legacy->id,
+            'line_no' => 1,
+            'item_id' => $item->id,
+            'qty' => 2,
+            'from_bin_id' => $bin->id,
+            'unit_cost' => 1000,
+        ]);
+
+        $global = $this->getJson('/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31')->assertOk();
+        $this->assertEquals(2000.0, (float) $global->json('data.ringkasan.nilai'));
+
+        $filtered = $this->getJson("/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&department_id={$dept->id}")->assertOk();
+        $this->assertEquals(0, $filtered->json('data.ringkasan.dokumen'));
+        $this->assertEquals(0.0, (float) $filtered->json('data.ringkasan.nilai'));
     }
 
     public function test_retur_tertaut_dan_alasan(): void

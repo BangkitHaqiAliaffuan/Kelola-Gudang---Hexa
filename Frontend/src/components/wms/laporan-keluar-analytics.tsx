@@ -94,22 +94,53 @@ export function LaporanKeluarAnalytics({
   const [jenis, setJenis] = useState<string>(ALL);
   const [tujuan, setTujuan] = useState<string>(ALL);
 
-  const { data, isLoading, isFetching, error, refetch } = useLaporanKeluarAnalytics({
-    from,
-    to,
-    warehouseId,
-    jenisTujuan: jenis === ALL ? null : (jenis as TujuanJenis),
-    enabled,
-  });
-  const a = data?.data;
-  const busy = isLoading || isFetching;
-
   // Satu dropdown untuk seluruh tujuan lintas jenis (cermin dropdown Tujuan di
   // form Barang Keluar): value `jenis:id-atau-nama` agar nama kembar lintas
   // jenis tidak tabrakan. Lainnya memakai nama karena tanpa FK.
   const tujuanKeyOf = (j: string, id: number | null, nama: string) => `${j}:${id ?? nama}`;
   const matchTujuan = (j: string, id: number | null, nama: string) =>
     tujuan === ALL || tujuan === tujuanKeyOf(j, id, nama);
+
+  // Tujuan terpilih diurai murni dari value dropdown (`jenis:id-atau-nama`)
+  // tanpa membaca agregat — stabil lintas refetch (agregat tersaring hanya
+  // memuat tujuan terpilih, sehingga lookup dari data akan hilang saat ganti
+  // pilihan). Non-lainnya selalu ber-ID numerik; nama ber-":" hanya mungkin
+  // pada lainnya yang memang tidak dikirim ke server (tanpa FK).
+  const selectedIds = useMemo(() => {
+    const none = {
+      kind: null as string | null,
+      customerId: null,
+      departmentId: null,
+      projectId: null,
+      isLainnya: false,
+    };
+    if (tujuan === ALL) return none;
+    const sep = tujuan.indexOf(":");
+    const j = sep < 0 ? "" : tujuan.slice(0, sep);
+    if (j === "lainnya" || j === "") return { ...none, kind: j || null, isLainnya: true };
+    const id = Number(tujuan.slice(sep + 1));
+    if (!Number.isInteger(id)) return { ...none, kind: j, isLainnya: true };
+    return {
+      kind: j,
+      customerId: j === "customer" ? id : null,
+      departmentId: j === "departemen" ? id : null,
+      projectId: j === "proyek" ? id : null,
+      isLainnya: false,
+    };
+  }, [tujuan]);
+
+  const { data, isLoading, isFetching, error, refetch } = useLaporanKeluarAnalytics({
+    from,
+    to,
+    warehouseId,
+    customerId: selectedIds.customerId,
+    departmentId: selectedIds.departmentId,
+    projectId: selectedIds.projectId,
+    jenisTujuan: jenis === ALL ? null : (jenis as TujuanJenis),
+    enabled,
+  });
+  const a = data?.data;
+  const busy = isLoading || isFetching;
 
   const tujuanOptions = useMemo(
     () =>
@@ -159,8 +190,34 @@ export function LaporanKeluarAnalytics({
     [a, tujuan],
   );
 
+  // Retur tersaring per tujuan — query $returs di server (sementara) hanya
+  // mengenal gudang+periode, jadi rate dihitung di sini dari rincian
+  // retur.per_tujuan yang sudah membawa dimensi tujuan. Rumus identik dengan
+  // server: rate = retur_tertujuan / total_keluar_scope. Tanpa filter tujuan,
+  // pakai angka server apa adanya (hindari selisih sen dari pembulatan ulang).
+  const returScoped = useMemo(() => {
+    if (!a) return null;
+    if (tujuan === ALL)
+      return {
+        nilai: a.retur.nilai,
+        qty: a.retur.qty,
+        rate_nilai: a.retur.rate_nilai,
+        rate_qty: a.retur.rate_qty,
+      };
+    const rows = (a.retur.per_tujuan ?? []).filter((r) => matchTujuan(r.jenis, r.id, r.nama));
+    const nilai = Math.round(rows.reduce((s, r) => s + r.nilai, 0) * 100) / 100;
+    const qty = rows.reduce((s, r) => s + r.qty, 0);
+    return {
+      nilai,
+      qty,
+      rate_nilai: a.ringkasan.nilai > 0 ? Math.round((nilai / a.ringkasan.nilai) * 10000) / 100 : 0,
+      rate_qty: a.ringkasan.qty > 0 ? Math.round((qty / a.ringkasan.qty) * 10000) / 100 : 0,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [a, tujuan]);
+
   const insight = useMemo(() => {
-    if (!a || a.top_tujuan.length === 0) return null;
+    if (!a || a.top_tujuan.length === 0 || !returScoped) return null;
     const top = a.top_tujuan[0]!;
     const parts = [
       `${top.nama} (${JENIS_LABEL[top.jenis]}) menyerap nilai terbesar: ${formatIDR(top.nilai)} (${top.share}% dari total).`,
@@ -169,21 +226,26 @@ export function LaporanKeluarAnalytics({
       const dir = a.ringkasan.mom.pct >= 0 ? "naik" : "turun";
       parts.push(`Nilai bulan terakhir ${dir} ${Math.abs(a.ringkasan.mom.pct)}% MoM.`);
     }
-    const risk = a.aktivitas.filter((r) => r.status === "at-risk").length;
+    const risk = atRisk.length;
     if (risk > 0) parts.push(`${risk} tujuan at-risk (tanpa order > 90 hari).`);
-    if (a.retur.rate_nilai > 0)
-      parts.push(`Tingkat retur ${a.retur.rate_nilai}% dari nilai keluar — cek panel retur.`);
+    if (returScoped.rate_nilai > 0)
+      parts.push(`Tingkat retur ${returScoped.rate_nilai}% dari nilai keluar — cek panel retur.`);
     if (a.proses.tertahan_dokumen > 0)
       parts.push(
         `${a.proses.tertahan_dokumen} dokumen (${formatIDRCompact(a.proses.tertahan_nilai)}) belum diposting.`,
       );
     return parts.join(" ");
-  }, [a]);
+  }, [a, returScoped, atRisk]);
 
   const handleExportCsv = () => {
     if (!a) return;
+    const scopeRows = a.per_tujuan_per_bulan.filter((r) => matchTujuan(r.jenis, r.id, r.nama));
+    const scopeOmzet = a.omzet.per_customer_per_bulan.filter((r) =>
+      matchTujuan(r.jenis, r.id, r.nama),
+    );
     const meta = [
       { keterangan: "Laporan", nilai: "Analitik Barang Keluar" },
+      { keterangan: "Cakupan Tujuan", nilai: tujuan === ALL ? "Semua" : tujuan },
       { keterangan: "Periode", nilai: `${formatDate(from)} s.d. ${formatDate(to)}` },
       { keterangan: "Total Nilai (pokok)", nilai: formatIDR(a.ringkasan.nilai) },
       { keterangan: "Total Qty", nilai: formatNumber(a.ringkasan.qty) },
@@ -199,7 +261,7 @@ export function LaporanKeluarAnalytics({
         { key: "nilai", label: "Nilai" },
       ]) +
       "\r\n" +
-      toCsv(a.per_tujuan_per_bulan, [
+      toCsv(scopeRows, [
         { key: "nama", label: "Tujuan" },
         { key: "jenis", label: "Jenis" },
         { key: "bulan", label: "Bulan" },
@@ -208,7 +270,7 @@ export function LaporanKeluarAnalytics({
         { key: "nilai", label: "Nilai" },
       ]) +
       "\r\n" +
-      toCsv(a.omzet.per_customer_per_bulan, [
+      toCsv(scopeOmzet, [
         { key: "nama", label: "Customer" },
         { key: "bulan", label: "Bulan" },
         { key: "dokumen", label: "Dokumen" },
@@ -225,12 +287,24 @@ export function LaporanKeluarAnalytics({
   if (!enabled) return null;
 
   const momPct = a?.ringkasan.mom?.pct ?? null;
+  // Bersih = omzet − omzet-retur; rincian omzet retur per tujuan belum
+  // tersedia di response, jadi kartu Omzet Bersih hanya valid global.
+  const omzetBersihTitle = busy
+    ? undefined
+    : tujuan === ALL
+      ? `Setelah retur ${formatIDR(a!.retur.omzet)}`
+      : "Hanya tersedia tanpa filter tujuan";
+  // Label jujur: kartu ringkasan mengikuti scope server. Tujuan ber-ID
+  // menyaring sampai level kartu; "lainnya" tanpa FK hanya menyaring tabel
+  // (ringkasan tetap selingkup jenis Lainnya).
+  const tujuanLabel =
+    tujuan === ALL ? null : (tujuanOptions.find((o) => o.value === tujuan)?.label ?? tujuan);
 
   return (
     <>
       <Panel
         title="Analitik Tujuan"
-        description="Nilai = nilai pokok persediaan (qty × unit_cost), dari dokumen Selesai"
+        description={`Nilai = nilai pokok persediaan (qty × unit_cost), dari dokumen Selesai${tujuanLabel ? ` · cakupan: ${tujuanLabel}` : ""}${selectedIds.isLainnya ? " (ringkasan selingkup jenis Lainnya)" : ""}`}
         actions={
           <Button
             variant="outline"
@@ -285,11 +359,11 @@ export function LaporanKeluarAnalytics({
           />
           <StatCard
             label="Tingkat Retur"
-            value={busy ? "…" : `${a!.retur.rate_nilai}%`}
+            value={busy || !returScoped ? "…" : `${returScoped.rate_nilai}%`}
             icon={Undo2}
-            tone={a && a.retur.rate_nilai > 5 ? "danger" : "warning"}
+            tone={returScoped && returScoped.rate_nilai > 5 ? "danger" : "warning"}
             loading={busy}
-            valueTitle={a ? `${formatIDR(a.retur.nilai)} diretur` : undefined}
+            valueTitle={returScoped ? `${formatIDR(returScoped.nilai)} diretur` : undefined}
             help={
               <HelpHint label="Penjelasan Tingkat Retur">
                 <p>
@@ -301,9 +375,7 @@ export function LaporanKeluarAnalytics({
           />
           <StatCard
             label="Tujuan At-Risk"
-            value={
-              busy ? "…" : formatNumber(a!.aktivitas.filter((r) => r.status === "at-risk").length)
-            }
+            value={busy ? "…" : formatNumber(atRisk.length)}
             icon={HeartPulse}
             tone="danger"
             loading={busy}
@@ -397,7 +469,7 @@ export function LaporanKeluarAnalytics({
 
       <Panel
         title="Omzet & Margin per Customer"
-        description={`Margin = omzet − HPP, khusus customer (dept/proyek at-cost, dikecualikan). Cakupan harga: ${a ? `${a.omzet.cakupan.aktual} aktual · ${a.omzet.cakupan.estimasi} estimasi · ${a.omzet.cakupan.tanpa_harga} tanpa harga` : "…"}`}
+        description={`Margin = omzet − HPP, khusus customer (dept/proyek at-cost, dikecualikan). Cakupan harga: ${a ? `${a.omzet.cakupan.aktual} aktual · ${a.omzet.cakupan.estimasi} estimasi · ${a.omzet.cakupan.tanpa_harga} tanpa harga` : "…"}${selectedIds.kind !== null && selectedIds.kind !== "customer" ? " · tujuan non-customer: panel ini Rp0 by-design" : ""}`}
       >
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
@@ -422,11 +494,11 @@ export function LaporanKeluarAnalytics({
           />
           <StatCard
             label="Omzet Bersih"
-            value={busy ? "…" : formatIDRCompact(a!.omzet.bersih)}
+            value={busy ? "…" : tujuan === ALL ? formatIDRCompact(a!.omzet.bersih) : "—"}
             icon={BadgeCheck}
             tone="brand"
             loading={busy}
-            valueTitle={a ? `Setelah retur ${formatIDR(a.retur.omzet)}` : undefined}
+            valueTitle={omzetBersihTitle}
           />
           <StatCard
             label="Top Margin"
@@ -508,7 +580,7 @@ export function LaporanKeluarAnalytics({
       {a && a.retur.qty > 0 && (
         <Panel
           title="Analisis Retur"
-          description={`Tingkat retur ${a.retur.rate_nilai}% nilai · ${a.retur.rate_qty}% qty (tertaut ke dokumen sumber)`}
+          description={`Tingkat retur ${returScoped?.rate_nilai ?? a.retur.rate_nilai}% nilai · ${returScoped?.rate_qty ?? a.retur.rate_qty}% qty (tertaut ke dokumen sumber)${tujuan === ALL ? "" : " · rincian alasan/item di bawah ini global"}`}
           actions={
             <HelpHint label="Penjelasan Analisis Retur">
               <p>
