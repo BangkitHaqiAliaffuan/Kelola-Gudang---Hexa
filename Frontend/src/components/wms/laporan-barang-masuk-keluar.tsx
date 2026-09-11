@@ -29,9 +29,11 @@ import { LaporanReturAnalytics } from "./laporan-retur-analytics";
 import { LaporanTransferAnalytics } from "./laporan-transfer-analytics";
 import { StockDocumentSheet } from "./stock-document-sheet";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useRowSelection } from "@/hooks/use-row-selection";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouses } from "@/hooks/use-master";
@@ -178,6 +180,16 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
     [data, qn, searchIndex, partner, status, partnerOf],
   );
 
+  // Seleksi baris untuk export/cetak terpilih. resetKey mencakup seluruh
+  // scope filter agar ID basi tidak bertahan saat filter berubah.
+  const { selected, toggle, toggleAll, clear } = useRowSelection(
+    JSON.stringify([type, debouncedQ, wh, partner, status, from, to]),
+  );
+  const selectedRows = useMemo(
+    () => (selected.length === 0 ? rows : rows.filter((d) => selected.includes(d.id))),
+    [rows, selected],
+  );
+
   const stats = useMemo(() => {
     const docs = rows.length;
     const qty = rows.reduce((s, d) => s + Math.abs(d.qty_total ?? 0), 0);
@@ -207,16 +219,22 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
     from && to && from <= to ? `${formatDate(from)} s.d. ${formatDate(to)}` : "Semua periode";
 
   const handleExportCsv = () => {
+    // Bila ada baris terpilih, export/cetak hanya yang dipilih; bila tidak,
+    // seluruh hasil filter (perilaku lama).
+    const target = selectedRows;
+    const scopeNote =
+      selected.length > 0 ? `${formatNumber(selected.length)} dokumen terpilih` : null;
     const metaRows = [
       { keterangan: "Laporan", nilai: title },
       { keterangan: "Periode", nilai: periodLabel },
       { keterangan: "Gudang", nilai: wh === ALL ? "Semua" : wh },
       { keterangan: partnerLabel, nilai: partner === ALL ? "Semua" : partner },
       { keterangan: "Status", nilai: status === ALL ? "Semua" : status },
-      { keterangan: "Baris", nilai: `${formatNumber(rows.length)} dokumen` },
+      { keterangan: "Baris", nilai: `${formatNumber(target.length)} dokumen` },
+      ...(scopeNote ? [{ keterangan: "Cakupan", nilai: scopeNote }] : []),
       { keterangan: "Dicetak", nilai: new Date().toLocaleString("id-ID") },
     ];
-    const dataRows = rows.map((d) => ({
+    const dataRows = target.map((d) => ({
       no: d.no,
       tanggal: d.document_date,
       tipe: d.type,
@@ -247,7 +265,11 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
         { key: "status", label: "Status" },
       ]);
     downloadCsv(`laporan-${meta.slug}-${from}-${to}.csv`, content);
-    toast.success("CSV diunduh");
+    toast.success(
+      selected.length > 0
+        ? `CSV ${formatNumber(selected.length)} dokumen terpilih diunduh`
+        : "CSV diunduh",
+    );
   };
 
   const handlePrint = () => {
@@ -256,7 +278,8 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
       toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
       return;
     }
-    const tbody = rows
+    const target = selectedRows;
+    const tbody = target
       .map(
         (d) => `
       <tr>
@@ -286,7 +309,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
   .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
 </style></head><body>
 <h1>${title}</h1>
-<p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${formatNumber(rows.length)} dokumen</p>
+<p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${formatNumber(target.length)} dokumen${selected.length > 0 ? " (terpilih)" : ""}</p>
 <table>
   <thead><tr><th>Nomor</th><th>Tanggal</th><th>Gudang</th><th>${partnerLabel}</th><th>Referensi</th><th class="right">Qty</th><th class="right">Nilai</th><th>PIC</th><th>Status</th></tr></thead>
   <tbody>${tbody}</tbody>
@@ -588,7 +611,14 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
 
       <Panel
         title="Detail Laporan"
-        description={`${formatNumber(rows.length)} dokumen${isFetching ? " · memperbarui..." : ""}`}
+        description={`${formatNumber(rows.length)} dokumen${selected.length > 0 ? ` · ${formatNumber(selected.length)} terpilih` : ""}${isFetching ? " · memperbarui..." : ""}`}
+        actions={
+          selected.length > 0 ? (
+            <Button variant="ghost" size="sm" className="rounded-lg" onClick={clear}>
+              Batalkan pilihan
+            </Button>
+          ) : undefined
+        }
       >
         <DataTable
           columns={columns}
@@ -599,11 +629,23 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
           onRetry={() => refetch()}
           initialSort={{ key: "document_date", dir: "desc" }}
           onRowClick={(r) => setSelectedId(r.id)}
-          mobileCard={(r) => (
+          selection={{ selected, onToggle: toggle, onToggleAll: toggleAll }}
+          mobileCard={(r, sel) => (
             <div className="space-y-1.5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <p className="truncate font-mono text-sm font-semibold">{r.no}</p>
-                <Pill tone={statusTone(r.status)}>{r.status}</Pill>
+                <div className="flex items-center gap-2">
+                  <Pill tone={statusTone(r.status)}>{r.status}</Pill>
+                  {sel && (
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={sel.selected}
+                        onCheckedChange={sel.onToggle}
+                        aria-label={`Pilih ${r.no}`}
+                      />
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="truncate text-xs text-muted-foreground">
                 {formatDate(r.document_date)} · {r.warehouse ?? "—"}

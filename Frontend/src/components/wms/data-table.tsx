@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatQueryError } from "@/lib/api";
+import { selectionState } from "@/hooks/use-row-selection";
 import { EmptyState, TableSkeleton } from "./kit";
 
 export type Column<T> = {
@@ -34,6 +36,19 @@ function compare(a: unknown, b: unknown): number {
   return String(a ?? "").localeCompare(String(b ?? ""), "id");
 }
 
+/** Kontrol selection dari pemilik tabel (lihat useRowSelection). */
+export type TableSelection = {
+  selected: (string | number)[];
+  onToggle: (id: string | number) => void;
+  onToggleAll: (allIds: (string | number)[]) => void;
+};
+
+/** Info seleksi per baris untuk render mobileCard. */
+export type MobileSelection = {
+  selected: boolean;
+  onToggle: () => void;
+};
+
 export function DataTable<T extends { id: string | number }>({
   columns,
   rows,
@@ -50,10 +65,11 @@ export function DataTable<T extends { id: string | number }>({
   serverTotalRows,
   serverTotalPages,
   onServerPageChange,
+  selection,
 }: {
   columns: Column<T>[];
   rows: T[];
-  mobileCard: (row: T) => ReactNode;
+  mobileCard: (row: T, sel?: MobileSelection) => ReactNode;
   pageSize?: number;
   loading?: boolean;
   /** Error query — bila diisi, tampil panel error (bukan empty state). */
@@ -69,6 +85,12 @@ export function DataTable<T extends { id: string | number }>({
   serverTotalRows?: number;
   serverTotalPages?: number;
   onServerPageChange?: ((page: number) => void) | undefined;
+  /**
+   * Seleksi baris opt-in (kolom checkbox + highlight). Pilih-semua mencakup
+   * seluruh `rows` (scope filter), bukan hanya halaman tampil — konsisten
+   * dengan pola halaman barang. Klik checkbox tidak memicu onRowClick.
+   */
+  selection?: TableSelection | undefined;
 }) {
   const isServer = onServerPageChange != null;
   const [page, setPage] = useState(1);
@@ -95,6 +117,47 @@ export function DataTable<T extends { id: string | number }>({
     });
   }, [rows, sort, columns]);
   const slice = isServer ? sorted : sorted.slice((current - 1) * pageSize, current * pageSize);
+
+  // Kolom checkbox disuntik di depan bila selection aktif. Bukan sortable
+  // sehingga tidak mengganggu initialSort; klik di-stopPropagation agar tidak
+  // memicu onRowClick (pola yang sama dipakai halaman barang).
+  const selectState = selectionState(
+    selection?.selected ?? [],
+    rows.map((r) => r.id),
+  );
+  const sel = selection!;
+  const selectColumn: Column<T> | null = selection
+    ? {
+        key: "___select",
+        label: "",
+        className: "w-10",
+        header:
+          rows.length > 0 ? (
+            <span onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={
+                  selectState.all ? true : selectState.some ? ("indeterminate" as const) : false
+                }
+                onCheckedChange={() => sel.onToggleAll(rows.map((r) => r.id))}
+                aria-label="Pilih semua"
+              />
+            </span>
+          ) : (
+            ""
+          ),
+        render: (row) => (
+          <span onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={sel.selected.includes(row.id)}
+              onCheckedChange={() => sel.onToggle(row.id)}
+              aria-label="Pilih baris"
+            />
+          </span>
+        ),
+      }
+    : null;
+  const visibleColumns = selectColumn ? [selectColumn, ...columns] : columns;
+  const isSelected = (row: T) => selection != null && selection.selected.includes(row.id);
 
   const goPage = (p: number) => {
     if (isServer) {
@@ -155,7 +218,7 @@ export function DataTable<T extends { id: string | number }>({
         <table className="w-full min-w-[720px] border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              {columns.map((c) => (
+              {visibleColumns.map((c) => (
                 <th
                   key={c.key}
                   className={cn(
@@ -191,10 +254,11 @@ export function DataTable<T extends { id: string | number }>({
                 className={cn(
                   "group transition-colors hover:bg-accent/40",
                   onRowClick && "cursor-pointer",
+                  isSelected(row) && "bg-primary/[0.04]",
                   rowClassName?.(row),
                 )}
               >
-                {columns.map((c) => (
+                {visibleColumns.map((c) => (
                   <td
                     key={c.key}
                     className={cn(
@@ -222,10 +286,16 @@ export function DataTable<T extends { id: string | number }>({
             onClick={() => onRowClick?.(row)}
             className={cn(
               "rounded-xl border border-border bg-card p-3.5 shadow-soft transition-colors active:bg-accent/40",
+              isSelected(row) && "border-primary/40 bg-primary/[0.04]",
               rowClassName?.(row),
             )}
           >
-            {mobileCard(row)}
+            {mobileCard(
+              row,
+              selection
+                ? { selected: isSelected(row), onToggle: () => selection.onToggle(row.id) }
+                : undefined,
+            )}
           </div>
         ))}
       </div>
