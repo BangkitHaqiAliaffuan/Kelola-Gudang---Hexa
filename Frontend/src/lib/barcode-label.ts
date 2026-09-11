@@ -480,6 +480,26 @@ ${pages.join("\n")}
 </html>`;
 }
 
+/**
+ * Varian preview-layar dari dokumen print: baris-baris label direnggangkan
+ * vertikal mengisi penuh tinggi section preview (iframe sandbox di /barcode).
+ * HANYA untuk `srcDoc` preview — builder cetak (`buildPrintHtml`) dan helper
+ * unduhan tidak tersentuh sehingga hasil printer tetap sesuai ukuran mm.
+ * Ukuran tiap label tidak diubah (tetap mm via `.label`); yang berubah hanya
+ * distribusi ruang kosong antar baris grid (satu baris tetap di atas,
+ * persis posisi cetak).
+ */
+export function withPreviewStretch(printHtml: string): string {
+  const style = [
+    "<style>",
+    "html, body { height: 100%; }",
+    ".sheet { min-height: 100%; }",
+    ".page { min-height: 100%; align-content: space-between; }",
+    "</style>",
+  ].join("");
+  return printHtml.replace("</head>", `${style}</head>`);
+}
+
 const PX_PER_MM = 96 / 25.4;
 /** Resolusi PNG 300 DPI untuk cetak tajam (96 DPI = 3.78 px/mm, 300 DPI = 11.81 px/mm). */
 const PX_PER_MM_300 = 300 / 25.4;

@@ -37,6 +37,7 @@ import {
   qrSideForTemplate,
   templateDims,
   validateTemplate,
+  withPreviewStretch,
   type BarcodeKind,
   type CodeSource,
   type LabelTemplate,
@@ -317,7 +318,9 @@ function BarcodePage() {
     return { labels, failedIds };
   }, [rows, items, kind, source, template]);
 
-  /** Preview WYSIWYG: string HTML yang PERSIS SAMA dengan yang dikirim ke printer. */
+  /** Preview WYSIWYG: dokumen yang SAMA dengan yang dikirim ke printer
+   * (sumber tunggal `buildPrintHtml`), dilapisi regangan vertikal khusus
+   * layar (`withPreviewStretch`) agar konten mengisi penuh tinggi section. */
   const preview = useMemo(() => {
     if (rows.length === 0) return null;
     if (draftError !== null) return { html: "", failed: [] as ItemApi[] };
@@ -326,7 +329,7 @@ function BarcodePage() {
       .map((id) => items.find((i) => i.id === id))
       .filter((x): x is ItemApi => x !== undefined);
     if (labels.length === 0) return { html: "", failed };
-    return { html: buildPrintHtml({ template, labels }), failed };
+    return { html: withPreviewStretch(buildPrintHtml({ template, labels })), failed };
   }, [rows, tryBuildLabels, items, template, draftError]);
 
   /** Barang yang nilainya bisa ditetapkan sebagai barcode produk (satu klik).
@@ -781,7 +784,9 @@ function BarcodePage() {
                   {/* Skala via transform (bukan properti non-standar zoom):
                       tinggi wrapper mengikuti viewport (lantai 336px, langit
                       600px); tinggi konten = wrapper / skala; lebar 166.67%
-                      (= 1/skala) agar tidak ada ruang kosong. */}
+                      (= 1/skala) agar tidak ada ruang kosong. Isi srcDoc
+                      dilapisi `withPreviewStretch` agar baris label merentang
+                      penuh tinggi section (cetak tidak terpengaruh). */}
                   <div className="overflow-hidden" style={{ height: previewBoxH }}>
                     <iframe
                       title="Preview label persis hasil cetak"
@@ -798,7 +803,9 @@ function BarcodePage() {
                   </div>
                   <p className="border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
                     Preview di atas adalah dokumen yang persis dikirim ke printer (diperkecil 60%,
-                    tinggi mengikuti layar). Garis putus-putus hanya panduan potong di layar.
+                    tinggi mengikuti layar). Baris label direnggangkan mengisi penuh tinggi preview
+                    — ukuran cetak tetap sesuai milimeter. Garis putus-putus hanya panduan potong di
+                    layar.
                   </p>
                 </div>
               )}

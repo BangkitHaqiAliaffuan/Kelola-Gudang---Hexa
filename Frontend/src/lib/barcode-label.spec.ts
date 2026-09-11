@@ -20,6 +20,7 @@ import {
   svgNaturalSize,
   templateDims,
   validateTemplate,
+  withPreviewStretch,
   type LabelTemplate,
 } from "./barcode-label";
 
@@ -486,5 +487,24 @@ describe("fitText", () => {
     const r = fitText(ctx, "A".repeat(100), { startSize: 20, maxWidth: 100 });
     expect(r.size).toBe(12); // 60% dari 20
     expect(r.text.endsWith("…")).toBe(true);
+  });
+});
+
+describe("withPreviewStretch", () => {
+  const labels = [{ svg: "<svg></svg>", name: "I", meta: "m", kind: "Barcode" as const }];
+
+  it("konten preview merentang penuh tinggi section tanpa mengubah ukuran label", () => {
+    const preview = withPreviewStretch(buildPrintHtml({ size: "50x30", labels }));
+    expect(preview).toContain("min-height: 100%");
+    expect(preview).toContain("align-content: space-between");
+    // Ukuran label mm tidak tersentuh style preview (tidak ada height:auto
+    // pada .label — label tetap berukuran cetak asli).
+    expect(preview).not.toMatch(/\.label\s*\{[^}]*height:\s*auto/);
+  });
+
+  it("dokumen cetak tidak mengandung style khusus preview", () => {
+    const print = buildPrintHtml({ size: "50x30", labels });
+    expect(print).not.toContain("align-content: space-between");
+    expect(print).not.toContain("min-height: 100%");
   });
 });
