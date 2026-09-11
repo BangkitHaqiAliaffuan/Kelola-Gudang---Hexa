@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useProcDocPo, useProcDocsPo } from "@/hooks/use-purchase-order";
 import { formatDate, formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
@@ -53,7 +54,9 @@ export function PurchaseOrderPage() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [supplier, setSupplier] = useState(ALL);
   const [myApproval, setMyApproval] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -65,10 +68,10 @@ export function PurchaseOrderPage() {
   const handleClearFilters = useCallback(() => {
     setQ("");
     setStatus(ALL);
-    setWh(ALL);
+    whFilter.reset();
     setSupplier(ALL);
     setMyApproval(false);
-  }, []);
+  }, [whFilter]);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -133,6 +136,13 @@ export function PurchaseOrderPage() {
       render: (r) => r.department ?? "—",
     },
     {
+      key: "warehouse",
+      label: "Gudang",
+      className: "min-w-[140px] whitespace-nowrap",
+      sortable: true,
+      render: (r) => r.warehouse ?? "—",
+    },
+    {
       key: "qty_total",
       label: "Qty",
       className: "text-right w-[90px] whitespace-nowrap",
@@ -167,6 +177,7 @@ export function PurchaseOrderPage() {
           supplier: r.supplier ?? "",
           reference: r.reference ?? "",
           departemen: r.department ?? "",
+          gudang: r.warehouse ?? "",
           qty: r.qty_total ?? 0,
           nilai: r.value_total ?? 0,
           status: r.status,
@@ -177,6 +188,7 @@ export function PurchaseOrderPage() {
           { key: "supplier", label: "Supplier" },
           { key: "reference", label: "No. PR" },
           { key: "departemen", label: "Departemen" },
+          { key: "gudang", label: "Gudang" },
           { key: "qty", label: "Qty" },
           { key: "nilai", label: "Nilai" },
           { key: "status", label: "Status" },
@@ -262,7 +274,7 @@ export function PurchaseOrderPage() {
           <FilterSelect
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
-            onChange={setWh}
+            onChange={whFilter.onChange}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
@@ -319,7 +331,7 @@ export function PurchaseOrderPage() {
                 <Pill tone={statusTone(r.status)}>{r.status}</Pill>
               </div>
               <p className="truncate text-xs text-muted-foreground">
-                {formatDate(r.document_date)} · {r.supplier ?? "—"}
+                {formatDate(r.document_date)} · {r.supplier ?? "—"} · {r.warehouse ?? "—"}
               </p>
               <p className="text-xs text-muted-foreground">
                 No. PR: {r.reference ?? "—"} · {formatNumber(r.qty_total ?? 0)} qty

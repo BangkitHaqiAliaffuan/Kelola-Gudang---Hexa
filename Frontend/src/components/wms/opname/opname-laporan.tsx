@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocuments } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -37,7 +38,9 @@ export function OpnameLaporanPage() {
 
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [status, setStatus] = useState(ALL);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -48,12 +51,12 @@ export function OpnameLaporanPage() {
   );
   const handleClearFilters = useCallback(() => {
     setQ("");
-    setWh(ALL);
+    whFilter.reset();
     setStatus(ALL);
     setDateFrom("");
     setDateTo("");
     setVisible(2);
-  }, []);
+  }, [whFilter]);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
   const searchIndex = useMemo(
@@ -207,7 +210,7 @@ export function OpnameLaporanPage() {
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={wh}
             onChange={(v) => {
-              setWh(v);
+              whFilter.onChange(v);
               setVisible(2);
             }}
             placeholder="Semua Gudang"

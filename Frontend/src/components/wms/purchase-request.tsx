@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDepartments, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
 import { useProcDoc, useProcDocs } from "@/hooks/use-pengadaan";
@@ -208,7 +209,9 @@ export function PurchaseRequestPage() {
   const debouncedQ = useDebouncedValue(q);
   const [status, setStatus] = useState(ALL);
   const [dept, setDept] = useState(ALL);
-  const [wh, setWh] = useState(ALL);
+  // Filter gudang: pilihan tersimpan per user → default user → Semua.
+  const whFilter = useWarehouseFilter(warehouses?.data);
+  const wh = whFilter.value;
   const [myApproval, setMyApproval] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [restockOpen, setRestockOpen] = useState(false);
@@ -222,9 +225,9 @@ export function PurchaseRequestPage() {
     setQ("");
     setStatus(ALL);
     setDept(ALL);
-    setWh(ALL);
+    whFilter.reset();
     setMyApproval(false);
-  }, []);
+  }, [whFilter]);
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -420,7 +423,7 @@ export function PurchaseRequestPage() {
             <FilterSelect
               className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={wh}
-              onChange={setWh}
+              onChange={whFilter.onChange}
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
               loading={warehousesLoading}

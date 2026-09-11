@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { FormCombobox } from "@/components/wms/form-combobox";
 import { EmptyState } from "@/components/wms/kit";
 import { useAuth } from "@/hooks/use-auth";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useUsers, useWarehouses } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockDocuments, useStockRows } from "@/hooks/use-persediaan";
 import { formatNumber } from "@/lib/wms-data";
@@ -36,6 +37,13 @@ export function OpnameCreateDialog({
   const create = useCreateStockDocument();
 
   const [warehouseId, setWarehouseId] = useState("");
+  // Init sekali dari session (read-only): user tetap bisa mengganti manual.
+  const sessionWhId = useWarehouseFilter(warehouses?.data).warehouseId;
+  useEffect(() => {
+    if (open && warehouseId === "" && sessionWhId != null) {
+      setWarehouseId(String(sessionWhId));
+    }
+  }, [open, warehouseId, sessionWhId]);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [pic, setPic] = useState(user?.name ?? "");
   const [note, setNote] = useState("");
