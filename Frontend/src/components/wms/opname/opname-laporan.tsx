@@ -84,7 +84,7 @@ export function OpnameLaporanPage() {
 
   const exportCsv = () => {
     const rows: Record<string, unknown>[] = [];
-    for (const s of sessions) {
+    for (const s of filtered) {
       const lines = analytics.linesOf(s);
       for (const l of lines) {
         rows.push({
@@ -146,9 +146,10 @@ export function OpnameLaporanPage() {
             variant="outline"
             className="rounded-xl"
             onClick={exportCsv}
-            disabled={sessions.length === 0}
+            disabled={filtered.length === 0}
           >
-            <ClipboardCheck className="h-4 w-4" /> Export Laporan
+            <ClipboardCheck className="h-4 w-4" /> Export Hasil Filter
+            {filtered.length > 0 ? ` (${filtered.length})` : ""}
           </Button>
         }
       />

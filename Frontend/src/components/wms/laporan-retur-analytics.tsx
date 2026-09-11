@@ -123,8 +123,19 @@ export function LaporanReturAnalytics({
     const meta = [
       { keterangan: "Laporan", nilai: `Analitik Retur ${pihakLabel}` },
       { keterangan: "Periode", nilai: `${formatDate(from)} s.d. ${formatDate(to)}` },
-      { keterangan: "Total Nilai Retur (pokok)", nilai: formatIDR(a.ringkasan.nilai) },
-      { keterangan: "Tingkat Retur", nilai: `${a.retur?.rate_qty ?? 0}%` },
+      { keterangan: "Filter pihak", nilai: pihak === ALL ? "Semua" : pihak },
+      {
+        keterangan: "Total Nilai Retur (pokok) — total periode (tanpa filter pihak)",
+        nilai: formatIDR(a.ringkasan.nilai),
+      },
+      {
+        keterangan: "Tingkat Retur — global (tanpa filter pihak)",
+        nilai: `${a.retur?.rate_qty ?? 0}%`,
+      },
+      {
+        keterangan: "Cakupan rincian per alasan / per item",
+        nilai: "Global (tanpa filter pihak)",
+      },
     ];
     const content =
       toCsv(meta, [

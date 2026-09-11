@@ -111,9 +111,20 @@ export function LaporanTransferAnalytics({
     const meta = [
       { keterangan: "Laporan", nilai: "Analitik Transfer Gudang" },
       { keterangan: "Periode", nilai: `${formatDate(from)} s.d. ${formatDate(to)}` },
-      { keterangan: "Total Nilai Mutasi (pokok)", nilai: formatIDR(a.ringkasan.nilai) },
-      { keterangan: "Total Qty", nilai: formatNumber(a.ringkasan.qty) },
-      { keterangan: "Dokumen", nilai: formatNumber(a.ringkasan.dokumen) },
+      { keterangan: "Filter gudang", nilai: pihak === ALL ? "Semua" : pihak },
+      {
+        keterangan: "Total Nilai Mutasi (pokok) — total periode (tanpa filter)",
+        nilai: formatIDR(a.ringkasan.nilai),
+      },
+      {
+        keterangan: "Total Qty — total periode (tanpa filter)",
+        nilai: formatNumber(a.ringkasan.qty),
+      },
+      {
+        keterangan: "Dokumen — total periode (tanpa filter)",
+        nilai: formatNumber(a.ringkasan.dokumen),
+      },
+      { keterangan: "Cakupan Net Flow", nilai: "Global (tanpa filter pihak)" },
     ];
     const content =
       toCsv(meta, [
@@ -121,7 +132,7 @@ export function LaporanTransferAnalytics({
         { key: "nilai", label: "Nilai" },
       ]) +
       "\r\n" +
-      toCsv(a.arus?.lanes ?? [], [
+      toCsv(laneRows, [
         { key: "dari", label: "Asal" },
         { key: "ke", label: "Tujuan" },
         { key: "dokumen", label: "Dokumen" },

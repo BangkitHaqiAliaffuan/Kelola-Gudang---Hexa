@@ -254,10 +254,13 @@ export function LaporanKartuStock() {
       return;
     }
     const tbody = filteredRows
-      .map(
-        (r) =>
-          `<tr><td>${formatDate(r.date)}</td><td class="mono">${r.no}</td><td>${r.type}</td><td>${r.warehouse ?? "—"}</td><td>${r.masuk ? `+${formatNumber(r.masuk)}` : "-"}</td><td>${r.keluar ? `-${formatNumber(r.keluar)}` : "-"}</td><td><b>${formatNumber(r.saldo)} ${r.unit ?? ""}</b></td><td>${formatIDR(r.nilai)}</td><td>${r.pic}</td><td>${r.note}</td></tr>`,
-      )
+      .map((r) => {
+        const whCell =
+          r.warehouse && r.destination && r.destination !== r.warehouse
+            ? `${r.warehouse} → ${r.destination}`
+            : (r.warehouse ?? "—");
+        return `<tr><td>${formatDate(r.date)}</td><td class="mono">${r.no}</td><td>${r.type}</td><td>${whCell}</td><td>${r.masuk ? `+${formatNumber(r.masuk)}` : "-"}</td><td>${r.keluar ? `-${formatNumber(r.keluar)}` : "-"}</td><td><b>${formatNumber(r.saldo)} ${r.unit ?? ""}</b></td><td>${formatIDR(r.nilai)}</td><td>${r.pic}</td><td>${r.note}</td></tr>`;
+      })
       .join("");
     win.document.write(
       `<!doctype html><html><head><meta charset="utf-8"/><title>Laporan Kartu Stock</title><style>body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#111;padding:24px}h1{font-size:18px;margin:0 0 4px}h2{font-size:12px;color:#666;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:11px}th{background:#f5f5f5}.right{text-align:right}.mono{font-family:monospace}</style></head><body><h1>Laporan Kartu Stock</h1><h2>${periodLabel} · ${warehouseLabel} · ${itemLabel} · ${valuationMethodLabels[method]}</h2><p>Saldo Awal ${formatNumber(saldoAwal)} ${unit} · Saldo Akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${filteredRows.length} baris</p><table><thead><tr><th>Tanggal</th><th>Nomor</th><th>Jenis</th><th>Gudang</th><th>Masuk</th><th>Keluar</th><th>Saldo</th><th>Nilai</th><th>PIC</th><th>Catatan</th></tr></thead><tbody>${tbody}</tbody></table></body></html>`,

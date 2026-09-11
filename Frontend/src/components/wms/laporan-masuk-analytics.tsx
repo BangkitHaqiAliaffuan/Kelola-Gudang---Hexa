@@ -112,9 +112,19 @@ export function LaporanMasukAnalytics({
     const meta = [
       { keterangan: "Laporan", nilai: "Analitik Barang Masuk" },
       { keterangan: "Periode", nilai: `${formatDate(from)} s.d. ${formatDate(to)}` },
-      { keterangan: "Total Nilai (pokok)", nilai: formatIDR(a.ringkasan.nilai) },
-      { keterangan: "Total Qty", nilai: formatNumber(a.ringkasan.qty) },
-      { keterangan: "Dokumen", nilai: formatNumber(a.ringkasan.dokumen) },
+      { keterangan: "Filter pihak", nilai: pihak === ALL ? "Semua" : pihak },
+      {
+        keterangan: "Total Nilai (pokok) — total periode (tanpa filter)",
+        nilai: formatIDR(a.ringkasan.nilai),
+      },
+      {
+        keterangan: "Total Qty — total periode (tanpa filter)",
+        nilai: formatNumber(a.ringkasan.qty),
+      },
+      {
+        keterangan: "Dokumen — total periode (tanpa filter)",
+        nilai: formatNumber(a.ringkasan.dokumen),
+      },
     ];
     const content =
       toCsv(meta, [
@@ -122,7 +132,7 @@ export function LaporanMasukAnalytics({
         { key: "nilai", label: "Nilai" },
       ]) +
       "\r\n" +
-      toCsv(a.per_pihak_per_bulan, [
+      toCsv(bulanRows, [
         { key: "nama", label: "Supplier" },
         { key: "jenis", label: "Jenis" },
         { key: "bulan", label: "Bulan" },
@@ -131,7 +141,7 @@ export function LaporanMasukAnalytics({
         { key: "nilai", label: "Nilai" },
       ]) +
       "\r\n" +
-      toCsv(a.varians_harga ?? [], [
+      toCsv(variansRows, [
         { key: "supplier", label: "Supplier" },
         { key: "sku", label: "SKU" },
         { key: "nama", label: "Barang" },

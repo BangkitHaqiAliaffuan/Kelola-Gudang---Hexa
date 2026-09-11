@@ -221,7 +221,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
       tanggal: d.document_date,
       tipe: d.type,
       gudang: d.warehouse ?? "—",
-      partner: d.partner ?? "—",
+      partner: partnerOf(d) ?? "—",
       referensi: d.reference_no ?? "—",
       qty: Math.abs(d.qty_total ?? 0),
       nilai: Math.abs(d.value_total ?? 0),
@@ -263,7 +263,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
         <td class="mono">${d.no}</td>
         <td>${formatDate(d.document_date)}</td>
         <td>${d.warehouse ?? "—"}</td>
-        <td>${d.partner ?? "—"}</td>
+        <td>${partnerOf(d) ?? "—"}</td>
         <td>${d.reference_no ?? "—"}</td>
         <td class="right">${formatNumber(Math.abs(d.qty_total ?? 0))}</td>
         <td class="right">${formatIDR(Math.abs(d.value_total ?? 0))}</td>
@@ -608,7 +608,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
               <p className="truncate text-xs text-muted-foreground">
                 {formatDate(r.document_date)} · {r.warehouse ?? "—"}
               </p>
-              <p className="truncate text-xs">{r.partner ?? "—"}</p>
+              <p className="truncate text-xs">{partnerOf(r) ?? "—"}</p>
               <div className="flex justify-between pt-1 text-xs">
                 <span>{formatNumber(Math.abs(r.qty_total ?? 0))} unit</span>
                 <b>{formatIDR(Math.abs(r.value_total ?? 0))}</b>

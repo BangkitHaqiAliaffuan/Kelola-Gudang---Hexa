@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProcDocPo } from "@/hooks/use-purchase-order";
+import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 
 export const Route = createFileRoute("/pengadaan/purchase-order/print/$id")({
@@ -17,15 +18,23 @@ export const Route = createFileRoute("/pengadaan/purchase-order/print/$id")({
 
 function PurchaseOrderPrint() {
   const { id } = Route.useParams();
-  const { data } = useProcDocPo(Number(id));
+  const { data, isLoading, isError } = useProcDocPo(Number(id));
   const doc = data?.data;
+  const { data: company } = useCompanySettings();
 
+  // Auto-print sekali setelah dokumen tiba (bukan saat halaman masih kosong).
+  // Dependen pada docId (stabil per dokumen): refetch dengan id sama tidak
+  // memicu print ulang; cleanup membatalkan timer saat unmount/StrictMode.
+  const docId = doc?.id;
   useEffect(() => {
+    if (docId == null) return;
     const t = window.setTimeout(() => window.print(), 400);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [docId]);
 
-  if (!doc) return null;
+  if (isLoading) return <p className="p-8 text-sm text-muted-foreground">Memuat Purchase Order…</p>;
+  if (isError || !doc)
+    return <p className="p-8 text-sm text-destructive">Gagal memuat Purchase Order.</p>;
 
   const lines = doc.lines ?? [];
   const totalValue = lines.reduce((sum, l) => sum + l.subtotal, 0);
@@ -41,10 +50,8 @@ function PurchaseOrderPrint() {
 
         <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
           <div>
-            <p className="text-xl font-bold">
-              Kelola<span className="font-normal">Gudang</span>
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">Warehouse Management System</p>
+            <style>{`.kop-logo{max-height:48px;width:auto;margin-bottom:6px}.mono{font-family:Consolas,monospace}.muted{color:#64748b;font-size:12px}`}</style>
+            <div dangerouslySetInnerHTML={{ __html: companyKopHtml(company) }} />
           </div>
           <div className="text-right">
             <p className="text-lg font-bold text-primary">PURCHASE ORDER</p>
