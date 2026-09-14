@@ -679,37 +679,49 @@ function KartuStock() {
         className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
         bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
       >
-        <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-6">
-          <div className="relative xl:col-span-2">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari nomor, referensi, catatan, PIC…"
-              className="rounded-xl pl-9"
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="flex min-w-0 flex-[2_1_240px] flex-col">
+            <label htmlFor="kartu-stock-q" className="mb-1 block text-xs text-muted-foreground">
+              Cari
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="kartu-stock-q"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Cari nomor, referensi, catatan, PIC…"
+                className="w-full rounded-xl pl-9"
+              />
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-[1_1_150px] flex-col">
+            <label className="mb-1 block text-xs text-muted-foreground">Jenis</label>
+            <FilterSelect
+              className="w-full"
+              value={jenis}
+              onChange={setJenis}
+              placeholder="Semua Jenis"
+              options={jenisOptions}
+              loading={card.isLoading}
             />
           </div>
-          <FilterSelect
-            className="w-full"
-            value={jenis}
-            onChange={setJenis}
-            placeholder="Semua Jenis"
-            options={jenisOptions}
-            loading={card.isLoading}
-          />
-          <FilterSelect
-            className="w-full"
-            value={pic}
-            onChange={setPic}
-            placeholder="Semua PIC"
-            options={picOptions}
-            loading={card.isLoading}
-          />
-          <div className="flex w-full flex-col gap-1 col-span-full md:col-span-2 lg:col-span-2 xl:col-span-2">
+          <div className="flex min-w-0 flex-[1_1_150px] flex-col">
+            <label className="mb-1 block text-xs text-muted-foreground">PIC</label>
+            <FilterSelect
+              className="w-full"
+              value={pic}
+              onChange={setPic}
+              placeholder="Semua PIC"
+              options={picOptions}
+              loading={card.isLoading}
+            />
+          </div>
+          <div className="flex min-w-0 flex-[2_1_300px] flex-col">
             <label className="text-xs text-muted-foreground mb-1 block">
               Filter Periode Transaksi
             </label>
-            <div className="flex w-full items-center justify-start gap-1 rounded-xl border border-input bg-card p-1.5">
+            <div className="flex w-full flex-col justify-start gap-1 rounded-xl border border-input bg-card p-1.5 min-[420px]:flex-row min-[420px]:items-center">
               <Input
                 type="date"
                 value={dateFrom}
@@ -718,7 +730,7 @@ function KartuStock() {
                 aria-label="Dari tanggal"
               />
               <span
-                className="flex shrink-0 items-center justify-center px-1 text-sm text-muted-foreground"
+                className="hidden shrink-0 items-center justify-center px-1 text-sm text-muted-foreground min-[420px]:flex"
                 aria-hidden="true"
               >
                 –
