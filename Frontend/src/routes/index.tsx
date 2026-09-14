@@ -29,6 +29,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  EmptyState,
   HelpHint,
   PageHeader,
   Panel,
@@ -196,6 +197,10 @@ function buildMonthly(docs: StockDocumentApi[]): MonthPoint[] {
 
 function Dashboard() {
   const { user, hasModuleLevel } = useAuth();
+  // Bell notifikasi di AppShell sudah digate hasModule("Persediaan") — samakan di sini
+  // agar role tanpa akses tidak menembak API (403 + toast error global) dan tidak
+  // melihat angka 0 yang menyesatkan.
+  const canViewStock = hasModuleLevel("Persediaan", "Baca");
   const visibleQuickActions = quickActions.filter(
     (a) => !a.module || hasModuleLevel(a.module, "Tulis"),
   );
@@ -248,7 +253,9 @@ function Dashboard() {
   const masukCount = summary?.masuk.count ?? 0;
   const keluarCount = summary?.keluar.count ?? 0;
 
-  const { data: minData, isLoading: minLoading } = useStockMinimum();
+  const { data: minData, isLoading: minLoading } = useStockMinimum({
+    enabled: canViewStock,
+  });
   const minRows = ((minData?.data ?? []) as StockMinimumApi[]).filter((r) => r.status !== "Normal");
   const stockMenipis = minRows.length;
   const stockHabis = minRows.filter((r) => r.status === "Habis").length;
@@ -323,16 +330,16 @@ function Dashboard() {
     },
     {
       label: "Stock Menipis",
-      value: formatNumber(stockMenipis),
-      hint: "di bawah minimum",
+      value: canViewStock ? formatNumber(stockMenipis) : "—",
+      hint: canViewStock ? "di bawah minimum" : "butuh akses Persediaan",
       icon: TriangleAlert,
       tone: "warning" as const,
       loading: minLoading,
     },
     {
       label: "Stock Habis",
-      value: formatNumber(stockHabis),
-      hint: "perlu restock segera",
+      value: canViewStock ? formatNumber(stockHabis) : "—",
+      hint: canViewStock ? "perlu restock segera" : "butuh akses Persediaan",
       icon: PackageX,
       tone: "danger" as const,
       loading: minLoading,
@@ -379,7 +386,9 @@ function Dashboard() {
         title={user ? `Selamat datang, ${user.name} 👋` : "Selamat datang 👋"}
         description={`Ringkasan operasional gudang hari ini, ${todayLabel}.`}
         actions={
-          stockHabis > 0 ? (
+          !canViewStock ? (
+            <Pill tone="neutral">Akses stok terbatas</Pill>
+          ) : stockHabis > 0 ? (
             <Pill tone="danger">{formatNumber(stockHabis)} stok habis</Pill>
           ) : (
             <Pill tone="success">Semua sistem normal</Pill>
@@ -563,7 +572,12 @@ function Dashboard() {
           </Panel>
 
           <Panel title="Perlu Perhatian" description="Stok di bawah minimum">
-            {minLoading ? (
+            {!canViewStock ? (
+              <EmptyState
+                title="Tidak memiliki akses"
+                description="Akun Anda tidak memiliki akses Baca pada modul Persediaan. Hubungi administrator untuk mengatur hak akses."
+              />
+            ) : minLoading ? (
               <TableSkeleton rows={4} />
             ) : attention.length === 0 ? (
               <p className="text-sm text-muted-foreground">Tidak ada stok yang perlu perhatian.</p>

@@ -376,44 +376,6 @@ export const activities = transactions.slice(0, 14).map((t) => ({
   date: t.date,
 }));
 
-export const notifications = [
-  {
-    id: "n1",
-    title: "Stock hampir habis",
-    body: `${lowStock.length} barang berada di bawah stok minimum`,
-    time: "5 menit lalu",
-    tone: "warning" as const,
-  },
-  {
-    id: "n2",
-    title: "Barang masuk diterima",
-    body: `${transactions[0]!.no} dari ${transactions[0]!.partner}`,
-    time: "22 menit lalu",
-    tone: "success" as const,
-  },
-  {
-    id: "n3",
-    title: "Transfer gudang selesai",
-    body: "TF/2026/00412 Bekasi → Surabaya",
-    time: "1 jam lalu",
-    tone: "info" as const,
-  },
-  {
-    id: "n4",
-    title: "Stock opname selesai",
-    body: "Opname Gudang Pusat Jakarta — selisih 14 item",
-    time: "3 jam lalu",
-    tone: "info" as const,
-  },
-  {
-    id: "n5",
-    title: "Menunggu approval",
-    body: "6 transaksi menunggu persetujuan supervisor",
-    time: "Kemarin",
-    tone: "warning" as const,
-  },
-];
-
 export const opnameSessions = warehouses.slice(0, 5).map((w, i) => {
   const total = int(120, 460);
   const checked = int(20, total);

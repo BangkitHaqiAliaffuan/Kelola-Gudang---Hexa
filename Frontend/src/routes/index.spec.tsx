@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 /** Kontrol state loading untuk query dokumen mutasi (useStockDocuments default). */
 const docsLoading = vi.hoisted(() => ({ value: false }));
 
+/** Kontrol akses modul Persediaan untuk skenario tanpa hak akses. */
+const stockAccess = vi.hoisted(() => ({ value: true }));
+
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -268,7 +271,7 @@ vi.mock("@/hooks/use-auth", () => ({
     login: vi.fn(),
     logout: vi.fn(),
     hasModule: () => true,
-    hasModuleLevel: () => true,
+    hasModuleLevel: (module: string) => (module === "Persediaan" ? stockAccess.value : true),
   }),
 }));
 
@@ -443,5 +446,27 @@ describe("Dashboard (index route)", () => {
 
     expect(screen.getAllByText(first.name).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(`${first.total_stock}/${first.min} ${first.unit}`)).toBeInTheDocument();
+  });
+
+  it("menampilkan status terkunci saat role tanpa akses Persediaan", () => {
+    stockAccess.value = false;
+    try {
+      const { container } = render(<DashboardView />);
+      expect(screen.getByText("Akses stok terbatas")).toBeInTheDocument();
+      expect(screen.getByText("Tidak memiliki akses")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Akun Anda tidak memiliki akses Baca pada modul Persediaan/),
+      ).toBeInTheDocument();
+      // Nilai disamarkan ("—"), bukan angka 0 yang menyesatkan.
+      const menipis = getStatCard("Stock Menipis");
+      expect(menipis.querySelector(".text-xl")?.textContent).toBe("—");
+      expect(within(menipis).getByText("butuh akses Persediaan")).toBeInTheDocument();
+      const habis = getStatCard("Stock Habis");
+      expect(habis.querySelector(".text-xl")?.textContent).toBe("—");
+      // Panel perhatian tidak merender link barang apa pun.
+      expect(container.querySelectorAll('a[data-to="/master/barang/$id"]')).toHaveLength(0);
+    } finally {
+      stockAccess.value = true;
+    }
   });
 });
