@@ -1,9 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 
 export type CompanySettings = Record<string, string>;
 
 export function useCompanySettings(enabled = true) {
+  // GET /system/settings digate role.access:System di backend — hanya tembak
+  // bila sesi punya System Baca agar role tanpa akses tidak 403 + toast global
+  // di setiap mount (dialog profil di header me-mount di semua halaman).
+  const { hasModuleLevel } = useAuth();
+  const canRead = hasModuleLevel("System", "Baca");
   return useQuery({
     queryKey: ["system", "settings"],
     queryFn: async () => {
@@ -12,7 +18,7 @@ export function useCompanySettings(enabled = true) {
       );
       return Object.fromEntries(res.data.map((r) => [r.key, r.value ?? ""])) as CompanySettings;
     },
-    enabled: typeof window !== "undefined" && enabled,
+    enabled: typeof window !== "undefined" && enabled && canRead,
   });
 }
 
