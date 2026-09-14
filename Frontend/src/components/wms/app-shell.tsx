@@ -42,10 +42,16 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useItems, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useStockDocuments, useStockMinimum } from "@/hooks/use-persediaan";
+import { stockDocumentTypes } from "@/lib/persediaan-types";
 import { formatNumber } from "@/lib/wms-data";
 import { toast } from "sonner";
 
 type QuickAction = { label: string; to: string; icon: typeof Package; module?: string };
+
+// Tipe dokumen yang punya tujuan klik di GlobalSearch — satu sumber kebenaran
+// dengan stockDocumentTypes. Tipe baru backend otomatis disembunyikan dari
+// hasil sampai dipetakan di goToDoc (anti klik-buntu).
+const KNOWN_DOC_TYPES: ReadonlySet<string> = new Set(stockDocumentTypes);
 
 const quickActions: QuickAction[] = [
   { label: "Barang Masuk", to: "/transaksi/masuk", icon: ArrowDownToLine, module: "Transaksi" },
@@ -234,9 +240,11 @@ function GlobalSearch({
   const apiWarehouses = useMemo(() => warehousesQ.data?.data ?? [], [warehousesQ.data]);
   const apiSuppliers = useMemo(() => suppliersQ.data?.data ?? [], [suppliersQ.data]);
   // Opname butuh modul Stock Opname; Adjustment ter-cover gate Persediaan.
-  // Sesi opname adalah baris stock_documents (id-nya = $docId detail opname).
   const apiDocs = useMemo(
-    () => (docsQ.data?.data ?? []).filter((d) => d.type !== "Stock Opname" || canOpname),
+    () =>
+      (docsQ.data?.data ?? []).filter(
+        (d) => KNOWN_DOC_TYPES.has(d.type) && (d.type !== "Stock Opname" || canOpname),
+      ),
     [docsQ.data, canOpname],
   );
   const searchLoading =
@@ -269,7 +277,8 @@ function GlobalSearch({
         navigate({ to: "/persediaan/adjustment", search: { doc: d.id } });
         break;
       case "Stock Opname":
-        navigate({ to: "/opname/laporan/$docId", params: { docId: String(d.id) } });
+        // Level list saja (bukan detail): pengguna memilih sesi di daftar.
+        navigate({ to: "/opname/$section", params: { section: "laporan" } });
         break;
     }
   };
