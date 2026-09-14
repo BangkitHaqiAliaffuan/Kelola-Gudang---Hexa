@@ -1,7 +1,7 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { Download, Minus, Plus, Printer, ScanLine, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Minus, Plus, Printer, ScanLine, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, Panel } from "@/components/wms/kit";
 import { Button } from "@/components/ui/button";
@@ -448,6 +448,11 @@ function BarcodePage() {
         description="Generate dan cetak label barang"
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"
