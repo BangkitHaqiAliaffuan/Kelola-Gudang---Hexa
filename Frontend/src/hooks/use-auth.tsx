@@ -1,8 +1,17 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { authApi, type AuthSession } from "@/lib/auth-api";
 import { clearAuthToken, getAuthToken, isApiError, setAuthToken } from "@/lib/api";
-import type { AccessLevel } from "@/lib/schemas";
+import { requestResync, setResyncHandler } from "@/lib/session-sync";
+import type { AccessLevel, RoleAccessEntry } from "@/lib/schemas";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -28,6 +37,12 @@ type AuthContextValue = {
   hasModule: (module: string) => boolean;
   /** True when the module exists AND its level ranks >= the required level. */
   hasModuleLevel: (module: string, minLevel: AccessLevel) => boolean;
+  /**
+   * Refresh sesi via GET /auth/me (peta `access` adalah snapshot login/boot dan
+   * bisa basi setelah role diubah). Resolve true bila peta akses berubah.
+   * 401 → token dibuang + unauthenticated (jalur logout existing).
+   */
+  refreshSession: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -84,6 +99,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Cermin sesi untuk handler resync (efek registrasi di bawah hanya jalan
+  // sekali agar tidak re-subscribe tiap render).
+  const sessionRef = useRef<AuthSession | null>(null);
+  sessionRef.current = session;
+
+  // Daftarkan refresh sesi ke jembatan session-sync agar QueryCache (di luar
+  // tree React) bisa memicu resync saat query 403 — peta access sesi basi
+  // setelah matriks role diubah.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    let inFlight: Promise<boolean> | null = null;
+
+    const sameAccess = (a: RoleAccessEntry[], b: RoleAccessEntry[]): boolean => {
+      const key = (e: RoleAccessEntry): string => `${e.module}::${e.level}`;
+      const sorted = (list: RoleAccessEntry[]): string[] =>
+        list.map(key).sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+      const sa = sorted(a);
+      const sb = sorted(b);
+      return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
+    };
+
+    const handler = (): Promise<boolean> => {
+      if (inFlight) return inFlight;
+      inFlight = (async (): Promise<boolean> => {
+        try {
+          if (!getAuthToken()) return false;
+          const me = await authApi.me();
+          if (cancelled) return false;
+          const changed = !sameAccess(sessionRef.current?.access ?? [], me.access);
+          setSession({ user: me.data, access: me.access });
+          setStatus("authenticated");
+          return changed;
+        } catch (err) {
+          // Token benar-benar mati → buang agar pendaratan berikutnya ke login.
+          if (!cancelled && isApiError(err) && err.status === 401) {
+            clearAuthToken();
+            setStatus("unauthenticated");
+          }
+          return false;
+        } finally {
+          inFlight = null;
+        }
+      })();
+      return inFlight;
+    };
+
+    setResyncHandler(handler);
+    return () => {
+      cancelled = true;
+      setResyncHandler(null);
+    };
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -91,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       access: session?.access ?? [],
       login,
       logout,
+      refreshSession: () => requestResync(),
       hasModule: (module) =>
         status !== "authenticated" ||
         session!.access.some((a) => a.module === module || a.module === "Semua Modul"),

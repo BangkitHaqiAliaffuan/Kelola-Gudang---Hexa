@@ -75,6 +75,7 @@ import {
 import { fieldError } from "@/lib/api";
 import { nextSku } from "@/lib/sku";
 import { eanChecksumOk, normalizeCode } from "@/lib/barcode-label";
+import { useAuth } from "@/hooks/use-auth";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import {
   useBins,
@@ -4217,6 +4218,7 @@ export function RoleEditDialog({
 }) {
   const update = useUpdateRole();
   const navigate = useNavigate();
+  const { user, refreshSession } = useAuth();
   const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
   const [canApprove, setCanApprove] = useState(false);
 
@@ -4247,6 +4249,10 @@ export function RoleEditDialog({
 
     try {
       await update.mutateAsync({ role: role.name, access });
+      // Bila mengedit role sendiri, peta access sesi langsung basi → sinkronkan
+      // agar gate UI mengikuti tanpa menunggu 403 / re-login. Role lain tidak
+      // perlu aksi di klien editor (sesi mereka resync malas saat 403).
+      if (role.name === user?.role) await refreshSession();
       toast.success("Hak akses role diperbarui");
       onOpenChange(false);
       navigate({ to: "/master/$section", params: { section: "role" } });
