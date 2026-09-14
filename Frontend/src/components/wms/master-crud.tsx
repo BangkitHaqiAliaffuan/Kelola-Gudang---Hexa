@@ -44,6 +44,7 @@ export function MasterCrudPage<T extends { id: number }>({
   title,
   description,
   searchPlaceholder,
+  initialQ,
   searchText,
   columns,
   mobileCard,
@@ -65,6 +66,8 @@ export function MasterCrudPage<T extends { id: number }>({
   title: string;
   description: string;
   searchPlaceholder: string;
+  /** Filter awal — deep-link ?q= dari GlobalSearch. */
+  initialQ?: string | undefined;
   searchText: (row: T) => string;
   columns: Column<T>[];
   mobileCard: (row: T) => ReactNode;
@@ -83,7 +86,11 @@ export function MasterCrudPage<T extends { id: number }>({
   slotHasActive?: boolean;
   onClearSlot?: () => void;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQ ?? "");
+  // Sinkronisasi via efek karena navigasi satu-route tidak me-remount halaman.
+  useEffect(() => {
+    if (initialQ !== undefined) setQ(initialQ);
+  }, [initialQ]);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
   const hasActive = q !== "" || !!slotHasActive;

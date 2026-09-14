@@ -215,22 +215,76 @@ function GlobalSearch({
 
   // Data API riil — fetch hanya saat dialog dibuka + modul diizinkan (di-cache
   // react-query antar buka). Tanpa gate, query fired di setiap mount AppShell.
+  const navigate = useNavigate();
   const canMaster = canAccess("Master Data");
   const canTrx = canAccess("Transaksi");
+  // Dokumen menembak /api/persediaan/* (gate backend: Persediaan) dan target
+  // navigasinya di bawah /transaksi (gate route: Transaksi) — butuh keduanya,
+  // kalau tidak query 403 tiap buka dialog untuk custom role yang timpang.
+  const canPersediaan = canAccess("Persediaan");
+  const canOpname = canAccess("Stock Opname");
+  const canDocs = canTrx && canPersediaan;
   const itemsQ = useItems(open && canMaster);
   const warehousesQ = useWarehouses(open && canMaster);
   const suppliersQ = useSuppliers(open && canMaster);
-  const docsQ = useStockDocuments({ perPage: 8, enabled: open && canTrx });
+  // Tanpa perPage → fetchAll agar nomor lama tetap ketemu (single request
+  // per_page=8 sebelumnya membuat transaksi lama mustahil muncul di search).
+  const docsQ = useStockDocuments({ enabled: open && canDocs });
   const apiItems = useMemo(() => itemsQ.data?.data ?? [], [itemsQ.data]);
   const apiWarehouses = useMemo(() => warehousesQ.data?.data ?? [], [warehousesQ.data]);
   const apiSuppliers = useMemo(() => suppliersQ.data?.data ?? [], [suppliersQ.data]);
-  const apiDocs = useMemo(() => docsQ.data?.data ?? [], [docsQ.data]);
+  // Opname butuh modul Stock Opname; Adjustment ter-cover gate Persediaan.
+  // Sesi opname adalah baris stock_documents (id-nya = $docId detail opname).
+  const apiDocs = useMemo(
+    () => (docsQ.data?.data ?? []).filter((d) => d.type !== "Stock Opname" || canOpname),
+    [docsQ.data, canOpname],
+  );
+  const searchLoading =
+    open &&
+    ((canMaster && (itemsQ.isLoading || warehousesQ.isLoading || suppliersQ.isLoading)) ||
+      (canDocs && docsQ.isLoading));
+
+  // Tujuan klik per tipe dokumen — switch eksplisit agar `to` tetap literal
+  // (type-safe search/params) karena TanStack tidak menerima `to` dinamis.
+  // Dipanggil dari onSelect (bukan asChild+Link) karena target bervariasi.
+  const goToDoc = (d: (typeof apiDocs)[number]) => {
+    setOpen(false);
+    switch (d.type) {
+      case "Penerimaan":
+        navigate({ to: "/transaksi/masuk", search: { doc: d.id } });
+        break;
+      case "Pengeluaran":
+        navigate({ to: "/transaksi/keluar", search: { doc: d.id } });
+        break;
+      case "Transfer Gudang":
+        navigate({ to: "/transaksi/transfer", search: { doc: d.id } });
+        break;
+      case "Retur Pembelian":
+        navigate({ to: "/transaksi/retur-pembelian", search: { doc: d.id } });
+        break;
+      case "Retur Penjualan":
+        navigate({ to: "/transaksi/retur-penjualan", search: { doc: d.id } });
+        break;
+      case "Stock Adjustment":
+        navigate({ to: "/persediaan/adjustment", search: { doc: d.id } });
+        break;
+      case "Stock Opname":
+        navigate({ to: "/opname/laporan/$docId", params: { docId: String(d.id) } });
+        break;
+    }
+  };
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Cari barang, SKU, barcode, supplier, gudang, nomor transaksi..." />
       <CommandList>
         <CommandEmpty>Tidak ada hasil ditemukan.</CommandEmpty>
+        {searchLoading && (
+          <CommandItem value="" disabled>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Memuat data…
+          </CommandItem>
+        )}
         <CommandGroup heading="Aksi Cepat">
           {visibleQuickActions.map((a) => (
             <CommandItem key={a.label} value={a.label} onSelect={() => setOpen(false)} asChild>
@@ -243,7 +297,7 @@ function GlobalSearch({
         </CommandGroup>
         {canAccess("Master Data") && (
           <CommandGroup heading="Barang / SKU / Barcode">
-            {apiItems.slice(0, 24).map((it) => (
+            {apiItems.slice(0, 100).map((it) => (
               <CommandItem
                 key={it.id}
                 value={`${it.name} ${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`}
@@ -259,12 +313,16 @@ function GlobalSearch({
             ))}
           </CommandGroup>
         )}
-        {canAccess("Transaksi") && (
+        {canDocs && (
           <CommandGroup heading="Nomor Transaksi">
-            {apiDocs.slice(0, 8).map((d) => (
-              <CommandItem key={d.id} value={d.no} onSelect={() => setOpen(false)}>
+            {apiDocs.slice(0, 50).map((d) => (
+              <CommandItem
+                key={d.id}
+                value={`${d.no} ${d.partner ?? ""} ${d.type} ${d.warehouse ?? ""} ${d.reference_no ?? ""}`}
+                onSelect={() => goToDoc(d)}
+              >
                 <ArrowLeftRight className="h-4 w-4" />
-                {d.no}
+                <span className="truncate font-mono">{d.no}</span>
                 <span className="ml-auto text-xs text-muted-foreground">{d.type}</span>
               </CommandItem>
             ))}
@@ -274,17 +332,37 @@ function GlobalSearch({
           <>
             <CommandGroup heading="Gudang">
               {apiWarehouses.map((w) => (
-                <CommandItem key={w.id} value={w.name} onSelect={() => setOpen(false)}>
-                  <Boxes className="h-4 w-4" />
-                  {w.name}
+                <CommandItem
+                  key={w.id}
+                  value={`${w.code} ${w.name}`}
+                  onSelect={() => setOpen(false)}
+                  asChild
+                >
+                  <Link to="/master/$section" params={{ section: "gudang" }} search={{ q: w.name }}>
+                    <Boxes className="h-4 w-4" />
+                    <span className="truncate">{w.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{w.code}</span>
+                  </Link>
                 </CommandItem>
               ))}
             </CommandGroup>
             <CommandGroup heading="Supplier">
-              {apiSuppliers.slice(0, 8).map((s) => (
-                <CommandItem key={s.id} value={s.name} onSelect={() => setOpen(false)}>
-                  <Package className="h-4 w-4" />
-                  {s.name}
+              {apiSuppliers.slice(0, 50).map((s) => (
+                <CommandItem
+                  key={s.id}
+                  value={`${s.code} ${s.name}`}
+                  onSelect={() => setOpen(false)}
+                  asChild
+                >
+                  <Link
+                    to="/master/$section"
+                    params={{ section: "supplier" }}
+                    search={{ q: s.name }}
+                  >
+                    <Package className="h-4 w-4" />
+                    <span className="truncate">{s.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{s.code}</span>
+                  </Link>
                 </CommandItem>
               ))}
             </CommandGroup>

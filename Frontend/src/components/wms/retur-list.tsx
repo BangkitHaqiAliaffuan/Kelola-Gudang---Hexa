@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, getRouteApi } from "@tanstack/react-router";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -49,6 +49,10 @@ type ReturListProps = {
   createLabel: string;
   createSection: string;
   reportSlug: "retur-pembelian" | "retur-penjualan";
+  /** Deep-link ?doc=<id> dari GlobalSearch (diteruskan wrapper route). */
+  docId?: number | undefined;
+  /** Dipanggil saat sheet ditutup agar wrapper membersihkan ?doc= di URL. */
+  onCloseDoc?: () => void;
 };
 
 function ReturListPage({
@@ -59,6 +63,8 @@ function ReturListPage({
   createLabel,
   createSection,
   reportSlug,
+  docId,
+  onCloseDoc,
 }: ReturListProps) {
   const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
@@ -75,6 +81,20 @@ function ReturListPage({
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Deep-link ?doc=<id> dari GlobalSearch: buka sheet dokumen; sinkronisasi
+  // via efek karena navigasi satu-route tidak me-remount komponen.
+  useEffect(() => {
+    if (docId != null) setSelectedId(docId);
+  }, [docId]);
+  const closeSheet = useCallback(
+    (o: boolean) => {
+      if (!o) {
+        setSelectedId(null);
+        onCloseDoc?.();
+      }
+    },
+    [onCloseDoc],
+  );
   const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const postDoc = usePostStockDocument();
@@ -328,7 +348,7 @@ function ReturListPage({
       <StockDocumentSheet
         doc={detail?.data ?? null}
         isLoading={detailLoading}
-        onOpenChange={(o) => !o && setSelectedId(null)}
+        onOpenChange={closeSheet}
         onPost={canPost ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
         onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
         busy={postDoc.isPending || cancelDoc.isPending}
@@ -375,7 +395,22 @@ function ReturListPage({
   );
 }
 
+const returPembelianRouteApi = getRouteApi("/transaksi/retur-pembelian");
+const returPenjualanRouteApi = getRouteApi("/transaksi/retur-penjualan");
+
 export function ReturPembelianPage() {
+  const search = returPembelianRouteApi.useSearch();
+  const navigate = returPembelianRouteApi.useNavigate();
+  const clearDoc = useCallback(
+    () =>
+      navigate({
+        search: (p) => {
+          const { doc: _cleared, ...rest } = p;
+          return rest;
+        },
+      }),
+    [navigate],
+  );
   return (
     <ReturListPage
       type="Retur Pembelian"
@@ -385,11 +420,25 @@ export function ReturPembelianPage() {
       createLabel="Retur Pembelian"
       createSection="retur-pembelian"
       reportSlug="retur-pembelian"
+      docId={search.doc}
+      onCloseDoc={clearDoc}
     />
   );
 }
 
 export function ReturPenjualanPage() {
+  const search = returPenjualanRouteApi.useSearch();
+  const navigate = returPenjualanRouteApi.useNavigate();
+  const clearDoc = useCallback(
+    () =>
+      navigate({
+        search: (p) => {
+          const { doc: _cleared, ...rest } = p;
+          return rest;
+        },
+      }),
+    [navigate],
+  );
   return (
     <ReturListPage
       type="Retur Penjualan"
@@ -399,6 +448,8 @@ export function ReturPenjualanPage() {
       createLabel="Retur Penjualan"
       createSection="retur-penjualan"
       reportSlug="retur-penjualan"
+      docId={search.doc}
+      onCloseDoc={clearDoc}
     />
   );
 }

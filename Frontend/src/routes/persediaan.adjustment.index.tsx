@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Plus, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,6 +46,13 @@ import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-t
 const ADJUSTMENT_TYPE = "Stock Adjustment";
 
 export const Route = createFileRoute("/persediaan/adjustment/")({
+  // Deep-link dari GlobalSearch: ?doc=<id> membuka sheet detail dokumen.
+  // Key opsional (return {} bila tak ada) agar Link/navigate existing tanpa
+  // search tetap lolos typecheck.
+  validateSearch: (search: Record<string, unknown>): { doc?: number } => {
+    const doc = Number(search["doc"]);
+    return Number.isFinite(doc) && doc > 0 ? { doc } : {};
+  },
   head: () => ({
     meta: [
       { title: "Stock Adjustment — KelolaGudang" },
@@ -86,7 +93,28 @@ function StockAdjustment() {
   const wh = whFilter.value;
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const search = Route.useSearch();
+  const navigateDoc = Route.useNavigate();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Deep-link ?doc=<id> dari GlobalSearch: buka sheet dokumen; sinkronisasi
+  // via efek karena navigasi satu-route tidak me-remount komponen.
+  useEffect(() => {
+    if (search.doc != null) setSelectedId(search.doc);
+  }, [search.doc]);
+  const closeSheet = useCallback(
+    (o: boolean) => {
+      if (!o) {
+        setSelectedId(null);
+        navigateDoc({
+          search: (p) => {
+            const { doc: _cleared, ...rest } = p;
+            return rest;
+          },
+        });
+      }
+    },
+    [navigateDoc],
+  );
   const hasActiveFilters = useMemo(
     () => q !== "" || status !== ALL || wh !== ALL || dateFrom !== "" || dateTo !== "",
     [q, status, wh, dateFrom, dateTo],
@@ -364,7 +392,7 @@ function StockAdjustment() {
       <StockDocumentSheet
         doc={detail?.data ?? null}
         isLoading={detailLoading}
-        onOpenChange={(o) => !o && setSelectedId(null)}
+        onOpenChange={closeSheet}
         onPost={canWrite ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
         onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
         onSubmit={canWrite ? () => detail?.data && setConfirmSubmitId(detail.data.id) : undefined}

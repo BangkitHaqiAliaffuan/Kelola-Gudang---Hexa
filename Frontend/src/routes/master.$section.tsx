@@ -38,6 +38,10 @@ const apiTitles: Record<string, { title: string; description: string }> = {
 const knownSections = new Set([...Object.keys(apiTitles), "role"]);
 
 export const Route = createFileRoute("/master/$section")({
+  // Deep-link dari GlobalSearch: ?q=<nama> memfilter tabel master.
+  // Key opsional agar Link/navigate existing tanpa search tetap lolos typecheck.
+  validateSearch: (search: Record<string, unknown>): { q?: string } =>
+    typeof search["q"] === "string" && search["q"] !== "" ? { q: search["q"] } : {},
   beforeLoad: ({ params }) => {
     if (!knownSections.has(params.section)) throw notFound();
   },
@@ -59,15 +63,17 @@ export const Route = createFileRoute("/master/$section")({
 
 function MasterSection() {
   const { section } = Route.useParams();
+  // Deep-link ?q= dari GlobalSearch — diteruskan sebagai filter awal.
+  const { q } = Route.useSearch();
 
   if (section === "kategori") return <KategoriPage />;
   if (section === "sub-kategori") return <SubKategoriPage />;
   if (section === "merk") return <MerkPage />;
   if (section === "satuan") return <SatuanPage />;
-  if (section === "gudang") return <GudangPage />;
+  if (section === "gudang") return <GudangPage initialQ={q} />;
   if (section === "rak") return <RakPage />;
   if (section === "bin-location") return <BinPage />;
-  if (section === "supplier") return <SupplierPage />;
+  if (section === "supplier") return <SupplierPage initialQ={q} />;
   if (section === "customer") return <CustomerPage />;
   if (section === "vendor") return <VendorPage />;
   if (section === "departemen") return <DepartemenPage />;

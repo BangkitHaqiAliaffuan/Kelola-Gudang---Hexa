@@ -395,7 +395,7 @@ export function SatuanPage() {
   );
 }
 
-export function GudangPage() {
+export function GudangPage({ initialQ }: { initialQ?: string | undefined }) {
   const { data, isLoading, error, refetch } = useWarehouses();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Warehouse | null>(null);
@@ -428,6 +428,7 @@ export function GudangPage() {
         title="Gudang"
         description="Daftar lokasi penyimpanan barang"
         searchPlaceholder="Cari gudang..."
+        initialQ={initialQ}
         searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""}`}
         columns={columns}
         rows={data?.data}
@@ -617,7 +618,7 @@ export function BinPage() {
   );
 }
 
-export function SupplierPage() {
+export function SupplierPage({ initialQ }: { initialQ?: string | undefined }) {
   const { data, isLoading, error, refetch } = useSuppliers();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
@@ -692,6 +693,7 @@ export function SupplierPage() {
         title="Supplier"
         description="Daftar pemasok barang"
         searchPlaceholder="Cari supplier..."
+        initialQ={initialQ}
         searchText={(r) => `${r.code} ${r.name} ${r.city ?? ""} ${r.payment_terms ?? ""}`}
         columns={columns}
         rows={filtered}

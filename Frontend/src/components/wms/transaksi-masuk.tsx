@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, getRouteApi } from "@tanstack/react-router";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -41,6 +41,8 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         ? "danger"
         : "warning";
 
+const masukRouteApi = getRouteApi("/transaksi/masuk");
+
 export function BarangMasukPage() {
   const { hasModule, hasModuleLevel } = useAuth();
   const canCreate = hasModuleLevel("Persediaan", "Tulis");
@@ -56,7 +58,28 @@ export function BarangMasukPage() {
   const wh = whFilter.value;
   const [partner, setPartner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
+  const search = masukRouteApi.useSearch();
+  const navigateDoc = masukRouteApi.useNavigate();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Deep-link ?doc=<id> dari GlobalSearch: buka sheet dokumen; sinkronisasi
+  // via efek karena navigasi satu-route tidak me-remount komponen.
+  useEffect(() => {
+    if (search.doc != null) setSelectedId(search.doc);
+  }, [search.doc]);
+  const closeSheet = useCallback(
+    (o: boolean) => {
+      if (!o) {
+        setSelectedId(null);
+        navigateDoc({
+          search: (p) => {
+            const { doc: _cleared, ...rest } = p;
+            return rest;
+          },
+        });
+      }
+    },
+    [navigateDoc],
+  );
   const [fullscreen, setFullscreen] = useState(false);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
   const postDoc = usePostStockDocument();
@@ -310,7 +333,7 @@ export function BarangMasukPage() {
       <StockDocumentSheet
         doc={detail?.data ?? null}
         isLoading={detailLoading}
-        onOpenChange={(o) => !o && setSelectedId(null)}
+        onOpenChange={closeSheet}
         onPost={canPost ? () => detail?.data && setConfirmPostId(detail.data.id) : undefined}
         onCancel={canCancel ? () => detail?.data && setConfirmCancelId(detail.data.id) : undefined}
         busy={postDoc.isPending || cancelDoc.isPending}
