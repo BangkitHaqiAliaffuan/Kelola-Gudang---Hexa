@@ -1,9 +1,11 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProcDocPo } from "@/hooks/use-purchase-order";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { printHtml } from "@/lib/barcode-label";
+import { buildPoPrintHtml } from "@/lib/purchase-order-print";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 
 export const Route = createFileRoute("/pengadaan/purchase-order/print/$id")({
@@ -20,17 +22,28 @@ function PurchaseOrderPrint() {
   const { id } = Route.useParams();
   const { data, isLoading, isError } = useProcDocPo(Number(id));
   const doc = data?.data;
-  const { data: company } = useCompanySettings();
+  const { data: company, isPending: companyPending } = useCompanySettings();
 
-  // Auto-print sekali setelah dokumen tiba (bukan saat halaman masih kosong).
-  // Dependen pada docId (stabil per dokumen): refetch dengan id sama tidak
-  // memicu print ulang; cleanup membatalkan timer saat unmount/StrictMode.
-  const docId = doc?.id;
+  // Cetak lewat iframe tersembunyi berisi dokumen HTML mandiri — bukan
+  // window.print() pada halaman utama — sehingga sidebar/header/bottom-nav
+  // AppShell tidak ikut masuk preview/print. Iframe (bukan window.open) agar
+  // auto-print saat halaman dibuka tidak diblokir popup-blocker.
+  const handlePrint = useCallback(() => {
+    if (!doc) return;
+    printHtml(buildPoPrintHtml(doc, companyKopHtml(company)));
+  }, [doc, company]);
+
+  // Auto-print sekali setelah dokumen + kop tiba (bukan saat masih kosong).
+  // Guard ref per dokumen: refetch id sama tidak memicu ulang; ref bertahan
+  // antar invoke StrictMode sehingga tidak cetak ganda.
+  const printedFor = useRef<number | null>(null);
   useEffect(() => {
-    if (docId == null) return;
-    const t = window.setTimeout(() => window.print(), 400);
+    if (doc == null || companyPending) return;
+    if (printedFor.current === doc.id) return;
+    printedFor.current = doc.id;
+    const t = window.setTimeout(handlePrint, 400);
     return () => window.clearTimeout(t);
-  }, [docId]);
+  }, [doc, companyPending, handlePrint]);
 
   if (isLoading) return <p className="p-8 text-sm text-muted-foreground">Memuat Purchase Order…</p>;
   if (isError || !doc)
@@ -43,7 +56,7 @@ function PurchaseOrderPrint() {
     <div className="min-h-screen bg-muted/40 p-4 print:bg-white print:p-0">
       <div className="mx-auto max-w-[760px] space-y-5 rounded-2xl border border-border bg-white p-8 shadow-soft print:max-w-none print:border-0 print:shadow-none">
         <div className="flex print:hidden">
-          <Button onClick={() => window.print()}>
+          <Button onClick={handlePrint}>
             <Printer className="h-4 w-4" /> Cetak / Simpan PDF
           </Button>
         </div>

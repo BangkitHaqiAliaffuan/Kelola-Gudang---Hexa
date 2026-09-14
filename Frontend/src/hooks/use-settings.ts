@@ -25,7 +25,7 @@ export function useUpdateCompanySettings() {
   });
 }
 
-const escHtml = (v: string) =>
+export const escHtml = (v: string) =>
   v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** Baris kop perusahaan untuk template cetak (window.print). */
