@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://1b31-158-140-171-68.ngrok-free.app/api/:path*"
+      "destination": "https://plastic-unwanted-mashing.ngrok-free.dev/api/:path*"
     },
     {
       "source": "/sanctum/:path*",
-      "destination": "https://1b31-158-140-171-68.ngrok-free.app/sanctum/:path*"
+      "destination": "https://plastic-unwanted-mashing.ngrok-free.dev/sanctum/:path*"
     },
     {
       "source": "/(.*)",
