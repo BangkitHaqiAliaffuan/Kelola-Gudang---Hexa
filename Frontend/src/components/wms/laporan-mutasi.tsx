@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
+  ArrowLeft,
   Boxes,
   FileSpreadsheet,
   Package,
@@ -12,6 +13,7 @@ import {
   CircleDollarSign,
   ArrowDownToLine,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ALL,
@@ -37,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { useLaporanMutasi } from "@/hooks/use-laporan";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import type { LaporanMutasiRowApi } from "@/lib/persediaan-types";
@@ -202,55 +205,37 @@ export function LaporanMutasi() {
   };
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const tbody = rows
       .map(
         (r) => `
       <tr>
-        <td>${r.name ?? "—"}</td>
-        <td class="mono">${r.sku ?? "—"}</td>
-        <td>${r.category ?? "—"}</td>
-        <td>${r.unit ?? "—"}</td>
+        <td>${t(r.name)}</td>
+        <td class="mono">${t(r.sku)}</td>
+        <td>${t(r.category)}</td>
+        <td>${t(r.unit)}</td>
         <td class="right">${formatNumber(r.saldo_awal)}</td>
         <td class="right">${formatNumber(r.masuk)}</td>
         <td class="right">${formatNumber(r.keluar)}</td>
         <td class="right"><b>${formatNumber(r.saldo_akhir)}</b></td>
         <td class="right">${formatIDR(r.unit_cost_avg)}</td>
         <td class="right">${formatIDR(r.nilai_akhir)}</td>
-        <td>${stockStatus(r)}</td>
+        <td>${t(stockStatus(r))}</td>
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>Laporan Mutasi</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>Laporan Mutasi</h1>
-${companyKopHtml(company)}
-<p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${wh === ALL ? "" : ""}${formatNumber(rows.length)} SKU</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title: "Laporan Mutasi",
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>Laporan Mutasi</h1>
+<p class="mono muted">Periode: ${t(periodLabel)} · ${wh === ALL ? "Semua Gudang" : t(wh)} · ${formatNumber(rows.length)} SKU</p>
 <table>
   <thead><tr><th>Barang</th><th>SKU</th><th>Kategori</th><th>Satuan</th><th class="right">Saldo Awal</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">HPP Satuan</th><th class="right">Nilai Akhir</th><th>Status</th></tr></thead>
   <tbody>${tbody}</tbody>
-</table>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+</table>`,
+      }),
+    );
   };
 
   const columns: Column<LaporanMutasiRowApi>[] = [
@@ -352,6 +337,11 @@ ${companyKopHtml(company)}
         description="Ringkas pergerakan stok per SKU (saldo awal, masuk, keluar, saldo akhir) — periode & gudang"
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"

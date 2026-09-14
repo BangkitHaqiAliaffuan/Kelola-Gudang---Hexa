@@ -1,7 +1,8 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
+  ArrowLeft,
   ArrowUpRight,
   Boxes,
   Maximize2,
@@ -49,6 +50,7 @@ import { useWmsScanner, type ScanMatch } from "@/hooks/use-wms-scanner";
 import { ScanDisambiguasiDialog } from "@/components/wms/scan-disambiguasi-dialog";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useItems, useWarehouses } from "@/hooks/use-master";
@@ -262,55 +264,37 @@ function KartuStock() {
   );
 
   const handlePrint = useCallback(() => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const tbody = filteredRows
       .map(
         (r) => `
       <tr>
         <td class="mono">${formatDate(r.date)}</td>
-        <td class="mono">${r.no}</td>
-        <td>${r.type}</td>
-        <td>${whLabel(r)}</td>
-        <td>${r.unit ?? "—"}</td>
+        <td class="mono">${t(r.no)}</td>
+        <td>${t(r.type)}</td>
+        <td>${t(whLabel(r))}</td>
+        <td>${t(r.unit)}</td>
         <td class="right">${r.masuk ? `+${formatNumber(r.masuk)}` : "-"}</td>
         <td class="right">${r.keluar ? `-${formatNumber(r.keluar)}` : "-"}</td>
-        <td class="right"><b>${formatNumber(r.saldo)} ${r.unit ?? ""}</b></td>
+        <td class="right"><b>${formatNumber(r.saldo)} ${t(r.unit)}</b></td>
         <td class="right">${formatIDR(r.nilai)}</td>
-        <td>${r.pic}</td>
-        <td>${r.note}</td>
+        <td>${t(r.pic)}</td>
+        <td>${t(r.note)}</td>
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>Kartu Stock — ${item?.name ?? "—"}</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>Kartu Stock — ${item?.name ?? "—"}</h1>
-${companyKopHtml(company)}
-<p class="mono muted">${item?.sku ?? ""} · Gudang: ${wh === ALL ? "Semua" : wh} · Metode: ${valuationMethodLabels[method]} · Saldo akhir: ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit}</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title: `Kartu Stock — ${item?.name ?? "—"}`,
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>Kartu Stock — ${t(item?.name)}</h1>
+<p class="mono muted">${t(item?.sku)} · Gudang: ${wh === ALL ? "Semua" : t(wh)} · Metode: ${t(valuationMethodLabels[method])} · Saldo akhir: ${formatNumber(cardData?.saldo_akhir ?? 0)} ${t(unit)}</p>
 <table>
-  <thead><tr><th>Tanggal</th><th>Nomor</th><th>Jenis</th><th>Gudang</th><th>Satuan</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo</th><th class="right">Nilai (${method})</th><th>PIC</th><th>Catatan</th></tr></thead>
+  <thead><tr><th>Tanggal</th><th>Nomor</th><th>Jenis</th><th>Gudang</th><th>Satuan</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo</th><th class="right">Nilai (${t(method)})</th><th>PIC</th><th>Catatan</th></tr></thead>
   <tbody>${tbody}</tbody>
-</table>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+</table>`,
+      }),
+    );
   }, [filteredRows, item, method, wh, unit, company, cardData]);
 
   const chart = useMemo(
@@ -461,6 +445,11 @@ ${companyKopHtml(company)}
           description="Riwayat pergerakan stok per barang"
           actions={
             <>
+              <Button asChild variant="outline" className="rounded-xl">
+                <Link to="/persediaan/stock">
+                  <ArrowLeft className="h-4 w-4" /> Kembali
+                </Link>
+              </Button>
               <div className="flex rounded-xl border border-border bg-card p-1">
                 {valuationMethods.map((m) => (
                   <button

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { Printer } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProcDocPo } from "@/hooks/use-purchase-order";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
@@ -55,7 +55,12 @@ function PurchaseOrderPrint() {
   return (
     <div className="min-h-screen bg-muted/40 p-4 print:bg-white print:p-0">
       <div className="mx-auto max-w-[760px] space-y-5 rounded-2xl border border-border bg-white p-8 shadow-soft print:max-w-none print:border-0 print:shadow-none">
-        <div className="flex print:hidden">
+        <div className="flex flex-wrap gap-2 print:hidden">
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/pengadaan/purchase-order">
+              <ArrowLeft className="h-4 w-4" /> Kembali
+            </Link>
+          </Button>
           <Button onClick={handlePrint}>
             <Printer className="h-4 w-4" /> Cetak / Simpan PDF
           </Button>

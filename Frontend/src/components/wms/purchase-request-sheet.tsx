@@ -42,6 +42,7 @@ import {
 } from "@/hooks/use-pengadaan";
 import { useUsers } from "@/hooks/use-master";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { canDecideProcDoc, type ProcDocApi, type ProcDocStatus } from "@/lib/pengadaan-types";
 
@@ -76,55 +77,34 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Cetak sungguhan: buka jendela print dengan layout dokumen PR. */
+/** Cetak sungguhan: dokumen HTML mandiri di window baru (tanpa chrome AppShell). */
 function printProcDoc(doc: ProcDocApi, kopHtml: string) {
-  const win = window.open("", "_blank", "width=900,height=650");
-  if (!win) {
-    toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-    return;
-  }
+  const t = (v: string | null | undefined) => escPrintText(v);
   const rows = (doc.lines ?? [])
     .map(
       (l) => `
         <tr>
           <td>${l.line_no}</td>
-          <td>${l.name ?? "—"}<br/><span style="color:#64748b;font-size:11px">${l.sku ?? ""}</span></td>
-          <td style="text-align:right">${formatNumber(l.qty)} ${l.unit ?? ""}</td>
+          <td>${t(l.name)}<br/><span style="color:#64748b;font-size:11px">${t(l.sku)}</span></td>
+          <td style="text-align:right">${formatNumber(l.qty)} ${t(l.unit)}</td>
           <td style="text-align:right">${formatIDR(l.price)}</td>
           <td style="text-align:right">${formatIDR(l.subtotal)}</td>
         </tr>`,
     )
     .join("");
-  win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>${doc.no} — Purchase Request</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}
-  .field{border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
-  .field b{display:block;font-size:13px}
-  .field span{color:#64748b;font-size:11px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .total{margin-top:12px;text-align:right;font-weight:700}
-  .note{margin-top:16px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>Purchase Request</h1>
-${kopHtml}
-<p class="mono muted">${doc.no} · Status: ${doc.status} · Tanggal: ${fmtDate(doc.document_date)}</p>
+  openPrintWindow(
+    buildPrintDoc({
+      title: `${doc.no} — Purchase Request`,
+      kopHtml,
+      bodyHtml: `<h1>Purchase Request</h1>
+<p class="mono muted">${t(doc.no)} · Status: ${t(doc.status)} · Tanggal: ${fmtDate(doc.document_date)}</p>
 <div class="grid">
-  <div class="field"><span>Departemen</span><b>${doc.department ?? "—"}</b></div>
-  <div class="field"><span>Supplier</span><b>${doc.supplier ?? "—"}</b></div>
-  <div class="field"><span>Gudang</span><b>${doc.warehouse ?? "—"}</b></div>
-  <div class="field"><span>Pemohon</span><b>${doc.requester ?? "—"}</b></div>
-  <div class="field"><span>Referensi</span><b>${doc.reference ?? "—"}</b></div>
-  <div class="field"><span>Disetujui</span><b>${doc.approved_by ?? "—"}</b></div>
+  <div class="field"><span>Departemen</span><b>${t(doc.department)}</b></div>
+  <div class="field"><span>Supplier</span><b>${t(doc.supplier)}</b></div>
+  <div class="field"><span>Gudang</span><b>${t(doc.warehouse)}</b></div>
+  <div class="field"><span>Pemohon</span><b>${t(doc.requester)}</b></div>
+  <div class="field"><span>Referensi</span><b>${t(doc.reference)}</b></div>
+  <div class="field"><span>Disetujui</span><b>${t(doc.approved_by)}</b></div>
   <div class="field"><span>Tanggal Approval</span><b>${fmtDate(doc.approved_at)}</b></div>
 </div>
 <table>
@@ -132,13 +112,10 @@ ${kopHtml}
   <tbody>${rows}</tbody>
 </table>
 <p class="total">Total Nilai: ${formatIDR(doc.value_total ?? 0)}</p>
-${doc.note ? `<div class="note"><b>Catatan:</b> ${doc.note}</div>` : ""}
-${doc.decision_note ? `<div class="note"><b>Catatan Keputusan:</b> ${doc.decision_note}</div>` : ""}
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-  win.document.close();
-  win.focus();
-  setTimeout(() => win.print(), 150);
+${doc.note ? `<div class="note"><b>Catatan:</b> ${t(doc.note)}</div>` : ""}
+${doc.decision_note ? `<div class="note"><b>Catatan Keputusan:</b> ${t(doc.decision_note)}</div>` : ""}`,
+    }),
+  );
 }
 
 export function PurchaseRequestSheet({

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { opnameReasonLabel } from "@/lib/persediaan-types";
 import type {
@@ -183,54 +184,36 @@ export function StockDocumentSheet({
 
   const handlePrint = () => {
     if (!doc) return;
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const gudang = doc.destination
-      ? `${doc.warehouse ?? "—"} → ${doc.destination}`
-      : (doc.warehouse ?? "—");
+      ? `${t(doc.warehouse)} → ${t(doc.destination)}`
+      : t(doc.warehouse);
     const tbody = lines
       .map(
         (l, i) => `
       <tr>
         <td class="mono">${i + 1}</td>
-        <td>${l.name ?? "—"}</td>
-        <td class="mono">${l.sku ?? "—"}</td>
-        <td>${l.unit ?? "—"}</td>
+        <td>${t(l.name)}</td>
+        <td class="mono">${t(l.sku)}</td>
+        <td>${t(l.unit)}</td>
         <td class="right">${lineQty(l)}</td>
         <td class="right">${formatIDR(lineValue(l))}</td>
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>Dokumen ${doc.no}</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>${doc.type} — ${doc.no}</h1>
-${companyKopHtml(company)}
-<p class="mono muted">Tanggal: ${formatDate(doc.document_date)} · Gudang: ${gudang} · Status: ${doc.status}${doc.partner ? ` · Partner: ${doc.partner}` : ""}${doc.reference_no ? ` · Ref: ${doc.reference_no}` : ""}${doc.pic ? ` · PIC: ${doc.pic}` : ""}</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title: `Dokumen ${doc.no}`,
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>${t(doc.type)} — ${t(doc.no)}</h1>
+<p class="mono muted">Tanggal: ${formatDate(doc.document_date)} · Gudang: ${gudang} · Status: ${t(doc.status)}${doc.partner ? ` · Partner: ${t(doc.partner)}` : ""}${doc.reference_no ? ` · Ref: ${t(doc.reference_no)}` : ""}${doc.pic ? ` · PIC: ${t(doc.pic)}` : ""}</p>
 <table>
   <thead><tr><th>No</th><th>Barang</th><th>SKU</th><th>Satuan</th><th class="right">Qty</th><th class="right">Nilai (HPP)</th></tr></thead>
   <tbody>${tbody}</tbody>
 </table>
-<p class="mono muted">Total nilai: ${formatIDR(netValue)}</p>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+<p class="mono muted">Total nilai: ${formatIDR(netValue)}</p>`,
+      }),
+    );
   };
 
   if (isLoading && !doc) {

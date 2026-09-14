@@ -1,6 +1,7 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   CheckCheck,
   ClipboardCheck,
   Download,
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { useWarehouses } from "@/hooks/use-master";
 import { useStockDocuments } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -198,43 +200,26 @@ function Laporan() {
   };
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
-    const thead = headers.map((h) => `<th>${h}</th>`).join("");
+    const t = (v: string | null | undefined) => escPrintText(v);
+    const thead = headers.map((h) => `<th>${t(h)}</th>`).join("");
     const tbody = rows
       .map((r) => {
         const cells = [r.a, r.b, r.c, r.d, r.e, r.f ?? "", r.g ?? ""].slice(0, headers.length);
-        return `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+        return `<tr>${cells.map((c) => `<td>${t(c)}</td>`).join("")}</tr>`;
       })
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>${reportTitle}</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>${reportTitle}</h1>
-${companyKopHtml(company)}
+    openPrintWindow(
+      buildPrintDoc({
+        title: reportTitle,
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>${t(reportTitle)}</h1>
 <p class="mono muted">Periode Agustus 2025 – Juli 2026 · ${formatNumber(rows.length)} baris</p>
 <table>
   <thead><tr>${thead}</tr></thead>
   <tbody>${tbody}</tbody>
-</table>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+</table>`,
+      }),
+    );
   };
 
   const whOptions = isStockOpname
@@ -252,6 +237,11 @@ ${companyKopHtml(company)}
         description="Periode Agustus 2025 – Juli 2026"
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/opname/$section" params={{ section: "laporan" }}>
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"

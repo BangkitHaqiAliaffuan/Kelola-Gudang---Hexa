@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   ArrowDownToLine,
+  ArrowLeft,
   Boxes,
   CircleDollarSign,
   FileSpreadsheet,
@@ -12,6 +13,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ALL,
@@ -34,6 +36,7 @@ import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useWarehouses } from "@/hooks/use-master";
 import { companyKopHtml, useCompanySettings } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { useStockValuation } from "@/hooks/use-persediaan";
 import { useLaporanMutasi } from "@/hooks/use-laporan";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -262,17 +265,13 @@ export function LaporanNilaiPersediaan() {
   };
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const tbody = rows
       .map(
         (r) => `
       <tr>
-        <td>${r.name ?? "—"}</td>
-        <td class="mono">${r.sku ?? "—"}</td>
+        <td>${t(r.name)}</td>
+        <td class="mono">${t(r.sku)}</td>
         <td class="right">${formatNumber(r.saldo_awal)}</td>
         <td class="right">${formatIDR(nilaiAwal(r))}</td>
         <td class="right">${formatNumber(r.masuk)}</td>
@@ -283,36 +282,21 @@ export function LaporanNilaiPersediaan() {
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>Laporan Nilai Persediaan</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  .kop-logo{max-height:48px;width:auto;margin-bottom:6px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .sign{margin-top:40px;display:flex;justify-content:space-between;font-size:12px}
-  .sign div{text-align:center}
-  .foot{margin-top:24px;font-size:11px;color:#64748b}
-</style></head><body>
-<h1>Laporan Nilai Persediaan</h1>
-${companyKopHtml(company)}
-<p class="mono muted">Periode: ${periodLabel} · Gudang: ${wh === ALL ? "Semua" : wh} · Kategori: ${cat === ALL ? "Semua" : cat} · Metode: ${METHOD_LABEL} · ${formatNumber(rows.length)} SKU</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title: "Laporan Nilai Persediaan",
+        kopHtml: companyKopHtml(company),
+        extraCss: `.sign-account{display:flex;justify-content:space-between;font-size:12px}\n  .sign-account div{text-align:center}`,
+        bodyHtml: `<h1>Laporan Nilai Persediaan</h1>
+<p class="mono muted">Periode: ${t(periodLabel)} · Gudang: ${wh === ALL ? "Semua" : t(wh)} · Kategori: ${cat === ALL ? "Semua" : t(cat)} · Metode: ${t(METHOD_LABEL)} · ${formatNumber(rows.length)} SKU</p>
 <table>
   <thead><tr><th>Barang</th><th>SKU</th><th class="right">Saldo Awal</th><th class="right">Nilai Awal*</th><th class="right">Masuk</th><th class="right">Keluar</th><th class="right">Saldo Akhir</th><th class="right">Nilai Akhir</th><th class="right">Selisih</th></tr></thead>
   <tbody>${tbody}</tbody>
 </table>
-<p class="foot">Total Nilai Awal: ${formatIDR(stats.awal)} · Total Nilai Akhir: ${formatIDR(stats.akhir)} · Selisih: ${formatIDR(stats.gap)}<br/>*${METHOD_NOTE}</p>
-<div class="sign"><div>Disiapkan oleh<br/><br/><br/>(............................)</div><div>Disetujui oleh<br/><br/><br/>(............................)</div></div>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span> · KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+<p class="foot">Total Nilai Awal: ${formatIDR(stats.awal)} · Total Nilai Akhir: ${formatIDR(stats.akhir)} · Selisih: ${formatIDR(stats.gap)}<br/>*${t(METHOD_NOTE)}</p>
+<div class="sign-account"><div>Disiapkan oleh<br/><br/><br/>(............................)</div><div>Disetujui oleh<br/><br/><br/>(............................)</div></div>`,
+      }),
+    );
   };
 
   const columns: Column<LaporanMutasiRowApi>[] = [
@@ -414,6 +398,11 @@ ${companyKopHtml(company)}
         description={`Rekonsiliasi nilai per periode · metode ${METHOD_LABEL} · ${periodLabel}`}
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"
