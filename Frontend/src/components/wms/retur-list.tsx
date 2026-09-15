@@ -1,6 +1,6 @@
-import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, getRouteApi } from "@tanstack/react-router";
+import { FileBarChart, Download, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
 import { buildStockDocumentSearchText } from "@/lib/stock-document-search";
 import { stockDocumentStatuses, type StockDocumentApi } from "@/lib/persediaan-types";
@@ -232,6 +233,37 @@ function ReturListPage({
     },
   ];
 
+  const exportCsv = () => {
+    downloadCsv(
+      `${reportSlug}.csv`,
+      toCsv(
+        rows.map((r) => ({
+          no: r.no,
+          tanggal: r.document_date ?? "",
+          gudang: r.warehouse ?? "",
+          pihak: r.partner ?? "",
+          referensi: r.reference_no ?? "",
+          qty: Math.abs(r.qty_total ?? 0),
+          nilai: Math.abs(r.value_total ?? 0),
+          pic: r.pic ?? "",
+          status: r.status,
+        })),
+        [
+          { key: "no", label: "Nomor" },
+          { key: "tanggal", label: "Tanggal" },
+          { key: "gudang", label: "Gudang" },
+          { key: "pihak", label: partnerLabel },
+          { key: "referensi", label: "Referensi" },
+          { key: "qty", label: "Qty" },
+          { key: "nilai", label: "Nilai" },
+          { key: "pic", label: "PIC" },
+          { key: "status", label: "Status" },
+        ],
+      ),
+    );
+    toast.success(`Data ${title} diekspor ke CSV`);
+  };
+
   return (
     <>
       <div inert={fullscreen || undefined} className="space-y-5">
@@ -239,13 +271,19 @@ function ReturListPage({
           title={title}
           description={description}
           actions={
-            canCreate && (
-              <Button asChild className="rounded-xl">
-                <Link to="/transaksi/entri/$section" params={{ section: createSection }}>
-                  <Plus className="h-4 w-4" /> Buat {createLabel}
-                </Link>
+            <>
+              <Button variant="outline" className="rounded-xl" onClick={exportCsv}>
+                <Download className="h-4 w-4" />
+                Export
               </Button>
-            )
+              {canCreate && (
+                <Button asChild className="rounded-xl">
+                  <Link to="/transaksi/entri/$section" params={{ section: createSection }}>
+                    <Plus className="h-4 w-4" /> Buat {createLabel}
+                  </Link>
+                </Button>
+              )}
+            </>
           }
         />
 

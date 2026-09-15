@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
+  ArrowLeft,
   ArrowUpRight,
   Boxes,
   FileSpreadsheet,
@@ -9,6 +10,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +36,7 @@ import { TrxDetailSheet } from "@/components/wms/trx-detail-sheet";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useItems, useWarehouses } from "@/hooks/use-master";
+import { useCompanySettings, companyKopHtml } from "@/hooks/use-settings";
 import { useStockCard, useStockDocument } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import type { StockCardRowApi, ValuationMethod } from "@/lib/persediaan-types";
@@ -86,6 +89,7 @@ export function LaporanKartuStock() {
   const [detail, setDetail] = useState<Trx | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: docDetail, isLoading: docLoading } = useStockDocument(selectedId ?? undefined);
+  const { data: company } = useCompanySettings();
 
   const activeId = id ?? options[0]?.id;
   const whId = whFilter.warehouseId;
@@ -263,12 +267,22 @@ export function LaporanKartuStock() {
       })
       .join("");
     win.document.write(
-      `<!doctype html><html><head><meta charset="utf-8"/><title>Laporan Kartu Stock</title><style>body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#111;padding:24px}h1{font-size:18px;margin:0 0 4px}h2{font-size:12px;color:#666;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:11px}th{background:#f5f5f5}.right{text-align:right}.mono{font-family:monospace}</style></head><body><h1>Laporan Kartu Stock</h1><h2>${periodLabel} · ${warehouseLabel} · ${itemLabel} · ${valuationMethodLabels[method]}</h2><p>Saldo Awal ${formatNumber(saldoAwal)} ${unit} · Saldo Akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${filteredRows.length} baris</p><table><thead><tr><th>Tanggal</th><th>Nomor</th><th>Jenis</th><th>Gudang</th><th>Masuk</th><th>Keluar</th><th>Saldo</th><th>Nilai</th><th>PIC</th><th>Catatan</th></tr></thead><tbody>${tbody}</tbody></table></body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"/><title>Laporan Kartu Stock</title><style>body{font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#111;padding:24px}h1{font-size:18px;margin:0 0 4px}h2{font-size:12px;color:#666;margin:0 0 12px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:11px}th{background:#f5f5f5}.right{text-align:right}.mono{font-family:monospace}.kop-logo{max-height:48px;width:auto;margin-bottom:6px}</style></head><body><h1>Laporan Kartu Stock</h1>${companyKopHtml(company)}<h2>${periodLabel} · ${warehouseLabel} · ${itemLabel} · ${valuationMethodLabels[method]}</h2><p>Saldo Awal ${formatNumber(saldoAwal)} ${unit} · Saldo Akhir ${formatNumber(cardData?.saldo_akhir ?? 0)} ${unit} · ${filteredRows.length} baris</p><table><thead><tr><th>Tanggal</th><th>Nomor</th><th>Jenis</th><th>Gudang</th><th>Masuk</th><th>Keluar</th><th>Saldo</th><th>Nilai</th><th>PIC</th><th>Catatan</th></tr></thead><tbody>${tbody}</tbody></table></body></html>`,
     );
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 150);
-  }, [filteredRows, periodLabel, warehouseLabel, itemLabel, method, saldoAwal, unit, cardData]);
+  }, [
+    filteredRows,
+    periodLabel,
+    warehouseLabel,
+    itemLabel,
+    method,
+    saldoAwal,
+    unit,
+    cardData,
+    company,
+  ]);
 
   const toTrx = (r: CardRow, it: NonNullable<typeof item>): Trx => {
     const qty = r.masuk || r.keluar;
@@ -400,6 +414,11 @@ export function LaporanKartuStock() {
         description={`${periodLabel} · ${warehouseLabel} · ${itemLabel}`}
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <div className="flex rounded-xl border border-border bg-card p-1">
               {valuationMethods.map((m) => (
                 <button

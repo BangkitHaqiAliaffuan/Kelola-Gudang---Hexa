@@ -38,16 +38,4 @@ export const trxSections: Record<string, SectionConfig> = {
     description: "Penerimaan barang retur dari customer",
     variant: "masuk",
   },
-  peminjaman: {
-    title: "Peminjaman Barang",
-    type: "Barang Keluar",
-    description: "Peminjaman alat dan barang operasional",
-    variant: "keluar",
-  },
-  pengembalian: {
-    title: "Pengembalian Barang",
-    type: "Barang Masuk",
-    description: "Pengembalian barang pinjaman ke gudang",
-    variant: "masuk",
-  },
 };

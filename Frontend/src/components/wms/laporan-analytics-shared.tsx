@@ -18,6 +18,7 @@ export const PIHAK_LABEL: Record<PihakJenis, string> = {
   customer: "Customer",
   departemen: "Departemen",
   proyek: "Proyek",
+  work_order: "Work Order",
   gudang: "Gudang",
   lainnya: "Lainnya",
 };
@@ -27,6 +28,7 @@ export const PIHAK_TONE: Record<PihakJenis, Tone> = {
   customer: "info",
   departemen: "brand",
   proyek: "warning",
+  work_order: "success",
   gudang: "success",
   lainnya: "neutral",
 };
@@ -36,6 +38,7 @@ export const PIHAK_FILL: Record<PihakJenis, string> = {
   customer: "var(--primary)",
   departemen: "var(--primary-glow)",
   proyek: "#f59e0b",
+  work_order: "#10b981",
   gudang: "#10b981",
   lainnya: "#94a3b8",
 };

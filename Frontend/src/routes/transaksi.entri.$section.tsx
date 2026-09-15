@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { BarangKeluarForm } from "@/components/wms/barang-keluar-form";
 import { BarangMasukForm } from "@/components/wms/barang-masuk-form";
@@ -18,11 +18,12 @@ const sectionModule: Record<string, string> = {
   transfer: "Persediaan",
   "retur-pembelian": "Persediaan",
   "retur-penjualan": "Persediaan",
-  peminjaman: "Transaksi",
-  pengembalian: "Transaksi",
 };
 
 export const Route = createFileRoute("/transaksi/entri/$section")({
+  beforeLoad: ({ params }) => {
+    if (!(params.section in sectionModule) || !(params.section in trxSections)) throw notFound();
+  },
   head: ({ params }) => {
     const cfg = trxSections[params.section];
     const title = `Tambah ${cfg?.title ?? "Transaksi"} — KelolaGudang`;

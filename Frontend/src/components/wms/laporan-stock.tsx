@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
+  ArrowLeft,
   Boxes,
   FileSpreadsheet,
   Package,
@@ -9,6 +10,7 @@ import {
   TriangleAlert,
   Wallet,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ALL,
@@ -26,6 +28,8 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useCompanySettings, companyKopHtml } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
@@ -52,6 +56,7 @@ export function LaporanStock() {
   const noAccess = authStatus === "authenticated" && !canView;
 
   const { data, isLoading, error, refetch } = useStockRows();
+  const { data: company } = useCompanySettings();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: items } = useItems();
@@ -164,53 +169,37 @@ export function LaporanStock() {
   };
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const tbody = rows
       .map(
         (r) => `
       <tr>
-        <td>${r.name ?? "—"}</td>
-        <td class="mono">${r.sku ?? "—"}</td>
-        <td>${r.unit ?? "—"}</td>
-        <td>${r.warehouse ?? "—"}</td>
-        <td class="mono">${r.rack ?? "—"}</td>
-        <td class="mono">${r.bin ?? "—"}</td>
+        <td>${t(r.name)}</td>
+        <td class="mono">${t(r.sku)}</td>
+        <td>${t(r.unit)}</td>
+        <td>${t(r.warehouse)}</td>
+        <td class="mono">${t(r.rack)}</td>
+        <td class="mono">${t(r.bin)}</td>
         <td class="right">${formatNumber(r.stock)}</td>
         <td class="right">${formatNumber(r.reserved)}</td>
         <td class="right">${formatNumber(r.available)}</td>
         <td class="right">${formatIDR(r.nilai)}</td>
-        <td>${r.status}</td>
+        <td>${t(r.status)}</td>
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>Laporan Stock — KelolaGudang</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>Laporan Stock</h1>
-<p class="mono muted">${wh === ALL ? "Semua Gudang" : wh} · ${cat === ALL ? "Semua Kategori" : cat} · ${formatNumber(rows.length)} lokasi / ${formatNumber(stats.sku)} SKU</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title: "Laporan Stock — KelolaGudang",
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>Laporan Stock</h1>
+<p class="mono muted">${wh === ALL ? "Semua Gudang" : t(wh)} · ${cat === ALL ? "Semua Kategori" : t(cat)} · ${formatNumber(rows.length)} lokasi / ${formatNumber(stats.sku)} SKU</p>
 <table>
   <thead><tr><th>Barang</th><th>SKU</th><th>Satuan</th><th>Gudang</th><th>Rak</th><th>Bin</th><th class="right">Qty</th><th class="right">Reserved</th><th class="right">Available</th><th class="right">Nilai</th><th>Status</th></tr></thead>
   <tbody>${tbody}</tbody>
-</table>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+</table>`,
+      }),
+    );
   };
 
   const columns: Column<StockRowApi>[] = [
@@ -324,6 +313,11 @@ export function LaporanStock() {
         description="Posisi stok terkini per gudang, rak, dan bin location"
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"

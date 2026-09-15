@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
+  ArrowLeft,
   ClipboardList,
   FileSpreadsheet,
   Package,
@@ -9,6 +10,7 @@ import {
   TriangleAlert,
   Wallet,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   ALL,
@@ -33,6 +35,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useCompanySettings, companyKopHtml } from "@/hooks/use-settings";
+import { buildPrintDoc, escPrintText, openPrintWindow } from "@/lib/print-doc";
 import { useRowSelection } from "@/hooks/use-row-selection";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useAuth } from "@/hooks/use-auth";
@@ -153,6 +157,7 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
     enabled: canView && rangeValid,
   });
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+  const { data: company } = useCompanySettings();
 
   const qn = debouncedQ.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -273,52 +278,36 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
   };
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=900,height=650");
-    if (!win) {
-      toast.error("Pop-up diblokir — izinkan pop-up untuk mencetak.");
-      return;
-    }
+    const t = (v: string | null | undefined) => escPrintText(v);
     const target = selectedRows;
     const tbody = target
       .map(
         (d) => `
       <tr>
-        <td class="mono">${d.no}</td>
+        <td class="mono">${t(d.no)}</td>
         <td>${formatDate(d.document_date)}</td>
-        <td>${d.warehouse ?? "—"}</td>
-        <td>${partnerOf(d) ?? "—"}</td>
-        <td>${d.reference_no ?? "—"}</td>
+        <td>${t(d.warehouse)}</td>
+        <td>${t(partnerOf(d))}</td>
+        <td>${t(d.reference_no)}</td>
         <td class="right">${formatNumber(Math.abs(d.qty_total ?? 0))}</td>
         <td class="right">${formatIDR(Math.abs(d.value_total ?? 0))}</td>
-        <td>${d.pic ?? "—"}</td>
-        <td>${d.status}</td>
+        <td>${t(d.pic)}</td>
+        <td>${t(d.status)}</td>
       </tr>`,
       )
       .join("");
-    win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"/>
-<title>${title}</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:32px}
-  h1{font-size:18px;margin:0}
-  .mono{font-family:Consolas,monospace}
-  .muted{color:#64748b;font-size:12px}
-  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:16px}
-  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left}
-  th{background:#f1f5f9;font-size:12px}
-  .right{text-align:right}
-  .foot{margin-top:32px;display:flex;justify-content:space-between;font-size:12px;color:#64748b}
-</style></head><body>
-<h1>${title}</h1>
-<p class="mono muted">Periode: ${periodLabel} · ${wh === ALL ? "Semua Gudang" : wh} · ${formatNumber(target.length)} dokumen${selected.length > 0 ? " (terpilih)" : ""}</p>
+    openPrintWindow(
+      buildPrintDoc({
+        title,
+        kopHtml: companyKopHtml(company),
+        bodyHtml: `<h1>${t(title)}</h1>
+<p class="mono muted">Periode: ${t(periodLabel)} · ${wh === ALL ? "Semua Gudang" : t(wh)} · ${formatNumber(target.length)} dokumen${selected.length > 0 ? " (terpilih)" : ""}</p>
 <table>
-  <thead><tr><th>Nomor</th><th>Tanggal</th><th>Gudang</th><th>${partnerLabel}</th><th>Referensi</th><th class="right">Qty</th><th class="right">Nilai</th><th>PIC</th><th>Status</th></tr></thead>
+  <thead><tr><th>Nomor</th><th>Tanggal</th><th>Gudang</th><th>${t(partnerLabel)}</th><th>Referensi</th><th class="right">Qty</th><th class="right">Nilai</th><th>PIC</th><th>Status</th></tr></thead>
   <tbody>${tbody}</tbody>
-</table>
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
-</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 150);
+</table>`,
+      }),
+    );
   };
 
   const columns: Column<StockDocumentApi>[] = [
@@ -419,6 +408,11 @@ export function LaporanBarangMasukKeluar({ type }: { type: keyof typeof DOC_META
         description={`Data dari sistem persediaan (${meta.docLabel})`}
         actions={
           <>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4" /> Kembali
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="rounded-xl"

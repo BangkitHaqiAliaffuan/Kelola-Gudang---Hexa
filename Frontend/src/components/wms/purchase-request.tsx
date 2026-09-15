@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   ClipboardList,
+  Download,
   Maximize2,
   Minimize2,
   Plus,
@@ -37,6 +38,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
+import { downloadCsv, toCsv } from "@/lib/csv";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDepartments, useSuppliers, useWarehouses } from "@/hooks/use-master";
 import { useStockMinimum } from "@/hooks/use-persediaan";
@@ -320,6 +323,35 @@ export function PurchaseRequestPage() {
     },
   ];
 
+  const exportCsv = () => {
+    downloadCsv(
+      "purchase-request.csv",
+      toCsv(
+        rows.map((r) => ({
+          no: r.no,
+          tanggal: r.document_date ?? "",
+          departemen: r.department ?? "",
+          supplier: r.supplier ?? "",
+          gudang: r.warehouse ?? "",
+          qty: r.qty_total ?? 0,
+          nilai: r.value_total ?? 0,
+          status: r.status,
+        })),
+        [
+          { key: "no", label: "Nomor" },
+          { key: "tanggal", label: "Tanggal" },
+          { key: "departemen", label: "Departemen" },
+          { key: "supplier", label: "Supplier" },
+          { key: "gudang", label: "Gudang" },
+          { key: "qty", label: "Qty" },
+          { key: "nilai", label: "Nilai" },
+          { key: "status", label: "Status" },
+        ],
+      ),
+    );
+    toast.success("Data Purchase Request diekspor ke CSV");
+  };
+
   return (
     <>
       <div inert={fullscreen || undefined} className="space-y-5">
@@ -328,6 +360,10 @@ export function PurchaseRequestPage() {
           description="Permintaan pembelian barang dari departemen"
           actions={
             <>
+              <Button variant="outline" className="rounded-xl" onClick={exportCsv}>
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
               {canViewRestock && (
                 <Button
                   variant="outline"

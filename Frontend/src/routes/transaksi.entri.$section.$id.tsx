@@ -1,9 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { TransactionFormPage } from "@/components/wms/transaction-form";
 import { trxSections } from "@/lib/trx-sections";
 import { transactions } from "@/lib/wms-data";
 
 export const Route = createFileRoute("/transaksi/entri/$section/$id")({
+  beforeLoad: ({ params }) => {
+    if (!(params.section in trxSections)) throw notFound();
+  },
   head: ({ params }) => {
     const cfg = trxSections[params.section];
     const title = `Edit ${cfg?.title ?? "Transaksi"} — KelolaGudang`;

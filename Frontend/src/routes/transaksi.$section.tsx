@@ -1,8 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { TransactionPage } from "@/components/wms/transaction-page";
 import { trxSections } from "@/lib/trx-sections";
 
 export const Route = createFileRoute("/transaksi/$section")({
+  beforeLoad: ({ params }) => {
+    if (!(params.section in trxSections)) throw notFound();
+  },
   head: ({ params }) => {
     const cfg = trxSections[params.section];
     const title = `${cfg?.title ?? "Transaksi"} — KelolaGudang`;
