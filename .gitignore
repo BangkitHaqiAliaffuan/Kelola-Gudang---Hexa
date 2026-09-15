@@ -9,7 +9,7 @@
 .vscode/
 .DS_Store
 Thumbs.db
-
+presentasi.txt
 # Loose secrets safety net (sub-project gitignores already cover their dirs)
 .env
 .env.*
