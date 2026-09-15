@@ -52,6 +52,29 @@ start_tunnel() {
   NGROK_PID=$!
 }
 
+# --- Rewrite Frontend/vercel.json → URL ngrok aktif (otomatis, tanpa placeholder manual) ---
+update_vercel_json() {
+  local url="$1" old_url="" escaped_old=""
+  VERCEL_JSON="$ROOT/Frontend/vercel.json"
+  if [ ! -f "$VERCEL_JSON" ]; then
+    echo "   ⚠ Frontend/vercel.json tidak ditemukan — buat dengan destination → $url."
+    return 0
+  fi
+  # Catat URL tunnel sebelumnya (ditulis tiap restart) untuk kasus custom NGROK_DOMAIN
+  # yang host-nya tidak berpola *.ngrok* — baca SEBELUM file URL ditimpa.
+  [ -f "$NGROK_URL_FILE" ] && old_url="$(cat "$NGROK_URL_FILE")"
+  # Ganti host ngrok APAPUN yang sudah ada (placeholder NGROK-URL, *.ngrok-free.app,
+  # *.ngrok-free.dev, *.ngrok.io) dengan URL tunnel aktif; suffix path (/api/:path*,
+  # /sanctum/:path*) dipertahankan karena regex hanya menyentuh host.
+  sed -i -e "s|https://[^/\"]*\.ngrok[^/\"]*|$url|g" "$VERCEL_JSON"
+  if [ -n "$old_url" ] && [ "$old_url" != "$url" ]; then
+    escaped_old="${old_url//|/\\|}"
+    escaped_old="${escaped_old//&/\\&}"
+    sed -i -e "s|$escaped_old|$url|g" "$VERCEL_JSON"
+  fi
+  echo "   ✓ Frontend/vercel.json → destination $url (commit + redeploy Vercel)."
+}
+
 wait_for_tunnel() {
   local tries=0 url=""
   until url="$(curl -sf --max-time 3 "http://127.0.0.1:4040/api/tunnels" | grep -o '"public_url":"[^"]*"' | head -1 | cut -d'"' -f4)" && [ -n "$url" ]; do
@@ -67,13 +90,7 @@ wait_for_tunnel() {
   echo "✓ Tunnel ngrok siap → $NGROK_PUBLIC_URL"
   echo ""
   echo "⚠ Koneksi produksi (Vercel) — same-origin proxy:"
-  VERCEL_JSON="$ROOT/Frontend/vercel.json"
-  if [ -f "$VERCEL_JSON" ]; then
-    sed -i -e "s|https://NGROK-URL\.ngrok-free\.app|$url|g" "$VERCEL_JSON"
-    echo "   ✓ Frontend/vercel.json → destination $url (commit + redeploy Vercel)."
-  else
-    echo "   ⚠ Frontend/vercel.json tidak ditemukan — buat dengan destination → $url."
-  fi
+  update_vercel_json "$url"
   echo "   (URL ngrok berubah tiap restart — update vercel.json & redeploy tiap kali.)"
   if is_windows && command -v clip >/dev/null 2>&1; then
     printf '%s' "$url" | clip && echo "   ✓ URL ngrok disalin ke clipboard."
