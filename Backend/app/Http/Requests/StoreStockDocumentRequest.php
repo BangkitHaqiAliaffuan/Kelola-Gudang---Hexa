@@ -7,7 +7,6 @@ use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Item;
 use App\Models\ItemStock;
-use App\Models\Project;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\Warehouse;
@@ -25,9 +24,23 @@ class StoreStockDocumentRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // Backwards compatibility: auto-resolve tujuan dari partner name.
-        // Retur Penjualan → customer; Pengeluaran → customer, lalu
-        // departemen, lalu proyek (tie-break sama dengan backfill migrasi).
+        // Tujuan Retur Penjualan diwarisi dari dokumen sumber (server
+        // authoritative — nilai kiriman klien ditimpa). Tanpa sumber, RJ hanya
+        // sah untuk customer (resolve legacy dari nama partner).
+        if ($this->input('type') === 'Retur Penjualan' && ! empty($this->input('source_document_id'))) {
+            $source = StockDocument::find($this->input('source_document_id'));
+            // Warisi hanya bila sumber ber-FK; sumber tekstual lama (tanpa FK)
+            // + customer_id eksplisit tetap sah (kompatibel ke belakang).
+            if ($source && $source->type === 'Pengeluaran'
+                && ($source->customer_id || $source->department_id || $source->work_order_id)
+            ) {
+                $this->merge([
+                    'customer_id' => $source->customer_id,
+                    'department_id' => $source->department_id,
+                    'work_order_id' => $source->work_order_id,
+                ]);
+            }
+        }
         if (empty($this->input('customer_id')) && ! empty($this->input('partner'))) {
             if ($this->input('type') === 'Retur Penjualan') {
                 $found = Customer::where('name', $this->input('partner'))->first();
@@ -36,8 +49,11 @@ class StoreStockDocumentRequest extends FormRequest
                 }
             } elseif ($this->input('type') === 'Pengeluaran'
                 && empty($this->input('department_id'))
-                && empty($this->input('project_id'))
+                && empty($this->input('work_order_id'))
             ) {
+                // Backwards compatibility: auto-resolve tujuan dari partner name.
+                // Proyek tidak lagi menjadi tujuan dokumen baru (lihat aturan
+                // project_id di bawah) sehingga tidak di-resolve ke FK.
                 $partner = $this->input('partner');
                 $found = Customer::where('name', $partner)->first();
                 if ($found) {
@@ -46,11 +62,6 @@ class StoreStockDocumentRequest extends FormRequest
                     $dept = Department::where('name', $partner)->first();
                     if ($dept) {
                         $this->merge(['department_id' => $dept->id]);
-                    } else {
-                        $proj = Project::where('name', $partner)->first();
-                        if ($proj) {
-                            $this->merge(['project_id' => $proj->id]);
-                        }
                     }
                 }
             }
@@ -92,27 +103,34 @@ class StoreStockDocumentRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::exists('customers', 'id'),
-                Rule::requiredIf(fn () => $this->input('type') === 'Retur Penjualan'),
+                // RJ tanpa sumber hanya sah untuk customer; RJ bersumber
+                // diwarisi server (prepareForValidation) sehingga terisi.
+                Rule::requiredIf(fn () => $this->input('type') === 'Retur Penjualan' && empty($this->input('source_document_id'))),
                 Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Pengeluaran', 'Retur Penjualan'], true)),
-                // Satu dokumen satu tujuan: customer / departemen / proyek eksklusif.
-                Rule::prohibitedIf(fn () => ! empty($this->input('department_id')) || ! empty($this->input('project_id'))),
+                // Satu dokumen satu tujuan: customer / departemen / work order eksklusif.
+                Rule::prohibitedIf(fn () => ! empty($this->input('department_id')) || ! empty($this->input('work_order_id'))),
             ],
-            // Tujuan Barang Keluar selain customer: departemen / proyek.
-            // Hanya untuk Pengeluaran; eksklusif satu sama lain & vs customer_id.
+            // Tujuan Barang Keluar selain customer: departemen / work order.
+            // Pengeluaran diisi klien; Retur Penjualan diwarisi dari sumber
+            // (prepareForValidation menimpa kiriman klien). Eksklusif satu
+            // sama lain & vs customer_id.
             'department_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('departments', 'id'),
-                Rule::prohibitedIf(fn () => $this->input('type') !== 'Pengeluaran'),
-                Rule::prohibitedIf(fn () => ! empty($this->input('customer_id')) || ! empty($this->input('project_id'))),
+                Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Pengeluaran', 'Retur Penjualan'], true)),
+                Rule::prohibitedIf(fn () => ! empty($this->input('customer_id')) || ! empty($this->input('work_order_id'))),
             ],
-            'project_id' => [
+            'work_order_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('projects', 'id'),
-                Rule::prohibitedIf(fn () => $this->input('type') !== 'Pengeluaran'),
+                Rule::exists('work_orders', 'id'),
+                Rule::prohibitedIf(fn () => ! in_array($this->input('type'), ['Pengeluaran', 'Retur Penjualan'], true)),
                 Rule::prohibitedIf(fn () => ! empty($this->input('customer_id')) || ! empty($this->input('department_id'))),
             ],
+            // Proyek bukan lagi tujuan dokumen baru (digantikan work order).
+            // Kolom dipertahankan untuk histori + laporan arsip.
+            'project_id' => ['prohibited'],
             'reference_no' => ['nullable', 'string', 'max:255'],
             'pic' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
@@ -181,6 +199,32 @@ class StoreStockDocumentRequest extends FormRequest
     public function after(): array
     {
         return [
+            function (Validator $validator) {
+                // Retur Penjualan wajib tepat satu tujuan. Tanpa sumber hanya
+                // customer yang sah; dengan sumber, tujuan diwarisi server.
+                // Sumber proyek-arsip tidak dapat diretur (tak terpetakan ke WO).
+                if ($this->input('type') !== 'Retur Penjualan') {
+                    return;
+                }
+                // Sumber proyek-arsip tidak dapat dipetakan ke WO otomatis.
+                $sourceId = $this->input('source_document_id');
+                if (! empty($sourceId) && StockDocument::whereKey($sourceId)->whereNotNull('project_id')->exists()) {
+                    $validator->errors()->add(
+                        'source_document_id',
+                        'Dokumen sumber bertujuan proyek (arsip) dan tidak dapat diretur. Pilih dokumen Barang Keluar bertujuan customer, departemen, atau work order.'
+                    );
+
+                    return;
+                }
+                $filled = collect([$this->input('customer_id'), $this->input('department_id'), $this->input('work_order_id')])
+                    ->filter(fn ($v) => ! empty($v))->count();
+                if ($filled !== 1) {
+                    $validator->errors()->add(
+                        'customer_id',
+                        'Retur Penjualan wajib memiliki tepat satu tujuan (customer, departemen, atau work order dari dokumen sumber).'
+                    );
+                }
+            },
             function (Validator $validator) {
                 // Hanya tipe dengan alur approval yang boleh dibuat langsung
                 // Menunggu Approval: Stock Adjustment (submit-approval) dan

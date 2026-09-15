@@ -29,6 +29,8 @@ class StockDocumentResource extends JsonResource
             'department' => $this->whenLoaded('department', fn () => $this->department?->name),
             'project_id' => $this->project_id,
             'project' => $this->whenLoaded('project', fn () => $this->project?->name),
+            'work_order_id' => $this->work_order_id,
+            'work_order' => $this->whenLoaded('workOrder', fn () => $this->workOrder?->no),
             'partner' => $this->partner,
             'reference_no' => $this->reference_no,
             'pic' => $this->pic,

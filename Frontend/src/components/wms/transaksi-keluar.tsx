@@ -1,6 +1,6 @@
-import { FileBarChart, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, getRouteApi } from "@tanstack/react-router";
+import { FileBarChart, Download, Maximize2, Minimize2, Plus, Search } from "lucide-react";
 import { ALL, ClearFiltersButton, FilterSelect, PageHeader, Panel, Pill, type Tone } from "./kit";
 import { DataTable, type Column } from "./data-table";
 import { StockDocumentSheet } from "./stock-document-sheet";
@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { downloadCsv, toCsv } from "@/lib/csv";
 
 const statusTone = (s: StockDocumentApi["status"]): Tone =>
   s === "Selesai"
@@ -216,20 +217,57 @@ export function BarangKeluarPage() {
     },
   ];
 
+  const exportCsv = () => {
+    downloadCsv(
+      "barang-keluar.csv",
+      toCsv(
+        rows.map((r) => ({
+          no: r.no,
+          tanggal: r.document_date ?? "",
+          gudang: r.warehouse ?? "",
+          tujuan: r.partner ?? "",
+          referensi: r.reference_no ?? "",
+          qty: Math.abs(r.qty_total ?? 0),
+          nilai: Math.abs(r.value_total ?? 0),
+          pic: r.pic ?? "",
+          status: r.status,
+        })),
+        [
+          { key: "no", label: "Nomor" },
+          { key: "tanggal", label: "Tanggal" },
+          { key: "gudang", label: "Gudang" },
+          { key: "tujuan", label: "Tujuan" },
+          { key: "referensi", label: "Referensi" },
+          { key: "qty", label: "Qty" },
+          { key: "nilai", label: "Nilai" },
+          { key: "pic", label: "PIC" },
+          { key: "status", label: "Status" },
+        ],
+      ),
+    );
+    toast.success("Data Barang Keluar diekspor ke CSV");
+  };
+
   return (
     <>
       <div inert={fullscreen || undefined} className="space-y-5">
         <PageHeader
           title="Barang Keluar"
-          description="Pengeluaran barang ke customer, produksi, departemen, atau proyek"
+          description="Pengeluaran barang ke customer, departemen, atau work order"
           actions={
-            canCreate && (
-              <Button asChild className="rounded-xl">
-                <Link to="/transaksi/entri/$section" params={{ section: "keluar" }}>
-                  <Plus className="h-4 w-4" /> Buat Barang Keluar
-                </Link>
+            <>
+              <Button variant="outline" className="rounded-xl" onClick={exportCsv}>
+                <Download className="h-4 w-4" />
+                Export
               </Button>
-            )
+              {canCreate && (
+                <Button asChild className="rounded-xl">
+                  <Link to="/transaksi/entri/$section" params={{ section: "keluar" }}>
+                    <Plus className="h-4 w-4" /> Buat Barang Keluar
+                  </Link>
+                </Button>
+              )}
+            </>
           }
         />
 

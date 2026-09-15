@@ -47,6 +47,7 @@ export function useLaporanKeluarAnalytics(params: KeluarAnalyticsParams & { enab
     customerId,
     departmentId,
     projectId,
+    workOrderId,
     jenisTujuan,
     atRiskDays,
     varianceBand,
@@ -62,6 +63,7 @@ export function useLaporanKeluarAnalytics(params: KeluarAnalyticsParams & { enab
       customerId ?? null,
       departmentId ?? null,
       projectId ?? null,
+      workOrderId ?? null,
       jenisTujuan ?? null,
       atRiskDays ?? null,
       varianceBand ?? null,
@@ -73,6 +75,7 @@ export function useLaporanKeluarAnalytics(params: KeluarAnalyticsParams & { enab
       if (customerId != null) sp.set("customer_id", String(customerId));
       if (departmentId != null) sp.set("department_id", String(departmentId));
       if (projectId != null) sp.set("project_id", String(projectId));
+      if (workOrderId != null) sp.set("work_order_id", String(workOrderId));
       if (jenisTujuan) sp.set("jenis_tujuan", jenisTujuan);
       if (atRiskDays != null) sp.set("at_risk_days", String(atRiskDays));
       if (varianceBand != null) sp.set("variance_band", String(varianceBand));

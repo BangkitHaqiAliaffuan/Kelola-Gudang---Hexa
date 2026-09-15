@@ -102,15 +102,16 @@ class LaporanKeluarAnalyticsTest extends TestCase
         $this->assertEquals(5000.0, (float) $data['proses']['tertahan_nilai']);
     }
 
-    public function test_klasifikasi_departemen_dan_proyek(): void
+    public function test_klasifikasi_departemen_dan_work_order(): void
     {
         $item = $this->makeItem();
         [$wh, , $bin] = $this->makeLocation();
         $this->seedInbound($item, $wh, $bin, 100, 1000);
         $dept = Department::factory()->create(['name' => 'Produksi']);
         $proj = Project::factory()->create(['name' => 'Proyek Tol X']);
+        $wo = WorkOrder::factory()->create(['project_id' => $proj->id, 'item_id' => $item->id, 'target_qty' => 10]);
 
-        // Via FK baru department_id / project_id.
+        // Via FK baru department_id / work_order_id.
         $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Pengeluaran',
             'status' => 'Selesai',
@@ -125,8 +126,8 @@ class LaporanKeluarAnalyticsTest extends TestCase
             'status' => 'Selesai',
             'document_date' => '2026-07-11',
             'warehouse_id' => $wh->id,
-            'project_id' => $proj->id,
-            'partner' => $proj->name,
+            'work_order_id' => $wo->id,
+            'partner' => $wo->no,
             'lines' => [['item_id' => $item->id, 'qty' => 6, 'from_bin_id' => $bin->id]],
         ])->assertStatus(201);
         // Legacy: partner string tanpa FK tetap terklasifikasi via name-match.
@@ -143,10 +144,15 @@ class LaporanKeluarAnalyticsTest extends TestCase
         $perJenis = collect($res->json('data.per_jenis'))->keyBy('jenis');
 
         $this->assertEquals(6000.0, (float) $perJenis['departemen']['nilai']);
-        $this->assertEquals(6000.0, (float) $perJenis['proyek']['nilai']);
+        $this->assertEquals(6000.0, (float) $perJenis['work_order']['nilai']);
 
-        $filter = $this->getJson('/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&jenis_tujuan=proyek')->assertOk();
+        $filter = $this->getJson('/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31&jenis_tujuan=work_order')->assertOk();
         $this->assertEquals(6000.0, (float) $filter->json('data.ringkasan.nilai'));
+
+        // Serapan dikelompokkan ke proyek induk WO.
+        $serapan = $res->json('data.proyek');
+        $this->assertCount(1, $serapan);
+        $this->assertEquals('Proyek Tol X', $serapan[0]['nama']);
     }
 
     public function test_filter_customer_id_menyaring_agregat(): void
@@ -318,15 +324,15 @@ class LaporanKeluarAnalyticsTest extends TestCase
         [$wh, , $bin] = $this->makeLocation();
         $this->seedInbound($item, $wh, $bin, 100, 1000);
         $proj = Project::factory()->create(['name' => 'Proyek A', 'budget' => 1000000]);
-        WorkOrder::factory()->create(['project_id' => $proj->id, 'item_id' => $item->id, 'target_qty' => 10]);
+        $wo = WorkOrder::factory()->create(['project_id' => $proj->id, 'item_id' => $item->id, 'target_qty' => 10]);
 
         $this->postJson('/api/persediaan/stock-documents', [
             'type' => 'Pengeluaran',
             'status' => 'Selesai',
             'document_date' => '2026-07-10',
             'warehouse_id' => $wh->id,
-            'project_id' => $proj->id,
-            'partner' => $proj->name,
+            'work_order_id' => $wo->id,
+            'partner' => $wo->no,
             'lines' => [['item_id' => $item->id, 'qty' => 12, 'from_bin_id' => $bin->id]],
         ])->assertStatus(201);
 

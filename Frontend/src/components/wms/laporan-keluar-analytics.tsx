@@ -47,13 +47,15 @@ const JENIS_TONE: Record<TujuanJenis, Tone> = {
   customer: "info",
   departemen: "brand",
   proyek: "warning",
+  work_order: "success",
   lainnya: "neutral",
 };
 
 const JENIS_LABEL: Record<TujuanJenis, string> = {
   customer: "Customer",
   departemen: "Departemen",
-  proyek: "Proyek",
+  proyek: "Proyek (Arsip)",
+  work_order: "Work Order",
   lainnya: "Lainnya",
 };
 
@@ -61,6 +63,7 @@ const JENIS_FILL: Record<TujuanJenis, string> = {
   customer: "var(--primary)",
   departemen: "var(--primary-glow)",
   proyek: "#f59e0b",
+  work_order: "#10b981",
   lainnya: "#94a3b8",
 };
 
@@ -112,6 +115,7 @@ export function LaporanKeluarAnalytics({
       customerId: null,
       departmentId: null,
       projectId: null,
+      workOrderId: null,
       isLainnya: false,
     };
     if (tujuan === ALL) return none;
@@ -125,6 +129,7 @@ export function LaporanKeluarAnalytics({
       customerId: j === "customer" ? id : null,
       departmentId: j === "departemen" ? id : null,
       projectId: j === "proyek" ? id : null,
+      workOrderId: j === "work_order" ? id : null,
       isLainnya: false,
     };
   }, [tujuan]);
@@ -136,6 +141,7 @@ export function LaporanKeluarAnalytics({
     customerId: selectedIds.customerId,
     departmentId: selectedIds.departmentId,
     projectId: selectedIds.projectId,
+    workOrderId: selectedIds.workOrderId,
     jenisTujuan: jenis === ALL ? null : (jenis as TujuanJenis),
     enabled,
   });
@@ -325,7 +331,7 @@ export function LaporanKeluarAnalytics({
               setTujuan(ALL);
             }}
             placeholder="Semua Jenis"
-            options={["customer", "departemen", "proyek", "lainnya"]}
+            options={["customer", "departemen", "work_order", "proyek", "lainnya"]}
           />
           <FilterCombobox
             className="w-full flex-1 min-w-[180px] max-w-[260px]"
@@ -469,7 +475,7 @@ export function LaporanKeluarAnalytics({
 
       <Panel
         title="Omzet & Margin per Customer"
-        description={`Margin = omzet − HPP, khusus customer (dept/proyek at-cost, dikecualikan). Cakupan harga: ${a ? `${a.omzet.cakupan.aktual} aktual · ${a.omzet.cakupan.estimasi} estimasi · ${a.omzet.cakupan.tanpa_harga} tanpa harga` : "…"}${selectedIds.kind !== null && selectedIds.kind !== "customer" ? " · tujuan non-customer: panel ini Rp0 by-design" : ""}`}
+        description={`Margin = omzet − HPP, khusus customer (dept/WO at-cost, dikecualikan). Cakupan harga: ${a ? `${a.omzet.cakupan.aktual} aktual · ${a.omzet.cakupan.estimasi} estimasi · ${a.omzet.cakupan.tanpa_harga} tanpa harga` : "…"}${selectedIds.kind !== null && selectedIds.kind !== "customer" ? " · tujuan non-customer: panel ini Rp0 by-design" : ""}`}
       >
         <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard

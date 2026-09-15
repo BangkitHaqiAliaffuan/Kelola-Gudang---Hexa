@@ -4,12 +4,19 @@ namespace Tests\Feature;
 
 use App\Models\Bin;
 use App\Models\Customer;
+use App\Models\Department;
 use App\Models\Item;
+use App\Models\Project;
 use App\Models\Rack;
+use App\Models\RolePermission;
 use App\Models\StockDocument;
+use App\Models\StockDocumentLine;
+use App\Models\User;
 use App\Models\Warehouse;
+use App\Models\WorkOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class StoreStockDocumentApiTest extends TestCase
@@ -1136,9 +1143,9 @@ class StoreStockDocumentApiTest extends TestCase
 
         $docId = $res->json('data.id');
 
-        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
-        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
-        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $approver = User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        Sanctum::actingAs($approver, ['*'], 'sanctum');
         $res = $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertOk()
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.posted_at', fn ($v) => $v !== null)
@@ -1195,9 +1202,9 @@ class StoreStockDocumentApiTest extends TestCase
         $res->assertStatus(201)
             ->assertJsonPath('data.status', 'Menunggu Approval');
         $docId = $res->json('data.id');
-        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
-        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
-        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $approver = User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        Sanctum::actingAs($approver, ['*'], 'sanctum');
         $res = $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertOk()
             ->assertJsonPath('data.status', 'Selesai')
             ->assertJsonPath('data.lines.0.qty', -4)
@@ -1314,9 +1321,9 @@ class StoreStockDocumentApiTest extends TestCase
             ],
         ])->assertStatus(201)->assertJsonPath('data.status', 'Menunggu Approval');
         $docId = $res->json('data.id');
-        $approver = \App\Models\User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
-        \App\Models\RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
-        \Laravel\Sanctum\Sanctum::actingAs($approver, ['*'], 'sanctum');
+        $approver = User::factory()->create(['role' => 'Auditor', 'is_active' => true]);
+        RolePermission::firstOrCreate(['role' => 'Auditor', 'module' => 'Persediaan'], ['level' => 'Kelola']);
+        Sanctum::actingAs($approver, ['*'], 'sanctum');
         $this->postJson("/api/persediaan/stock-documents/{$docId}/approve")->assertStatus(422)
             ->assertJsonPath('message', fn ($v) => str_contains((string) $v, 'Stok tidak mencukupi'));
         $this->actingAsMasterAdmin();
@@ -1404,6 +1411,149 @@ class StoreStockDocumentApiTest extends TestCase
             'bin_id' => $bin->id,
             'stock' => 8,
         ]);
+    }
+
+    public function test_store_retur_penjualan_inherits_department_from_source_at_cost(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $dept = Department::factory()->create(['name' => 'Produksi']);
+        $this->makePostedPenerimaan($item->id, $bin->id, 10, 1500);
+
+        $sourceNo = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'department_id' => $dept->id,
+            'partner' => $dept->name,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.no');
+        $source = StockDocument::where('no', $sourceNo)->firstOrFail();
+
+        // Tanpa FK tujuan di payload — diwarisi server dari sumber.
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'to_bin_id' => $bin->id, 'source_line_id' => $source->lines()->firstOrFail()->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.department_id', $dept->id)
+            ->assertJsonPath('data.department', 'Produksi')
+            ->assertJsonPath('data.customer_id', null)
+            ->assertJsonPath('data.lines.0.unit_price', null);
+    }
+
+    public function test_store_retur_penjualan_inherits_work_order_from_source_at_cost(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $proj = Project::factory()->create(['name' => 'Proyek A']);
+        $wo = WorkOrder::factory()->create(['project_id' => $proj->id, 'item_id' => $item->id, 'target_qty' => 10]);
+        $this->makePostedPenerimaan($item->id, $bin->id, 10, 1500);
+
+        $sourceNo = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-11',
+            'warehouse_id' => $wh->id,
+            'work_order_id' => $wo->id,
+            'partner' => $wo->no,
+            'lines' => [['item_id' => $item->id, 'qty' => 5, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(201)->json('data.no');
+        $source = StockDocument::where('no', $sourceNo)->firstOrFail();
+
+        $res = $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Selesai',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'to_bin_id' => $bin->id, 'source_line_id' => $source->lines()->firstOrFail()->id],
+            ],
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.work_order_id', $wo->id)
+            ->assertJsonPath('data.work_order', $wo->no)
+            ->assertJsonPath('data.customer_id', null)
+            ->assertJsonPath('data.lines.0.unit_price', null);
+    }
+
+    public function test_store_retur_penjualan_internal_without_source_returns_422(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $dept = Department::factory()->create(['name' => 'Produksi']);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'department_id' => $dept->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $bin->id]],
+        ])->assertStatus(422)->assertJsonValidationErrors('customer_id');
+    }
+
+    public function test_store_pengeluaran_rejects_project_id(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $proj = Project::factory()->create(['name' => 'Proyek A']);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Pengeluaran',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'project_id' => $proj->id,
+            'partner' => $proj->name,
+            'lines' => [['item_id' => $item->id, 'qty' => 1, 'from_bin_id' => $bin->id]],
+        ])->assertStatus(422)->assertJsonValidationErrors('project_id');
+    }
+
+    public function test_store_retur_penjualan_from_legacy_project_source_rejected(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $proj = Project::factory()->create(['name' => 'Proyek Arsip']);
+
+        // Dokumen arsip dibuat langsung (validasi API menolak project_id baru).
+        $source = StockDocument::create([
+            'no' => 'BK/2026/99999',
+            'type' => 'Pengeluaran',
+            'status' => 'Selesai',
+            'document_date' => '2026-07-01',
+            'warehouse_id' => $wh->id,
+            'project_id' => $proj->id,
+            'partner' => $proj->name,
+            'posted_at' => now(),
+        ]);
+        $sourceLine = StockDocumentLine::create([
+            'document_id' => $source->id,
+            'line_no' => 1,
+            'item_id' => $item->id,
+            'qty' => -5,
+            'from_bin_id' => $bin->id,
+            'unit_cost' => 1000,
+        ]);
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Retur Penjualan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'source_document_id' => $source->id,
+            'lines' => [['item_id' => $item->id, 'qty' => 1, 'to_bin_id' => $bin->id, 'source_line_id' => $sourceLine->id]],
+        ])->assertStatus(422)->assertJsonValidationErrors('source_document_id');
     }
 
     public function test_store_retur_penjualan_source_must_be_posted_pengeluaran(): void
@@ -1670,7 +1820,7 @@ class StoreStockDocumentApiTest extends TestCase
             'warehouse_id' => $whA->id,
         ]);
 
-        \App\Models\StockDocumentLine::create([
+        StockDocumentLine::create([
             'document_id' => $doc->id,
             'line_no' => 1,
             'item_id' => $item->id,

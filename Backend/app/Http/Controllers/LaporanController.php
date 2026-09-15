@@ -166,6 +166,13 @@ class LaporanController extends Controller
             if ($d->department_id) {
                 return ['jenis' => 'departemen', 'id' => (int) $d->department_id, 'nama' => $d->department?->name ?? $d->partner ?? '—', 'segmen' => null];
             }
+            if ($d->work_order_id) {
+                $wo = $d->workOrder;
+                $nama = $wo ? $wo->no.($wo->project ? ' · '.$wo->project->name : '') : ($d->partner ?? '—');
+
+                return ['jenis' => 'work_order', 'id' => (int) $d->work_order_id, 'nama' => $nama, 'segmen' => null];
+            }
+            // Arsip: BK lama bertujuan proyek (project_id tak lagi diisi baru).
             if ($d->project_id) {
                 return ['jenis' => 'proyek', 'id' => (int) $d->project_id, 'nama' => $d->project?->name ?? $d->partner ?? '—', 'segmen' => null];
             }
@@ -182,7 +189,7 @@ class LaporanController extends Controller
         $tujuanKey = fn (array $t): string => $t['jenis'].'|'.($t['id'] ?? 'null').'|'.$t['nama'];
 
         $baseDocs = StockDocument::query()
-            ->with(['customer', 'department', 'project'])
+            ->with(['customer', 'department', 'project', 'workOrder.project'])
             ->withSum('lines as qty_total', 'qty')
             ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
             ->withSum('lines as revenue_total', DB::raw('qty * unit_price'))
@@ -192,6 +199,7 @@ class LaporanController extends Controller
             ->when(isset($data['customer_id']), fn ($q) => $q->where('customer_id', $data['customer_id']))
             ->when(isset($data['department_id']), fn ($q) => $q->where('department_id', $data['department_id']))
             ->when(isset($data['project_id']), fn ($q) => $q->where('project_id', $data['project_id']))
+            ->when(isset($data['work_order_id']), fn ($q) => $q->where('work_order_id', $data['work_order_id']))
             ->orderBy('document_date')
             ->get()
             ->each(fn (StockDocument $d) => $d->setAttribute('_tujuan', $classify($d)));
@@ -368,7 +376,7 @@ class LaporanController extends Controller
 
         // ---- Retur tertaut (Retur Penjualan Selesai periode ini) ----
         $returs = StockDocument::query()
-            ->with(['lines', 'customer'])
+            ->with(['lines', 'customer', 'department', 'workOrder.project'])
             ->withSum('lines as qty_total', 'qty')
             ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
             ->withSum('lines as revenue_total', DB::raw('qty * unit_price'))
@@ -385,7 +393,7 @@ class LaporanController extends Controller
         $returPerItem = [];
         $sourceDocIds = $returs->pluck('source_document_id')->filter()->unique()->values();
         $sourceDocs = $sourceDocIds->isNotEmpty()
-            ? StockDocument::with(['customer', 'department', 'project'])->whereIn('id', $sourceDocIds)->get()->keyBy('id')
+            ? StockDocument::with(['customer', 'department', 'project', 'workOrder.project'])->whereIn('id', $sourceDocIds)->get()->keyBy('id')
             : collect();
         foreach ($returs as $r) {
             $q = abs((int) ($r->qty_total ?? 0));
@@ -405,9 +413,10 @@ class LaporanController extends Controller
             $perAlasan[$alasan]['nilai'] = round($perAlasan[$alasan]['nilai'] + $n, 2);
             $perAlasan[$alasan]['dokumen']++;
 
-            // Tujuan retur = tujuan dokumen Pengeluaran sumber (fallback customer retur itu sendiri).
+            // Tujuan retur = tujuan dokumen Pengeluaran sumber (fallback: tujuan
+            // retur itu sendiri — customer/departemen/work_order warisan server).
             $src = $r->source_document_id ? $sourceDocs->get($r->source_document_id) : null;
-            $t = $src ? $classify($src) : ['jenis' => 'customer', 'id' => $r->customer_id ? (int) $r->customer_id : null, 'nama' => $r->customer?->name ?? $r->partner ?? '—'];
+            $t = $src ? $classify($src) : $classify($r);
             $rk = $t['jenis'].'|'.($t['id'] ?? 'null').'|'.$t['nama'];
             $returPerTujuan[$rk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $returPerTujuan[$rk]['qty'] += $q;
@@ -488,23 +497,46 @@ class LaporanController extends Controller
         ];
 
         // ---- Serapan proyek (vs budget Rp + vs target WO per item) ----
+        // Dikelompokkan per proyek induk: BK bertujuan WO (via
+        // work_order.project_id) + BK proyek-arsip (project_id). Shape agregat
+        // dipertahankan agar respons API tidak berubah.
         $proyekOut = [];
-        $projKeys = collect($aggTujuan)->filter(fn ($a) => $a['jenis'] === 'proyek')->values();
+        $projBuckets = [];
+        foreach ($posted as $d) {
+            $pid = $d->work_order_id !== null ? $d->workOrder?->project_id : ($d->project_id);
+            if ($pid === null) {
+                continue;
+            }
+            $key = 'proyek|'.$pid;
+            if (! isset($projBuckets[$key])) {
+                $nama = $d->work_order_id !== null
+                    ? ($d->workOrder?->project?->name ?? $d->partner ?? '—')
+                    : ($d->project?->name ?? $d->partner ?? '—');
+                $projBuckets[$key] = ['jenis' => 'proyek', 'id' => (int) $pid, 'nama' => $nama, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
+            }
+            $projBuckets[$key]['qty'] += abs((int) ($d->qty_total ?? 0));
+            $projBuckets[$key]['nilai'] = round($projBuckets[$key]['nilai'] + abs((float) ($d->value_total ?? 0)), 2);
+            $projBuckets[$key]['dokumen']++;
+        }
+        $projKeys = collect(array_values($projBuckets));
         if ($projKeys->isNotEmpty()) {
             $projModels = Project::whereIn('id', $projKeys->pluck('id')->filter()->values())->get()->keyBy('id');
 
-            // Fase 2.3: petakan dokumen posted ke key proyek dalam satu pass O(T)
-            // (dulu: $posted->filter per proyek), lalu 3 query batch untuk SEMUA
-            // proyek (dulu: 3 query PER proyek). Klasifikasi key tetap di PHP.
-            $docIdsByProjKey = [];
-            foreach ($posted as $d) {
-                $docIdsByProjKey[$tujuanKey($d->getAttribute('_tujuan'))][] = $d->id;
-            }
+            // Fase 2.3: petakan dokumen posted ke key bucket proyek dalam satu
+            // pass O(T), lalu 3 query batch untuk SEMUA proyek. Kunci bucket
+            // sama dengan $tujuanKey($a) dari entri $projKeys di atas.
             $projKeyByDocId = [];
-            foreach ($projKeys as $a) {
-                foreach ($docIdsByProjKey[$tujuanKey($a)] ?? [] as $docId) {
-                    $projKeyByDocId[$docId] = $tujuanKey($a);
+            foreach ($posted as $d) {
+                $pid = $d->work_order_id !== null ? $d->workOrder?->project_id : ($d->project_id);
+                if ($pid === null) {
+                    continue;
                 }
+                $bkey = 'proyek|'.$pid;
+                if (! isset($projBuckets[$bkey])) {
+                    continue;
+                }
+                $a = $projBuckets[$bkey];
+                $projKeyByDocId[$d->id] = $a['jenis'].'|'.($a['id'] ?? 'null').'|'.$a['nama'];
             }
             // [projKey][item_id] => ['qty', 'nilai'] — diakumulasi per chunk agar
             // whereIn tetap kecil; pembulatan akhir 2 desimal sama seperti dulu.
@@ -682,6 +714,14 @@ class LaporanController extends Controller
                 if ($d->customer_id) {
                     return ['jenis' => 'customer', 'id' => (int) $d->customer_id, 'nama' => $d->customer?->name ?? $d->partner ?? '—'];
                 }
+                if ($d->department_id) {
+                    return ['jenis' => 'departemen', 'id' => (int) $d->department_id, 'nama' => $d->department?->name ?? $d->partner ?? '—'];
+                }
+                if ($d->work_order_id) {
+                    $wo = $d->workOrder;
+
+                    return ['jenis' => 'work_order', 'id' => (int) $d->work_order_id, 'nama' => $wo ? $wo->no.($wo->project ? ' · '.$wo->project->name : '') : ($d->partner ?? '—')];
+                }
                 $key = mb_strtolower(trim((string) $d->partner));
                 if ($key !== '' && isset($customerMap[$key])) {
                     return ['jenis' => 'customer', 'id' => (int) $customerMap[$key]['id'], 'nama' => $customerMap[$key]['name']];
@@ -696,7 +736,7 @@ class LaporanController extends Controller
         $pihakKey = fn (array $t): string => TransaksiAnalytics::pihakKey($t['jenis'], $t['id'], $t['nama']);
 
         $docs = StockDocument::query()
-            ->with(['customer', 'warehouse', 'destination'])
+            ->with(['customer', 'department', 'workOrder.project', 'warehouse', 'destination'])
             ->withSum('lines as qty_total', 'qty')
             ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
             ->where('type', $type)

@@ -30,7 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
-import { useBins, useCustomers, useItems, useWarehouses } from "@/hooks/use-master";
+import { useBins, useItems, useWarehouses } from "@/hooks/use-master";
 import {
   useCreateStockDocument,
   useStockDocument,
@@ -68,12 +68,10 @@ export function ReturPenjualanForm() {
   const create = useCreateStockDocument();
 
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
-  const { data: customers, isLoading: customersLoading } = useCustomers();
   const { data: items } = useItems();
   const { data: bins } = useBins();
 
   const [warehouseId, setWarehouseId] = useState("");
-  const [customer, setCustomer] = useState("");
   const [sourceDocId, setSourceDocId] = useState("");
   const [sourceSearch, setSourceSearch] = useState("");
   const [selectedSourceDoc, setSelectedSourceDoc] = useState<StockDocumentApi | null>(null);
@@ -129,15 +127,16 @@ export function ReturPenjualanForm() {
     [warehouses],
   );
 
-  const customerOptions: ComboboxOption[] = useMemo(
-    () =>
-      (customers?.data ?? []).map((c) => ({
-        value: String(c.id),
-        label: c.name,
-        keywords: c.name,
-      })),
-    [customers],
-  );
+  // Tujuan retur diwarisi server dari dokumen sumber — ditampilkan read-only
+  // sebagai badge (jenis + nama snapshot partner).
+  const sourceTujuan: { jenis: string; nama: string } | null = useMemo(() => {
+    const d = selectedSourceDoc;
+    if (!d) return null;
+    if (d.customer_id) return { jenis: "Customer", nama: d.partner ?? "—" };
+    if (d.department_id) return { jenis: "Departemen", nama: d.partner ?? "—" };
+    if (d.work_order_id) return { jenis: "Work Order", nama: d.partner ?? "—" };
+    return { jenis: "Lainnya", nama: d.partner ?? "—" };
+  }, [selectedSourceDoc]);
 
   // Dokumen Barang Keluar (Pengeluaran Selesai) di gudang terpilih — dimuat
   // async dari server (per_page=20 + search). Dokumen yang sedang dipilih tetap
@@ -274,14 +273,14 @@ export function ReturPenjualanForm() {
     setLines((prev) => prev.map((l) => ({ ...l, binId: "" })));
   };
 
-  // Pilih dokumen Pengeluaran sumber: customer ikut terisi dari customer_id dokumen
+  // Pilih dokumen Pengeluaran sumber: tujuan retur mengikuti dokumen ini
+  // (diwarisi server — form tidak mengirim FK tujuan).
   const pickSourceDoc = (id: string) => {
     setSourceDocId(id);
     const doc =
       (outboundDocs?.data ?? []).find((d) => String(d.id) === id) ??
       (selectedSourceDoc && String(selectedSourceDoc.id) === id ? selectedSourceDoc : null);
     setSelectedSourceDoc(doc);
-    setCustomer(doc?.customer_id ? String(doc.customer_id) : "");
     setLines([newLine()]);
   };
 
@@ -294,8 +293,6 @@ export function ReturPenjualanForm() {
   };
 
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
-    const cid = customer ? Number(customer) : null;
-    const cname = cid ? (customers?.data.find((c) => c.id === cid)?.name ?? null) : null;
     return {
       type: "Retur Penjualan",
       status,
@@ -303,8 +300,9 @@ export function ReturPenjualanForm() {
       document_date: date || today(),
       warehouse_id: Number(warehouseId),
       source_document_id: sourceDocId ? Number(sourceDocId) : null,
-      customer_id: cid,
-      partner: cname,
+      // Tanpa FK tujuan + partner: server mewarisi dari dokumen sumber dan
+      // membuat snapshot nama tujuan.
+      partner: null,
       reference_no: reference.trim() || null,
       pic: pic.trim() || null,
       note: buildNote(),
@@ -382,7 +380,7 @@ export function ReturPenjualanForm() {
     <>
       <PageHeader
         title="Tambah Retur Penjualan"
-        description="Catat penerimaan barang retur dari customer"
+        description="Catat penerimaan barang retur dari tujuan asal (customer, departemen, work order)"
         actions={
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/transaksi/retur-penjualan">
@@ -456,18 +454,19 @@ export function ReturPenjualanForm() {
             )}
           </div>
           <div className="space-y-1.5">
-            <Label>Customer</Label>
-            <FormCombobox
-              value={customer}
-              onValueChange={setCustomer}
-              options={customerOptions}
-              placeholder="Pilih Customer"
-              searchPlaceholder="Cari customer..."
-              allowEmpty
-              side="bottom"
-              avoidCollisions={false}
-              loading={customersLoading}
+            <Label>Tujuan (dari dokumen sumber)</Label>
+            <Input
+              readOnly
+              value={
+                sourceTujuan
+                  ? `${sourceTujuan.nama} — ${sourceTujuan.jenis}`
+                  : "Pilih dokumen sumber dulu"
+              }
+              className="rounded-xl text-muted-foreground"
             />
+            <p className="text-xs text-muted-foreground">
+              Diwarisi otomatis — retur internal (departemen/work order) tanpa omzet.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Alasan Retur</Label>

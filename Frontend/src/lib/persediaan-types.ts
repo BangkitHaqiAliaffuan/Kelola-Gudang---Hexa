@@ -221,6 +221,9 @@ export type StockDocumentApi = {
   department?: string | null;
   project_id?: number | null;
   project?: string | null;
+  /** Tujuan work order (menggantikan proyek untuk dokumen baru). */
+  work_order_id?: number | null;
+  work_order?: string | null;
   partner: string | null;
   reference_no: string | null;
   pic: string | null;
@@ -270,8 +273,10 @@ export type StockDocumentSummaryApi = {
 //   wajib memakai `source_line_id` baris Penerimaan tersebut — server memvalidasi
 //   relasi + sisa qty dan meng-backfill harga beli asal dari baris sumber.
 // - Retur Penjualan: perilaku = Penerimaan (arah IN, `to_bin_id` wajib, qty
-//   positif, server memakai unit_cost baris sumber), nomor `RJ/YYYY/#####`,
-//   partner = customer. Bila `source_document_id` (dokumen Pengeluaran sumber)
+//   positif, server memakai unit_cost baris sumber), nomor `RJ/YYYY/#####`.
+//   Tujuan (customer/departemen/work_order) diwarisi server dari dokumen
+//   Pengeluaran sumber — klien tidak mengirim FK tujuan. Bila
+//   `source_document_id` dikirim, setiap baris wajib memakai `source_line_id`
 //   dikirim, setiap baris wajib memakai `source_line_id` baris Pengeluaran
 //   tersebut — server memvalidasi relasi + sisa qty (cap abs qty baris BK),
 //   `to_bin_id` harus sama dengan `from_bin_id` baris sumber, dan meng-backfill
@@ -313,7 +318,9 @@ export type StockDocumentPayload = {
   source_document_id?: number | null;
   customer_id?: number | null;
   department_id?: number | null;
+  /** Legacy arsip — ditolak server untuk dokumen baru. */
   project_id?: number | null;
+  work_order_id?: number | null;
   partner: string | null;
   reference_no: string | null;
   pic?: string | null;
@@ -356,10 +363,11 @@ export type LaporanMutasiParams = {
 };
 
 // ---- Analitik Barang Keluar (GET /api/laporan/keluar-analytics) ----
-// Agregat Pengeluaran per tujuan (Customer/Departemen/Proyek) per bulan.
+// Agregat Pengeluaran per tujuan (Customer/Departemen/Work Order) per bulan.
 // "nilai" = nilai pokok persediaan (qty × unit_cost), BUKAN revenue.
+// 'proyek' = alias arsip untuk BK lama ber-project_id.
 
-export type TujuanJenis = "customer" | "departemen" | "proyek" | "lainnya";
+export type TujuanJenis = "customer" | "departemen" | "proyek" | "work_order" | "lainnya";
 
 export type KeluarAnalyticsParams = {
   from: string;
@@ -368,6 +376,7 @@ export type KeluarAnalyticsParams = {
   customerId?: number | null;
   departmentId?: number | null;
   projectId?: number | null;
+  workOrderId?: number | null;
   jenisTujuan?: TujuanJenis | null;
   atRiskDays?: number | null;
   varianceBand?: number | null;
@@ -525,7 +534,8 @@ export type KeluarAnalyticsApi = {
 // Melayani Penerimaan, Transfer Gudang, Retur Pembelian, Retur Penjualan.
 // "nilai" selalu = nilai pokok persediaan (qty × unit_cost), BUKAN omzet.
 
-export type PihakJenis = "supplier" | "customer" | "departemen" | "proyek" | "gudang" | "lainnya";
+export type PihakJenis =
+  "supplier" | "customer" | "departemen" | "proyek" | "work_order" | "gudang" | "lainnya";
 
 export type TransaksiAnalyticsType =
   "Penerimaan" | "Transfer Gudang" | "Retur Pembelian" | "Retur Penjualan";

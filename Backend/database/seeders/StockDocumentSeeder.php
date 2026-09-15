@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Bin;
 use App\Models\Customer;
+use App\Models\Department;
 use App\Models\Item;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
@@ -63,6 +64,9 @@ class StockDocumentSeeder extends Seeder
         $binsByWarehouse = Bin::with('rack')->get()
             ->groupBy(fn (Bin $bin): int => $bin->rack->warehouse_id);
         $customers = Customer::orderBy('id')->get();
+        // Tujuan internal BK non-customer = departemen 'Produksi' (null-safe:
+        // tanpa dept, seeder tetap jalan dengan partner teks saja).
+        $produksiDeptId = Department::where('name', 'Produksi')->value('id');
 
         $counters = ['BM' => 0, 'BK' => 0, 'ADJ' => 0, 'TF' => 0, 'SO' => 0];
 
@@ -115,9 +119,11 @@ class StockDocumentSeeder extends Seeder
                         $cust = $customers[$int(0, $customers->count() - 1)];
                         $partner = $cust->name;
                         $customerId = $cust->id;
+                        $departmentId = null;
                     } else {
-                        $partner = 'Departemen Produksi';
+                        $partner = 'Produksi';
                         $customerId = null;
+                        $departmentId = $produksiDeptId;
                     }
                     $note = $type === 'Stock Adjustment' ? 'Penyesuaian stok (kurang)' : 'Pengeluaran ke produksi';
                     $balance -= $qty;
@@ -137,6 +143,7 @@ class StockDocumentSeeder extends Seeder
                     'unit_cost' => $currentCost,
                     'partner' => $partner,
                     'customer_id' => $customerId ?? null,
+                    'department_id' => $departmentId ?? null,
                     'note' => $note,
                     'pic' => $pick(self::PICS),
                 ];
@@ -165,6 +172,7 @@ class StockDocumentSeeder extends Seeder
                 && $open['day'] === $day
                 && $open['warehouse_id'] === $movement['warehouse_id']
                 && (($open['customer_id'] ?? null) === ($movement['customer_id'] ?? null))
+                && (($open['department_id'] ?? null) === ($movement['department_id'] ?? null))
                 && $open['partner'] === $movement['partner'];
 
             if (! $same || count($open['lines']) >= self::MAX_LINES_PER_DOCUMENT) {
@@ -176,6 +184,7 @@ class StockDocumentSeeder extends Seeder
                     'date' => $movement['date'],
                     'partner' => $movement['partner'],
                     'customer_id' => $movement['customer_id'] ?? null,
+                    'department_id' => $movement['department_id'] ?? null,
                     'pic' => $movement['pic'],
                     'note' => $movement['note'],
                     'lines' => [],
@@ -374,8 +383,9 @@ class StockDocumentSeeder extends Seeder
                     'day' => $depleteDate->startOfDay()->toDateTimeString(),
                     'warehouse_id' => $warehouseId,
                     'date' => $depleteDate,
-                    'partner' => $custPick?->name ?? 'Departemen Produksi',
+                    'partner' => $custPick?->name ?? 'Produksi',
                     'customer_id' => $custPick?->id,
+                    'department_id' => $custPick ? null : $produksiDeptId,
                     'pic' => $pick(self::PICS),
                     'note' => 'Pemakaian produksi (stok tersisa di bawah minimum)',
                     'lines' => $group,
@@ -438,8 +448,9 @@ class StockDocumentSeeder extends Seeder
                 'warehouse_id' => $warehouse->id,
                 'destination_warehouse_id' => $type === 'Transfer Gudang' ? $destWarehouse->id : null,
                 'date' => $ref->subDays($int(0, 30))->setTime($int(7, 17), $int(0, 59), 0),
-                'partner' => $type === 'Penerimaan' ? ($lines[0]['item']->supplier?->name ?? 'Supplier') : ($type === 'Pengeluaran' ? ($custPick2?->name ?? 'Departemen Produksi') : null),
+                'partner' => $type === 'Penerimaan' ? ($lines[0]['item']->supplier?->name ?? 'Supplier') : ($type === 'Pengeluaran' ? ($custPick2?->name ?? 'Produksi') : null),
                 'customer_id' => $custPick2?->id,
+                'department_id' => $type === 'Pengeluaran' && ! $custPick2 ? $produksiDeptId : null,
                 'pic' => $pick(self::PICS),
                 'note' => 'Dokumen belum diposting',
                 'status' => $pick($type === 'Stock Adjustment' ? $adjustmentStatuses : $nonPostedStatuses),
@@ -504,8 +515,9 @@ class StockDocumentSeeder extends Seeder
                 'day' => $floorDate->startOfDay()->toDateTimeString(),
                 'warehouse_id' => $floorWh,
                 'date' => $floorDate->setTime(23, 59, 0),
-                'partner' => $floorCust?->name ?? 'Departemen Produksi',
+                'partner' => $floorCust?->name ?? 'Produksi',
                 'customer_id' => $floorCust?->id,
+                'department_id' => $floorCust ? null : $produksiDeptId,
                 'pic' => $pick(self::PICS),
                 'note' => 'Pengeluaran lantai (tanpa bin)',
                 'lines' => $floorOutLines,
@@ -536,6 +548,7 @@ class StockDocumentSeeder extends Seeder
                     'warehouse_id' => $def['warehouse_id'],
                     'destination_warehouse_id' => $def['destination_warehouse_id'] ?? null,
                     'customer_id' => $def['customer_id'] ?? null,
+                    'department_id' => $def['department_id'] ?? null,
                     'partner' => $def['partner'],
                     'reference_no' => $def['type'] === 'Penerimaan' ? "PO-{$int(10000, 99999)}" : ($def['type'] === 'Pengeluaran' ? "SPK-{$int(10000, 99999)}" : null),
                     'pic' => $def['pic'],

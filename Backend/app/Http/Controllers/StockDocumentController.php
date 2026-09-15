@@ -14,6 +14,7 @@ use App\Models\Project;
 use App\Models\RolePermission;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
+use App\Models\WorkOrder;
 use App\Services\AuditLogger;
 use App\Services\StockDocumentService;
 use App\Support\CodeGenerator;
@@ -71,7 +72,7 @@ class StockDocumentController extends Controller
         ]);
 
         $query = StockDocument::query()
-            ->with(['warehouse', 'destination', 'sourceDocument', 'customer', 'department', 'project'])
+            ->with(['warehouse', 'destination', 'sourceDocument', 'customer', 'department', 'project', 'workOrder'])
             ->withCount('lines')
             ->withCount(['lines as checked_count' => fn ($q) => $q->whereNotNull('actual_qty')])
             ->withSum('lines as qty_total', 'qty')
@@ -281,14 +282,21 @@ class StockDocumentController extends Controller
                     'customer_id' => $data['customer_id'] ?? null,
                     'department_id' => $data['department_id'] ?? null,
                     'project_id' => $data['project_id'] ?? null,
+                    'work_order_id' => $data['work_order_id'] ?? null,
                     // Snapshot nama tujuan: dari FK yang terisi (customer /
-                    // departemen / proyek), fallback string partner kiriman.
+                    // departemen / work order + proyek induknya), fallback
+                    // string partner kiriman.
                     'partner' => (function () use ($data) {
                         if (! empty($data['customer_id'] ?? null)) {
                             return Customer::find($data['customer_id'])?->name ?? $data['partner'] ?? null;
                         }
                         if (! empty($data['department_id'] ?? null)) {
                             return Department::find($data['department_id'])?->name ?? $data['partner'] ?? null;
+                        }
+                        if (! empty($data['work_order_id'] ?? null)) {
+                            $wo = WorkOrder::with('project')->find($data['work_order_id']);
+
+                            return $wo ? $wo->no.($wo->project ? ' · '.$wo->project->name : '') : ($data['partner'] ?? null);
                         }
                         if (! empty($data['project_id'] ?? null)) {
                             return Project::find($data['project_id'])?->name ?? $data['partner'] ?? null;
@@ -311,12 +319,16 @@ class StockDocumentController extends Controller
                     // Snapshot harga jual: input user menang; RJ ter-link mewarisi
                     // harga baris sumber; Pengeluaran/RJ-tanpa-sumber fallback ke
                     // Harga Jual master (> 0); tipe lain NULL (tak bermakna revenue).
+                    // RJ bertujuan internal (departemen/work order) at-cost:
+                    // unit_price selalu NULL agar tak masuk omzet/margin.
                     $sourcePrice = $data['type'] === 'Retur Penjualan'
                         ? $sourceLines->get((int) ($line['source_line_id'] ?? 0))?->unit_price
                         : null;
                     $masterPrice = (float) ($itemPrices->get((int) ($line['item_id'] ?? 0)) ?? 0);
                     $unitPrice = null;
-                    if ($isRevenueType) {
+                    $isInternalRetur = $data['type'] === 'Retur Penjualan'
+                        && (! empty($data['department_id'] ?? null) || ! empty($data['work_order_id'] ?? null));
+                    if ($isRevenueType && ! $isInternalRetur) {
                         if (array_key_exists('unit_price', $line) && $line['unit_price'] !== null && $line['unit_price'] !== '') {
                             $unitPrice = (float) $line['unit_price'];
                         } elseif ($sourcePrice !== null) {
@@ -388,7 +400,7 @@ class StockDocumentController extends Controller
         }
 
         return (new StockDocumentResource($document->load([
-            'warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
+            'warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy',
         ])->loadCount('lines')->loadSum('lines as qty_total', 'qty')->loadSum('lines as value_total', DB::raw('qty * unit_cost'))->loadSum('lines as revenue_total', DB::raw('qty * unit_price'))))->response()->setStatusCode(201);
     }
 
@@ -435,6 +447,7 @@ class StockDocumentController extends Controller
             'customer',
             'department',
             'project',
+            'workOrder',
             'creator',
             'sourceDocument',
             'lines.item.unit',
@@ -898,7 +911,7 @@ class StockDocumentController extends Controller
             }
             $locked->update(['locked_by_user_id' => $authId, 'locked_at' => now()]);
 
-            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            return new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         });
     }
 
@@ -916,21 +929,21 @@ class StockDocumentController extends Controller
         }
         $stockDocument->update(['locked_at' => now()]);
 
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function unlock(Request $request, StockDocument $stockDocument)
     {
         $authId = $request->user('sanctum')?->id ?? $request->user()?->id;
         if (empty($stockDocument->locked_by_user_id)) {
-            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
         }
         if ((int) $stockDocument->locked_by_user_id !== (int) $authId) {
             return response()->json(['message' => 'Hanya pemilik lock yang bisa unlock.'], 423);
         }
         $stockDocument->update(['locked_by_user_id' => null, 'locked_at' => null]);
 
-        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+        return new StockDocumentResource($stockDocument->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
     }
 
     public function forceUnlock(Request $request, StockDocument $stockDocument)
@@ -949,7 +962,7 @@ class StockDocumentController extends Controller
             $locked = StockDocument::where('id', $stockDocument->id)->lockForUpdate()->first();
             $locked->update(['locked_by_user_id' => $user->id, 'locked_at' => now(), 'decision_note' => trim(($locked->decision_note ? $locked->decision_note."\n" : '')."Force unlock dari {$oldLocker} oleh {$user->name}".($reason ? ": {$reason}" : ''))]);
 
-            $response = new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
+            $response = new StockDocumentResource($locked->fresh()->load(['warehouse', 'destination', 'customer', 'department', 'project', 'workOrder', 'creator', 'sourceDocument', 'locker', 'requester', 'approver', 'lines.item.unit', 'lines.fromBin.rack', 'lines.toBin.rack', 'lines.countedBy']));
 
             $this->auditDoc($stockDocument, 'Force Unlock');
 

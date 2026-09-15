@@ -42,6 +42,7 @@ class StockDocument extends Model
         'customer_id',
         'department_id',
         'project_id',
+        'work_order_id',
         'partner',
         'reference_no',
         'pic',
@@ -120,6 +121,11 @@ class StockDocument extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function workOrder(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrder::class);
     }
 
     public function locker(): BelongsTo

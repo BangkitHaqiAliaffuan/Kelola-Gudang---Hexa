@@ -34,8 +34,8 @@ import {
   useCustomers,
   useDepartments,
   useItems,
-  useProjects,
   useWarehouses,
+  useWorkOrders,
 } from "@/hooks/use-master";
 import { useCreateStockDocument, useStockRows } from "@/hooks/use-persediaan";
 import { isApiError } from "@/lib/api";
@@ -69,7 +69,7 @@ export function BarangKeluarForm() {
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: customers, isLoading: customersLoading } = useCustomers();
   const { data: departments, isLoading: departmentsLoading } = useDepartments();
-  const { data: projects, isLoading: projectsLoading } = useProjects();
+  const { data: workOrders, isLoading: workOrdersLoading } = useWorkOrders();
   const { data: items, isLoading: itemsLoading } = useItems();
   const { data: bins, isLoading: binsLoading } = useBins();
   const { data: stockRows, isLoading: stockLoading } = useStockRows();
@@ -118,16 +118,21 @@ export function BarangKeluarForm() {
 
   // Tujuan: gabung 3 master tapi hindari collision nama — value di-prefix dengan tipe,
   // label dibedakan. customer:12 vs department:5 dengan nama sama tidak tabrakan.
+  // Work order hanya yang aktif (Perencanaan/Berjalan) — keluar ke WO selesai
+  // tidak bermakna operasional.
   const purposeOptions: ComboboxOption[] = useMemo(() => {
     const opts: ComboboxOption[] = [];
     for (const c of customers?.data ?? [])
       opts.push({ value: `customer:${c.id}`, label: `${c.name} — Customer`, keywords: c.name });
     for (const d of departments?.data ?? [])
       opts.push({ value: `department:${d.id}`, label: `${d.name} — Departemen`, keywords: d.name });
-    for (const p of projects?.data ?? [])
-      opts.push({ value: `project:${p.id}`, label: `${p.name} — Proyek`, keywords: p.name });
+    for (const w of workOrders?.data ?? []) {
+      if (w.status !== "Perencanaan" && w.status !== "Berjalan") continue;
+      const label = `${w.no}${w.project ? ` · ${w.project}` : ""} — Work Order`;
+      opts.push({ value: `work_order:${w.id}`, label, keywords: `${w.no} ${w.project ?? ""}` });
+    }
     return opts.sort((a, b) => a.label.localeCompare(b.label));
-  }, [customers, departments, projects]);
+  }, [customers, departments, workOrders]);
 
   const itemOptions: ComboboxOption[] = useMemo(
     () =>
@@ -321,7 +326,7 @@ export function BarangKeluarForm() {
   const buildPayload = (status: "Draft" | "Selesai"): StockDocumentPayload => {
     let cid: number | null = null;
     let did: number | null = null;
-    let pid: number | null = null;
+    let wid: number | null = null;
     let partnerName: string | null = null;
     if (purpose) {
       if (purpose.startsWith("customer:")) {
@@ -330,9 +335,10 @@ export function BarangKeluarForm() {
       } else if (purpose.startsWith("department:")) {
         did = Number(purpose.split(":")[1] ?? "");
         partnerName = departments?.data.find((d) => String(d.id) === String(did))?.name ?? null;
-      } else if (purpose.startsWith("project:")) {
-        pid = Number(purpose.split(":")[1] ?? "");
-        partnerName = projects?.data.find((p) => String(p.id) === String(pid))?.name ?? null;
+      } else if (purpose.startsWith("work_order:")) {
+        wid = Number(purpose.split(":")[1] ?? "");
+        const wo = workOrders?.data.find((w) => String(w.id) === String(wid));
+        partnerName = wo ? `${wo.no}${wo.project ? ` · ${wo.project}` : ""}` : null;
       } else {
         // fallback legacy string (seharusnya tidak terjadi)
         partnerName = purpose;
@@ -347,7 +353,7 @@ export function BarangKeluarForm() {
       warehouse_id: Number(warehouseId),
       customer_id: cid,
       department_id: did,
-      project_id: pid,
+      work_order_id: wid,
       partner: partnerName,
       reference_no: reference.trim() || null,
       pic: pic.trim() || null,
@@ -412,7 +418,7 @@ export function BarangKeluarForm() {
     <>
       <PageHeader
         title="Tambah Barang Keluar"
-        description="Catat pengeluaran barang ke customer, produksi, departemen, atau proyek"
+        description="Catat pengeluaran barang ke customer, departemen, atau work order"
         actions={
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/transaksi/keluar">
@@ -472,7 +478,7 @@ export function BarangKeluarForm() {
               searchPlaceholder="Cari tujuan..."
               side="bottom"
               avoidCollisions={false}
-              loading={customersLoading || departmentsLoading || projectsLoading}
+              loading={customersLoading || departmentsLoading || workOrdersLoading}
             />
             {docError("partner") && (
               <p className="text-xs text-destructive">{docError("partner")}</p>
