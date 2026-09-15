@@ -17,7 +17,7 @@ class StoreSubCategoryRequest extends FormRequest
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'code' => ['nullable', 'string', 'max:20', Rule::unique('sub_categories', 'code')],
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150', Rule::unique('sub_categories', 'name')->where(fn ($q) => $q->where('category_id', $this->input('category_id')))],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

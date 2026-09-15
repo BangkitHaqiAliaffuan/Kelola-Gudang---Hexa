@@ -98,6 +98,45 @@ class SubCategoryApiTest extends TestCase
             ->assertJsonPath('data.name', 'Baru');
     }
 
+    public function test_store_rejects_duplicate_name_within_same_category(): void
+    {
+        $category = Category::factory()->create();
+        SubCategory::factory()->create(['category_id' => $category->id, 'name' => 'Sensor']);
+
+        $this->postJson('/api/master/sub-categories', [
+            'category_id' => $category->id,
+            'name' => 'Sensor',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_store_allows_same_name_in_different_category(): void
+    {
+        $a = Category::factory()->create();
+        $b = Category::factory()->create();
+        SubCategory::factory()->create(['category_id' => $a->id, 'name' => 'Sensor']);
+
+        $this->postJson('/api/master/sub-categories', [
+            'category_id' => $b->id,
+            'name' => 'Sensor',
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Sensor');
+    }
+
+    public function test_update_rejects_duplicate_name_within_same_category(): void
+    {
+        $category = Category::factory()->create();
+        SubCategory::factory()->create(['category_id' => $category->id, 'code' => 'SUB-801', 'name' => 'Sensor']);
+        $other = SubCategory::factory()->create(['category_id' => $category->id, 'code' => 'SUB-802', 'name' => 'Kabel']);
+
+        $this->putJson("/api/master/sub-categories/{$other->id}", [
+            'category_id' => $category->id,
+            'code' => 'SUB-802',
+            'name' => 'Sensor',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['name']);
+    }
+
     public function test_cannot_delete_sub_category_that_has_items(): void
     {
         $sub = SubCategory::factory()->create();

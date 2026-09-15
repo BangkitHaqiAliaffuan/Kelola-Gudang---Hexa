@@ -19,7 +19,7 @@ class UpdateSubCategoryRequest extends FormRequest
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'code' => ['required', 'string', 'max:20', Rule::unique('sub_categories', 'code')->ignore($subCategory)],
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150', Rule::unique('sub_categories', 'name')->where(fn ($q) => $q->where('category_id', $this->input('category_id')))->ignore($subCategory)],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

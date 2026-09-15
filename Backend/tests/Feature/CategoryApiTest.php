@@ -118,6 +118,37 @@ class CategoryApiTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_store_rejects_duplicate_name(): void
+    {
+        Category::factory()->create(['name' => 'Elektronik']);
+
+        $this->postJson('/api/master/categories', ['name' => 'Elektronik'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_update_rejects_duplicate_name(): void
+    {
+        Category::factory()->create(['code' => 'KAT-801', 'name' => 'Elektronik']);
+        $other = Category::factory()->create(['code' => 'KAT-802', 'name' => 'Perkakas']);
+
+        $this->putJson("/api/master/categories/{$other->id}", [
+            'code' => 'KAT-802',
+            'name' => 'Elektronik',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_update_allows_keeping_own_name(): void
+    {
+        $category = Category::factory()->create(['code' => 'KAT-803', 'name' => 'Elektronik']);
+
+        $this->putJson("/api/master/categories/{$category->id}", [
+            'code' => 'KAT-803',
+            'name' => 'Elektronik',
+        ])->assertOk();
+    }
+
     public function test_cannot_delete_category_that_has_items(): void
     {
         $category = Category::factory()->create();
