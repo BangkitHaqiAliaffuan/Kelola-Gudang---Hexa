@@ -13,6 +13,7 @@ use App\Models\Item;
 use App\Models\Merk;
 use App\Models\ProcDocLine;
 use App\Models\StockDocumentLine;
+use App\Models\SubCategory;
 use App\Models\Unit;
 use App\Models\WorkOrder;
 use App\Support\CodeGenerator;
@@ -515,9 +516,23 @@ class ItemController extends Controller
                     continue;
                 }
 
+                // Row-level: sub-kategori harus milik kategori ter-resolve
+                // (aturan exists polos di atas tidak men-scope ke kategori,
+                // tidak seperti StoreItemRequest).
+                $subId = $row['sub_category_id'] ?? null;
+                if ($subId && ! SubCategory::where('id', $subId)->where('category_id', $catId)->exists()) {
+                    $subName = SubCategory::where('id', $subId)->value('name') ?? $subId;
+                    $catName = Category::where('id', $catId)->value('name') ?? $catId;
+                    $errors[$index] = "Sub Kategori '{$subName}' bukan bagian dari Kategori '{$catName}'.";
+
+                    continue;
+                }
+
                 $payload = collect($row)
                     ->except(['action', 'category_name', 'brand_name', 'unit_name'])
-                    ->filter()
+                    // Hanya buang null/string kosong — nilai falsy valid (0)
+                    // harus lolos (filter() polos akan menghapus min_stock: 0).
+                    ->reject(fn ($v) => $v === null || $v === '')
                     ->toArray();
                 $payload['category_id'] = $catId;
                 if ($brandId) {
@@ -539,7 +554,7 @@ class ItemController extends Controller
                     $created++;
                 } catch (QueryException $e) {
                     report($e);
-                    $errors[$index] = 'Baris '.($index + 1).': gagal disimpan (kemungkinan data duplikat/tidak valid).';
+                    $errors[$index] = $this->friendlyImportDbError($e, $index, $sku);
                 } catch (\Exception $e) {
                     $errors[$index] = 'Baris '.($index + 1).': '.$e->getMessage();
                 }
@@ -558,6 +573,48 @@ class ItemController extends Controller
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Pesan DB-error spesifik per baris import (bukan "gagal disimpan" generik).
+     * Menyebut constraint/relasi pelanggar agar operator tahu yang harus dibetulkan.
+     */
+    private function friendlyImportDbError(QueryException $e, int $index, string $sku): string
+    {
+        $rowLabel = 'Baris '.($index + 1)." (SKU '{$sku}')";
+        $msg = $e->getMessage();
+
+        if (
+            str_contains($msg, 'items_sku_unique')
+            || preg_match('/duplicate key value[^;]*"sku"/i', $msg) === 1
+        ) {
+            return "{$rowLabel}: SKU sudah dipakai barang lain (terdaftar saat import berjalan).";
+        }
+
+        if (
+            str_contains($msg, 'items_internal_barcode_unique')
+            || preg_match('/duplicate key value[^;]*"internal_barcode"/i', $msg) === 1
+        ) {
+            return "{$rowLabel}: barcode internal bentrok dengan barang lain.";
+        }
+
+        if (preg_match('/foreign key constraint "items_(\w+)_foreign"/', $msg, $m) === 1) {
+            $labels = [
+                'category_id' => 'Kategori',
+                'sub_category_id' => 'Sub Kategori',
+                'brand_id' => 'Merk',
+                'unit_id' => 'Satuan',
+                'preferred_supplier_id' => 'Supplier',
+                'default_warehouse_id' => 'Gudang Default',
+                'default_rack_id' => 'Rak Default',
+                'default_bin_id' => 'Bin Default',
+            ];
+            $label = $labels[$m[1]] ?? $m[1];
+
+            return "{$rowLabel}: {$label} tidak valid (data master berubah saat import berjalan).";
+        }
+
+        return "{$rowLabel}: gagal disimpan (kemungkinan data duplikat/tidak valid).";
     }
 
     private function nextSkuSeries(array $allSeen): string

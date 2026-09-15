@@ -23,8 +23,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { isApiError } from "@/lib/api";
 import {
   isRowFatalError,
+  mergeServerImportFeedback,
   normalizeHeaderKey,
   numberAmbiguityWarning,
   parseLocalizedNumber,
@@ -484,10 +486,13 @@ export function ImportBarangDialog({
   const handleSubmit = useCallback(async () => {
     if (!parsedRows) return;
 
-    // Build items — rows with unchecked auto-create become errors
+    // Build items — rows with unchecked auto-create become errors.
+    // submittedToParsed maps indeks-submit (yang dipakai backend di
+    // res.errors/res.warnings) → indeks-baris-preview.
     const toImport: BulkImportItem[] = [];
-    for (const row of parsedRows) {
-      if (row.status === "error") continue;
+    const submittedToParsed: number[] = [];
+    parsedRows.forEach((row, parsedIdx) => {
+      if (row.status === "error") return;
 
       // Check if any auto-create entry is unchecked → skip this row
       const hasUncheckedAutoCreate =
@@ -495,10 +500,11 @@ export function ImportBarangDialog({
         (row.autoCreateMerk && !row.autoCreateMerk.checked) ||
         (row.autoCreateUnit && !row.autoCreateUnit.checked);
 
-      if (hasUncheckedAutoCreate) continue;
+      if (hasUncheckedAutoCreate) return;
 
+      submittedToParsed.push(parsedIdx);
       toImport.push({ ...row.resolved, action: row.action } as BulkImportItem);
-    }
+    });
 
     if (toImport.length === 0) {
       toast.error("Tidak ada baris valid untuk diimport");
@@ -508,10 +514,22 @@ export function ImportBarangDialog({
     setSubmitting(true);
     try {
       const res = await bulkImport.mutateAsync({ items: toImport });
-      toast.success(res.message);
-      if (res.errors && Object.keys(res.errors).length > 0) {
-        toast.warning(`${Object.keys(res.errors).length} baris gagal diproses`);
+      const serverErrors = res.errors ?? {};
+      const failedCount = Object.keys(serverErrors).length;
+      if (failedCount > 0) {
+        // Gagal sebagian: merge error/warning server ke baris preview dan
+        // biarkan dialog terbuka agar operator melihat baris mana yang gagal.
+        setParsedRows((prev) =>
+          prev
+            ? mergeServerImportFeedback(prev, submittedToParsed, serverErrors, res.warnings)
+            : prev,
+        );
+        toast.warning(`${res.created} berhasil, ${failedCount} baris gagal — lihat kolom Catatan`, {
+          duration: 8000,
+        });
+        return;
       }
+      toast.success(res.message);
       if (res.warnings && Object.keys(res.warnings).length > 0) {
         const first = Object.entries(res.warnings)
           .slice(0, 3)
@@ -526,7 +544,17 @@ export function ImportBarangDialog({
       setFileName(null);
       onOpenChange(false);
     } catch (err) {
-      toast.error((err as Error).message);
+      // Validasi whole-request (422) membawa rincian per-field di err.errors —
+      // tampilkan agar operator tahu kolom mana yang ditolak server.
+      if (isApiError(err) && err.errors && Object.keys(err.errors).length > 0) {
+        const details = Object.entries(err.errors)
+          .slice(0, 5)
+          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`)
+          .join("; ");
+        toast.error(`${err.message} — ${details}`, { duration: 10000 });
+      } else {
+        toast.error((err as Error).message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -781,7 +809,7 @@ export function ImportBarangDialog({
                           )}
                         </td>
                         <td className="border-b border-border/50 px-2 py-1.5 text-xs">
-                          {row.status === "auto_create" ? (
+                          {row.status === "auto_create" && (
                             <span className="text-info">
                               <Sparkles className="mr-1 inline h-3.5 w-3.5" />
                               Akan dibuat baru:
@@ -790,34 +818,28 @@ export function ImportBarangDialog({
                               {row.autoCreateMerk?.checked && ` Merk '${row.autoCreateMerk.name}'`}
                               {row.autoCreateUnit?.checked &&
                                 ` Satuan '${row.autoCreateUnit.name}'`}
-                              {row.warnings.length > 0 &&
-                                row.warnings.map((w, wi) => (
-                                  <span
-                                    key={wi}
-                                    className="block text-warning flex items-center gap-1"
-                                  >
-                                    <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
-                                  </span>
-                                ))}
-                            </span>
-                          ) : row.status === "skipped" ? (
-                            <span className="text-muted-foreground">
-                              Auto-create dimatikan — baris dilewati impor.
-                            </span>
-                          ) : row.warnings.length > 0 ? (
-                            <span className="text-warning">
-                              {row.warnings.map((w, wi) => (
-                                <span key={wi} className="block flex items-center gap-1">
-                                  <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
-                                </span>
-                              ))}
-                            </span>
-                          ) : (
-                            <span className="text-destructive">
-                              {row.errors.filter((e) => !e.startsWith("Duplikat SKU")).join("; ") ||
-                                "—"}
                             </span>
                           )}
+                          {row.status === "skipped" && (
+                            <span className="block text-muted-foreground">
+                              Auto-create dimatikan — baris dilewati impor.
+                            </span>
+                          )}
+                          {row.errors.map((e, ei) => (
+                            <span key={ei} className="block text-destructive">
+                              {e}
+                            </span>
+                          ))}
+                          {row.warnings.map((w, wi) => (
+                            <span key={wi} className="block text-warning flex items-center gap-1">
+                              <TriangleAlert className="h-3 w-3 shrink-0" /> {w}
+                            </span>
+                          ))}
+                          {row.errors.length === 0 &&
+                            row.warnings.length === 0 &&
+                            row.status !== "auto_create" && (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                         </td>
                       </tr>
                     ))}

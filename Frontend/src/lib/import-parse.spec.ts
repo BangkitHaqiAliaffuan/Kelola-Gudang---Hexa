@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUTO_CREATABLE_PREFIXES,
   isRowFatalError,
+  mergeServerImportFeedback,
   normalizeHeaderKey,
   numberAmbiguityWarning,
   parseLocalizedNumber,
@@ -141,5 +142,64 @@ describe("resolveImportRowStatus", () => {
 
   it("valid bila tanpa error dan tanpa entry", () => {
     expect(resolveImportRowStatus({ errors: [] })).toBe("valid");
+  });
+
+  it("error supplier + warning sub-kategori → tetap error (kasus Minuman)", () => {
+    expect(
+      resolveImportRowStatus({
+        errors: ["Supplier 'PT X' tidak ditemukan"],
+        autoCreateCat: { name: "Minuman", checked: true },
+      }),
+    ).toBe("error");
+  });
+});
+
+describe("mergeServerImportFeedback", () => {
+  it("error server di-merge ke baris preview yang tepat via peta indeks", () => {
+    const rows = [
+      {
+        errors: [] as string[],
+        warnings: ["Sub Kategori 'Minuman' tidak ditemukan"],
+        status: "valid" as const,
+      },
+      { errors: [] as string[], warnings: [] as string[], status: "valid" as const },
+      {
+        errors: ["Supplier 'PT X' tidak ditemukan"],
+        warnings: [] as string[],
+        status: "error" as const,
+      },
+    ];
+    // Hanya baris preview 0 dan 1 yang disubmit (baris 2 error, dilewati).
+    const merged = mergeServerImportFeedback(rows, [0, 1], {
+      1: "SKU 'SKU-10001-001' sudah ada.",
+    });
+    expect(merged[0]!.errors).toEqual([]);
+    expect(merged[0]!.status).toBe("valid");
+    expect(merged[1]!.errors).toEqual(["SKU 'SKU-10001-001' sudah ada."]);
+    expect(merged[1]!.status).toBe("error");
+    expect(merged[2]!.errors).toEqual(["Supplier 'PT X' tidak ditemukan"]);
+  });
+
+  it("tidak duplikat bila pesan sama sudah ada; warning ikut di-merge", () => {
+    const rows = [
+      {
+        errors: ["SKU 'A' sudah ada."] as string[],
+        warnings: [] as string[],
+        status: "error" as const,
+      },
+    ];
+    const merged = mergeServerImportFeedback(
+      rows,
+      [0],
+      { 0: "SKU 'A' sudah ada." },
+      { 0: "Barcode dipakai bersama: Teh Botol (SKU-B)." },
+    );
+    expect(merged[0]!.errors).toEqual(["SKU 'A' sudah ada."]);
+    expect(merged[0]!.warnings).toEqual(["Barcode dipakai bersama: Teh Botol (SKU-B)."]);
+  });
+
+  it("tanpa feedback server → baris dikembalikan apa adanya", () => {
+    const rows = [{ errors: [] as string[], warnings: [] as string[], status: "valid" as const }];
+    expect(mergeServerImportFeedback(rows, [0], {})).toEqual(rows);
   });
 });

@@ -93,6 +93,42 @@ export function resolveImportRowStatus(row: {
 
 export const REQUIRED_CSV_HEADERS = ["Nama Barang", "Kategori", "Harga Pokok", "Harga Jual"];
 
+/** Baris preview minimal untuk merge umpan-balik server (lihat mergeServerImportFeedback). */
+export type ImportFeedbackRow = {
+  errors: string[];
+  warnings: string[];
+  autoCreateCat?: ImportAutoCreateEntry | undefined;
+  autoCreateMerk?: ImportAutoCreateEntry | undefined;
+  autoCreateUnit?: ImportAutoCreateEntry | undefined;
+  status: ImportRowStatus;
+};
+
+/**
+ * Gabungkan error/warning per-baris dari respons bulk-import ke baris preview.
+ * Indeks server = posisi di array yang disubmit (subset terfilter), jadi
+ * `submittedToParsed` memetakan indeks-submit → indeks-baris-preview.
+ * Status dihitung ulang agar error server langsung terlihat di kolom Catatan.
+ */
+export function mergeServerImportFeedback<T extends ImportFeedbackRow>(
+  rows: T[],
+  submittedToParsed: number[],
+  serverErrors: Record<number | string, string>,
+  serverWarnings?: Record<number | string, string> | undefined,
+): T[] {
+  return rows.map((row, parsedIdx) => {
+    const subIdx = submittedToParsed.indexOf(parsedIdx);
+    if (subIdx < 0) return row;
+    const sErr = serverErrors[subIdx];
+    const sWarn = serverWarnings?.[subIdx];
+    if (!sErr && !sWarn) return row;
+    const errors = sErr && !row.errors.includes(sErr) ? [...row.errors, sErr] : row.errors;
+    const warnings =
+      sWarn && !row.warnings.includes(sWarn) ? [...row.warnings, sWarn] : row.warnings;
+    const updated = { ...row, errors, warnings };
+    return { ...updated, status: resolveImportRowStatus(updated) };
+  });
+}
+
 /** Normalisasi header: strip BOM/trim/case-insensitive ke label kanonik. */
 export function normalizeHeaderKey(key: string, known: readonly string[]): string {
   const t = key.replace(/^\uFEFF/, "").trim();
