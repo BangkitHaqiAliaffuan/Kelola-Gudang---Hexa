@@ -246,12 +246,20 @@ const {
 });
 
 vi.mock("@/hooks/use-persediaan", () => ({
-  useStockDocuments: vi.fn((params?: { type?: string; status?: string; perPage?: number }) =>
-    params?.type === "Stock Opname"
-      ? { data: { data: opnameFixture }, isLoading: false }
-      : params?.status === "Menunggu Approval"
-        ? { data: { data: pendingFixture }, isLoading: false }
-        : { data: { data: recentDocsFixture }, isLoading: docsLoading.value },
+  useStockDocuments: vi.fn(
+    (params?: { type?: string; status?: string; perPage?: number; excludeStatus?: string }) =>
+      params?.type === "Stock Opname"
+        ? { data: { data: opnameFixture }, isLoading: false }
+        : params?.status === "Menunggu Approval"
+          ? { data: { data: pendingFixture }, isLoading: false }
+          : // Eksklusi status terjadi server-side (kontrak API exclude_status):
+            // mock meniru server yang sudah menyaring.
+            params?.excludeStatus
+            ? {
+                data: { data: recentDocsFixture.filter((d) => d.status !== params.excludeStatus) },
+                isLoading: docsLoading.value,
+              }
+            : { data: { data: recentDocsFixture }, isLoading: docsLoading.value },
   ),
   useStockDocumentSummary: () => ({ data: { data: summaryFixture }, isLoading: false }),
   useStockMinimum: () => ({ data: { data: stockMinFixture }, isLoading: false }),

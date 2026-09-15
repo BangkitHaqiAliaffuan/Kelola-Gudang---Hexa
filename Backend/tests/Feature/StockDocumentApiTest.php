@@ -64,6 +64,20 @@ class StockDocumentApiTest extends TestCase
             ->assertJsonPath('data.0.no', $doc->no);
     }
 
+    public function test_index_exclude_status(): void
+    {
+        $this->makeDoc('Penerimaan', 'Selesai');
+        $this->makeDoc('Pengeluaran', 'Draft');
+        $this->makeDoc('Transfer Gudang', 'Menunggu Approval');
+
+        $expected = StockDocument::where('status', '!=', 'Draft')->count();
+
+        $this->getJson('/api/persediaan/stock-documents?exclude_status=Draft&per_page=100')
+            ->assertOk()
+            ->assertJsonPath('meta.total', $expected)
+            ->assertJsonMissing(['status' => 'Draft']);
+    }
+
     public function test_show_includes_lines(): void
     {
         $doc = $this->makeDocument('Penerimaan', 'Draft', [
@@ -228,8 +242,8 @@ class StockDocumentApiTest extends TestCase
                 ],
             ],
         ])->assertStatus(201)
-          ->assertJsonPath('data.status', 'Selesai')
-          ->assertJsonPath('data.posted_at', fn ($value) => $value !== null);
+            ->assertJsonPath('data.status', 'Selesai')
+            ->assertJsonPath('data.posted_at', fn ($value) => $value !== null);
 
         $this->assertDatabaseHas('stock_movements', [
             'direction' => 'IN',

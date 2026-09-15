@@ -57,7 +57,7 @@ class StockDocumentController extends Controller
 
     /**
      * Daftar dokumen mutasi stock — searchable by nomor/partner/note, filterable
-     * by jenis, status, gudang, dan rentang tanggal.
+     * by jenis, status (termasuk eksklusi via exclude_status), gudang, dan rentang tanggal.
      */
     public function index(Request $request)
     {
@@ -65,6 +65,7 @@ class StockDocumentController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', Rule::in(StockDocument::TYPES)],
             'status' => ['nullable', 'string', Rule::in(StockDocument::STATUSES)],
+            'exclude_status' => ['nullable', 'string', Rule::in(StockDocument::STATUSES)],
             'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
@@ -90,6 +91,7 @@ class StockDocumentController extends Controller
 
         $query->when($data['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($data['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($data['exclude_status'] ?? null, fn ($q, $status) => $q->where('status', '!=', $status))
             ->when($data['warehouse_id'] ?? null, fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
             ->when($data['from'] ?? null, fn ($q, $from) => $q->whereDate('document_date', '>=', $from))
             ->when($data['to'] ?? null, fn ($q, $to) => $q->whereDate('document_date', '<=', $to));

@@ -42,6 +42,7 @@ import { Progress } from "@/components/ui/progress";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { useAuth } from "@/hooks/use-auth";
 import { useItems, useWarehouses } from "@/hooks/use-master";
+import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import {
   useStockDocumentSummary,
   useStockDocuments,
@@ -222,12 +223,21 @@ function Dashboard() {
   });
   const pending = pendingData?.data.length ?? 0;
 
-  // Semua dokumen mutasi: agregasi chart bulanan + aktivitas terkini.
+  // Semua dokumen mutasi: agregasi chart bulanan (tetap full agar filter client truthful).
   const { data: docsData, isLoading: docsLoading } = useStockDocuments();
   const allDocs = (docsData?.data ?? []) as StockDocumentApi[];
   const monthly = buildMonthly(allDocs);
-  const recentActivities = allDocs
-    .filter((d) => d.status !== "Draft")
+
+  // Timeline aktivitas: query terpisah — Draft disaring server-side (jangan andalkan
+  // filter client; payload Draft tak boleh mendarat di browser) + ikut filter gudang
+  // aktif (read-only: dashboard tak menulis pilihan). Tanpa perPage → fetchAll.
+  const { warehouseId: activityWarehouseId } = useWarehouseFilter(warehousesData?.data);
+  const { data: activityData, isLoading: activityLoading } = useStockDocuments({
+    perPage: 15,
+    excludeStatus: "Draft",
+    warehouseId: activityWarehouseId,
+  });
+  const recentActivities = ((activityData?.data ?? []) as StockDocumentApi[])
     .map((d) => ({
       id: d.id,
       type: d.type,
@@ -506,7 +516,7 @@ function Dashboard() {
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Panel title="Aktivitas Terkini" description="Dokumen mutasi terbaru">
-          {docsLoading ? (
+          {activityLoading ? (
             <TableSkeleton rows={6} cols={3} />
           ) : recentActivities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada aktivitas.</p>

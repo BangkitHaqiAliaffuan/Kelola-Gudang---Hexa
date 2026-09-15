@@ -76,6 +76,7 @@ export function useStockDocuments(
   params: {
     type?: string;
     status?: string;
+    excludeStatus?: string;
     perPage?: number;
     warehouseId?: number | null;
     search?: string | null;
@@ -84,7 +85,17 @@ export function useStockDocuments(
     enabled?: boolean;
   } = {},
 ) {
-  const { type, status, perPage, warehouseId, search, from, to, enabled = true } = params;
+  const {
+    type,
+    status,
+    excludeStatus,
+    perPage,
+    warehouseId,
+    search,
+    from,
+    to,
+    enabled = true,
+  } = params;
   return useQuery({
     queryKey: [
       "persediaan",
@@ -92,6 +103,7 @@ export function useStockDocuments(
       "list",
       type ?? null,
       status ?? null,
+      excludeStatus ?? null,
       warehouseId ?? null,
       search ?? null,
       from ?? null,
@@ -105,6 +117,7 @@ export function useStockDocuments(
       const params: Record<string, string> = {};
       if (type) params["type"] = type;
       if (status) params["status"] = status;
+      if (excludeStatus) params["exclude_status"] = excludeStatus;
       if (warehouseId != null) params["warehouse_id"] = String(warehouseId);
       if (search) params["search"] = search;
       if (from) params["from"] = from;
