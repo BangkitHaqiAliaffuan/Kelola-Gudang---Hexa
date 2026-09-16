@@ -51,6 +51,7 @@ export const navGroups: NavGroup[] = [
     icon: Boxes,
     children: [
       { label: "Stock Saat Ini", to: "/persediaan/stock" },
+      { label: "Rekap Stock", to: "/persediaan/rekap-stock" },
       { label: "Kartu Stock", to: "/persediaan/kartu-stock" },
       { label: "Mutasi Stock", to: "/persediaan/mutasi" },
       { label: "Stock Minimum", to: "/persediaan/stock-minimum" },

@@ -24,6 +24,7 @@ import { Route as PersediaanAdjustmentRouteImport } from './routes/persediaan.ad
 import { Route as PersediaanKartuStockRouteImport } from './routes/persediaan.kartu-stock'
 import { Route as PersediaanMutasiRouteImport } from './routes/persediaan.mutasi'
 import { Route as PersediaanNilaiRouteImport } from './routes/persediaan.nilai'
+import { Route as PersediaanRekapStockRouteImport } from './routes/persediaan.rekap-stock'
 import { Route as PersediaanStockRouteImport } from './routes/persediaan.stock'
 import { Route as PersediaanStockMinimumRouteImport } from './routes/persediaan.stock-minimum'
 import { Route as SystemSectionRouteImport } from './routes/system.$section'
@@ -127,6 +128,11 @@ const PersediaanMutasiRoute = PersediaanMutasiRouteImport.update({
 const PersediaanNilaiRoute = PersediaanNilaiRouteImport.update({
   id: '/persediaan/nilai',
   path: '/persediaan/nilai',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PersediaanRekapStockRoute = PersediaanRekapStockRouteImport.update({
+  id: '/persediaan/rekap-stock',
+  path: '/persediaan/rekap-stock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PersediaanStockRoute = PersediaanStockRouteImport.update({
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
+  '/persediaan/rekap-stock': typeof PersediaanRekapStockRoute
   '/persediaan/stock': typeof PersediaanStockRouteWithChildren
   '/persediaan/stock-minimum': typeof PersediaanStockMinimumRoute
   '/system/$section': typeof SystemSectionRoute
@@ -337,6 +344,7 @@ export interface FileRoutesByTo {
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
+  '/persediaan/rekap-stock': typeof PersediaanRekapStockRoute
   '/persediaan/stock-minimum': typeof PersediaanStockMinimumRoute
   '/system/$section': typeof SystemSectionRoute
   '/transaksi/$section': typeof TransaksiSectionRoute
@@ -382,6 +390,7 @@ export interface FileRoutesById {
   '/persediaan/kartu-stock': typeof PersediaanKartuStockRoute
   '/persediaan/mutasi': typeof PersediaanMutasiRoute
   '/persediaan/nilai': typeof PersediaanNilaiRoute
+  '/persediaan/rekap-stock': typeof PersediaanRekapStockRoute
   '/persediaan/stock': typeof PersediaanStockRouteWithChildren
   '/persediaan/stock-minimum': typeof PersediaanStockMinimumRoute
   '/system/$section': typeof SystemSectionRoute
@@ -429,6 +438,7 @@ export interface FileRouteTypes {
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
+    | '/persediaan/rekap-stock'
     | '/persediaan/stock'
     | '/persediaan/stock-minimum'
     | '/system/$section'
@@ -470,6 +480,7 @@ export interface FileRouteTypes {
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
+    | '/persediaan/rekap-stock'
     | '/persediaan/stock-minimum'
     | '/system/$section'
     | '/transaksi/$section'
@@ -514,6 +525,7 @@ export interface FileRouteTypes {
     | '/persediaan/kartu-stock'
     | '/persediaan/mutasi'
     | '/persediaan/nilai'
+    | '/persediaan/rekap-stock'
     | '/persediaan/stock'
     | '/persediaan/stock-minimum'
     | '/system/$section'
@@ -560,6 +572,7 @@ export interface RootRouteChildren {
   PersediaanKartuStockRoute: typeof PersediaanKartuStockRoute
   PersediaanMutasiRoute: typeof PersediaanMutasiRoute
   PersediaanNilaiRoute: typeof PersediaanNilaiRoute
+  PersediaanRekapStockRoute: typeof PersediaanRekapStockRoute
   PersediaanStockRoute: typeof PersediaanStockRouteWithChildren
   PersediaanStockMinimumRoute: typeof PersediaanStockMinimumRoute
   SystemSectionRoute: typeof SystemSectionRoute
@@ -681,6 +694,13 @@ declare module '@tanstack/react-router' {
       path: '/persediaan/nilai'
       fullPath: '/persediaan/nilai'
       preLoaderRoute: typeof PersediaanNilaiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/persediaan/rekap-stock': {
+      id: '/persediaan/rekap-stock'
+      path: '/persediaan/rekap-stock'
+      fullPath: '/persediaan/rekap-stock'
+      preLoaderRoute: typeof PersediaanRekapStockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/persediaan/stock': {
@@ -991,6 +1011,7 @@ const rootRouteChildren: RootRouteChildren = {
   PersediaanKartuStockRoute: PersediaanKartuStockRoute,
   PersediaanMutasiRoute: PersediaanMutasiRoute,
   PersediaanNilaiRoute: PersediaanNilaiRoute,
+  PersediaanRekapStockRoute: PersediaanRekapStockRoute,
   PersediaanStockRoute: PersediaanStockRouteWithChildren,
   PersediaanStockMinimumRoute: PersediaanStockMinimumRoute,
   SystemSectionRoute: SystemSectionRoute,
