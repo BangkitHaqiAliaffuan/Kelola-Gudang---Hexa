@@ -248,9 +248,9 @@ export const projectSchema = z.object({
 });
 export type ProjectInput = z.infer<typeof projectSchema>;
 
-// Mirrors StoreUserRequest::ROLES / UpdateUserRequest in the backend.
-export const USER_ROLES = ["Administrator", "Supervisor", "Operator Gudang", "Auditor"] as const;
-export type UserRole = (typeof USER_ROLES)[number];
+// Role tidak lagi hardcoded — registry hidup di tabel `roles` (Backend) dan
+// dibaca via GET /api/master/roles. Type di bawah hanya untuk kompatibilitas.
+export type UserRole = string;
 
 export type AccessLevel = "Baca" | "Tulis" | "Kelola";
 
@@ -274,46 +274,6 @@ export const ACCESS_MODULES = [
   "Audit Trails",
 ] as const;
 
-// Mirrors the seeded RolePermissionSeeder matrix (Backend), kept for SSR/first
-// paint as the fallback when the API access map is empty.
-export const ROLE_ACCESS: Record<UserRole, RoleAccessEntry[]> = {
-  Administrator: [
-    { module: "Master Data", level: "Kelola" },
-    { module: "Transaksi", level: "Kelola" },
-    { module: "Persediaan", level: "Kelola" },
-    { module: "Stock Opname", level: "Kelola" },
-    { module: "Pengadaan", level: "Kelola" },
-    { module: "Laporan", level: "Kelola" },
-    { module: "System", level: "Kelola" },
-    { module: "Audit Trails", level: "Kelola" },
-  ],
-  Supervisor: [
-    { module: "Master Data", level: "Baca" },
-    { module: "Transaksi", level: "Tulis" },
-    { module: "Persediaan", level: "Tulis" },
-    { module: "Stock Opname", level: "Baca" },
-    { module: "Pengadaan", level: "Tulis" },
-    { module: "Approval Pengadaan", level: "Kelola" },
-    { module: "Laporan", level: "Baca" },
-  ],
-  "Operator Gudang": [
-    { module: "Master Data", level: "Baca" },
-    { module: "Transaksi", level: "Tulis" },
-    { module: "Persediaan", level: "Tulis" },
-    { module: "Stock Opname", level: "Tulis" },
-  ],
-  Auditor: [
-    { module: "Master Data", level: "Baca" },
-    { module: "Transaksi", level: "Baca" },
-    { module: "Persediaan", level: "Baca" },
-    { module: "Stock Opname", level: "Baca" },
-    { module: "Pengadaan", level: "Baca" },
-    { module: "Laporan", level: "Baca" },
-    // System: Tidak Ada (tanpa baris) — mirror seeder, non-admin tak melihat System.
-    { module: "Audit Trails", level: "Baca" },
-  ],
-};
-
 const emailRequired = z
   .string()
   .trim()
@@ -324,7 +284,7 @@ const baseUserSchema = z.object({
   code,
   name,
   email: emailRequired,
-  role: z.enum(USER_ROLES),
+  role: z.string().trim().min(1, "Role wajib dipilih"),
   default_warehouse_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
   is_active: z.boolean().default(true),
 });

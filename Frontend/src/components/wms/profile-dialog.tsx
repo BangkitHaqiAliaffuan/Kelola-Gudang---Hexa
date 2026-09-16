@@ -6,7 +6,7 @@ import { themes, useTheme } from "./theme";
 import { useCompanySettings } from "@/hooks/use-settings";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 import type { AuthUser } from "@/lib/auth-api";
-import { ROLE_ACCESS, type RoleAccessEntry, type UserRole } from "@/lib/schemas";
+import { type RoleAccessEntry } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -98,7 +98,7 @@ export function ProfileHelpDialog({
   const name = user?.name ?? "Pengguna";
   const role = user?.role ?? "";
   const email = user?.email ?? "";
-  const accessList = access.length > 0 ? access : (ROLE_ACCESS[role as UserRole] ?? []);
+  const accessList = access;
   const initials =
     name
       .split(" ")

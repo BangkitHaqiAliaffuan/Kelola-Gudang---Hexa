@@ -50,6 +50,7 @@ class AuthController extends Controller
         return response()->json([
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
+            'can_review' => $user->canReview(),
             'token' => $token,
         ]);
     }
@@ -73,6 +74,7 @@ class AuthController extends Controller
         return response()->json([
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
+            'can_review' => $user->canReview(),
         ]);
     }
 }

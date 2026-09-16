@@ -152,12 +152,12 @@ export function StockDocumentSheet({
   onReject?: (() => void) | undefined;
   busy?: boolean;
 }) {
-  const { user, hasModuleLevel } = useAuth();
+  const { user, canReview, hasModuleLevel } = useAuth();
   const { data: company } = useCompanySettings();
   const canPost = hasModuleLevel("Persediaan", "Tulis");
   const canCancel = hasModuleLevel("Persediaan", "Kelola");
   const canSubmit = hasModuleLevel("Persediaan", "Tulis");
-  const canApprove = hasModuleLevel("Persediaan", "Kelola") || user?.role === "Auditor";
+  const canApprove = hasModuleLevel("Persediaan", "Kelola") || canReview;
   const isSelf = doc?.requester_user_id != null && user?.id === doc.requester_user_id;
   const isSelfBlocked =
     isSelf && (doc?.type === "Stock Adjustment" || doc?.type === "Stock Opname");

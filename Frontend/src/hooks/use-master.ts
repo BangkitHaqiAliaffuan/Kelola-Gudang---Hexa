@@ -153,17 +153,55 @@ export function useRoles() {
 export type RolePermissionPayload = {
   role: string;
   access: RoleAccessEntry[];
+  /** Rename opsional (PUT): nama baru role. */
+  name?: string;
+  description?: string | null;
+  can_review?: boolean;
 };
+
+export type RoleCreatePayload = {
+  name: string;
+  description?: string;
+  can_review?: boolean;
+  access?: RoleAccessEntry[];
+};
+
+export function useCreateRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: RoleCreatePayload) =>
+      api.post<{ data: RoleCatalog }>("/master/roles", payload),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: keys.roles });
+    },
+  });
+}
 
 export function useUpdateRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ role, access }: RolePermissionPayload) =>
-      api.put<{ data: RoleCatalog }>(`/master/roles/${encodeURIComponent(role)}`, { access }),
+    mutationFn: ({ role, access, name, description, can_review }: RolePermissionPayload) =>
+      api.put<{ data: RoleCatalog }>(`/master/roles/${encodeURIComponent(role)}`, {
+        ...(name !== undefined ? { name } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(can_review !== undefined ? { can_review } : {}),
+        access,
+      }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: keys.roles });
       await qc.refetchQueries({ queryKey: keys.roles });
       await qc.invalidateQueries({ queryKey: keys.users });
+    },
+  });
+}
+
+export function useDeleteRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (role: string) =>
+      api.delete<{ message: string }>(`/master/roles/${encodeURIComponent(role)}`),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: keys.roles });
     },
   });
 }

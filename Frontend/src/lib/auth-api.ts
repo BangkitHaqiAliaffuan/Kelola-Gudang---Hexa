@@ -17,11 +17,14 @@ export type AuthUser = {
 export type AuthSession = {
   user: AuthUser;
   access: RoleAccessEntry[];
+  /** Hak review dokumen persediaan (flag `can_review` dari tabel roles). */
+  can_review: boolean;
 };
 
 type AuthResponse = {
   data: AuthUser;
   access: RoleAccessEntry[];
+  can_review: boolean;
 };
 
 type LoginResponse = AuthResponse & {

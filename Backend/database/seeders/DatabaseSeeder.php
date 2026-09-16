@@ -29,14 +29,14 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             VendorSeeder::class,
             ItemSeeder::class,
+            RolePermissionSeeder::class,
             UserSeeder::class,
             DepartmentSeeder::class,
             ProjectSeeder::class,
             WorkOrderSeeder::class,
             StockDocumentSeeder::class,
             ProcDocSeeder::class,
-            RolePermissionSeeder::class,
-            ]);
+        ]);
         });
     }
 }

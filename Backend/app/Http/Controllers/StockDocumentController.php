@@ -692,7 +692,7 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
         }
 
-        $isAuditor = $user && $user->role === 'Auditor';
+        $isAuditor = $user && $user->canReview();
         $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
         if (! ($isAuditor || $hasKelola)) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk menyetujui dokumen ini.'], 403);
@@ -734,7 +734,7 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menolak laporannya sendiri.'], 422);
         }
 
-        $isAuditor = $user && $user->role === 'Auditor';
+        $isAuditor = $user && $user->canReview();
         $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
         if (! ($isAuditor || $hasKelola)) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk menolak dokumen ini.'], 403);
@@ -794,7 +794,7 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
         }
 
-        $isAuditor = $user && $user->role === 'Auditor';
+        $isAuditor = $user && $user->canReview();
         $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
         if (! ($isAuditor || $hasKelola)) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk menyetujui dokumen ini.'], 403);
@@ -836,7 +836,7 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menolak laporannya sendiri.'], 422);
         }
 
-        $isAuditor = $user && $user->role === 'Auditor';
+        $isAuditor = $user && $user->canReview();
         $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
         if (! ($isAuditor || $hasKelola)) {
             return response()->json(['message' => 'Anda tidak memiliki hak untuk menolak dokumen ini.'], 403);
@@ -888,7 +888,7 @@ class StockDocumentController extends Controller
         if (! $user) {
             return false;
         }
-        if ($user->role === 'Auditor') {
+        if ($user->canReview()) {
             return true;
         }
 

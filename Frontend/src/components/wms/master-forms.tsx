@@ -53,7 +53,6 @@ import {
   vendorSchema,
   warehouseSchema,
   workOrderSchema,
-  USER_ROLES,
   type AccessLevel,
   type BinInput,
   type CategoryInput,
@@ -88,6 +87,7 @@ import {
   useCreateMerk,
   useCreateProject,
   useCreateRack,
+  useCreateRole,
   useCreateSubCategory,
   useCreateSupplier,
   useCreateUnit,
@@ -101,6 +101,7 @@ import {
   useMerks,
   useProjects,
   useRacks,
+  useRoles,
   useSubCategories,
   useSuppliers,
   useUnits,
@@ -3939,6 +3940,8 @@ export function UserFormDialog({
   const update = useUpdateUser();
   const { data: users } = useUsers();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
+  const { data: rolesData } = useRoles();
+  const roleNames = useMemo(() => (rolesData?.data ?? []).map((r) => r.name), [rolesData]);
   const previewCode = nextCode(
     (users?.data ?? []).map((u) => u.code),
     "USR",
@@ -3970,7 +3973,7 @@ export function UserFormDialog({
               code: "",
               name: "",
               email: "",
-              role: "Operator Gudang",
+              role: "",
               default_warehouse_id: "",
               password: "",
               password_confirmation: "",
@@ -4085,7 +4088,7 @@ export function UserFormDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="rounded-xl" side="bottom" avoidCollisions={false}>
-                      {USER_ROLES.map((r) => (
+                      {roleNames.map((r) => (
                         <SelectItem key={r} value={r}>
                           {r}
                         </SelectItem>
@@ -4221,6 +4224,9 @@ export function RoleEditDialog({
   const { user, refreshSession } = useAuth();
   const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
   const [canApprove, setCanApprove] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [description, setDescription] = useState("");
+  const [canReview, setCanReview] = useState(false);
 
   useEffect(() => {
     if (role) {
@@ -4229,6 +4235,9 @@ export function RoleEditDialog({
       for (const entry of role.access) next[entry.module] = entry.level;
       setDraft(next);
       setCanApprove(role.access.some((a) => a.module === "Approval Pengadaan"));
+      setNewName(role.name);
+      setDescription(role.description ?? "");
+      setCanReview(role.can_review);
     }
   }, [role]);
 
@@ -4248,12 +4257,19 @@ export function RoleEditDialog({
     if (canApprove) access.push({ module: "Approval Pengadaan", level: "Kelola" });
 
     try {
-      await update.mutateAsync({ role: role.name, access });
+      const trimmedName = newName.trim();
+      await update.mutateAsync({
+        role: role.name,
+        ...(trimmedName && trimmedName !== role.name ? { name: trimmedName } : {}),
+        description: description.trim() === "" ? null : description.trim(),
+        can_review: canReview,
+        access,
+      });
       // Bila mengedit role sendiri, peta access sesi langsung basi → sinkronkan
       // agar gate UI mengikuti tanpa menunggu 403 / re-login. Role lain tidak
       // perlu aksi di klien editor (sesi mereka resync malas saat 403).
       if (role.name === user?.role) await refreshSession();
-      toast.success("Hak akses role diperbarui");
+      toast.success("Role diperbarui");
       onOpenChange(false);
       navigate({ to: "/master/$section", params: { section: "role" } });
     } catch (err) {
@@ -4265,10 +4281,37 @@ export function RoleEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl">
         <DialogHeader>
-          <DialogTitle>Edit Hak Akses — {role?.name}</DialogTitle>
-          <DialogDescription>Atur tingkat akses tiap modul untuk role ini.</DialogDescription>
+          <DialogTitle>Edit Role — {role?.name}</DialogTitle>
+          <DialogDescription>Atur nama, deskripsi, dan tingkat akses tiap modul.</DialogDescription>
         </DialogHeader>
         <form noValidate onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="role-name">Nama Role</Label>
+              <Input
+                id="role-name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="mis. Staff Gudang"
+                className="rounded-xl"
+                maxLength={100}
+              />
+              <p className="text-xs text-muted-foreground">
+                Rename otomatis memindahkan seluruh user role ini (tanpa garis miring).
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="role-description">Deskripsi (opsional)</Label>
+              <Input
+                id="role-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Kegunaan role ini"
+                className="rounded-xl"
+                maxLength={500}
+              />
+            </div>
+          </div>
           <div className="rounded-xl border border-border">
             <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground">
               <span>Modul</span>
@@ -4306,6 +4349,21 @@ export function RoleEditDialog({
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="min-w-0">
+              <Label htmlFor="role-can-review" className="text-sm font-medium">
+                Dapat me-review dokumen persediaan
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Role ini dapat menyetujui/menolak adjustment & opname serta force-unlock.
+              </p>
+            </div>
+            <Checkbox
+              id="role-can-review"
+              checked={canReview}
+              onCheckedChange={(value) => setCanReview(value === true)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
               <Label htmlFor="role-can-approve" className="text-sm font-medium">
                 Approval Pengadaan
               </Label>
@@ -4331,6 +4389,181 @@ export function RoleEditDialog({
             </Button>
             <Button type="submit" className="rounded-xl" disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 animate-spin" />} Simpan
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function RoleCreateDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const create = useCreateRole();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [canReview, setCanReview] = useState(false);
+  const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
+  const [canApprove, setCanApprove] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setDescription("");
+      setCanReview(false);
+      setDraft({});
+      setCanApprove(false);
+    }
+  }, [open]);
+
+  const saving = create.isPending;
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Nama role wajib diisi");
+      return;
+    }
+
+    const access: RoleAccessEntry[] = ACCESS_MODULES.filter(
+      (m) => m !== "Approval Pengadaan",
+    ).flatMap((module) => {
+      const level = draft[module];
+      return level ? [{ module, level }] : [];
+    });
+    if (canApprove) access.push({ module: "Approval Pengadaan", level: "Kelola" });
+
+    try {
+      await create.mutateAsync({
+        name: trimmed,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        can_review: canReview,
+        access,
+      });
+      toast.success(`Role "${trimmed}" dibuat — tanpa akses sampai diberi hak`);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Tambah Role</DialogTitle>
+          <DialogDescription>
+            Role baru lahir tanpa akses (deny-by-default) — beri hak eksplisit di bawah.
+          </DialogDescription>
+        </DialogHeader>
+        <form noValidate onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="role-new-name">Nama Role</Label>
+              <Input
+                id="role-new-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="mis. Staff Gudang"
+                className="rounded-xl"
+                maxLength={100}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="role-new-description">Deskripsi (opsional)</Label>
+              <Input
+                id="role-new-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Kegunaan role ini"
+                className="rounded-xl"
+                maxLength={500}
+              />
+            </div>
+          </div>
+          <div className="rounded-xl border border-border">
+            <div className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2.5 text-xs font-medium text-muted-foreground">
+              <span>Modul</span>
+              <span className="w-32 text-right">Hak Akses</span>
+            </div>
+            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan").map((module) => (
+              <div
+                key={module}
+                className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
+              >
+                <span className="text-sm">{module}</span>
+                <Select
+                  value={draft[module] ?? "NONE"}
+                  onValueChange={(value) =>
+                    setDraft((draft) => ({
+                      ...draft,
+                      [module]: value === "NONE" ? null : (value as AccessLevel),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-32 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent side="bottom" avoidCollisions={false}>
+                    <SelectItem value="NONE">Tidak Ada</SelectItem>
+                    {ACCESS_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-new-can-review" className="text-sm font-medium">
+                Dapat me-review dokumen persediaan
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Role ini dapat menyetujui/menolak adjustment & opname serta force-unlock.
+              </p>
+            </div>
+            <Checkbox
+              id="role-new-can-review"
+              checked={canReview}
+              onCheckedChange={(value) => setCanReview(value === true)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-new-can-approve" className="text-sm font-medium">
+                Approval Pengadaan
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Role ini dapat menyetujui/menolak dokumen pengadaan (PR/PO).
+              </p>
+            </div>
+            <Checkbox
+              id="role-new-can-approve"
+              checked={canApprove}
+              onCheckedChange={(value) => setCanApprove(value === true)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => onOpenChange(false)}
+              disabled={saving}
+            >
+              Batal
+            </Button>
+            <Button type="submit" className="rounded-xl" disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />} Buat Role
             </Button>
           </DialogFooter>
         </form>

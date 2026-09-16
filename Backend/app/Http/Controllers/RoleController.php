@@ -2,43 +2,111 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
 use App\Http\Resources\RoleResource;
+use App\Models\Role;
 use App\Models\RolePermission;
-use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class RoleController extends Controller
 {
     public function index()
     {
-        return RoleResource::collection($this->roleCatalog());
+        return RoleResource::collection(Role::query()->orderBy('id')->get());
+    }
+
+    public function store(StoreRoleRequest $request): RoleResource|JsonResponse
+    {
+        $validated = $request->validated();
+
+        $role = DB::transaction(function () use ($validated) {
+            $role = Role::create([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'can_review' => $validated['can_review'] ?? false,
+            ]);
+
+            // Role baru lahir dengan NOL baris permission = tolak semua modul
+            // (deny-by-default) sampai diberi akses eksplisit.
+            foreach ($validated['access'] ?? [] as $entry) {
+                RolePermission::create([
+                    'role' => $role->name,
+                    'module' => $entry['module'],
+                    'level' => $entry['level'],
+                ]);
+            }
+
+            return $role;
+        });
+
+        AuditLogger::record([
+            'action' => 'Create',
+            'module' => 'System',
+            'auditable_type' => 'Role',
+            'record_no' => "Role: {$role->name}",
+            'new_values' => $validated,
+        ]);
+
+        return (new RoleResource($role->fresh()))->response()->setStatusCode(201);
     }
 
     public function update(string $role, UpdateRoleRequest $request): RoleResource|JsonResponse
     {
-        if (! in_array($role, StoreUserRequest::ROLES, true)) {
+        $record = Role::query()->where('name', $role)->first();
+
+        if (! $record) {
             return response()->json([
                 'message' => 'Role tidak ditemukan.',
-                'errors' => ['role' => ['Role tidak ditemukan.']],
-            ], 422);
+            ], 404);
         }
 
-        $access = $request->validated('access');
+        $validated = $request->validated();
+        $newName = $validated['name'] ?? $record->name;
 
-        DB::transaction(function () use ($role, $access) {
-            RolePermission::query()->where('role', $role)->delete();
+        // Self-lockout guard: user tak boleh mencabut System/Kelola dari
+        // role-nya sendiri (akan mengunci diri keluar dari manajemen akses).
+        $authUser = $request->user('sanctum') ?? $request->user();
+        if ($authUser && $authUser->role === $record->name && array_key_exists('access', $validated)) {
+            $keepsSystem = collect($validated['access'])->contains(
+                fn (array $entry) => $entry['module'] === 'System' && $entry['level'] === 'Kelola'
+            );
 
-            foreach ($access as $entry) {
-                RolePermission::create([
-                    'role' => $role,
-                    'module' => $entry['module'],
-                    'level' => $entry['level'],
-                ]);
+            if (! $keepsSystem) {
+                return response()->json([
+                    'message' => 'Role Anda sendiri wajib mempertahankan akses System Kelola.',
+                    'errors' => ['access' => ['Role Anda sendiri wajib mempertahankan akses System Kelola.']],
+                ], 422);
+            }
+        }
+
+        DB::transaction(function () use ($record, $role, $newName, $validated) {
+            $record->update([
+                'name' => $newName,
+                'description' => $validated['description'] ?? $record->description,
+                'can_review' => $validated['can_review'] ?? $record->can_review,
+            ]);
+
+            // Rename berpropagasi ke users + permission dalam satu transaksi
+            // (kolom string tanpa FK — audit_logs adalah snapshot historis
+            // dan SENGAJA tidak ikut di-rewrite).
+            if ($newName !== $role) {
+                DB::table('users')->where('role', $role)->update(['role' => $newName]);
+                RolePermission::query()->where('role', $role)->update(['role' => $newName]);
+            }
+
+            if (array_key_exists('access', $validated)) {
+                RolePermission::query()->where('role', $newName)->delete();
+
+                foreach ($validated['access'] as $entry) {
+                    RolePermission::create([
+                        'role' => $newName,
+                        'module' => $entry['module'],
+                        'level' => $entry['level'],
+                    ]);
+                }
             }
         });
 
@@ -46,24 +114,44 @@ class RoleController extends Controller
             'action' => 'Update',
             'module' => 'System',
             'auditable_type' => 'Role',
-            'record_no' => "Role: {$role}",
-            'new_values' => ['access' => $access],
+            'record_no' => "Role: {$record->name}",
+            'new_values' => $validated,
         ]);
 
-        return new RoleResource($this->roleCatalog()->firstWhere('name', $role));
+        return new RoleResource(Role::query()->where('name', $newName)->first());
     }
 
-    /**
-     * @return Collection<int, array<string, mixed>>
-     */
-    private function roleCatalog()
+    public function destroy(string $role): JsonResponse
     {
-        return collect(StoreUserRequest::ROLES)->map(fn (string $role, int $index) => [
-            'id' => $index + 1,
-            'name' => $role,
-            'user_count' => User::query()->where('role', $role)->count(),
-            'active_user_count' => User::query()->where('role', $role)->where('is_active', true)->count(),
-            'access' => RolePermission::accessForRole($role),
+        $record = Role::query()->where('name', $role)->first();
+
+        if (! $record) {
+            return response()->json([
+                'message' => 'Role tidak ditemukan.',
+            ], 404);
+        }
+
+        $userCount = $record->userCount();
+
+        if ($userCount > 0) {
+            return response()->json([
+                'message' => "Role masih dipakai {$userCount} user — pindahkan atau nonaktifkan user-nya dulu.",
+                'errors' => ['role' => ["Role masih dipakai {$userCount} user."]],
+            ], 422);
+        }
+
+        DB::transaction(function () use ($record) {
+            RolePermission::query()->where('role', $record->name)->delete();
+            $record->delete();
+        });
+
+        AuditLogger::record([
+            'action' => 'Delete',
+            'module' => 'System',
+            'auditable_type' => 'Role',
+            'record_no' => "Role: {$record->name}",
         ]);
+
+        return response()->json(['message' => 'Role dihapus.']);
     }
 }

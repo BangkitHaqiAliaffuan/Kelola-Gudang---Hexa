@@ -44,7 +44,9 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('vendors', VendorController::class);
     Route::apiResource('users', UserController::class);
     Route::get('roles', [RoleController::class, 'index']);
+    Route::post('roles', [RoleController::class, 'store']);
     Route::put('roles/{role}', [RoleController::class, 'update']);
+    Route::delete('roles/{role}', [RoleController::class, 'destroy']);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('projects', ProjectController::class);
     Route::apiResource('work-orders', WorkOrderController::class);

@@ -25,6 +25,27 @@ class User extends Authenticatable
     }
 
     /**
+     * Baris registry role (relasi via string `users.role` → `roles.name`;
+     * tanpa FK database — lihat RoleController). Null bila role tidak
+     * terdaftar (deny-by-default di semua gate).
+     */
+    public function roleRecord(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role', 'name');
+    }
+
+    /**
+     * Pengganti pengecekan nama role 'Auditor' yang hardcoded:
+     * hak me-review/approve dokumen persediaan + force-unlock.
+     */
+    public function canReview(): bool
+    {
+        return (bool) ($this->relationLoaded('roleRecord')
+            ? $this->roleRecord?->can_review
+            : $this->roleRecord()->first()?->can_review);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

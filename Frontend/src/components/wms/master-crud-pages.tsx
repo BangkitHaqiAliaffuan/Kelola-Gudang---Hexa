@@ -9,6 +9,7 @@ import {
   MerkFormDialog,
   ProjectFormDialog,
   RackFormDialog,
+  RoleCreateDialog,
   RoleEditDialog,
   SubCategoryFormDialog,
   SupplierFormDialog,
@@ -23,7 +24,6 @@ import { CustomerDetailSheet, SupplierDetailSheet, VendorDetailSheet } from "./p
 import { type Column } from "./data-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatDate, formatIDR, formatNumber } from "@/lib/wms-data";
-import { ROLE_ACCESS, USER_ROLES, type UserRole } from "@/lib/schemas";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,7 @@ import {
   useDeleteMerk,
   useDeleteProject,
   useDeleteRack,
+  useDeleteRole,
   useDeleteSubCategory,
   useDeleteSupplier,
   useDeleteUnit,
@@ -1425,6 +1426,8 @@ export function WorkOrderPage() {
 
 export function UserPage() {
   const { data, isLoading, error, refetch } = useUsers();
+  const { data: rolesData } = useRoles();
+  const roleOptions = useMemo(() => (rolesData?.data ?? []).map((r) => r.name), [rolesData]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<MasterUser | null>(null);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -1519,7 +1522,7 @@ export function UserPage() {
               value={roleFilter}
               onChange={setRoleFilter}
               placeholder="Semua Role"
-              options={[...USER_ROLES]}
+              options={roleOptions}
             />
           </>
         }
@@ -1546,21 +1549,34 @@ export function RolePage() {
   const { data, isLoading, error, refetch } = useRoles();
   const [levelFilter, setLevelFilter] = useState(ALL);
   const [editingRole, setEditingRole] = useState<RoleCatalog | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const del = useDeleteRole();
   const slotHasActive = useMemo(() => levelFilter !== ALL, [levelFilter]);
   const handleClearSlot = useCallback(() => setLevelFilter(ALL), []);
 
   const rows = data?.data ?? [];
   const filtered = rows.filter((r) => {
     if (levelFilter === ALL) return true;
-    const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
-    return access.some((a) => a.level === levelFilter);
+    return r.access.some((a) => a.level === levelFilter);
   });
 
   const columns: Column<RoleCatalog>[] = [
     {
       key: "name",
       label: "Nama Role",
-      render: (r) => <span className="font-medium">{r.name}</span>,
+      render: (r) => (
+        <span>
+          <span className="font-medium">{r.name}</span>
+          {r.description ? (
+            <span className="block text-xs font-normal text-muted-foreground">{r.description}</span>
+          ) : null}
+          {r.can_review ? (
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">
+              Dapat me-review dokumen
+            </span>
+          ) : null}
+        </span>
+      ),
     },
     {
       key: "users",
@@ -1578,14 +1594,17 @@ export function RolePage() {
       key: "access",
       label: "Hak Akses",
       render: (r) => {
-        const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
         return (
           <div className="flex max-w-xl flex-wrap gap-1">
-            {access.map((a) => (
-              <Pill key={a.module} tone={levelTone(a.level)}>
-                {a.module} • {a.level}
-              </Pill>
-            ))}
+            {r.access.length === 0 ? (
+              <Pill tone="neutral">Tidak ada akses</Pill>
+            ) : (
+              r.access.map((a) => (
+                <Pill key={a.module} tone={levelTone(a.level)}>
+                  {a.module} • {a.level}
+                </Pill>
+              ))
+            )}
           </div>
         );
       },
@@ -1615,7 +1634,16 @@ export function RolePage() {
         isLoading={isLoading}
         error={error}
         onRetry={() => refetch()}
+        onAdd={() => setCreateOpen(true)}
         onEdit={(r) => setEditingRole(r)}
+        onDelete={async (r) => {
+          try {
+            await del.mutateAsync(r.name);
+            toast.success(`Role "${r.name}" dihapus`);
+          } catch (err) {
+            toast.error((err as Error).message);
+          }
+        }}
         slotHasActive={slotHasActive}
         onClearSlot={handleClearSlot}
         filters={
@@ -1628,7 +1656,6 @@ export function RolePage() {
         }
         onExport={exportCsv}
         mobileCard={(r) => {
-          const access = r.access.length > 0 ? r.access : (ROLE_ACCESS[r.name as UserRole] ?? []);
           return (
             <div>
               <p className="truncate text-sm font-semibold">{r.name}</p>
@@ -1636,17 +1663,26 @@ export function RolePage() {
                 {formatNumber(r.user_count)} user ({formatNumber(r.active_user_count)} aktif)
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
-                {access.slice(0, 3).map((a) => (
-                  <Pill key={a.module} tone={levelTone(a.level)}>
-                    {a.module}
-                  </Pill>
-                ))}
-                {access.length > 3 && <Pill tone="neutral">+{access.length - 3} modul</Pill>}
+                {r.access.length === 0 ? (
+                  <Pill tone="neutral">Tidak ada akses</Pill>
+                ) : (
+                  <>
+                    {r.access.slice(0, 3).map((a) => (
+                      <Pill key={a.module} tone={levelTone(a.level)}>
+                        {a.module}
+                      </Pill>
+                    ))}
+                    {r.access.length > 3 && (
+                      <Pill tone="neutral">+{r.access.length - 3} modul</Pill>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           );
         }}
       />
+      <RoleCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
       <RoleEditDialog role={editingRole} onOpenChange={(o) => !o && setEditingRole(null)} />
     </>
   );

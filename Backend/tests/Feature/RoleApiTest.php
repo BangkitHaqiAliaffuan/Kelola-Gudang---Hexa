@@ -18,18 +18,14 @@ class RoleApiTest extends TestCase
         $this->actingAsMasterAdmin();
     }
 
-    public function test_index_returns_all_roles_in_enum_order(): void
+    public function test_index_returns_base_roles_from_registry(): void
     {
         $this->getJson('/api/master/roles')
             ->assertOk()
             ->assertJsonCount(4, 'data')
-            ->assertJsonPath('data.0.id', 1)
             ->assertJsonPath('data.0.name', 'Administrator')
-            ->assertJsonPath('data.1.id', 2)
             ->assertJsonPath('data.1.name', 'Supervisor')
-            ->assertJsonPath('data.2.id', 3)
             ->assertJsonPath('data.2.name', 'Operator Gudang')
-            ->assertJsonPath('data.3.id', 4)
             ->assertJsonPath('data.3.name', 'Auditor');
     }
 
@@ -48,14 +44,15 @@ class RoleApiTest extends TestCase
         User::factory()->count(3)->create(['role' => 'Supervisor', 'is_active' => false]);
         User::factory()->count(1)->create(['role' => 'Operator Gudang']);
 
-        $this->getJson('/api/master/roles')
-            ->assertOk()
-            ->assertJsonPath('data.0.user_count', 2)
-            ->assertJsonPath('data.0.active_user_count', 2)
-            ->assertJsonPath('data.1.user_count', 3)
-            ->assertJsonPath('data.1.active_user_count', 0)
-            ->assertJsonPath('data.2.user_count', 1)
-            ->assertJsonPath('data.2.active_user_count', 1);
+        $response = $this->getJson('/api/master/roles')->assertOk();
+
+        $byName = collect($response->json('data'))->keyBy('name');
+        $this->assertSame(2, $byName['Administrator']['user_count']);
+        $this->assertSame(2, $byName['Administrator']['active_user_count']);
+        $this->assertSame(3, $byName['Supervisor']['user_count']);
+        $this->assertSame(0, $byName['Supervisor']['active_user_count']);
+        $this->assertSame(1, $byName['Operator Gudang']['user_count']);
+        $this->assertSame(1, $byName['Operator Gudang']['active_user_count']);
     }
 
     public function test_index_returns_seeded_access_per_role(): void
@@ -63,21 +60,21 @@ class RoleApiTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
 
         $response = $this->getJson('/api/master/roles');
-        $response
-            ->assertOk()
-            ->assertJsonPath('data.0.access.0.module', 'Master Data')
-            ->assertJsonPath('data.0.access.0.level', 'Kelola')
-            ->assertJsonPath('data.1.access.0.module', 'Master Data')
-            ->assertJsonPath('data.1.access.0.level', 'Baca')
-            ->assertJsonPath('data.2.access.0.module', 'Master Data')
-            ->assertJsonPath('data.2.access.0.level', 'Baca')
-            ->assertJsonCount(7, 'data.3.access')
-            ->assertJsonPath('data.3.access.0.module', 'Master Data')
-            ->assertJsonPath('data.3.access.0.level', 'Baca');
+        $response->assertOk();
+
+        $byName = collect($response->json('data'))->keyBy('name');
+        $this->assertSame('Kelola', $byName['Administrator']['access'][0]['level']);
+        $this->assertSame('Baca', $byName['Supervisor']['access'][0]['level']);
+        $this->assertSame('Baca', $byName['Operator Gudang']['access'][0]['level']);
+        $this->assertCount(7, $byName['Auditor']['access']);
+        $this->assertSame('Baca', $byName['Auditor']['access'][0]['level']);
 
         // Auditor tanpa modul System (Tidak Ada = tanpa baris).
-        $auditorAccess = collect($response->json('data'))->firstWhere('name', 'Auditor')['access'];
+        $auditorAccess = $byName['Auditor']['access'];
         $this->assertNotContains('System', array_column($auditorAccess, 'module'));
+        // Flag can_review hanya milik Auditor.
+        $this->assertTrue($byName['Auditor']['can_review']);
+        $this->assertFalse($byName['Administrator']['can_review']);
     }
 
     public function test_update_sets_access_for_role(): void
@@ -98,10 +95,9 @@ class RoleApiTest extends TestCase
             ->assertJsonPath('data.access.1.module', 'Laporan')
             ->assertJsonPath('data.access.1.level', 'Baca');
 
-        $this->getJson('/api/master/roles')
-            ->assertOk()
-            ->assertJsonPath('data.1.name', 'Supervisor')
-            ->assertJsonCount(2, 'data.1.access');
+        $response = $this->getJson('/api/master/roles')->assertOk();
+        $supervisor = collect($response->json('data'))->firstWhere('name', 'Supervisor');
+        $this->assertCount(2, $supervisor['access']);
     }
 
     public function test_update_replaces_prior_access(): void
@@ -160,14 +156,21 @@ class RoleApiTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('access');
     }
 
-    public function test_update_rejects_unknown_role(): void
+    public function test_update_unknown_role_returns_not_found(): void
     {
         $this->putJson('/api/master/roles/Manager', [
             'access' => [
                 ['module' => 'Laporan', 'level' => 'Baca'],
             ],
-        ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('role');
+        ])->assertNotFound();
+    }
+
+    public function test_role_without_registry_row_is_not_catalogued(): void
+    {
+        RolePermission::firstOrCreate(['role' => 'Test Admin', 'module' => 'Laporan'], ['level' => 'Baca']);
+
+        $names = collect($this->getJson('/api/master/roles')->json('data'))->pluck('name');
+
+        $this->assertNotContains('Test Admin', $names);
     }
 }

@@ -28,9 +28,9 @@ import { formatDate, formatNumber } from "@/lib/wms-data";
 import { isApiError } from "@/lib/api";
 
 export function OpnameCountPage({ docId }: { docId: number }) {
-  const { hasModuleLevel, user } = useAuth();
+  const { hasModuleLevel, canReview } = useAuth();
   const canWrite = hasModuleLevel("Persediaan", "Tulis");
-  const canForceUnlock = hasModuleLevel("Persediaan", "Kelola") || user?.role === "Auditor";
+  const canForceUnlock = hasModuleLevel("Persediaan", "Kelola") || canReview;
   const router = useRouter();
 
   const { data: detail, isLoading: detailLoading } = useStockDocument(docId);

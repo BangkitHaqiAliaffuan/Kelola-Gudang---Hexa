@@ -31,6 +31,8 @@ type AuthContextValue = {
   status: AuthStatus;
   user: AuthSession["user"] | null;
   access: AuthSession["access"];
+  /** Flag `can_review` role sendiri (pengganti cek nama role "Auditor"). */
+  canReview: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   /** True when the module exists in the session's access map (or while still loading). */
@@ -65,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await authApi.me();
         if (!cancelled) {
-          setSession({ user: me.data, access: me.access });
+          setSession({ user: me.data, access: me.access, can_review: me.can_review ?? false });
           setStatus("authenticated");
         }
       } catch (err) {
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const next = await authApi.login(email, password);
     setAuthToken(next.token);
-    setSession({ user: next.data, access: next.access });
+    setSession({ user: next.data, access: next.access, can_review: next.can_review ?? false });
     setStatus("authenticated");
   };
 
@@ -128,8 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!getAuthToken()) return false;
           const me = await authApi.me();
           if (cancelled) return false;
-          const changed = !sameAccess(sessionRef.current?.access ?? [], me.access);
-          setSession({ user: me.data, access: me.access });
+          const changed =
+            !sameAccess(sessionRef.current?.access ?? [], me.access) ||
+            (sessionRef.current?.can_review ?? false) !== (me.can_review ?? false);
+          setSession({ user: me.data, access: me.access, can_review: me.can_review ?? false });
           setStatus("authenticated");
           return changed;
         } catch (err) {
@@ -158,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user: session?.user ?? null,
       access: session?.access ?? [],
+      canReview: session?.can_review ?? false,
       login,
       logout,
       refreshSession: () => requestResync(),

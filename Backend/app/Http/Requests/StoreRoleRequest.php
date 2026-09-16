@@ -6,20 +6,21 @@ use App\Models\RolePermission;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateRoleRequest extends FormRequest
+class StoreRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function rules(): array
     {
-        $current = $this->route('role');
-
         return [
-            // Rename opsional: berpropagasi ke users + role_permissions.
-            'name' => ['sometimes', 'string', 'max:100', 'not_regex:/\//', Rule::unique('roles', 'name')->ignore($current, 'name')],
+            // Nama dipakai di URL (…/roles/{role}) — tanpa slash agar routing aman.
+            'name' => ['required', 'string', 'max:100', 'not_regex:/\//', Rule::unique('roles', 'name')],
             'description' => ['nullable', 'string', 'max:500'],
             'can_review' => ['sometimes', 'boolean'],
             'access' => ['sometimes', 'array'],

@@ -127,10 +127,22 @@ export const API_CATALOG: ApiCatalogGroup[] = [
         gate: BACA("Master Data"),
       },
       {
+        method: "POST",
+        path: "/master/roles",
+        desc: "Buat role baru (default tanpa akses)",
+        gate: TULIS("Master Data"),
+      },
+      {
         method: "PUT",
         path: "/master/roles/{role}",
-        desc: "Ganti akses satu role",
+        desc: "Ganti akses/rename role",
         gate: TULIS("Master Data"),
+      },
+      {
+        method: "DELETE",
+        path: "/master/roles/{role}",
+        desc: "Hapus role tanpa user",
+        gate: KELOLA("Master Data"),
       },
     ],
   },

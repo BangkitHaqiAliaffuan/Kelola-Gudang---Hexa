@@ -209,6 +209,9 @@ export type MasterUser = {
 export type RoleCatalog = {
   id: number;
   name: string;
+  description: string | null;
+  is_system: boolean;
+  can_review: boolean;
   user_count: number;
   active_user_count: number;
   access: RoleAccessEntry[];
