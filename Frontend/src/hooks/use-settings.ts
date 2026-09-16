@@ -31,6 +31,13 @@ export function useUpdateCompanySettings() {
   });
 }
 
+/** Allowlist lapis-kedua (F3.3): hanya data-URL PNG/JPEG — sama dengan regex backend. */
+export const SAFE_LOGO_PATTERN = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/;
+
+export function isSafeLogo(value: string): boolean {
+  return SAFE_LOGO_PATTERN.test(value);
+}
+
 export const escHtml = (v: string) =>
   v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -41,7 +48,7 @@ export function companyKopHtml(company: CompanySettings | undefined): string {
     .filter(Boolean)
     .join(" · ");
   const logo = company?.["company.logo"]?.trim() || "";
-  // data-URL aman di src="..." kutip-ganda (base64 tak mengandung & < > ").
-  const logoImg = logo ? `<img class="kop-logo" src="${logo}" alt="" />` : "";
+  // Tolak nilai di luar allowlist (lapisan kedua; backend sudah me-regex).
+  const logoImg = logo && isSafeLogo(logo) ? `<img class="kop-logo" src="${logo}" alt="" />` : "";
   return `${logoImg}<p class="mono muted">${escHtml(name)}${meta ? ` · ${escHtml(meta)}` : ""}</p>`;
 }

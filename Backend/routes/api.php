@@ -47,9 +47,9 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('work-orders', WorkOrderController::class);
     Route::post('items/bulk-delete', [ItemController::class, 'bulkDestroy']);
     Route::post('items/bulk-status', [ItemController::class, 'bulkUpdateStatus']);
-    Route::post('items/bulk-import', [ItemController::class, 'bulkImport']);
+    Route::post('items/bulk-import', [ItemController::class, 'bulkImport'])->middleware('throttle:bulk');
     Route::get('items/cost-drift', [ItemController::class, 'costDrift']);
-    Route::post('items/sync-cost', [ItemController::class, 'syncCost']);
+    Route::post('items/sync-cost', [ItemController::class, 'syncCost'])->middleware('throttle:bulk');
     Route::get('items/lookup', [ItemController::class, 'lookup']);
     Route::apiResource('items', ItemController::class);
 
@@ -77,7 +77,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::get('stock-card', [StockController::class, 'stockCard']);
     Route::get('valuation', [StockController::class, 'valuation']);
     Route::get('stock-documents', [StockDocumentController::class, 'index']);
-    Route::post('stock-documents', [StockDocumentController::class, 'store']);
+    Route::post('stock-documents', [StockDocumentController::class, 'store'])->middleware('throttle:mutasi');
     Route::get('stock-documents/summary', [StockDocumentController::class, 'summary']);
     Route::get('stock-documents/{stockDocument}', [StockDocumentController::class, 'show']);
     Route::put('stock-documents/{stockDocument}', [StockDocumentController::class, 'update']);
@@ -116,7 +116,7 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');
 });
 
-Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->group(function () {
+Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan', 'throttle:laporan'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
     Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);

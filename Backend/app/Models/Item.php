@@ -31,8 +31,9 @@ class Item extends Model
         'min_stock',
         'max_stock',
         'lead_time',
-        'stock',
-        'reserved',
+        // `stock`/`reserved` disengaja TIDAK fillable (F3.2): kebenaran stok
+        // adalah ledger `item_stock` + `stock_movements`; kolom items.* hanya
+        // proyeksi denormalisasi yang ditulis StockLedger via query builder.
         'status',
         'image_url',
     ];

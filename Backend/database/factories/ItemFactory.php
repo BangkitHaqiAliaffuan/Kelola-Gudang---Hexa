@@ -42,8 +42,9 @@ class ItemFactory extends Factory
             'min_stock' => $this->faker->numberBetween(1, 50),
             'max_stock' => $this->faker->numberBetween(100, 5000),
             'lead_time' => $this->faker->numberBetween(1, 21),
-            'stock' => $this->faker->numberBetween(0, 2000),
-            'reserved' => fn (array $attrs) => $this->faker->numberBetween(0, (int) $attrs['stock']),
+            // `stock`/`reserved` disengaja tidak diisi (F3.2): bukan fillable;
+            // kolom items.* default 0 di DB. Test yang butuh stok memakai
+            // baris `item_stock` eksplisit (sumber kebenaran ledger).
             'status' => $this->faker->randomElement(['Aktif', 'Nonaktif']),
             'image_url' => null,
         ];

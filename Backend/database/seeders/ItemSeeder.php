@@ -107,8 +107,7 @@ class ItemSeeder extends Seeder
                 'lead_time' => $int(1, 21),
                 // Stock is derived from the movement ledger (StockMovementSeeder),
                 // not seeded as a raw number — keeps it reconciliable with the stock card.
-                'stock' => 0,
-                'reserved' => 0,
+                // (`stock`/`reserved` bukan fillable sejak F3.2; default DB 0.)
                 'status' => $status,
             ]);
         }
