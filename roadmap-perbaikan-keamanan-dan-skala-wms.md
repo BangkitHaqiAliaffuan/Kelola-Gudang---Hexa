@@ -230,7 +230,9 @@ Cakupan minimal:
 
 **Alternatif lebih murah**: karena middleware sudah jadi chokepoint, cukup tambahkan `authorize()` yang mengembalikan `true` hanya bila user terautentikasi (`$this->user() !== null`) untuk SEMUA request, dan implementasi penuh hanya untuk FormRequest pada rute non-standar (`bulk-import`, `sync-cost`, `cost-drift`, `bulk-status`).
 
-**Keputusan yang perlu dikonfirmasi user**: pendekatan penuh vs parsial (parsial = effort jauh lebih kecil, nilai hampir sama karena middleware sudah menutup).
+**Keputusan (2026-09-16, dikunci): parsial.** `authorize()` = `$this->user() !== null` untuk semua FormRequest; pemetaan modul/level penuh hanya untuk 4 request non-standar (`BulkItemImportRequest`, `SyncItemCostRequest`, `CostDriftRequest`, `BulkItemStatusRequest`) via trait `AuthorizesModule` + helper bersama `RoleAccessLevels` (dipakai juga oleh `EnsureRoleAccess` agar tak drift).
+
+> **Deviasi sesi Hermes (2026-09-16, DITERIMA user):** 5 request identitas (`Store/UpdateUserRequest`, `Store/UpdateRoleRequest`, `SettingUpdateRequest`) memakai trait terpisah `AuthorizesAdministrator` (admin-only di `authorize()`), bukan auth-check parsial. Fungsional aman — kelimanya hanya dipakai rute tulis yang sudah digate `role.administrator`, sehingga middleware selalu menolak lebih dulu (S8/baca tak tersentuh). Redundan terhadap middleware; bila kelak ada flag `is_admin`, trait ini harus ikut diperbarui.
 
 ### 2.2 Ganti `bulkImport` & `syncCost` ke FormRequest yang benar
 
@@ -240,6 +242,22 @@ Cakupan minimal:
 **Kriteria lulus**: `BulkImportItemsTest` hijau; test baru untuk `syncCost` (403 untuk non-berhak, 200 untuk berhak).
 
 **Estimasi**: 1–2 hari. **Risiko**: RENDAH.
+
+### 2.3 Follow-up T2 — trait `AuthorizesAdministrator` untuk request istimewa ✅ SELESAI (uncommitted)
+
+**Konteks (hasil crosscheck Hermes atas F2)**: 3 request istimewa (`Store/UpdateUserRequest`, `Store/UpdateRoleRequest`, `SettingUpdateRequest`) semula hanya `return $this->user() !== null` — no-op di route bergate auth. Reviewer Opencode menandai ketiganya "harus mencerminkan gate administrator pasca-F1".
+
+**Yang dikerjakan**:
+- **File baru**: `app/Http/Requests/Concerns/AuthorizesAdministrator.php` — trait `authorize()` = `user !== null && user->role === 'Administrator'`.
+- **Diterapkan ke 5 FormRequest**: `StoreUserRequest`, `UpdateUserRequest`, `StoreRoleRequest`, `UpdateRoleRequest`, `SettingUpdateRequest` (menggantikan `return $this->user() !== null`).
+- **Test**: +2 kasus di `AdministratorGuardTest` (`authorize()` langsung: tolak non-admin, terima admin) → 13 passed.
+- **Verifikasi**: full suite **533 passed / 1 skipped**; pint bersih.
+
+**Catatan desain**: chokepoint utama tetap middleware `role.administrator` (S1) — trait ini lapisan kedua. Bila suatu saat gate route dilepas, `authorize()` tetap menolak non-admin. Nama role `'Administrator'` konsisten dengan `EnsureAdministrator`.
+
+**Sisa (opsional, tidak dikerjakan)**: `BulkItemDeleteRequest` (POST items/bulk-delete) belum pakai `AuthorizesModule` — hanya dilindungi middleware. Minor, karena route-nya di grup `role.access:Master Data`.
+
+**Estimasi**: 0.5 hari. **Risiko**: RENDAH.
 
 ---
 

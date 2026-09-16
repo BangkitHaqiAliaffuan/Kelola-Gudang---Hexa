@@ -2,14 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\AuthorizesModule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CostDriftRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use AuthorizesModule;
 
     public function rules(): array
     {

@@ -2,15 +2,13 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\AuthorizesAdministrator;
 use App\Rules\ValidNpwp;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SettingUpdateRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use AuthorizesAdministrator;
 
     public function rules(): array
     {

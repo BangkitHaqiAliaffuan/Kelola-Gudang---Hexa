@@ -2,6 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Http\Requests\SettingUpdateRequest;
+use App\Http\Requests\StoreRoleRequest;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateRoleRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
@@ -110,6 +115,43 @@ class AdministratorGuardTest extends TestCase
         RolePermission::create(['role' => 'Supervisor', 'module' => 'System', 'level' => 'Baca']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/system/settings')->assertOk();
+    }
+
+    // ---- Follow-up F2: trait AuthorizesAdministrator mencerminkan gate route ----
+    // Bila gate middleware dilepas, authorize() FormRequest tetap menolak non-admin.
+
+    public function test_authorize_trait_rejects_non_admin_directly(): void
+    {
+        $user = $this->supervisorWithMasterTulis();
+
+        $store = new StoreUserRequest;
+        $store->setUserResolver(fn () => $user);
+        $this->assertFalse($store->authorize(), 'StoreUserRequest::authorize harus false utk non-admin');
+
+        $setting = new SettingUpdateRequest;
+        $setting->setUserResolver(fn () => $user);
+        $this->assertFalse($setting->authorize(), 'SettingUpdateRequest::authorize harus false utk non-admin');
+
+        $role = new UpdateRoleRequest;
+        $role->setUserResolver(fn () => $user);
+        $this->assertFalse($role->authorize(), 'UpdateRoleRequest::authorize harus false utk non-admin');
+    }
+
+    public function test_authorize_trait_allows_admin_directly(): void
+    {
+        $admin = $this->administrator();
+
+        foreach ([
+            StoreUserRequest::class,
+            UpdateUserRequest::class,
+            StoreRoleRequest::class,
+            UpdateRoleRequest::class,
+            SettingUpdateRequest::class,
+        ] as $class) {
+            $request = new $class;
+            $request->setUserResolver(fn () => $admin);
+            $this->assertTrue($request->authorize(), "{$class}::authorize harus true utk admin");
+        }
     }
 
     // ---- Guard Administrator terakhir & mutasi diri sendiri ----

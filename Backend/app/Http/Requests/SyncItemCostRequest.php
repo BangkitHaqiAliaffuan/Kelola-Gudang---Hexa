@@ -2,14 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\AuthorizesModule;
 use Illuminate\Foundation\Http\FormRequest;
 
-class BulkItemDeleteRequest extends FormRequest
+class SyncItemCostRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user() !== null;
-    }
+    use AuthorizesModule;
 
     public function rules(): array
     {
