@@ -31,11 +31,16 @@ class RoleApiTest extends TestCase
 
     public function test_index_returns_zero_counts_when_no_users(): void
     {
+        // Role yang belum diberi akses (mis. Auditor setelah akses di-reset)
+        // tampil dengan access kosong = deny-by-default.
+        RolePermission::query()->where('role', 'Auditor')->delete();
+
         $this->getJson('/api/master/roles')
             ->assertOk()
-            ->assertJsonPath('data.0.user_count', 0)
-            ->assertJsonPath('data.0.active_user_count', 0)
-            ->assertJsonPath('data.0.access', []);
+            ->assertJsonPath('data.3.name', 'Auditor')
+            ->assertJsonPath('data.3.user_count', 0)
+            ->assertJsonPath('data.3.active_user_count', 0)
+            ->assertJsonPath('data.3.access', []);
     }
 
     public function test_index_reports_user_counts_per_role(): void

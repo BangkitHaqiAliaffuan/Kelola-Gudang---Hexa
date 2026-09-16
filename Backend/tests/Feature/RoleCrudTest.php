@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class RoleCrudTest extends TestCase
@@ -113,10 +114,18 @@ class RoleCrudTest extends TestCase
 
     public function test_update_cannot_strip_system_kelola_from_own_role(): void
     {
-        Role::create(['name' => 'Test Admin']);
-        RolePermission::create(['role' => 'Test Admin', 'module' => 'System', 'level' => 'Kelola']);
+        // Guard self-lockout kini hanya relevan lewat HTTP untuk Administrator
+        // (karena operasi tulis role digate role.administrator). Aktor = role
+        // Administrator yang mencoba mencabut System:Kelola dari role-nya sendiri.
+        RolePermission::firstOrCreate(
+            ['role' => 'Administrator', 'module' => 'System'],
+            ['level' => 'Kelola'],
+        );
 
-        $this->putJson('/api/master/roles/Test%20Admin', ['access' => []])
+        $actor = User::factory()->create(['role' => 'Administrator', 'is_active' => true]);
+        Sanctum::actingAs($actor, ['*'], 'sanctum');
+
+        $this->putJson('/api/master/roles/Administrator', ['access' => []])
             ->assertStatus(422)
             ->assertJsonValidationErrors('access');
     }

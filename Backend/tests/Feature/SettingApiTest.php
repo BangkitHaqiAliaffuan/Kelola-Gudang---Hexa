@@ -39,7 +39,7 @@ class SettingApiTest extends TestCase
     {
         // Regresi: Simpan tanpa mengubah apa pun (seperti form General Setting)
         // tidak boleh 422 — dulu gagal karena default NPWP tidak lolos checksum.
-        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $this->actingAsRole('Administrator', 'System', 'Kelola');
 
         $company = [];
         foreach (SettingService::defaults() as $key => $value) {
@@ -56,7 +56,7 @@ class SettingApiTest extends TestCase
 
     public function test_update_logo_persists_and_appears_in_index(): void
     {
-        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $this->actingAsRole('Administrator', 'System', 'Kelola');
         $logo = 'data:image/png;base64,'.base64_encode(random_bytes(1024));
 
         $this->putJson('/api/system/settings', ['company' => ['logo' => $logo]])->assertOk();
@@ -69,7 +69,7 @@ class SettingApiTest extends TestCase
 
     public function test_update_logo_rejects_non_image_and_oversize(): void
     {
-        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $this->actingAsRole('Administrator', 'System', 'Kelola');
 
         $this->putJson('/api/system/settings', ['company' => ['logo' => 'data:text/html;base64,PGI+']])
             ->assertStatus(422);
@@ -100,7 +100,7 @@ class SettingApiTest extends TestCase
 
     public function test_update_persists_and_audits(): void
     {
-        $user = $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $user = $this->actingAsRole('Administrator', 'System', 'Kelola');
 
         $this->putJson('/api/system/settings', [
             'company' => ['name' => 'PT Maju Jaya', 'email' => 'halo@majujaya.id'],
@@ -117,7 +117,7 @@ class SettingApiTest extends TestCase
 
     public function test_update_validates_and_ignores_unknown_keys(): void
     {
-        $this->actingAsRole('SysAdmin', 'System', 'Kelola');
+        $this->actingAsRole('Administrator', 'System', 'Kelola');
 
         $this->putJson('/api/system/settings', ['company' => ['email' => 'bukan-email']])
             ->assertStatus(422);

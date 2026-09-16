@@ -42,11 +42,6 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::apiResource('suppliers', SupplierController::class);
     Route::apiResource('customers', CustomerController::class);
     Route::apiResource('vendors', VendorController::class);
-    Route::apiResource('users', UserController::class);
-    Route::get('roles', [RoleController::class, 'index']);
-    Route::post('roles', [RoleController::class, 'store']);
-    Route::put('roles/{role}', [RoleController::class, 'update']);
-    Route::delete('roles/{role}', [RoleController::class, 'destroy']);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('projects', ProjectController::class);
     Route::apiResource('work-orders', WorkOrderController::class);
@@ -57,6 +52,23 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     Route::post('items/sync-cost', [ItemController::class, 'syncCost']);
     Route::get('items/lookup', [ItemController::class, 'lookup']);
     Route::apiResource('items', ItemController::class);
+
+    // Manajemen user & role — BACA (GET) tetap di bawah role.access agar form
+    // non-admin (select PIC di PR/opname, halaman Role) tetap berfungsi.
+    Route::get('users', [UserController::class, 'index']);
+    Route::get('users/{user}', [UserController::class, 'show']);
+    Route::get('roles', [RoleController::class, 'index']);
+
+    // Manajemen user & role — TULIS hanya Administrator (cegah eskalasi
+    // privilege: membuat Administrator baru / mengubah matriks hak akses).
+    Route::middleware('role.administrator')->group(function () {
+        Route::post('users', [UserController::class, 'store']);
+        Route::put('users/{user}', [UserController::class, 'update']);
+        Route::delete('users/{user}', [UserController::class, 'destroy']);
+        Route::post('roles', [RoleController::class, 'store']);
+        Route::put('roles/{role}', [RoleController::class, 'update']);
+        Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+    });
 });
 
 Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan'])->group(function () {
@@ -113,5 +125,7 @@ Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan'])->g
 
 Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->group(function () {
     Route::get('settings', [SettingController::class, 'index']);
-    Route::put('settings', [SettingController::class, 'update']);
+    // Tulis pengaturan (profil perusahaan) hanya Administrator — mencegah
+    // perubahan identitas/kop dokumen oleh role non-admin.
+    Route::put('settings', [SettingController::class, 'update'])->middleware('role.administrator');
 });

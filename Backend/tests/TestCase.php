@@ -32,31 +32,39 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Authenticate as an in-memory (non-persisted) user with full "Master Data"
-     * and "Persediaan" access under a non-catalogued role, so DB row counts in
-     * feature tests (users, role_permissions, user_count assertions) stay
+     * Authenticate as an in-memory (non-persisted) Administrator user with
+     * full "Master Data", "Persediaan" and "Laporan" access, so DB row counts
+     * in feature tests (users, role_permissions, user_count assertions) stay
      * unaffected.
+     *
+     * Memakai role `Administrator` (persisted via `roles` registry) karena
+     * operasi tulis user/role/settings kini digate `role.administrator`;
+     * user-nya sendiri in-memory sehingga tidak muncul di hitungan `users`.
      */
     protected function actingAsMasterAdmin(): void
     {
         $this->seedBaseRoles();
         RolePermission::firstOrCreate(
-            ['role' => 'Test Admin', 'module' => 'Master Data'],
+            ['role' => 'Administrator', 'module' => 'Master Data'],
             ['level' => 'Kelola'],
         );
         RolePermission::firstOrCreate(
-            ['role' => 'Test Admin', 'module' => 'Persediaan'],
+            ['role' => 'Administrator', 'module' => 'Persediaan'],
             ['level' => 'Kelola'],
         );
         RolePermission::firstOrCreate(
-            ['role' => 'Test Admin', 'module' => 'Laporan'],
+            ['role' => 'Administrator', 'module' => 'Laporan'],
+            ['level' => 'Kelola'],
+        );
+        RolePermission::firstOrCreate(
+            ['role' => 'Administrator', 'module' => 'System'],
             ['level' => 'Kelola'],
         );
 
         $user = new User([
             'name' => 'Master Admin',
             'email' => 'master.admin@test.local',
-            'role' => 'Test Admin',
+            'role' => 'Administrator',
             'is_active' => true,
         ]);
 
