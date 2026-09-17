@@ -11,7 +11,6 @@ import {
   Panel,
   Pill,
   StatCard,
-  type Tone,
 } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
 import { RekapLocationsCell, RekapLocationsCompact } from "@/components/wms/rekap-locations-cell";
@@ -24,7 +23,6 @@ import { useStockRows } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { foldStockRekap, type RekapRow } from "@/lib/stock-rekap";
-import type { StockRowApi } from "@/lib/persediaan-types";
 
 export const Route = createFileRoute("/persediaan/rekap-stock")({
   head: () => ({
@@ -40,13 +38,6 @@ export const Route = createFileRoute("/persediaan/rekap-stock")({
   component: RekapStock,
 });
 
-const statusTone: Record<StockRowApi["status"], Tone> = {
-  Habis: "danger",
-  Menipis: "warning",
-  Overstock: "info",
-  Normal: "success",
-};
-
 function RekapStock() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useStockRows();
@@ -59,38 +50,36 @@ function RekapStock() {
   const whFilter = useWarehouseFilter(warehouses?.data);
   const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
-  const [status, setStatus] = useState(ALL);
-  const hasActiveFilters = useMemo(
-    () => q !== "" || wh !== ALL || cat !== ALL || status !== ALL,
-    [q, wh, cat, status],
-  );
+  const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);
   const handleClearFilters = useCallback(() => {
     setQ("");
-    whFilter.reset();
+    // reset() kembali ke gudang default user — bukan global. Di halaman ini
+    // "hapus filter" harus berarti eksplisit Semua agar total/lokasi global.
+    whFilter.onChange(ALL);
     setCat(ALL);
-    setStatus(ALL);
   }, [whFilter]);
 
   const rows = useMemo(() => {
-    // Filter gudang dipakai SEBELUM fold agar total mencerminkan gudang terpilih.
-    const locs = (data?.data ?? []).filter((r) => wh === ALL || r.warehouse === wh);
-    const folded = foldStockRekap(locs, items?.data ?? []);
+    // Fold SELALU dari seluruh lokasi agar total dan sebaran
+    // mencerminkan keseluruhan gudang. Filter gudang hanya menyaring
+    // daftar barang (wajib ada stock > 0 di gudang itu) + menyorot barisnya.
+    const folded = foldStockRekap(data?.data ?? [], items?.data ?? []);
     const qn = debouncedQ.trim().toLowerCase();
+    const whId = whFilter.warehouseId;
     return folded.filter(
       (r) =>
         (!qn || `${r.name} ${r.sku}`.toLowerCase().includes(qn)) &&
         (cat === ALL || r.category === cat) &&
-        (status === ALL || r.status === status),
+        (whId == null || r.warehouses.some((w) => w.warehouse_id === whId && w.stock > 0)),
     );
-  }, [data, items, debouncedQ, wh, cat, status]);
+  }, [data, items, debouncedQ, whFilter.warehouseId, cat]);
 
   const stats = useMemo(() => {
-    const needAttention = rows.filter((r) => r.status === "Habis" || r.status === "Menipis").length;
     return {
       sku: rows.length,
       nilai: rows.reduce((a, r) => a + r.nilai, 0),
       lokasi: rows.reduce((a, r) => a + r.locationCount, 0),
-      needAttention,
+      gudang: new Set(rows.flatMap((r) => r.warehouses.map((w) => w.warehouse_id))).size,
     };
   }, [rows]);
 
@@ -122,8 +111,10 @@ function RekapStock() {
         total: r.stock,
         available: r.available,
         nilai: Math.round(r.nilai),
-        status: r.status,
-        lokasi: r.warehouses.map((w) => `${w.warehouse}:${w.stock}`).join("; ") || "—",
+        lokasi:
+          r.warehouses
+            .map((w) => `${w.warehouse}:${w.stock} (tersedia ${w.available})`)
+            .join("; ") || "—",
       })),
       [
         { key: "nama", label: "Barang" },
@@ -133,8 +124,7 @@ function RekapStock() {
         { key: "total", label: "Total Stock" },
         { key: "available", label: "Available" },
         { key: "nilai", label: "Nilai" },
-        { key: "status", label: "Status" },
-        { key: "lokasi", label: "Sebaran Gudang" },
+        { key: "lokasi", label: "Lokasi Stock" },
       ],
     );
     const today = new Date().toISOString().slice(0, 10);
@@ -168,10 +158,14 @@ function RekapStock() {
     },
     {
       key: "loc",
-      label: "Sebaran Gudang",
-      className: "min-w-[220px]",
+      label: "Lokasi Stock",
+      className: "min-w-[260px]",
       render: (r) => (
-        <RekapLocationsCell row={r} onWarehouseClick={(wid) => goToCard(r.item_id, wid)} />
+        <RekapLocationsCell
+          row={r}
+          highlightId={whFilter.warehouseId}
+          onWarehouseClick={(wid) => goToCard(r.item_id, wid)}
+        />
       ),
     },
     {
@@ -205,13 +199,6 @@ function RekapStock() {
       sortable: true,
       sortAccessor: (r) => r.nilai,
       render: (r) => formatIDR(r.nilai),
-    },
-    {
-      key: "status",
-      label: "Status",
-      className: "w-[100px] whitespace-nowrap",
-      sortable: true,
-      render: (r) => <Pill tone={statusTone[r.status]}>{r.status}</Pill>,
     },
   ];
 
@@ -252,15 +239,16 @@ function RekapStock() {
             loading={isLoading}
             label="Titik Lokasi"
             value={formatNumber(stats.lokasi)}
+            hint="Baris lokasi semua gudang, untuk barang tampil"
             icon={Boxes}
           />
           <StatCard
             loading={isLoading}
-            label="Perlu Perhatian"
-            value={formatNumber(stats.needAttention)}
-            hint="Habis + Menipis"
+            label="Gudang Aktif"
+            value={formatNumber(stats.gudang)}
+            hint="Milik barang tampil, semua gudang"
             icon={Boxes}
-            tone={stats.needAttention > 0 ? "warning" : "success"}
+            tone="success"
           />
         </div>
 
@@ -290,13 +278,6 @@ function RekapStock() {
               options={categoryNames}
               loading={catsLoading}
             />
-            <FilterSelect
-              className="w-full min-w-[140px] max-w-[180px] flex-1"
-              value={status}
-              onChange={setStatus}
-              placeholder="Semua Status"
-              options={["Habis", "Menipis", "Overstock", "Normal"]}
-            />
             <div className="ml-auto flex shrink-0 items-end">
               <ClearFiltersButton visible={hasActiveFilters} onClick={handleClearFilters} />
             </div>
@@ -306,18 +287,15 @@ function RekapStock() {
 
       <Panel
         title="Rekap per Barang"
-        description={`${formatNumber(rows.length)} barang · klik baris untuk detail · klik segmen bar untuk kartu stock gudang`}
+        description={`${formatNumber(rows.length)} barang · total & lokasi selalu global · klik baris untuk detail · klik gudang untuk kartu stock`}
         actions={
           <HelpHint label="Penjelasan">
+            <p>Total dan daftar lokasi selalu mencakup SEMUA gudang.</p>
             <p>
-              Bar = proporsi stock per gudang (terbesar paling pekat). Angka di sampingnya = gudang
-              dominan.
+              Filter gudang hanya menyaring daftar barang (yang ada stock-nya di gudang itu) dan
+              menebalkan barisnya.
             </p>
-            <p>Klik segmen bar untuk membuka kartu stock gudang tersebut.</p>
-            <p>
-              Status: total 0 = Habis; selain itu peringkat terburuk lokasi (Menipis &gt; Overstock
-              &gt; Normal).
-            </p>
+            <p>Klik baris gudang untuk membuka kartu stock gudang tersebut.</p>
           </HelpHint>
         }
       >
@@ -336,9 +314,15 @@ function RekapStock() {
                   <p className="truncate text-sm font-semibold">{r.name}</p>
                   <p className="truncate font-mono text-xs text-muted-foreground">{r.sku}</p>
                 </div>
-                <Pill tone={statusTone[r.status]}>{r.status}</Pill>
+                <Pill tone={r.warehouses.length > 0 ? "info" : "neutral"}>
+                  {r.warehouses.length > 0 ? `${r.warehouses.length} gudang` : "Tidak ada stock"}
+                </Pill>
               </div>
-              <RekapLocationsCompact row={r} />
+              <RekapLocationsCompact
+                row={r}
+                highlightId={whFilter.warehouseId}
+                onWarehouseClick={(wid) => goToCard(r.item_id, wid)}
+              />
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
                 <div>
                   <p className="text-muted-foreground">Total</p>

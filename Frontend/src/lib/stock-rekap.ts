@@ -8,8 +8,6 @@ export type RekapWarehouse = {
   reserved: number;
   available: number;
   nilai: number;
-  /** Pangsa stock gudang ini terhadap total barang (0–100). */
-  pct: number;
 };
 
 export type RekapRow = {
@@ -24,27 +22,17 @@ export type RekapRow = {
   reserved: number;
   available: number;
   nilai: number;
-  status: StockRowApi["status"];
   /** Rincian per gudang, terurut qty terbesar dulu. */
   warehouses: RekapWarehouse[];
   /** Jumlah baris lokasi (gudang × rak × bin) penyusun total. */
   locationCount: number;
 };
 
-const STATUS_RANK: Record<StockRowApi["status"], number> = {
-  Habis: 0,
-  Normal: 1,
-  Overstock: 2,
-  Menipis: 3,
-};
-
-const RANK_STATUS: StockRowApi["status"][] = ["Habis", "Normal", "Overstock", "Menipis"];
-
 /**
  * Lipat baris stock per lokasi (`GET /api/persediaan/stock`) menjadi satu
  * baris per barang: total + rincian per gudang. Barang master tanpa baris
- * stock ikut tampil dengan angka 0 (status Habis) agar "seluruh barang"
- * benar-benar terlihat tanpa klik satu-satu.
+ * stock ikut tampil dengan angka 0 agar "seluruh barang" benar-benar
+ * terlihat tanpa klik satu-satu.
  */
 export function foldStockRekap(rows: StockRowApi[], items: ItemApi[]): RekapRow[] {
   const byItem = new Map<number, StockRowApi[]>();
@@ -81,17 +69,10 @@ export function foldStockRekap(rows: StockRowApi[], items: ItemApi[]): RekapRow[
           reserved: r.reserved,
           available: r.available,
           nilai: r.nilai,
-          pct: 0,
         });
       }
     }
-    const warehouses: RekapWarehouse[] = [...perWh.values()]
-      .map((w) => ({ ...w, pct: stock > 0 ? (w.stock / stock) * 100 : 0 }))
-      .sort((a, b) => b.stock - a.stock);
-
-    const worst = locs.reduce((a, r) => Math.max(a, STATUS_RANK[r.status]), 0);
-    const status: StockRowApi["status"] =
-      locs.length === 0 || stock <= 0 ? "Habis" : RANK_STATUS[worst]!;
+    const warehouses: RekapWarehouse[] = [...perWh.values()].sort((a, b) => b.stock - a.stock);
 
     const master = fallback ?? itemById.get(itemId);
     return {
@@ -105,7 +86,6 @@ export function foldStockRekap(rows: StockRowApi[], items: ItemApi[]): RekapRow[
       reserved,
       available,
       nilai,
-      status,
       warehouses,
       locationCount: locs.length,
     };

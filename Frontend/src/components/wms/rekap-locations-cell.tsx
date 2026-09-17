@@ -1,96 +1,112 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Pill } from "./kit";
 import { formatNumber } from "@/lib/wms-data";
 import type { RekapRow } from "@/lib/stock-rekap";
 import { cn } from "@/lib/utils";
 
-/**
- * Intensitas segmen mengikuti peringkat qty (bukan warna per gudang):
- * aman untuk 8 tema pastel + dark mode, tanpa token warna baru.
- */
-const SEGMENT_TONE = ["bg-primary", "bg-primary/70", "bg-primary/40", "bg-primary/25"];
+type Props = {
+  row: RekapRow;
+  /** Id gudang tersorot (dari filter): barisnya tampil tegas, sisanya redup. */
+  highlightId?: number | null;
+  onWarehouseClick: (warehouseId: number) => void;
+};
 
 /**
- * Sel hybrid "sebaran lokasi": bar distribusi proporsional (lebar tetap
- * apapun jumlah gudang) + label gudang dominan + tooltip per segmen.
- * Klik segmen = drill ke kartu stock gudang itu (stopPropagation agar tidak
- * memicu onRowClick baris = halaman detail barang).
+ * Daftar SELURUH gudang penyimpan barang beserta saldonya — tanpa batas
+ * jumlah. Klik baris gudang = drill ke kartu stock gudang itu
+ * (stopPropagation agar tidak memicu onRowClick baris = halaman detail).
  */
-export function RekapLocationsCell({
-  row,
-  onWarehouseClick,
-}: {
-  row: RekapRow;
-  onWarehouseClick: (warehouseId: number) => void;
-}) {
+export function RekapLocationsCell({ row, highlightId, onWarehouseClick }: Props) {
   if (row.warehouses.length === 0) {
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-sm text-muted-foreground">Tidak ada stock</span>;
   }
 
-  const top = row.warehouses[0]!;
-
   return (
-    <TooltipProvider delayDuration={0}>
-      <div className="flex min-w-[180px] items-center gap-2">
-        <div
-          className="flex h-2.5 w-20 shrink-0 overflow-hidden rounded-full bg-muted"
-          role="img"
-          aria-label={`${row.warehouses.length} gudang, terbanyak ${top.warehouse}`}
-        >
-          {row.warehouses.map((w, i) => (
-            <Tooltip key={w.warehouse_id}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={`${w.warehouse}: ${formatNumber(w.stock)} (${Math.round(w.pct)}%)`}
-                  className={cn(
-                    "h-full min-w-[2px] cursor-pointer",
-                    SEGMENT_TONE[i % SEGMENT_TONE.length],
-                  )}
-                  style={{ flexBasis: `${Math.max(w.pct, 0)}%`, flexGrow: w.pct > 0 ? 1 : 0 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onWarehouseClick(w.warehouse_id);
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipContent className="whitespace-nowrap">
-                {w.warehouse}: {formatNumber(w.stock)} ({Math.round(w.pct)}%)
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-        <span className="truncate text-xs text-muted-foreground" title={top.warehouse}>
-          {top.warehouse} {Math.round(top.pct)}%
-        </span>
-      </div>
-    </TooltipProvider>
+    <ul className="min-w-[220px] divide-y divide-border/60">
+      {row.warehouses.map((w) => {
+        const hl = highlightId == null || w.warehouse_id === highlightId;
+        return (
+          <li key={w.warehouse_id}>
+            <button
+              type="button"
+              title={`Buka kartu stock ${w.warehouse}`}
+              className={cn(
+                "flex w-full items-baseline justify-between gap-3 py-1 text-left",
+                !hl && "opacity-50",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onWarehouseClick(w.warehouse_id);
+              }}
+            >
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm",
+                  hl ? "font-medium text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {w.warehouse}
+              </span>
+              <span className="shrink-0 text-sm">
+                <b>
+                  {formatNumber(w.stock)} {row.unit || "—"}
+                </b>{" "}
+                <span className="text-xs text-muted-foreground">
+                  · tersedia {formatNumber(w.available)}
+                </span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
 /**
- * Varian ringkas untuk kartu mobile: tanpa bar (hover tak ada di sentuh),
- * daftar datar 3 lokasi teratas + pill status.
+ * Varian kartu mobile: daftar gudang penuh yang sama, tanpa tooltip
+ * (hover tak ada di sentuh).
  */
-export function RekapLocationsCompact({ row }: { row: RekapRow }) {
+export function RekapLocationsCompact({ row, highlightId, onWarehouseClick }: Props) {
   if (row.warehouses.length === 0) {
-    return <Pill tone="danger">Habis</Pill>;
+    return <p className="text-xs text-muted-foreground">Tidak ada stock</p>;
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {row.warehouses.slice(0, 3).map((w) => (
-        <span
-          key={w.warehouse_id}
-          className="truncate text-xs text-muted-foreground"
-          title={`${w.warehouse}: ${formatNumber(w.stock)}`}
-        >
-          {w.warehouse} · <b className="text-foreground">{formatNumber(w.stock)}</b>
-        </span>
-      ))}
-      {row.warehouses.length > 3 && (
-        <span className="text-xs text-muted-foreground">+{row.warehouses.length - 3} gudang</span>
-      )}
-    </div>
+    <ul className="divide-y divide-border/60">
+      {row.warehouses.map((w) => {
+        const hl = highlightId == null || w.warehouse_id === highlightId;
+        return (
+          <li key={w.warehouse_id}>
+            <button
+              type="button"
+              className={cn(
+                "flex w-full items-baseline justify-between gap-3 py-1.5 text-left text-xs",
+                !hl && "opacity-50",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onWarehouseClick(w.warehouse_id);
+              }}
+            >
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate",
+                  hl ? "font-medium text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {w.warehouse}
+              </span>
+              <span className="shrink-0">
+                <b className="text-foreground">
+                  {formatNumber(w.stock)} {row.unit || "—"}
+                </b>{" "}
+                <span className="text-muted-foreground">
+                  · tersedia {formatNumber(w.available)}
+                </span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

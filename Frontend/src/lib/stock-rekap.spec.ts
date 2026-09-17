@@ -9,6 +9,8 @@ function row(partial: Partial<StockRowApi> & { item_id: number }): StockRowApi {
     sku: "SKU-1",
     name: "Barang 1",
     unit: "pcs",
+    category_id: null,
+    category: null,
     min: null,
     max: null,
     cost: 1000,
@@ -98,24 +100,21 @@ describe("foldStockRekap", () => {
     expect(r!.nilai).toBe(100000);
     expect(r!.locationCount).toBe(2);
     expect(r!.warehouses.map((w) => w.warehouse)).toEqual(["Gudang A", "Gudang B"]);
-    expect(r!.warehouses[0]!.pct).toBeCloseTo(80);
-    // Status agregat = peringkat terburuk lokasi.
-    expect(r!.status).toBe("Menipis");
+    expect(r!.warehouses[0]!.stock).toBe(80);
   });
 
-  it("barang master tanpa stock tampil 0 berstatus Habis", () => {
+  it("barang master tanpa stock tampil 0 tanpa rincian gudang", () => {
     const [r] = foldStockRekap([], [item({ id: 9, name: "Kosong", sku: "EMPTY" })]);
 
     expect(r!.stock).toBe(0);
-    expect(r!.status).toBe("Habis");
     expect(r!.warehouses).toEqual([]);
     expect(r!.name).toBe("Kosong");
   });
 
-  it("total nol dari lokasi berpenghuni tetap Habis", () => {
+  it("total nol dari lokasi berpenghuni tetap tampil dengan stock 0", () => {
     const rows = [row({ item_id: 1, stock: 0, status: "Habis" })];
     const [r] = foldStockRekap(rows, [item({ id: 1 })]);
 
-    expect(r!.status).toBe("Habis");
+    expect(r!.stock).toBe(0);
   });
 });
