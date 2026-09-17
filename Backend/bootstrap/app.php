@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureRoleAccess;
+use App\Http\Middleware\EnsureWarehouseScope;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role.access' => EnsureRoleAccess::class,
             'role.administrator' => EnsureAdministrator::class,
+            'scope.warehouse' => EnsureWarehouseScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

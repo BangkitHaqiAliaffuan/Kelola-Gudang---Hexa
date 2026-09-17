@@ -71,7 +71,7 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     });
 });
 
-Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan'])->group(function () {
+Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan', 'scope.warehouse'])->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-minimum', [StockController::class, 'stockMinimum']);
     Route::get('stock-card', [StockController::class, 'stockCard']);
@@ -98,7 +98,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('stock-documents/{stockDocument}/force-unlock', [StockDocumentController::class, 'forceUnlock']);
 });
 
-Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan'])->group(function () {
+Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan', 'scope.warehouse'])->group(function () {
     Route::get('proc-docs', [ProcDocController::class, 'index']);
     Route::post('proc-docs', [ProcDocController::class, 'store']);
     Route::get('proc-docs/{procDoc}', [ProcDocController::class, 'show'])->whereNumber('procDoc');
@@ -116,7 +116,7 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');
 });
 
-Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan', 'throttle:laporan'])->group(function () {
+Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan', 'throttle:laporan', 'scope.warehouse'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
     Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
