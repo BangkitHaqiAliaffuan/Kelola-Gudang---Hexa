@@ -11,7 +11,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavChild = { label: string; to: string; module?: string };
+export type NavChild = {
+  label: string;
+  to: string;
+  module?: string;
+  /** Bila "Semua": hanya user lingkup gudang Semua (F7) yang melihat menu ini. */
+  scope?: "Semua";
+};
 
 export type NavGroup = {
   label: string;
@@ -51,7 +57,7 @@ export const navGroups: NavGroup[] = [
     icon: Boxes,
     children: [
       { label: "Stock Saat Ini", to: "/persediaan/stock" },
-      { label: "Rekap Stock", to: "/persediaan/rekap-stock" },
+      { label: "Rekap Stock", to: "/persediaan/rekap-stock", scope: "Semua" },
       { label: "Kartu Stock", to: "/persediaan/kartu-stock" },
       { label: "Mutasi Stock", to: "/persediaan/mutasi" },
       { label: "Stock Minimum", to: "/persediaan/stock-minimum" },

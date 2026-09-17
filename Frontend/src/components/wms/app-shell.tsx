@@ -486,7 +486,7 @@ function NotificationCenter() {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { status, user, access, hasModule, logout } = useAuth();
+  const { status, user, access, hasModule, logout, warehouseScope } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -517,7 +517,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           const isPublic = g.label === "Dashboard" || g.label === "Barcode";
           if (!g.children || isPublic) return g;
           const groupModule = g.module ?? g.label;
-          const children = g.children.filter((c) => hasModule(c.module ?? groupModule));
+          // F7: anak ber-scope "Semua" (mis. Rekap Stock) disembunyikan dari
+          // user Terbatas. Cermin hasModule: lolos saat sesi belum resolved.
+          const children = g.children.filter(
+            (c) =>
+              hasModule(c.module ?? groupModule) &&
+              (c.scope !== "Semua" ||
+                warehouseScope?.mode !== "Terbatas" ||
+                status !== "authenticated"),
+          );
           return { ...g, children };
         })
         .filter((g) => {
@@ -528,7 +536,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           if (g.children) return g.children.length > 0;
           return hasModule(g.module ?? g.label);
         }),
-    [hasModule],
+    [hasModule, status, warehouseScope],
   );
 
   const visibleQuickActions = useMemo(
@@ -752,15 +760,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function RouteForbidden() {
+export function RouteForbidden({ description }: { description?: string }) {
   return (
     <div className="grid min-h-[60vh] place-items-center px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">403</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Akses ditolak</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Role Anda tidak memiliki akses ke modul ini. Hubungi administrator bila Anda merasa
-          seharusnya dapat mengakses halaman tersebut.
+          {description ??
+            "Role Anda tidak memiliki akses ke modul ini. Hubungi administrator bila Anda merasa seharusnya dapat mengakses halaman tersebut."}
         </p>
       </div>
     </div>

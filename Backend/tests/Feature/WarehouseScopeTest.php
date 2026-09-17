@@ -72,6 +72,12 @@ class WarehouseScopeTest extends TestCase
         $this->getJson("/api/persediaan/stock?per_page=100&warehouse_id={$b->id}")
             ->assertOk()
             ->assertJsonCount(0, 'data');
+
+        // Filter item_id (dipakai halaman detail stock): tetap ter-scope.
+        $this->getJson("/api/persediaan/stock?per_page=100&item_id={$item->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.warehouse_id', $a->id);
     }
 
     public function test_stock_documents_and_proc_docs_are_scoped(): void

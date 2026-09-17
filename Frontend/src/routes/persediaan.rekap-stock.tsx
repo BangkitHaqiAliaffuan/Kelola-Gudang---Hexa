@@ -13,6 +13,7 @@ import {
   StatCard,
 } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
+import { RouteForbidden } from "@/components/wms/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -49,7 +50,7 @@ function RekapStock() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const whFilter = useWarehouseFilter(warehouses?.data);
-  const { warehouseScope } = useAuth();
+  const { warehouseScope, status } = useAuth();
   const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
@@ -252,6 +253,14 @@ function RekapStock() {
     ],
     [warehouseList, highlightId, qtyOf, goToCard],
   );
+
+  // F7: halaman ini khusus lingkup gudang Semua (menampilkan seluruh stock).
+  // Cermin gate modul: tolak hanya saat sesi authenticated.
+  if (status === "authenticated" && warehouseScope?.mode === "Terbatas") {
+    return (
+      <RouteForbidden description="Halaman Rekap Stock membutuhkan lingkup gudang Semua karena menampilkan seluruh stock. Hubungi administrator bila Anda merasa seharusnya dapat mengakses halaman tersebut." />
+    );
+  }
 
   return (
     <>
