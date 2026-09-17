@@ -20,13 +20,16 @@ abstract class TestCase extends BaseTestCase
     /**
      * Daftarkan role dasar ke tabel `roles` (registry untuk validasi
      * `Rule::exists('roles', 'name')` pada endpoint user/role).
+     *
+     * Semua role seed lintas-gudang (F7/W12): tanpa ini, user test
+     * ber-role non-Admin akan fail-closed oleh warehouse scope.
      */
     protected function seedBaseRoles(): void
     {
         foreach (['Administrator', 'Supervisor', 'Operator Gudang', 'Auditor'] as $name) {
             Role::firstOrCreate(
                 ['name' => $name],
-                ['is_system' => true, 'can_review' => $name === 'Auditor'],
+                ['is_system' => true, 'can_review' => $name === 'Auditor', 'warehouse_scope_mode' => 'Semua'],
             );
         }
     }

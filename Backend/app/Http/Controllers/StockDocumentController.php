@@ -18,6 +18,7 @@ use App\Models\WorkOrder;
 use App\Services\AuditLogger;
 use App\Services\StockDocumentService;
 use App\Support\CodeGenerator;
+use App\Support\WarehouseScope;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,12 +110,15 @@ class StockDocumentController extends Controller
      * ribuan baris dokumen. qty keluar bertanda negatif (konsisten dengan
      * `qty_total` pada index); frontend memakai nilai absolutnya.
      */
-    public function summary()
+    public function summary(Request $request)
     {
+        // F7.3: query builder bypass global scope — batasi manual.
+        $allowed = WarehouseScope::effectiveIdsFor($request->user());
         $rows = DB::table('stock_documents')
             ->join('stock_document_lines', 'stock_document_lines.document_id', '=', 'stock_documents.id')
             ->whereIn('stock_documents.type', ['Penerimaan', 'Pengeluaran'])
             ->where('stock_documents.status', '!=', 'Draft')
+            ->when($allowed !== null, fn ($q) => $q->whereIn('stock_documents.warehouse_id', $allowed))
             ->groupBy('stock_documents.type')
             ->selectRaw(
                 'stock_documents.type,

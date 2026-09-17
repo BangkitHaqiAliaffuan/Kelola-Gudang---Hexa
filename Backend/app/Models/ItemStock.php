@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesToWarehouse;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ItemStock extends Model
 {
+    use ScopesToWarehouse;
+
     protected $table = 'item_stock';
 
     public $incrementing = false;

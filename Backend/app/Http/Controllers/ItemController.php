@@ -19,6 +19,7 @@ use App\Models\SubCategory;
 use App\Models\Unit;
 use App\Models\WorkOrder;
 use App\Support\CodeGenerator;
+use App\Support\WarehouseScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -245,9 +246,12 @@ class ItemController extends Controller
     {
         $data = $request->validated();
         $threshold = (float) ($data['threshold_pct'] ?? 10);
+        // F7.3: query builder bypass global scope — batasi manual.
+        $allowed = WarehouseScope::effectiveIdsFor($request->user());
 
         $avgs = DB::table('item_stock')
             ->join('items', 'items.id', '=', 'item_stock.item_id')
+            ->when($allowed !== null, fn ($q) => $q->whereIn('item_stock.warehouse_id', $allowed))
             ->groupBy('item_stock.item_id', 'items.sku', 'items.name', 'items.cost')
             ->havingRaw('SUM(item_stock.stock) > 0')
             ->selectRaw(
@@ -296,10 +300,13 @@ class ItemController extends Controller
     public function syncCost(SyncItemCostRequest $request): JsonResponse
     {
         $applied = [];
+        // F7.3: query builder bypass global scope — batasi manual.
+        $allowed = WarehouseScope::effectiveIdsFor($request->user());
         $items = Item::whereIn('id', $request->validated('ids'))->get();
         foreach ($items as $item) {
             $agg = DB::table('item_stock')
                 ->where('item_id', $item->id)
+                ->when($allowed !== null, fn ($q) => $q->whereIn('item_stock.warehouse_id', $allowed))
                 ->selectRaw('SUM(stock) as stock, SUM(stock * unit_cost_avg) as value')
                 ->first();
             if (! $agg || (int) $agg->stock <= 0) {
