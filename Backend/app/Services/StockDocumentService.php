@@ -9,8 +9,8 @@ use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
 use App\Support\CodeGenerator;
+use App\Support\WarehouseScope;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class StockDocumentService
 {
@@ -33,6 +33,7 @@ class StockDocumentService
 
         $document->loadMissing(['warehouse', 'destination', 'lines.item.bin.rack', 'lines.fromBin.rack.warehouse', 'lines.toBin.rack.warehouse']);
         $this->assertBinsBelongToWarehouse($document);
+        $this->assertWarehouseInScope($document);
 
         if ($document->type === 'Stock Opname') {
             $this->assertOpnameReadyForPost($document);
@@ -270,6 +271,31 @@ class StockDocumentService
             throw new \InvalidArgumentException(
                 "Alasan selisih wajib diisi sebelum penyesuaian diposting: {$labels}."
             );
+        }
+    }
+
+    /**
+     * Guard lingkup gudang (F7.4): gudang ASAL dokumen wajib ∈ allowed user.
+     * Gudang tujuan transfer bebas (W8). Tanpa user terautentikasi
+     * (console/seeder) → lolos. Controller `post()` memetakan
+     * InvalidArgumentException → 422.
+     */
+    public function assertWarehouseInScope(StockDocument $document): void
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return;
+        }
+
+        $allowed = WarehouseScope::effectiveIdsFor($user);
+
+        if ($allowed === null) {
+            return;
+        }
+
+        if (! in_array((int) $document->warehouse_id, $allowed, true)) {
+            throw new \InvalidArgumentException('Gudang asal dokumen di luar lingkup akses Anda.');
         }
     }
 

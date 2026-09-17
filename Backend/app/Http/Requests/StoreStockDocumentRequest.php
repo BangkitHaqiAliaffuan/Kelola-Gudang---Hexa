@@ -10,6 +10,7 @@ use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\Warehouse;
+use App\Rules\WarehouseInScope;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -75,7 +76,7 @@ class StoreStockDocumentRequest extends FormRequest
             'status' => ['required', Rule::in(['Draft', 'Selesai', 'Menunggu Approval'])],
             'document_date' => ['required', 'date'],
             'blind_count' => ['nullable', 'boolean'],
-            'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')],
+            'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id'), new WarehouseInScope],
             // Transfer Gudang: warehouse_id = gudang asal, destination_warehouse_id = gudang tujuan.
             'destination_warehouse_id' => [
                 'nullable',
