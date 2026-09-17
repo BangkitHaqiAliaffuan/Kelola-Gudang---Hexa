@@ -4031,9 +4031,10 @@ export function UserFormDialog({
           rowField(form as never, err, "password");
           // warehouse_ids bukan field RHF terdaftar (checkbox state lokal) —
           // setError tak terlihat, jadi pesan server ditampilkan via toast.
+          // else-if: eksplisit dan generik saling meniadakan (tepat 1 toast).
           const whScopeError = fieldError(err, "warehouse_ids");
           if (whScopeError) toast.error(whScopeError);
-          if (
+          else if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
