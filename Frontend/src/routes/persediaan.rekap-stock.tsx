@@ -196,6 +196,7 @@ function RekapStock() {
           "text-right min-w-[110px] whitespace-nowrap",
           highlightId != null && w.id === highlightId && "bg-primary/[0.07]",
         ),
+        headerClassName: "max-w-[140px] whitespace-normal break-words leading-snug",
         sortable: true,
         sortAccessor: (r) => qtyOf(r, w.id),
         render: (r) => {

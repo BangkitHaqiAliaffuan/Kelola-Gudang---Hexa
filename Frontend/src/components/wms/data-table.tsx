@@ -19,6 +19,8 @@ export type Column<T> = {
   label: string;
   header?: ReactNode;
   className?: string;
+  /** Kelas tambahan khusus sel header (<th>) — mis. wrap header panjang. */
+  headerClassName?: string;
   sticky?: "left" | "right";
   sortable?: boolean;
   sortAccessor?: (row: T) => unknown;
@@ -229,6 +231,7 @@ export function DataTable<T extends { id: string | number }>({
                     c.sticky === "right" && "right-0 z-10 bg-muted",
                     c.sticky === "left" && "left-0 z-10 bg-muted",
                     c.className,
+                    c.headerClassName,
                   )}
                 >
                   {c.header ??
