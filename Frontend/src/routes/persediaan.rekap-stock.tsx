@@ -16,6 +16,7 @@ import { DataTable, type Column } from "@/components/wms/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
+import { useAuth } from "@/hooks/use-auth";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
 import { useStockRows } from "@/hooks/use-persediaan";
@@ -48,6 +49,7 @@ function RekapStock() {
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   const whFilter = useWarehouseFilter(warehouses?.data);
+  const { warehouseScope } = useAuth();
   const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
@@ -105,7 +107,14 @@ function RekapStock() {
   );
 
   /** Daftar gudang master — tiap gudang menjadi satu kolom qty (0 bila kosong). */
-  const warehouseList = useMemo(() => warehouses?.data ?? [], [warehouses]);
+  const warehouseList = useMemo(() => {
+    const all = warehouses?.data ?? [];
+    // F7.5: user Terbatas hanya melihat kolom gudang izin (defense-in-depth;
+    // backend sudah men-scope /master/warehouses).
+    if (warehouseScope.mode !== "Terbatas") return all;
+    const ids = new Set(warehouseScope.ids ?? []);
+    return all.filter((w) => ids.has(w.id));
+  }, [warehouses, warehouseScope]);
 
   /** Qty barang di satu gudang; 0 bila tidak ada baris lokasi di gudang itu. */
   const qtyOf = useCallback(
@@ -308,6 +317,7 @@ function RekapStock() {
               className="w-full min-w-[140px] max-w-[180px] flex-1"
               value={wh}
               onChange={whFilter.onChange}
+              hideAll={whFilter.hideAll}
               placeholder="Semua Gudang"
               options={warehouseNames}
               loading={warehousesLoading}

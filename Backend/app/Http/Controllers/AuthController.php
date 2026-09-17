@@ -6,6 +6,7 @@ use App\Http\Resources\UserResource;
 use App\Models\RolePermission;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\WarehouseScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,11 @@ class AuthController extends Controller
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
             'can_review' => $user->canReview(),
+            // F7.5: lingkup gudang untuk penguncian UI (ids null = Semua).
+            'warehouse_scope' => [
+                'mode' => WarehouseScope::modeFor($user),
+                'ids' => WarehouseScope::effectiveIdsFor($user),
+            ],
             'token' => $token,
         ]);
     }
@@ -75,6 +81,11 @@ class AuthController extends Controller
             'data' => (new UserResource($user))->resolve(),
             'access' => RolePermission::accessForRole($user->role),
             'can_review' => $user->canReview(),
+            // F7.5: lingkup gudang untuk penguncian UI (ids null = Semua).
+            'warehouse_scope' => [
+                'mode' => WarehouseScope::modeFor($user),
+                'ids' => WarehouseScope::effectiveIdsFor($user),
+            ],
         ]);
     }
 }

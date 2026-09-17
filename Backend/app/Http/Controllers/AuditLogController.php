@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AuditLogIndexRequest;
 use App\Http\Resources\AuditLogResource;
 use App\Models\AuditLog;
+use App\Support\WarehouseScope;
 
 class AuditLogController extends Controller
 {
@@ -13,6 +14,12 @@ class AuditLogController extends Controller
         $data = $request->validated();
 
         $query = AuditLog::query()
+            // F7.5: AuditLog tanpa kolom gudang — user Terbatas hanya boleh
+            // membaca jejaknya sendiri (Auditor = Semua, tak terpengaruh).
+            ->when(
+                WarehouseScope::effectiveIdsFor($request->user()) !== null,
+                fn ($q) => $q->where('user_id', $request->user()->id)
+            )
             ->when($data['action'] ?? null, fn ($q, $v) => $q->where('action', $v))
             ->when($data['module'] ?? null, fn ($q, $v) => $q->where('module', $v))
             ->when($data['user_id'] ?? null, fn ($q, $v) => $q->where('user_id', $v))

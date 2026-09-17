@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
@@ -224,5 +225,52 @@ class WarehouseScopeTest extends TestCase
         $this->getJson('/api/persediaan/stock?per_page=100')
             ->assertOk()
             ->assertJsonCount(2, 'data');
+    }
+
+    public function test_warehouses_index_is_scoped(): void
+    {
+        $this->makeTerbatasRole('Op Wh', ['Master Data']);
+        $a = Warehouse::factory()->create();
+        Warehouse::factory()->create();
+        Sanctum::actingAs($this->makeScopedUser('Op Wh', $a));
+
+        $this->getJson('/api/master/warehouses?per_page=100')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $a->id);
+    }
+
+    public function test_me_reports_warehouse_scope(): void
+    {
+        $this->makeTerbatasRole('Op Me', ['Master Data']);
+        $a = Warehouse::factory()->create();
+        Sanctum::actingAs($this->makeScopedUser('Op Me', $a));
+
+        $this->getJson('/api/auth/me')
+            ->assertOk()
+            ->assertJsonPath('warehouse_scope.mode', 'Terbatas')
+            ->assertJsonPath('warehouse_scope.ids', [$a->id]);
+    }
+
+    public function test_audit_logs_limited_to_own_for_terbatas(): void
+    {
+        $this->makeTerbatasRole('Op Audit', ['Audit Trails']);
+        $a = Warehouse::factory()->create();
+        $me = $this->makeScopedUser('Op Audit', $a);
+        $other = User::factory()->create(['role' => 'Op Audit']);
+        AuditLog::create([
+            'occurred_at' => now(), 'user_id' => $me->id, 'user_name' => $me->name,
+            'role' => 'Op Audit', 'action' => 'Login', 'module' => 'System',
+        ]);
+        AuditLog::create([
+            'occurred_at' => now(), 'user_id' => $other->id, 'user_name' => $other->name,
+            'role' => 'Op Audit', 'action' => 'Login', 'module' => 'System',
+        ]);
+        Sanctum::actingAs($me);
+
+        $this->getJson('/api/system/audit-logs?per_page=100')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.user_id', $me->id);
     }
 }

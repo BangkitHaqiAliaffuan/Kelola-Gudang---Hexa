@@ -280,6 +280,7 @@ export function TransferGudangPage() {
               className="w-full flex-1 min-w-[140px] max-w-[180px]"
               value={fromWh}
               onChange={whFilter.onChange}
+              hideAll={whFilter.hideAll}
               placeholder="Semua Gudang Asal"
               options={warehouses?.data.map((w) => w.name) ?? []}
               loading={warehousesLoading}

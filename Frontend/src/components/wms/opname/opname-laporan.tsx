@@ -214,6 +214,7 @@ export function OpnameLaporanPage() {
               whFilter.onChange(v);
               setVisible(2);
             }}
+            hideAll={whFilter.hideAll}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

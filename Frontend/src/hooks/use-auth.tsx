@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { authApi, type AuthSession } from "@/lib/auth-api";
+import { authApi, normalizeScope, type AuthSession } from "@/lib/auth-api";
 import { clearAuthToken, getAuthToken, isApiError, setAuthToken } from "@/lib/api";
 import { requestResync, setResyncHandler } from "@/lib/session-sync";
 import type { AccessLevel, RoleAccessEntry } from "@/lib/schemas";
@@ -33,6 +33,8 @@ type AuthContextValue = {
   access: AuthSession["access"];
   /** Flag `can_review` role sendiri (pengganti cek nama role "Auditor"). */
   canReview: boolean;
+  /** Lingkup gudang sesi (F7): mode + id gudang izin (null = Semua). */
+  warehouseScope: AuthSession["warehouse_scope"];
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   /** True when the module exists in the session's access map (or while still loading). */
@@ -67,7 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await authApi.me();
         if (!cancelled) {
-          setSession({ user: me.data, access: me.access, can_review: me.can_review ?? false });
+          setSession({
+            user: me.data,
+            access: me.access,
+            can_review: me.can_review ?? false,
+            warehouse_scope: normalizeScope(me.warehouse_scope),
+          });
           setStatus("authenticated");
         }
       } catch (err) {
@@ -87,7 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const next = await authApi.login(email, password);
     setAuthToken(next.token);
-    setSession({ user: next.data, access: next.access, can_review: next.can_review ?? false });
+    setSession({
+      user: next.data,
+      access: next.access,
+      can_review: next.can_review ?? false,
+      warehouse_scope: normalizeScope(next.warehouse_scope),
+    });
     setStatus("authenticated");
   };
 
@@ -123,6 +135,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return sa.length === sb.length && sa.every((v, i) => v === sb[i]);
     };
 
+    const sameScope = (
+      a: AuthSession["warehouse_scope"] | undefined,
+      b: AuthSession["warehouse_scope"],
+    ): boolean => {
+      const idsA = a?.ids ?? null;
+      return (
+        (a?.mode ?? "Semua") === b.mode &&
+        (idsA === null || b.ids === null
+          ? idsA === b.ids
+          : idsA.length === b.ids.length && idsA.every((v, i) => v === b.ids![i]))
+      );
+    };
+
     const handler = (): Promise<boolean> => {
       if (inFlight) return inFlight;
       inFlight = (async (): Promise<boolean> => {
@@ -130,10 +155,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!getAuthToken()) return false;
           const me = await authApi.me();
           if (cancelled) return false;
+          const scope = normalizeScope(me.warehouse_scope);
           const changed =
             !sameAccess(sessionRef.current?.access ?? [], me.access) ||
-            (sessionRef.current?.can_review ?? false) !== (me.can_review ?? false);
-          setSession({ user: me.data, access: me.access, can_review: me.can_review ?? false });
+            (sessionRef.current?.can_review ?? false) !== (me.can_review ?? false) ||
+            !sameScope(sessionRef.current?.warehouse_scope, scope);
+          setSession({
+            user: me.data,
+            access: me.access,
+            can_review: me.can_review ?? false,
+            warehouse_scope: scope,
+          });
           setStatus("authenticated");
           return changed;
         } catch (err) {
@@ -163,6 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       access: session?.access ?? [],
       canReview: session?.can_review ?? false,
+      warehouseScope: session?.warehouse_scope ?? { mode: "Semua", ids: null },
       login,
       logout,
       refreshSession: () => requestResync(),

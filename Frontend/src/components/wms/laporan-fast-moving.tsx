@@ -394,6 +394,7 @@ export function LaporanFastMoving() {
             className="w-full"
             value={whFilter.value}
             onChange={whFilter.onChange}
+            hideAll={whFilter.hideAll}
             placeholder="Semua Gudang"
             options={warehouseNames}
             loading={warehousesLoading}

@@ -5,11 +5,14 @@ import { ALL } from "@/components/wms/kit";
 import { useWarehouseFilter } from "./use-warehouse-filter";
 
 const { authState } = vi.hoisted(() => ({
-  authState: { user: null as { id: number; default_warehouse_id: number | null } | null },
+  authState: {
+    user: null as { id: number; default_warehouse_id: number | null } | null,
+    warehouseScope: { mode: "Semua", ids: null } as { mode: string; ids: number[] | null },
+  },
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: authState.user }),
+  useAuth: () => ({ user: authState.user, warehouseScope: authState.warehouseScope }),
 }));
 
 const WAREHOUSES = [
@@ -23,6 +26,7 @@ const KEY = "kg-wh-filter:7";
 beforeEach(() => {
   window.localStorage.clear();
   authState.user = { id: 7, default_warehouse_id: 2 };
+  authState.warehouseScope = { mode: "Semua", ids: null };
 });
 
 describe("useWarehouseFilter", () => {
@@ -94,5 +98,41 @@ describe("useWarehouseFilter", () => {
     authState.user = { id: 9, default_warehouse_id: null };
     const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
     expect(result.current.value).toBe("Gudang Surabaya");
+  });
+
+  it("mode Terbatas: pilihan di luar izin diabaikan, hideAll true", () => {
+    authState.warehouseScope = { mode: "Terbatas", ids: [3] };
+    window.localStorage.setItem(KEY, "1");
+    const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
+    expect(result.current.hideAll).toBe(true);
+    expect(result.current.value).toBe("Gudang Surabaya");
+    expect(result.current.warehouseId).toBe(3);
+  });
+
+  it('mode Terbatas: "Semua" tersimpan menjadi gudang izin pertama', () => {
+    authState.warehouseScope = { mode: "Terbatas", ids: [2, 3] };
+    window.localStorage.setItem(KEY, "all");
+    const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
+    expect(result.current.value).toBe("Gudang Bekasi");
+    expect(result.current.warehouseId).toBe(2);
+  });
+
+  it("mode Terbatas: default di luar izin diabaikan", () => {
+    authState.warehouseScope = { mode: "Terbatas", ids: [3] };
+    const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
+    expect(result.current.value).toBe("Gudang Surabaya");
+    expect(result.current.warehouseId).toBe(3);
+  });
+
+  it("mode Terbatas tanpa izin: fail-closed ke Semua/null", () => {
+    authState.warehouseScope = { mode: "Terbatas", ids: [] };
+    const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
+    expect(result.current.hideAll).toBe(true);
+    expect(result.current.warehouseId).toBeNull();
+  });
+
+  it("mode Semua: hideAll false", () => {
+    const { result } = renderHook(() => useWarehouseFilter(WAREHOUSES));
+    expect(result.current.hideAll).toBe(false);
   });
 });

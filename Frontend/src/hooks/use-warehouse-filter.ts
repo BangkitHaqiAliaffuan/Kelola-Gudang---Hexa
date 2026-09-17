@@ -14,6 +14,10 @@ import type { Warehouse } from "@/lib/master-types";
  *   2. Gudang default user (`user.default_warehouse_id` dari server).
  *   3. "Semua" (null) — user tanpa default / gudang sudah tidak ada.
  *
+ * Mode Terbatas (F7): rantai di atas diinterseksi izin — pilihan/default di
+ * luar izin diabaikan, "Semua" menjadi gudang izin pertama (`hideAll: true`
+ * untuk menyembunyikan opsinya di dropdown).
+ *
  * Aturan anti-konflik:
  * - Halaman DAFTAR boleh membaca + menulis (via `onChange` / `reset`).
  * - FORM hanya boleh MEMBACA (`warehouseId`) untuk inisialisasi kolom Gudang —
@@ -24,7 +28,7 @@ import type { Warehouse } from "@/lib/master-types";
 export function useWarehouseFilter(
   warehouses: ReadonlyArray<Pick<Warehouse, "id" | "name">> | undefined,
 ) {
-  const { user } = useAuth();
+  const { user, warehouseScope } = useAuth();
   const userId = user?.id ?? null;
 
   // Pilihan tersimpan: undefined = belum dimuat / tidak ada key yang usable,
@@ -59,6 +63,20 @@ export function useWarehouseFilter(
     stored !== undefined && stored.kind === "id" ? stored.id : null,
   );
 
+  // F7.5: mode Terbatas — pilihan di luar izin dianggap tidak ada.
+  // "Semua" eksplisit maupun default yang tak diizinkan jatuh ke gudang
+  // izin pertama (atau null bila izin kosong = fail-closed).
+  const limited = warehouseScope.mode === "Terbatas";
+  const allowedIds = useMemo(() => new Set(warehouseScope.ids ?? []), [warehouseScope]);
+  const scopedStoredId =
+    validStoredId != null && (!limited || allowedIds.has(validStoredId)) ? validStoredId : null;
+  const scopedDefaultId =
+    validDefaultId != null && (!limited || allowedIds.has(validDefaultId)) ? validDefaultId : null;
+  const firstAllowedId = useMemo(
+    () => list?.find((w) => !limited || allowedIds.has(w.id))?.id ?? null,
+    [list, limited, allowedIds],
+  );
+
   // Selama daftar gudang belum dimuat, belum bisa resolve nama/id —
   // tahan di "Semua" agar perilaku sama seperti sebelum fitur ini
   // (query jalan tanpa filter dulu, lalu menyempit setelah data siap).
@@ -66,11 +84,13 @@ export function useWarehouseFilter(
   const warehouseId =
     list === undefined
       ? null
-      : stored !== undefined && stored.kind === "all"
-        ? null
-        : validStoredId !== null
-          ? validStoredId
-          : validDefaultId;
+      : limited
+        ? (scopedStoredId ?? scopedDefaultId ?? firstAllowedId)
+        : stored !== undefined && stored.kind === "all"
+          ? null
+          : validStoredId !== null
+            ? validStoredId
+            : validDefaultId;
   const warehouseName =
     list === undefined || warehouseId == null
       ? null
@@ -119,6 +139,8 @@ export function useWarehouseFilter(
     value: warehouseName ?? ALL,
     /** Id gudang untuk query server + inisialisasi form, atau null ("Semua"). */
     warehouseId,
+    /** True bila user Terbatas: opsi "Semua" disembunyikan (teruskan ke `hideAll`). */
+    hideAll: limited,
     /** Handler langsung untuk FilterSelect (`value`/`onChange`). */
     onChange,
     /** Hapus pilihan tersimpan → kembali ke rantai default. */

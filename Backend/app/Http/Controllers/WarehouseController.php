@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateWarehouseRequest;
 use App\Http\Resources\WarehouseResource;
 use App\Models\Warehouse;
 use App\Support\CodeGenerator;
+use App\Support\WarehouseScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,13 @@ class WarehouseController extends Controller
     public function index(Request $request)
     {
         $query = Warehouse::query()->withCount('items');
+
+        // F7.5 (W7): user Terbatas hanya menerima gudang miliknya —
+        // dropdown FE otomatis benar tanpa logika ganda.
+        $allowed = WarehouseScope::effectiveIdsFor($request->user());
+        if ($allowed !== null) {
+            $query->whereIn('warehouses.id', $allowed);
+        }
 
         if ($search = $request->query('search')) {
             $needle = strtolower($search);

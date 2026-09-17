@@ -197,6 +197,7 @@ export function OpnameJadwalPage() {
             className="w-full"
             value={wh}
             onChange={whFilter.onChange}
+            hideAll={whFilter.hideAll}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}

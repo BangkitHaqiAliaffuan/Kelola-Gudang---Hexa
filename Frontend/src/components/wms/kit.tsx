@@ -59,6 +59,7 @@ export function FilterSelect({
   options,
   className,
   loading = false,
+  hideAll = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -66,6 +67,8 @@ export function FilterSelect({
   options: Array<string | { value: string; label: string }>;
   className?: string;
   loading?: boolean;
+  /** Sembunyikan opsi "Semua" (untuk user Terbatas F7 — teruskan `hideAll` filter). */
+  hideAll?: boolean;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
@@ -82,7 +85,7 @@ export function FilterSelect({
           </SelectItem>
         ) : (
           <>
-            <SelectItem value={ALL}>{placeholder}</SelectItem>
+            {!hideAll && <SelectItem value={ALL}>{placeholder}</SelectItem>}
             {options.map((o) => {
               const entry = typeof o === "string" ? { value: o, label: o } : o;
               return (
@@ -111,6 +114,7 @@ export function FilterCombobox({
   options,
   className,
   loading = false,
+  hideAll = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -118,13 +122,15 @@ export function FilterCombobox({
   options: Array<string | { value: string; label: string }>;
   className?: string;
   loading?: boolean;
+  /** Sembunyikan opsi "Semua" (untuk user Terbatas F7 — teruskan `hideAll` filter). */
+  hideAll?: boolean;
 }) {
   const entries = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
   return (
     <FormCombobox
       value={value === ALL ? "" : value}
       onValueChange={(v) => onChange(v === "" ? ALL : v)}
-      options={[{ value: "", label: placeholder }, ...entries]}
+      options={hideAll ? entries : [{ value: "", label: placeholder }, ...entries]}
       placeholder={placeholder}
       searchPlaceholder={`Cari ${placeholder.replace(/^Semua\s+/i, "")}...`}
       loading={loading}

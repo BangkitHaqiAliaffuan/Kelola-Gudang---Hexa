@@ -509,6 +509,7 @@ function KartuStock() {
               className="w-full sm:w-48"
               value={wh}
               onChange={handleWhChange}
+              hideAll={whFilter.hideAll}
               placeholder="Semua Gudang"
               options={warehouses?.data.map((w) => w.name) ?? []}
               loading={warehousesLoading}

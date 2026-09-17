@@ -492,6 +492,7 @@ export function LaporanNilaiPersediaan() {
             className="w-full flex-1 min-w-[140px] max-w-[180px]"
             value={whFilter.value}
             onChange={whFilter.onChange}
+            hideAll={whFilter.hideAll}
             placeholder="Semua Gudang"
             options={warehouses?.data.map((w) => w.name) ?? []}
             loading={warehousesLoading}
