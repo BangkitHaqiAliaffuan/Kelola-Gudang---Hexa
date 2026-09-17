@@ -27,11 +27,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
-    Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
-    Route::get('me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+    Route::post('logout', [AuthController::class, 'logout'])->middleware(['auth:sanctum', 'user.active']);
+    Route::get('me', [AuthController::class, 'me'])->middleware(['auth:sanctum', 'user.active']);
 });
 
-Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])->group(function () {
+Route::prefix('master')->middleware(['auth:sanctum', 'user.active', 'role.access:Master Data'])->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('sub-categories', SubCategoryController::class);
     Route::apiResource('merks', MerkController::class);
@@ -71,7 +71,7 @@ Route::prefix('master')->middleware(['auth:sanctum', 'role.access:Master Data'])
     });
 });
 
-Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan', 'scope.warehouse'])->group(function () {
+Route::prefix('persediaan')->middleware(['auth:sanctum', 'user.active', 'role.access:Persediaan', 'scope.warehouse'])->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-minimum', [StockController::class, 'stockMinimum']);
     Route::get('stock-card', [StockController::class, 'stockCard']);
@@ -90,7 +90,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum', 'role.access:Persediaan
     Route::post('stock-documents/{stockDocument}/unlock', [StockDocumentController::class, 'unlock']);
 });
 
-Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('persediaan')->middleware(['auth:sanctum', 'user.active'])->group(function () {
     Route::post('stock-documents/{stockDocument}/approve', [StockDocumentController::class, 'approve']);
     Route::post('stock-documents/{stockDocument}/reject', [StockDocumentController::class, 'reject']);
     Route::post('stock-documents/{stockDocument}/approve-review', [StockDocumentController::class, 'approveReview']);
@@ -98,7 +98,7 @@ Route::prefix('persediaan')->middleware(['auth:sanctum'])->group(function () {
     Route::post('stock-documents/{stockDocument}/force-unlock', [StockDocumentController::class, 'forceUnlock']);
 });
 
-Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan', 'scope.warehouse'])->group(function () {
+Route::prefix('pengadaan')->middleware(['auth:sanctum', 'user.active', 'role.access:Pengadaan', 'scope.warehouse'])->group(function () {
     Route::get('proc-docs', [ProcDocController::class, 'index']);
     Route::post('proc-docs', [ProcDocController::class, 'store']);
     Route::get('proc-docs/{procDoc}', [ProcDocController::class, 'show'])->whereNumber('procDoc');
@@ -111,19 +111,19 @@ Route::prefix('pengadaan')->middleware(['auth:sanctum', 'role.access:Pengadaan',
 
 // Aksi approval hanya butuh auth:sanctum — hanya approver yang ditugaskan
 // (approver_user_id) yang boleh memutuskan; reassign butuh Pengadaan Kelola.
-Route::prefix('pengadaan')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('pengadaan')->middleware(['auth:sanctum', 'user.active'])->group(function () {
     Route::post('proc-docs/{procDoc}/approve', [ProcDocController::class, 'approve'])->whereNumber('procDoc');
     Route::post('proc-docs/{procDoc}/reject', [ProcDocController::class, 'reject'])->whereNumber('procDoc');
 });
 
-Route::prefix('laporan')->middleware(['auth:sanctum', 'role.access:Laporan', 'throttle:laporan', 'scope.warehouse'])->group(function () {
+Route::prefix('laporan')->middleware(['auth:sanctum', 'user.active', 'role.access:Laporan', 'throttle:laporan', 'scope.warehouse'])->group(function () {
     Route::get('mutasi', [LaporanController::class, 'mutasi']);
     Route::get('keluar-analytics', [LaporanController::class, 'keluarAnalytics']);
     Route::get('transaksi-analytics', [LaporanController::class, 'transaksiAnalytics']);
     Route::get('fast-moving', [LaporanFastMovingController::class, 'index']);
 });
 
-Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->group(function () {
+Route::prefix('system')->middleware(['auth:sanctum', 'user.active', 'role.access:System'])->group(function () {
     Route::get('settings', [SettingController::class, 'index']);
     // Tulis pengaturan (profil perusahaan) hanya Administrator — mencegah
     // perubahan identitas/kop dokumen oleh role non-admin.

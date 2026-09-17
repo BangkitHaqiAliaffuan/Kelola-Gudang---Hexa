@@ -45,7 +45,10 @@ class ItemFactory extends Factory
             // `stock`/`reserved` disengaja tidak diisi (F3.2): bukan fillable;
             // kolom items.* default 0 di DB. Test yang butuh stok memakai
             // baris `item_stock` eksplisit (sumber kebenaran ledger).
-            'status' => $this->faker->randomElement(['Aktif', 'Nonaktif']),
+            // Default Aktif (deterministik): dokumen hanya menerima barang
+            // Aktif; test yang butuh Nonaktif mengeset eksplisit. Seeder
+            // mengeset status sendiri (weighted), tak terpengaruh default ini.
+            'status' => 'Aktif',
             'image_url' => null,
         ];
     }

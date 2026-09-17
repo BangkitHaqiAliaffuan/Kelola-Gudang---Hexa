@@ -100,13 +100,16 @@ export function StockAdjustmentForm() {
     [warehouses],
   );
 
+  // Barang nonaktif disembunyikan dari opsi transaksi.
   const itemOptions: ComboboxOption[] = useMemo(
     () =>
-      (items?.data ?? []).map((it) => ({
-        value: String(it.id),
-        label: it.name,
-        keywords: `${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`,
-      })),
+      (items?.data ?? [])
+        .filter((it) => it.status === "Aktif")
+        .map((it) => ({
+          value: String(it.id),
+          label: it.name,
+          keywords: `${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`,
+        })),
     [items],
   );
 

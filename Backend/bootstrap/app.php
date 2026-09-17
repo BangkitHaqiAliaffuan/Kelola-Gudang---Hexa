@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureAdministrator;
 use App\Http\Middleware\EnsureRoleAccess;
+use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\EnsureWarehouseScope;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\QueryException;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role.access' => EnsureRoleAccess::class,
             'role.administrator' => EnsureAdministrator::class,
             'scope.warehouse' => EnsureWarehouseScope::class,
+            'user.active' => EnsureUserActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

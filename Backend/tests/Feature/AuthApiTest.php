@@ -73,6 +73,39 @@ class AuthApiTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors(['email']);
     }
 
+    public function test_deactivated_user_session_rejected_on_next_request(): void
+    {
+        $user = User::factory()->create(['role' => 'Supervisor', 'is_active' => true]);
+        RolePermission::create(['role' => 'Supervisor', 'module' => 'Master Data', 'level' => 'Baca']);
+        $token = $user->createToken('kg-session')->plainTextToken;
+
+        // Sesi aktif: lolos.
+        $this->withToken($token)->getJson('/api/auth/me')->assertOk();
+
+        // Akun dinonaktifkan dari Master Data > User (oleh admin lain —
+        // query builder agar guard self-mutation tak ikut campur).
+        User::where('id', $user->id)->update(['is_active' => false]);
+
+        // Guard mem-memoize user antar request dalam satu test; reset agar dibaca ulang dari DB.
+        Auth::forgetGuards();
+
+        // Request berikutnya langsung 401 — tanpa perlu logout/login ulang.
+        $this->withToken($token)->getJson('/api/auth/me')
+            ->assertUnauthorized()
+            ->assertJsonPath('message', 'Akun ini telah dinonaktifkan. Silakan login kembali.');
+        $this->withToken($token)->getJson('/api/master/categories')->assertUnauthorized();
+    }
+
+    public function test_active_user_unaffected_by_user_active_gate(): void
+    {
+        $user = User::factory()->create(['role' => 'Supervisor', 'is_active' => true]);
+        RolePermission::create(['role' => 'Supervisor', 'module' => 'Master Data', 'level' => 'Baca']);
+        $token = $user->createToken('kg-session')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/auth/me')->assertOk();
+        $this->withToken($token)->getJson('/api/master/categories')->assertOk();
+    }
+
     public function test_login_requires_email_and_password(): void
     {
         $this->postJson('/api/auth/login', [])

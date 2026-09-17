@@ -1834,6 +1834,41 @@ class StoreStockDocumentApiTest extends TestCase
             ->assertJsonPath('message', fn ($msg) => str_contains($msg, 'Bin') && str_contains($msg, 'berada di'));
     }
 
+    public function test_store_rejects_inactive_item(): void
+    {
+        $item = $this->makeItem();
+        $item->update(['status' => 'Nonaktif']);
+        [$wh, , $bin] = $this->makeLocation();
+
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Penerimaan',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit_cost' => 1500, 'to_bin_id' => $bin->id],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['lines.0.item_id']);
+    }
+
+    public function test_store_opname_allows_inactive_item(): void
+    {
+        $item = $this->makeItem();
+        $item->update(['status' => 'Nonaktif']);
+        [$wh, , $bin] = $this->makeLocation();
+
+        // Opname menghitung realitas fisik — barang nonaktif tetap sah dihitung.
+        $this->postJson('/api/persediaan/stock-documents', [
+            'type' => 'Stock Opname',
+            'status' => 'Draft',
+            'document_date' => '2026-08-12',
+            'warehouse_id' => $wh->id,
+            'lines' => [
+                ['item_id' => $item->id, 'from_bin_id' => $bin->id],
+            ],
+        ])->assertStatus(201);
+    }
+
     private function makeItem(): Item
     {
         $unique = random_int(10000, 99999);
@@ -1842,6 +1877,8 @@ class StoreStockDocumentApiTest extends TestCase
             'sku' => "SKU-STORE-{$unique}",
             'barcode' => '899'.str_pad((string) $unique, 10, '0', STR_PAD_LEFT),
             'internal_barcode' => "IB-STORE-{$unique}",
+            // Dokumen butuh barang Aktif (factory default acak Aktif/Nonaktif).
+            'status' => 'Aktif',
         ]);
     }
 

@@ -136,7 +136,14 @@ class StoreStockDocumentRequest extends FormRequest
             'pic' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:1000'],
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')],
+            // Barang nonaktif tidak boleh masuk dokumen baru — KECUALI baris
+            // Stock Opname (hitung fisik: realitas lapangan tetap dicatat,
+            // opname sendiri 0 movement).
+            'lines.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')->where(function ($q) {
+                if ($this->input('type') !== 'Stock Opname') {
+                    $q->where('status', 'Aktif');
+                }
+            })],
             // qty selalu positif dari klien; controller menegasi baris Pengeluaran &
             // Retur Pembelian saat menyimpan (konvensi ledger: garis bertanda, arah
             // diturunkan dari tanda qty). Baris Stock Opname TIDAK membawa qty —
@@ -197,6 +204,13 @@ class StoreStockDocumentRequest extends FormRequest
      * (destination_warehouse_id) — posting memakai rack/warehouse yang
      * diturunkan dari bin tersebut.
      */
+    public function messages(): array
+    {
+        return [
+            'lines.*.item_id.exists' => 'Barang pada :attribute tidak valid atau sudah dinonaktifkan.',
+        ];
+    }
+
     public function after(): array
     {
         return [
