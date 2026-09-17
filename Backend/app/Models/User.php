@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,28 @@ class User extends Authenticatable
     public function defaultWarehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'default_warehouse_id');
+    }
+
+    /**
+     * Gudang konkret user untuk role ber-mode 'Terbatas' (pivot
+     * `user_warehouse`). Bukan default tampilan — itu `defaultWarehouse`.
+     */
+    public function warehouses(): BelongsToMany
+    {
+        return $this->belongsToMany(Warehouse::class, 'user_warehouse')->withTimestamps();
+    }
+
+    /**
+     * Mode lingkup gudang dari registry role. Role tak terdaftar / nilai
+     * asing → 'Semua' (W10: tidak memutus role lama; deny dijaga permission).
+     */
+    public function warehouseScopeMode(): string
+    {
+        $mode = $this->relationLoaded('roleRecord')
+            ? $this->roleRecord?->warehouse_scope_mode
+            : $this->roleRecord()->first()?->warehouse_scope_mode;
+
+        return in_array($mode, Role::WAREHOUSE_SCOPES, true) ? $mode : 'Semua';
     }
 
     /**

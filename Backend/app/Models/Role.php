@@ -6,7 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
-    protected $fillable = ['name', 'description', 'is_system', 'can_review'];
+    /** Mode lingkup gudang: 'Semua' = lintas-gudang, 'Terbatas' = hanya gudang user (pivot). */
+    public const WAREHOUSE_SCOPES = ['Semua', 'Terbatas'];
+
+    protected $fillable = ['name', 'description', 'is_system', 'can_review', 'warehouse_scope_mode'];
 
     /**
      * @return array<string, string>
