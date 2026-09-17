@@ -267,9 +267,9 @@ export function DataTable<T extends { id: string | number }>({
                     className={cn(
                       "border-b border-border/70 px-3 py-2.5 align-middle",
                       c.sticky === "right" &&
-                        "sticky right-0 z-10 border-l bg-card group-hover:bg-accent/40",
+                        "sticky right-0 z-10 border-l bg-card group-hover:bg-muted",
                       c.sticky === "left" &&
-                        "sticky left-0 z-10 border-r bg-card group-hover:bg-accent/40",
+                        "sticky left-0 z-10 border-r bg-card group-hover:bg-muted",
                       c.className,
                     )}
                   >

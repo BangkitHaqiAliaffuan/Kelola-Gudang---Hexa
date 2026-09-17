@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Boxes, RefreshCw } from "lucide-react";
 import { EmptyState, PageHeader, Panel, Pill, StatCard, type Tone } from "@/components/wms/kit";
@@ -468,14 +468,20 @@ function StockDetail() {
 }
 
 function BackHeader({ title }: { title: string }) {
+  const router = useRouter();
+  const navigate = useNavigate();
+  const goBack = () => {
+    // Kembali ke halaman asal (Rekap / Stock / Barang / Dashboard).
+    // Tanpa riwayat (buka URL langsung) → fallback Stock Saat Ini.
+    if (router.history.canGoBack()) router.history.back();
+    else void navigate({ to: "/persediaan/stock" });
+  };
   return (
     <PageHeader
       title={title}
       actions={
-        <Button variant="outline" className="rounded-xl" asChild>
-          <Link to="/persediaan/stock">
-            <ArrowLeft className="h-4 w-4" /> Kembali
-          </Link>
+        <Button variant="outline" className="rounded-xl" onClick={goBack}>
+          <ArrowLeft className="h-4 w-4" /> Kembali
         </Button>
       }
     />
