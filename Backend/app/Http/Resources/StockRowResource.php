@@ -25,6 +25,11 @@ class StockRowResource extends JsonResource
             'sku' => $item?->sku,
             'name' => $item?->name,
             'unit' => $item?->unit?->name,
+            // Kategori item (Fase 4): item.category sudah eager-loaded di
+            // StockController@index — tanpa ini halaman stock butuh
+            // fetchAll("/master/items") hanya untuk memetakan kategori.
+            'category_id' => $item?->category_id,
+            'category' => $item?->category?->name,
             'min' => $item?->min_stock,
             'max' => $max,
             'cost' => $item?->cost,

@@ -6,6 +6,18 @@ const pages: { name: string; url: string; waitFor: RegExp; heading: RegExp }[] =
   { name: "opname-jadwal", url: "/opname/jadwal", waitFor: /stock-documents/, heading: /Jadwal Opname/i },
   { name: "opname-proses", url: "/opname/proses", waitFor: /stock-documents/, heading: /Proses Opname|Daftar Sesi/i },
   { name: "persediaan-stock", url: "/persediaan/stock", waitFor: /stock/, heading: /Stock Saat Ini|Persediaan/i },
+  {
+    name: "persediaan-mutasi",
+    url: "/persediaan/mutasi",
+    waitFor: /stock-documents/,
+    heading: /Mutasi Stock/i,
+  },
+  {
+    name: "master-barang",
+    url: "/master/barang",
+    waitFor: /master\/items/,
+    heading: /Master Barang/i,
+  },
   { name: "persediaan-kartu-stock", url: "/persediaan/kartu-stock", waitFor: /stock-card|stock/, heading: /Kartu Stock/i },
   { name: "transaksi-retur-penjualan", url: "/transaksi/retur-penjualan", waitFor: /stock-documents/, heading: /Retur Penjualan/i },
   { name: "master-proyek", url: "/master/proyek", waitFor: /projects/, heading: /Proyek/i },

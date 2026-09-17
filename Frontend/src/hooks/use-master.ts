@@ -24,7 +24,9 @@ import type {
 // yang butuh seluruh baris di client diambil via fetchAll() — loop halaman
 // 100 mengikuti meta.last_page, perilaku tetap sama seperti fetch-all lama.
 
-const keys = {
+// Diekspor untuk Fase 4: hook tabel server harus ber-key di bawah prefix ini
+// agar invalidasi mutasi (prefix-match) tetap me-refresh tabel.
+export const keys = {
   categories: ["master", "categories"] as const,
   subCategories: ["master", "sub-categories"] as const,
   merks: ["master", "merks"] as const,

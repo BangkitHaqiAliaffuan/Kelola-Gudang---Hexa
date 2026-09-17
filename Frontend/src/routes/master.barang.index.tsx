@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Download,
   MoreVertical,
@@ -47,16 +47,18 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import {
+  keys as masterKeys,
   useBulkDeleteItems,
   useBulkUpdateItemStatus,
   useCategories,
   useCostDrift,
   useDeleteItem,
-  useItems,
   useMerks,
   useSubCategories,
   useSyncCost,
 } from "@/hooks/use-master";
+import { useServerTable } from "@/hooks/use-server-table";
+import { fetchAll } from "@/lib/api";
 import type { ItemApi } from "@/lib/master-types";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useAuth } from "@/hooks/use-auth";
@@ -87,12 +89,14 @@ const stockStatus = (it: { stock: number; min: number; max: number | null }) =>
 
 const hueFor = (id: number) => (id * 137) % 360;
 
+const PAGE_SIZE = 12;
+
 function MasterBarang() {
   const navigate = useNavigate();
   const { hasModuleLevel } = useAuth();
   const canWrite = hasModuleLevel("Master Data", "Tulis");
   const canDelete = hasModuleLevel("Master Data", "Kelola");
-  const { data, isLoading, error, refetch } = useItems();
+  const [page, setPage] = useState(1);
   const { data: cats, isLoading: catsLoading } = useCategories();
   const { data: subs, isLoading: subsLoading } = useSubCategories();
   const { data: merks, isLoading: merksLoading } = useMerks();
@@ -157,23 +161,41 @@ function MasterBarang() {
     }
   };
 
+  // Kembali ke halaman 1 setiap kali filter berubah (Fase 4: paginasi server).
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, cat, subCat, brand, stockF, status]);
+
+  // FilterSelect memakai nama; server butuh id.
+  const categoryId = cat === ALL ? null : (cats?.data.find((c) => c.name === cat)?.id ?? null);
+  const subCategoryId =
+    subCat === ALL ? null : (subs?.data.find((s) => s.name === subCat)?.id ?? null);
+  const brandId = brand === ALL ? null : (merks?.data.find((m) => m.name === brand)?.id ?? null);
+
+  const {
+    rows: serverRows,
+    total,
+    lastPage,
+    isLoading,
+    error,
+    refetch,
+  } = useServerTable<ItemApi>([...masterKeys.items], "/master/items", {
+    page,
+    perPage: PAGE_SIZE,
+    search: debouncedQ || null,
+    filters: {
+      category_id: categoryId,
+      sub_category_id: subCategoryId,
+      brand_id: brandId,
+      status: status === ALL ? null : status,
+    },
+  });
+
+  // Filter level-stock dihitung client (stockStatus memakai kolom denormalisasi
+  // items.stock) — hanya menyempitkan halaman tampil, bukan query server (Fase 4).
   const rows = useMemo(
-    () =>
-      (data?.data ?? []).filter((it) => {
-        const s = stockStatus(it).label;
-        return (
-          (!debouncedQ ||
-            `${it.name} ${it.sku} ${it.barcode ?? ""} ${it.internal_barcode ?? ""}`
-              .toLowerCase()
-              .includes(debouncedQ.toLowerCase())) &&
-          (cat === ALL || it.category === cat) &&
-          (subCat === ALL || it.subCategory === subCat) &&
-          (brand === ALL || it.brand === brand) &&
-          (stockF === ALL || s === stockF) &&
-          (status === ALL || it.status === status)
-        );
-      }),
-    [data, debouncedQ, cat, subCat, brand, stockF, status],
+    () => serverRows.filter((it) => stockF === ALL || stockStatus(it).label === stockF),
+    [serverRows, stockF],
   );
 
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
@@ -189,6 +211,8 @@ function MasterBarang() {
   const toggle = (id: number) =>
     setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
+  // "Pilih semua" = halaman tampil (Fase 4: seleksi lintas halaman tetap
+  // tersimpan di `selected` untuk bulk-action, tapi header hanya menyeleksi halaman ini).
   const allFilteredIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const allSelected =
     allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.includes(id));
@@ -239,18 +263,49 @@ function MasterBarang() {
     status: r.status,
   });
 
-  const handleExportAll = () => {
-    const content = toCsv(rows.map(mapRowForExport), [...exportHeaders]);
-    downloadCsv(`master-barang-${new Date().toISOString().slice(0, 10)}.csv`, content);
-    toast.success(`Export ${formatNumber(rows.length)} barang`);
+  const [exporting, setExporting] = useState(false);
+
+  // Seluruh baris terfilter dari server (bukan halaman tampil) — dipakai export
+  // semua/terpilih + cetak barcode agar mencakup lintas halaman (Fase 4).
+  const fetchFilteredItems = useCallback(async () => {
+    const params: Record<string, string> = {};
+    if (debouncedQ) params["search"] = debouncedQ;
+    if (categoryId != null) params["category_id"] = String(categoryId);
+    if (subCategoryId != null) params["sub_category_id"] = String(subCategoryId);
+    if (brandId != null) params["brand_id"] = String(brandId);
+    if (status !== ALL) params["status"] = status;
+    const res = await fetchAll<ItemApi>("/master/items", params);
+    return res.data.filter((it) => stockF === ALL || stockStatus(it).label === stockF);
+  }, [debouncedQ, categoryId, subCategoryId, brandId, status, stockF]);
+
+  const handleExportAll = async () => {
+    setExporting(true);
+    try {
+      const items = await fetchFilteredItems();
+      const content = toCsv(items.map(mapRowForExport), [...exportHeaders]);
+      downloadCsv(`master-barang-${new Date().toISOString().slice(0, 10)}.csv`, content);
+      toast.success(`Export ${formatNumber(items.length)} barang`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export gagal.");
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const handleExportSelected = () => {
-    const selectedRows = rows.filter((r) => selected.includes(r.id));
-    if (selectedRows.length === 0) return;
-    const content = toCsv(selectedRows.map(mapRowForExport), [...exportHeaders]);
-    downloadCsv(`master-barang-terpilih-${new Date().toISOString().slice(0, 10)}.csv`, content);
-    toast.success(`Export ${formatNumber(selectedRows.length)} barang terpilih`);
+  const handleExportSelected = async () => {
+    if (selected.length === 0) return;
+    setExporting(true);
+    try {
+      const items = await fetchFilteredItems();
+      const selectedRows = items.filter((r) => selected.includes(r.id));
+      const content = toCsv(selectedRows.map(mapRowForExport), [...exportHeaders]);
+      downloadCsv(`master-barang-terpilih-${new Date().toISOString().slice(0, 10)}.csv`, content);
+      toast.success(`Export ${formatNumber(selectedRows.length)} barang terpilih`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export gagal.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -419,7 +474,7 @@ function MasterBarang() {
     <>
       <PageHeader
         title="Master Barang"
-        description={`${formatNumber(data?.meta?.total ?? rows.length)} SKU terdaftar`}
+        description={`${formatNumber(total)} SKU terdaftar`}
         actions={
           <>
             {canWrite && (
@@ -439,11 +494,14 @@ function MasterBarang() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={handleExportAll}>
+                  <DropdownMenuItem onClick={handleExportAll} disabled={exporting}>
                     <Download className="h-4 w-4" /> Export Semua Barang
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled={selected.length === 0} onClick={handleExportSelected}>
+                  <DropdownMenuItem
+                    disabled={selected.length === 0 || exporting}
+                    onClick={handleExportSelected}
+                  >
                     <Download className="h-4 w-4" /> Export Barang Terpilih
                     {selected.length > 0 && (
                       <span className="ml-auto text-xs text-muted-foreground">
@@ -551,14 +609,23 @@ function MasterBarang() {
               variant="outline"
               className="rounded-lg"
               onClick={() => {
-                const skus = rows.filter((r) => selected.includes(r.id)).map((r) => r.sku);
-                const first = skus[0];
-                if (!first) return;
-                void navigate({ to: "/barcode", search: { sku: first } });
-                if (skus.length > 1)
-                  toast.info(
-                    `+${skus.length - 1} barang lain tidak ikut — halaman Barcode menerima 1 SKU`,
-                  );
+                void (async () => {
+                  try {
+                    const items = await fetchFilteredItems();
+                    const skus = items.filter((r) => selected.includes(r.id)).map((r) => r.sku);
+                    const first = skus[0];
+                    if (!first) return;
+                    void navigate({ to: "/barcode", search: { sku: first } });
+                    if (skus.length > 1)
+                      toast.info(
+                        `+${skus.length - 1} barang lain tidak ikut — halaman Barcode menerima 1 SKU`,
+                      );
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error ? err.message : "Gagal memuat barang terpilih.",
+                    );
+                  }
+                })();
               }}
             >
               Cetak Barcode
@@ -602,14 +669,18 @@ function MasterBarang() {
         </div>
       )}
 
-      <Panel title="Daftar Barang" description={`${formatNumber(rows.length)} hasil`}>
+      <Panel title="Daftar Barang" description={`${formatNumber(total)} hasil`}>
         <DataTable
           columns={columns}
           rows={rows}
-          pageSize={12}
+          pageSize={PAGE_SIZE}
           loading={isLoading}
           error={error}
           onRetry={() => refetch()}
+          serverPage={page}
+          serverTotalRows={total}
+          serverTotalPages={lastPage}
+          onServerPageChange={setPage}
           onRowClick={(r) => navigate({ to: "/master/barang/$id", params: { id: String(r.id) } })}
           mobileCard={(r) => {
             const s = stockStatus(r);

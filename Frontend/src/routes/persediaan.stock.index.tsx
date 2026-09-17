@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Maximize2, Minimize2, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,10 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
-import { useCategories, useItems, useWarehouses } from "@/hooks/use-master";
-import { useStockRows } from "@/hooks/use-persediaan";
+import { useCategories, useWarehouses } from "@/hooks/use-master";
+import { useServerTable } from "@/hooks/use-server-table";
 import { cn } from "@/lib/utils";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { fetchAll } from "@/lib/api";
 import { formatIDR, formatNumber } from "@/lib/wms-data";
 import type { StockRowApi } from "@/lib/persediaan-types";
 
@@ -46,13 +47,12 @@ const statusTone: Record<StockRowApi["status"], Tone> = {
   Normal: "success",
 };
 
+const PAGE_SIZE = 12;
+
 function StockSaatIni() {
   const navigate = useNavigate();
-  const { data, isLoading, error, refetch } = useStockRows();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const { data: cats, isLoading: catsLoading } = useCategories();
-  const { data: items } = useItems();
-
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
   // Filter gudang: pilihan tersimpan per user → default user → Semua.
@@ -60,6 +60,27 @@ function StockSaatIni() {
   const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
   const [fullscreen, setFullscreen] = useState(false);
+  const [page, setPage] = useState(1);
+
+  // Kembali ke halaman 1 setiap kali filter berubah (Fase 4: paginasi server).
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, wh, cat]);
+
+  // FilterSelect memakai nama; server butuh id.
+  const categoryId = cat === ALL ? null : (cats?.data.find((c) => c.name === cat)?.id ?? null);
+
+  const { rows, total, lastPage, isLoading, error, refetch } = useServerTable<StockRowApi>(
+    ["persediaan", "stock"],
+    "/persediaan/stock",
+    {
+      page,
+      perPage: PAGE_SIZE,
+      search: debouncedQ || null,
+      filters: { warehouse_id: whFilter.warehouseId, category_id: categoryId },
+    },
+  );
+
   const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);
   const handleClearFilters = useCallback(() => {
     setQ("");
@@ -67,60 +88,57 @@ function StockSaatIni() {
     setCat(ALL);
   }, [whFilter]);
 
-  const itemCat = useMemo(
-    () => new Map((items?.data ?? []).map((i) => [i.id, i.category])),
-    [items],
-  );
-
-  const rows = useMemo(
-    () =>
-      (data?.data ?? []).filter(
-        (it) =>
-          (!debouncedQ ||
-            `${it.name ?? ""} ${it.sku ?? ""}`.toLowerCase().includes(debouncedQ.toLowerCase())) &&
-          (wh === ALL || it.warehouse === wh) &&
-          (cat === ALL || itemCat.get(it.item_id) === cat),
-      ),
-    [data, debouncedQ, wh, cat, itemCat],
-  );
-
-  const handleExport = useCallback(() => {
-    const content = toCsv(
-      rows.map((it) => ({
-        nama: it.name ?? "—",
-        sku: it.sku ?? "—",
-        satuan: it.unit ?? "—",
-        gudang: it.warehouse ?? "—",
-        rak: it.rack ?? "—",
-        bin: it.bin ?? "—",
-        stock: it.stock,
-        reserved: it.reserved,
-        available: it.available,
-        min: it.min,
-        max: it.max ?? "—",
-        cost: it.cost,
-        status: it.status,
-      })),
-      [
-        { key: "nama", label: "Barang" },
-        { key: "sku", label: "SKU" },
-        { key: "satuan", label: "Satuan" },
-        { key: "gudang", label: "Gudang" },
-        { key: "rak", label: "Rak" },
-        { key: "bin", label: "Bin" },
-        { key: "stock", label: "Stock" },
-        { key: "reserved", label: "Reserved" },
-        { key: "available", label: "Available" },
-        { key: "min", label: "Min" },
-        { key: "max", label: "Max" },
-        { key: "cost", label: "HPP" },
-        { key: "status", label: "Status" },
-      ],
-    );
-    const today = new Date().toISOString().slice(0, 10);
-    downloadCsv(`stock-saat-ini-${today}.csv`, content);
-    toast.success(`Export ${rows.length} baris`);
-  }, [rows]);
+  const [exporting, setExporting] = useState(false);
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      // Export mencakup SEMUA baris terfilter (bukan 1 halaman): fetchAll terpisah (Fase 4).
+      const params: Record<string, string> = {};
+      if (debouncedQ) params["search"] = debouncedQ;
+      if (whFilter.warehouseId != null) params["warehouse_id"] = String(whFilter.warehouseId);
+      if (categoryId != null) params["category_id"] = String(categoryId);
+      const res = await fetchAll<StockRowApi>("/persediaan/stock", params);
+      const content = toCsv(
+        res.data.map((it) => ({
+          nama: it.name ?? "—",
+          sku: it.sku ?? "—",
+          satuan: it.unit ?? "—",
+          gudang: it.warehouse ?? "—",
+          rak: it.rack ?? "—",
+          bin: it.bin ?? "—",
+          stock: it.stock,
+          reserved: it.reserved,
+          available: it.available,
+          min: it.min,
+          max: it.max ?? "—",
+          cost: it.cost,
+          status: it.status,
+        })),
+        [
+          { key: "nama", label: "Barang" },
+          { key: "sku", label: "SKU" },
+          { key: "satuan", label: "Satuan" },
+          { key: "gudang", label: "Gudang" },
+          { key: "rak", label: "Rak" },
+          { key: "bin", label: "Bin" },
+          { key: "stock", label: "Stock" },
+          { key: "reserved", label: "Reserved" },
+          { key: "available", label: "Available" },
+          { key: "min", label: "Min" },
+          { key: "max", label: "Max" },
+          { key: "cost", label: "HPP" },
+          { key: "status", label: "Status" },
+        ],
+      );
+      const today = new Date().toISOString().slice(0, 10);
+      downloadCsv(`stock-saat-ini-${today}.csv`, content);
+      toast.success(`Export ${res.data.length} baris`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export gagal.");
+    } finally {
+      setExporting(false);
+    }
+  }, [debouncedQ, whFilter, categoryId]);
 
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
@@ -134,12 +152,13 @@ function StockSaatIni() {
     [navigate],
   );
 
+  // Sort header nonaktif: backend mengurutkan nama barang tetap dan tidak
+  // menyediakan param sort — sort client atas 1 halaman menyesatkan (Fase 4).
   const columns: Column<StockRowApi>[] = [
     {
       key: "name",
       label: "Barang",
       className: "min-w-[220px]",
-      sortable: true,
       render: (r) => (
         <span className="block max-w-[280px] truncate font-medium" title={r.name ?? ""}>
           {r.name ?? "—"}
@@ -150,62 +169,48 @@ function StockSaatIni() {
       key: "sku",
       label: "SKU",
       className: "w-[110px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <span className="font-mono text-xs">{r.sku ?? "—"}</span>,
     },
     {
       key: "unit",
       label: "Satuan",
       className: "w-[90px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <Pill tone="neutral">{r.unit ?? "—"}</Pill>,
     },
     {
       key: "wh",
       label: "Gudang",
       className: "min-w-[140px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.warehouse ?? "",
       render: (r) => r.warehouse ?? "—",
     },
     {
       key: "rak",
       label: "Rak",
       className: "w-[80px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.rack ?? "",
       render: (r) => r.rack ?? "Lantai",
     },
     {
       key: "bin",
       label: "Bin",
       className: "w-[90px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.bin ?? "",
       render: (r) => r.bin ?? "Lantai",
     },
     {
       key: "qty",
       label: "Qty",
       className: "text-right w-[110px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.stock,
       render: (r) => `${formatNumber(r.stock)} ${r.unit ?? ""}`,
     },
     {
       key: "res",
       label: "Reserved",
       className: "text-right w-[110px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.reserved,
       render: (r) => `${formatNumber(r.reserved)} ${r.unit ?? ""}`,
     },
     {
       key: "avl",
       label: "Available",
       className: "text-right w-[110px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.available,
       render: (r) => (
         <b>
           {formatNumber(r.available)} {r.unit ?? ""}
@@ -216,29 +221,24 @@ function StockSaatIni() {
       key: "min",
       label: "Minimum",
       className: "text-right w-[110px] whitespace-nowrap",
-      sortable: true,
       render: (r) => (r.min != null ? `${formatNumber(r.min)} ${r.unit ?? ""}` : "—"),
     },
     {
       key: "max",
       label: "Maximum",
       className: "text-right w-[110px] whitespace-nowrap",
-      sortable: true,
       render: (r) => (r.max != null ? `${formatNumber(r.max)} ${r.unit ?? ""}` : "—"),
     },
     {
       key: "val",
       label: "Nilai Stock",
       className: "text-right min-w-[130px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.stock * r.cost,
       render: (r) => formatIDR(r.stock * r.cost),
     },
     {
       key: "status",
       label: "Status",
       className: "w-[100px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <Pill tone={statusTone[r.status]}>{r.status}</Pill>,
     },
   ];
@@ -254,9 +254,9 @@ function StockSaatIni() {
               variant="outline"
               className="rounded-xl"
               onClick={handleExport}
-              disabled={rows.length === 0 || isLoading}
+              disabled={rows.length === 0 || isLoading || exporting}
             >
-              <Download className="h-4 w-4" /> Export
+              <Download className="h-4 w-4" /> {exporting ? "Mengekspor..." : "Export"}
             </Button>
           }
         />
@@ -296,7 +296,7 @@ function StockSaatIni() {
 
       <Panel
         title="Posisi Stock"
-        description={`${formatNumber(rows.length)} baris`}
+        description={`${formatNumber(total)} baris`}
         actions={
           <>
             <HelpHint label="Penjelasan kolom">
@@ -326,11 +326,15 @@ function StockSaatIni() {
         <DataTable
           columns={columns}
           rows={rows}
-          pageSize={12}
+          pageSize={PAGE_SIZE}
           loading={isLoading}
           error={error}
           onRetry={() => refetch()}
           onRowClick={goToDetail}
+          serverPage={page}
+          serverTotalRows={total}
+          serverTotalPages={lastPage}
+          onServerPageChange={setPage}
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">

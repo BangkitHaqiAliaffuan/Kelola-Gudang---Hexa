@@ -15,6 +15,8 @@ export type StockRowApi = {
   sku: string | null;
   name: string | null;
   unit: string | null;
+  category_id?: number | null;
+  category?: string | null;
   min: number | null;
   max: number | null;
   cost: number;

@@ -44,13 +44,27 @@ class ItemController extends Controller
             $query->where('category_id', $categoryId);
         }
 
+        // Filter Fase 4 (server pagination halaman Barang): sub-kategori
+        // (FK nullable) + merk (`brand_id` menyimpan id merk sebagai string).
+        if ($subCategoryId = $request->query('sub_category_id')) {
+            $query->where('sub_category_id', $subCategoryId);
+        }
+
+        if ($brandId = $request->query('brand_id')) {
+            $query->where('brand_id', $brandId);
+        }
+
         if ($status = $request->query('status')) {
             $query->where('status', $status);
         }
 
         $query->orderBy('name');
 
-        $request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']]);
+        $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'sub_category_id' => ['nullable', 'integer', 'exists:sub_categories,id'],
+            'brand_id' => ['nullable', 'integer', 'exists:merks,id'],
+        ]);
 
         $items = $query->paginate((int) $request->query('per_page', 20));
 

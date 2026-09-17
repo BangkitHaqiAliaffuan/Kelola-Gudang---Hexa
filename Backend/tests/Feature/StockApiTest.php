@@ -53,14 +53,17 @@ class StockApiTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     '*' => [
-                        'id', 'item_id', 'sku', 'name', 'unit', 'min', 'max', 'cost',
+                        'id', 'item_id', 'sku', 'name', 'unit', 'category_id', 'category',
+                        'min', 'max', 'cost',
                         'warehouse', 'rack', 'bin', 'stock', 'reserved', 'available',
                         'nilai', 'status',
                     ],
                 ],
                 'meta' => ['total'],
             ])
-            ->assertJsonPath('meta.total', ItemStock::count());
+            ->assertJsonPath('meta.total', ItemStock::count())
+            ->assertJsonPath('data.0.category_id', $item->category_id)
+            ->assertJsonPath('data.0.category', $item->category->name);
 
         $row = ItemStock::query()->with(['item', 'warehouse', 'bin'])->first();
         $this->assertNotNull($row->item);

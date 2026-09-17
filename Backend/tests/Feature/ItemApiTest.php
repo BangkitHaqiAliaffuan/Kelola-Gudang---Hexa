@@ -82,6 +82,37 @@ class ItemApiTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_index_filters_by_sub_category_and_brand(): void
+    {
+        $category = Category::factory()->create();
+        $subA = SubCategory::factory()->create(['category_id' => $category->id]);
+        $subB = SubCategory::factory()->create(['category_id' => $category->id]);
+        $merkA = Merk::factory()->create();
+        $merkB = Merk::factory()->create();
+        Item::factory()->create([
+            'category_id' => $category->id,
+            'sub_category_id' => $subA->id,
+            'brand_id' => $merkA->id,
+        ]);
+        Item::factory()->create([
+            'category_id' => $category->id,
+            'sub_category_id' => $subB->id,
+            'brand_id' => $merkA->id,
+        ]);
+        Item::factory()->create([
+            'category_id' => $category->id,
+            'sub_category_id' => $subA->id,
+            'brand_id' => $merkB->id,
+        ]);
+
+        $this->getJson("/api/master/items?sub_category_id={$subA->id}&brand_id={$merkA->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/master/items?sub_category_id=999999')
+            ->assertUnprocessable();
+    }
+
     public function test_can_store_item(): void
     {
         $category = Category::factory()->create();

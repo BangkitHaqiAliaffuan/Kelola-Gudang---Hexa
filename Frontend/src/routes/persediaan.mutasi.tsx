@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -18,8 +18,10 @@ import { Input } from "@/components/ui/input";
 import { useWarehouseFilter } from "@/hooks/use-warehouse-filter";
 import { useDebouncedValue } from "@/hooks/use-debounce";
 import { useWarehouses } from "@/hooks/use-master";
-import { useStockDocument, useStockDocuments } from "@/hooks/use-persediaan";
+import { useStockDocument } from "@/hooks/use-persediaan";
+import { useServerTable } from "@/hooks/use-server-table";
 import { downloadCsv, toCsv } from "@/lib/csv";
+import { fetchAll } from "@/lib/api";
 import { formatDate, formatNumber } from "@/lib/wms-data";
 import {
   stockDocumentStatuses,
@@ -62,8 +64,9 @@ const statusTone = (s: StockDocumentApi["status"]): Tone =>
         ? "danger"
         : "warning";
 
+const PAGE_SIZE = 12;
+
 function MutasiStock() {
-  const { data, isLoading, error, refetch } = useStockDocuments();
   const { data: warehouses, isLoading: warehousesLoading } = useWarehouses();
   const [q, setQ] = useState("");
   const debouncedQ = useDebouncedValue(q);
@@ -72,8 +75,37 @@ function MutasiStock() {
   // Filter gudang: pilihan tersimpan per user → default user → Semua.
   const whFilter = useWarehouseFilter(warehouses?.data);
   const wh = whFilter.value;
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: detail, isLoading: detailLoading } = useStockDocument(selectedId ?? undefined);
+
+  // Kembali ke halaman 1 setiap kali filter berubah (Fase 4: paginasi server).
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, type, status, wh]);
+
+  // FilterSelect memakai nama; server butuh id.
+  const warehouseId = wh === ALL ? null : (warehouses?.data.find((w) => w.name === wh)?.id ?? null);
+  const queryFilters = useMemo(
+    () => ({
+      type: type === ALL ? null : type,
+      status: status === ALL ? null : status,
+      warehouse_id: warehouseId,
+    }),
+    [type, status, warehouseId],
+  );
+
+  const { rows, total, lastPage, isLoading, error, refetch } = useServerTable<StockDocumentApi>(
+    ["persediaan", "stock-documents"],
+    "/persediaan/stock-documents",
+    {
+      page,
+      perPage: PAGE_SIZE,
+      search: debouncedQ || null,
+      filters: queryFilters,
+    },
+  );
+
   const hasActiveFilters = useMemo(
     () => q !== "" || type !== ALL || status !== ALL || wh !== ALL,
     [q, type, status, wh],
@@ -85,76 +117,74 @@ function MutasiStock() {
     whFilter.reset();
   }, [whFilter]);
 
-  const rows = useMemo(
-    () =>
-      (data?.data ?? []).filter(
-        (d) =>
-          (!debouncedQ ||
-            `${d.no} ${d.partner ?? ""} ${d.note ?? ""}`
-              .toLowerCase()
-              .includes(debouncedQ.toLowerCase())) &&
-          (type === ALL || d.type === type) &&
-          (status === ALL || d.status === status) &&
-          (wh === ALL || d.warehouse === wh),
-      ),
-    [data, debouncedQ, type, status, wh],
-  );
+  const [exporting, setExporting] = useState(false);
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      // Export mencakup SEMUA baris terfilter (bukan 1 halaman): fetchAll terpisah (Fase 4).
+      const params: Record<string, string> = {};
+      if (debouncedQ) params["search"] = debouncedQ;
+      if (type !== ALL) params["type"] = type;
+      if (status !== ALL) params["status"] = status;
+      if (warehouseId != null) params["warehouse_id"] = String(warehouseId);
+      const res = await fetchAll<StockDocumentApi>("/persediaan/stock-documents", params);
+      const content = toCsv(
+        res.data.map((d) => ({
+          no: d.no,
+          tanggal: formatDate(d.document_date),
+          jenis: d.type,
+          gudang: d.destination ? `${d.warehouse ?? "—"} → ${d.destination}` : (d.warehouse ?? "—"),
+          baris: d.line_count,
+          status: d.status,
+          partner: d.partner ?? "—",
+          catatan: d.note ?? "—",
+        })),
+        [
+          { key: "no", label: "Nomor" },
+          { key: "tanggal", label: "Tanggal" },
+          { key: "jenis", label: "Jenis" },
+          { key: "gudang", label: "Gudang" },
+          { key: "baris", label: "Baris" },
+          { key: "status", label: "Status" },
+          { key: "partner", label: "Partner" },
+          { key: "catatan", label: "Catatan" },
+        ],
+      );
+      const today = new Date().toISOString().slice(0, 10);
+      downloadCsv(`mutasi-stock-${today}.csv`, content);
+      toast.success(`Export ${res.data.length} dokumen`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Export gagal.");
+    } finally {
+      setExporting(false);
+    }
+  }, [debouncedQ, type, status, warehouseId]);
 
-  const handleExport = useCallback(() => {
-    const content = toCsv(
-      rows.map((d) => ({
-        no: d.no,
-        tanggal: formatDate(d.document_date),
-        jenis: d.type,
-        gudang: d.destination ? `${d.warehouse ?? "—"} → ${d.destination}` : (d.warehouse ?? "—"),
-        baris: d.line_count,
-        status: d.status,
-        partner: d.partner ?? "—",
-        catatan: d.note ?? "—",
-      })),
-      [
-        { key: "no", label: "Nomor" },
-        { key: "tanggal", label: "Tanggal" },
-        { key: "jenis", label: "Jenis" },
-        { key: "gudang", label: "Gudang" },
-        { key: "baris", label: "Baris" },
-        { key: "status", label: "Status" },
-        { key: "partner", label: "Partner" },
-        { key: "catatan", label: "Catatan" },
-      ],
-    );
-    const today = new Date().toISOString().slice(0, 10);
-    downloadCsv(`mutasi-stock-${today}.csv`, content);
-    toast.success(`Export ${rows.length} dokumen`);
-  }, [rows]);
-
+  // Sort header nonaktif: backend mengurutkan document_date desc tetap dan
+  // tidak menyediakan param sort — sort client atas 1 halaman menyesatkan (Fase 4).
   const columns: Column<StockDocumentApi>[] = [
     {
       key: "no",
       label: "Nomor",
       className: "w-[170px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <span className="font-mono text-xs font-semibold text-primary">{r.no}</span>,
     },
     {
       key: "document_date",
       label: "Tanggal",
       className: "w-[130px] whitespace-nowrap",
-      sortable: true,
       render: (r) => formatDate(r.document_date),
     },
     {
       key: "type",
       label: "Jenis",
       className: "min-w-[140px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <Pill tone={typeTone(r.type)}>{r.type}</Pill>,
     },
     {
       key: "warehouse",
       label: "Gudang",
       className: "min-w-[150px] whitespace-nowrap",
-      sortable: true,
       render: (r) =>
         r.destination ? `${r.warehouse ?? "—"} → ${r.destination}` : (r.warehouse ?? "—"),
     },
@@ -162,14 +192,12 @@ function MutasiStock() {
       key: "line_count",
       label: "Baris",
       className: "text-right w-[80px] whitespace-nowrap",
-      sortable: true,
       render: (r) => formatNumber(r.line_count),
     },
     {
       key: "status",
       label: "Status",
       className: "w-[150px] whitespace-nowrap",
-      sortable: true,
       render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
     },
   ];
@@ -184,9 +212,9 @@ function MutasiStock() {
             variant="outline"
             className="rounded-xl"
             onClick={handleExport}
-            disabled={rows.length === 0 || isLoading}
+            disabled={rows.length === 0 || isLoading || exporting}
           >
-            <Download className="h-4 w-4" /> Export
+            <Download className="h-4 w-4" /> {exporting ? "Mengekspor..." : "Export"}
           </Button>
         }
       />
@@ -228,15 +256,19 @@ function MutasiStock() {
           </div>
         </div>
       </Panel>
-      <Panel title="Daftar Dokumen" description={`${formatNumber(rows.length)} dokumen`}>
+      <Panel title="Daftar Dokumen" description={`${formatNumber(total)} dokumen`}>
         <DataTable
           columns={columns}
           rows={rows}
-          pageSize={12}
+          pageSize={PAGE_SIZE}
           loading={isLoading}
           error={error}
           onRetry={() => refetch()}
           onRowClick={(r) => setSelectedId(r.id)}
+          serverPage={page}
+          serverTotalRows={total}
+          serverTotalPages={lastPage}
+          onServerPageChange={setPage}
           mobileCard={(r) => (
             <div className="space-y-1.5">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
