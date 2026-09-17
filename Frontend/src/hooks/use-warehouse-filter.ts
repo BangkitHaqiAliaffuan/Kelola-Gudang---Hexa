@@ -66,7 +66,8 @@ export function useWarehouseFilter(
   // F7.5: mode Terbatas — pilihan di luar izin dianggap tidak ada.
   // "Semua" eksplisit maupun default yang tak diizinkan jatuh ke gudang
   // izin pertama (atau null bila izin kosong = fail-closed).
-  const limited = warehouseScope.mode === "Terbatas";
+  // `?.` defensif: mock useAuth lama di spec mungkin tak punya warehouseScope.
+  const limited = warehouseScope?.mode === "Terbatas";
   const allowedIds = useMemo(() => new Set(warehouseScope.ids ?? []), [warehouseScope]);
   const scopedStoredId =
     validStoredId != null && (!limited || allowedIds.has(validStoredId)) ? validStoredId : null;

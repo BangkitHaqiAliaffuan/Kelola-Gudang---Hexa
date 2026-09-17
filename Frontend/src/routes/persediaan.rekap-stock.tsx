@@ -111,7 +111,7 @@ function RekapStock() {
     const all = warehouses?.data ?? [];
     // F7.5: user Terbatas hanya melihat kolom gudang izin (defense-in-depth;
     // backend sudah men-scope /master/warehouses).
-    if (warehouseScope.mode !== "Terbatas") return all;
+    if (warehouseScope?.mode !== "Terbatas") return all;
     const ids = new Set(warehouseScope.ids ?? []);
     return all.filter((w) => ids.has(w.id));
   }, [warehouses, warehouseScope]);
