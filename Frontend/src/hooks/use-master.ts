@@ -159,12 +159,14 @@ export type RolePermissionPayload = {
   name?: string;
   description?: string | null;
   can_review?: boolean;
+  warehouse_scope_mode?: string;
 };
 
 export type RoleCreatePayload = {
   name: string;
   description?: string;
   can_review?: boolean;
+  warehouse_scope_mode?: string;
   access?: RoleAccessEntry[];
 };
 
@@ -182,11 +184,19 @@ export function useCreateRole() {
 export function useUpdateRole() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ role, access, name, description, can_review }: RolePermissionPayload) =>
+    mutationFn: ({
+      role,
+      access,
+      name,
+      description,
+      can_review,
+      warehouse_scope_mode,
+    }: RolePermissionPayload) =>
       api.put<{ data: RoleCatalog }>(`/master/roles/${encodeURIComponent(role)}`, {
         ...(name !== undefined ? { name } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(can_review !== undefined ? { can_review } : {}),
+        ...(warehouse_scope_mode !== undefined ? { warehouse_scope_mode } : {}),
         access,
       }),
     onSuccess: async () => {
@@ -865,6 +875,8 @@ export type UserPayload = {
   email: string;
   role: string;
   default_warehouse_id?: number | null;
+  /** Gudang tugasan (F7): hanya dikirim bila diubah di form. */
+  warehouse_ids?: number[];
   password?: string;
   password_confirmation?: string;
   is_active: boolean;

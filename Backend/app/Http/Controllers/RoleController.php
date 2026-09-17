@@ -27,6 +27,7 @@ class RoleController extends Controller
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
                 'can_review' => $validated['can_review'] ?? false,
+                'warehouse_scope_mode' => $validated['warehouse_scope_mode'] ?? 'Semua',
             ]);
 
             // Role baru lahir dengan NOL baris permission = tolak semua modul
@@ -87,6 +88,7 @@ class RoleController extends Controller
                 'name' => $newName,
                 'description' => $validated['description'] ?? $record->description,
                 'can_review' => $validated['can_review'] ?? $record->can_review,
+                'warehouse_scope_mode' => $validated['warehouse_scope_mode'] ?? $record->warehouse_scope_mode,
             ]);
 
             // Rename berpropagasi ke users + permission dalam satu transaksi

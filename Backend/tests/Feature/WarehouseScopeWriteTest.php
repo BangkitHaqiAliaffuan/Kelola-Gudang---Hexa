@@ -160,4 +160,72 @@ class WarehouseScopeWriteTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('warehouse_id');
     }
+
+    public function test_admin_manages_role_scope_mode(): void
+    {
+        $this->actingAsMasterAdmin();
+
+        $this->postJson('/api/master/roles', ['name' => 'Op Dinamis'])
+            ->assertCreated()
+            ->assertJsonPath('data.warehouse_scope_mode', 'Semua');
+
+        $this->putJson('/api/master/roles/Op Dinamis', ['warehouse_scope_mode' => 'Terbatas'])
+            ->assertOk()
+            ->assertJsonPath('data.warehouse_scope_mode', 'Terbatas');
+
+        $this->putJson('/api/master/roles/Op Dinamis', ['warehouse_scope_mode' => 'Bebas'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('warehouse_scope_mode');
+
+        $this->getJson('/api/master/roles')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Op Dinamis', 'warehouse_scope_mode' => 'Terbatas']);
+    }
+
+    public function test_admin_assigns_warehouses_to_user_with_w4_guard(): void
+    {
+        $this->actingAsMasterAdmin();
+        Role::create(['name' => 'Op W4', 'warehouse_scope_mode' => 'Terbatas']);
+        $a = Warehouse::factory()->create();
+        $b = Warehouse::factory()->create();
+
+        $base = [
+            'name' => 'Operator W4',
+            'email' => 'opw4@test.local',
+            'role' => 'Op W4',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        // Tanpa gudang & tanpa default → 422 (W4).
+        $this->postJson('/api/master/users', $base)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('warehouse_ids');
+
+        // Dengan pivot → 201 + ids terbaca di show.
+        $id = $this->postJson('/api/master/users', [...$base, 'warehouse_ids' => [$a->id, $b->id]])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->getJson("/api/master/users/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.warehouse_ids', [$a->id, $b->id]);
+
+        // Update sync pivot.
+        $this->putJson("/api/master/users/{$id}", [
+            'name' => 'Operator W4',
+            'email' => 'opw4@test.local',
+            'role' => 'Op W4',
+            'warehouse_ids' => [$b->id],
+        ])->assertOk()->assertJsonPath('data.warehouse_ids', [$b->id]);
+
+        // Hapus semua pivot tanpa default → 422.
+        $this->putJson("/api/master/users/{$id}", [
+            'name' => 'Operator W4',
+            'email' => 'opw4@test.local',
+            'role' => 'Op W4',
+            'warehouse_ids' => [],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('warehouse_ids');
+    }
 }

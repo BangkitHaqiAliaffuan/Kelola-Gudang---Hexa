@@ -20,6 +20,8 @@ class UpdateUserRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
             'role' => ['required', 'string', Rule::exists('roles', 'name')],
             'default_warehouse_id' => ['nullable', 'integer', Rule::exists('warehouses', 'id')],
+            'warehouse_ids' => ['sometimes', 'array'],
+            'warehouse_ids.*' => ['integer', Rule::exists('warehouses', 'id')],
             'password' => ['nullable', 'string', 'min:8', 'max:64', 'confirmed'],
             'is_active' => ['sometimes', 'boolean'],
         ];

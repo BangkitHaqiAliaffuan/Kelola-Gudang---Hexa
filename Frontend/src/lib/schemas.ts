@@ -286,6 +286,8 @@ const baseUserSchema = z.object({
   email: emailRequired,
   role: z.string().trim().min(1, "Role wajib dipilih"),
   default_warehouse_id: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
+  /** Gudang tugasan (F7): hanya relevan bila role ber-mode Terbatas. */
+  warehouse_ids: z.array(z.coerce.number().int().positive()).optional(),
   is_active: z.boolean().default(true),
 });
 

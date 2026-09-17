@@ -71,7 +71,7 @@ import {
   type WarehouseInput,
   type WorkOrderInput,
 } from "@/lib/schemas";
-import { fieldError } from "@/lib/api";
+import { api, fieldError } from "@/lib/api";
 import { nextSku } from "@/lib/sku";
 import { eanChecksumOk, normalizeCode } from "@/lib/barcode-label";
 import { useAuth } from "@/hooks/use-auth";
@@ -3948,6 +3948,22 @@ export function UserFormDialog({
   );
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  // Gudang tugasan (F7): state lokal agar pivot tidak terhapus saat edit
+  // tanpa menyentuh bagian ini — hanya dikirim bila diubah (whTouched).
+  const [whIds, setWhIds] = useState<number[]>([]);
+  const [whTouched, setWhTouched] = useState(false);
+
+  useEffect(() => {
+    setWhTouched(false);
+    if (open && initial) {
+      api
+        .get<{ data: MasterUser }>(`/master/users/${initial.id}`)
+        .then((res) => setWhIds(res.data.warehouse_ids ?? []))
+        .catch(() => setWhIds([]));
+    } else {
+      setWhIds([]);
+    }
+  }, [open, initial]);
 
   return (
     <CrudFormDialog<UserInput>
@@ -3990,6 +4006,7 @@ export function UserFormDialog({
         const whId = values.default_warehouse_id;
         if (whId !== "" && whId != null) payload.default_warehouse_id = Number(whId);
         else if (initial) payload.default_warehouse_id = null;
+        if (whTouched) payload.warehouse_ids = whIds;
         const code = values.code?.trim();
         if (initial && code) payload.code = code;
         if (values.password) payload.password = values.password;
@@ -4011,6 +4028,7 @@ export function UserFormDialog({
           rowField(form as never, err, "email");
           rowField(form as never, err, "role");
           rowField(form as never, err, "default_warehouse_id");
+          rowField(form as never, err, "warehouse_ids");
           rowField(form as never, err, "password");
           if (
             !fieldError(err, "code") &&
@@ -4018,6 +4036,7 @@ export function UserFormDialog({
             !fieldError(err, "email") &&
             !fieldError(err, "role") &&
             !fieldError(err, "default_warehouse_id") &&
+            !fieldError(err, "warehouse_ids") &&
             !fieldError(err, "password")
           )
             toast.error((err as Error).message);
@@ -4131,6 +4150,45 @@ export function UserFormDialog({
                 );
               }}
             />
+            {(() => {
+              // Gudang tugasan (F7): hanya untuk role ber-mode Terbatas.
+              const roleName = form.watch("role");
+              const mode = (rolesData?.data ?? []).find(
+                (r) => r.name === roleName,
+              )?.warehouse_scope_mode;
+              if (mode !== "Terbatas") return null;
+              return (
+                <div className="grid gap-1.5">
+                  <Label>Gudang Tugasan</Label>
+                  <div className="grid gap-1 rounded-xl border border-border p-2">
+                    {warehousesLoading ? (
+                      <p className="px-2 py-1 text-xs text-muted-foreground">Memuat gudang...</p>
+                    ) : (
+                      (warehouses?.data ?? []).map((w) => (
+                        <label
+                          key={w.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent/40"
+                        >
+                          <Checkbox
+                            checked={whIds.includes(w.id)}
+                            onCheckedChange={(v) => {
+                              setWhTouched(true);
+                              setWhIds((ids) =>
+                                v === true ? [...ids, w.id] : ids.filter((id) => id !== w.id),
+                              );
+                            }}
+                          />
+                          <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    User role Terbatas wajib punya minimal 1 gudang atau gudang default.
+                  </p>
+                </div>
+              );
+            })()}
             <div className="space-y-2">
               <Label>Password</Label>
               <div className="relative">
@@ -4227,6 +4285,7 @@ export function RoleEditDialog({
   const [newName, setNewName] = useState("");
   const [description, setDescription] = useState("");
   const [canReview, setCanReview] = useState(false);
+  const [scopeMode, setScopeMode] = useState("Semua");
 
   useEffect(() => {
     if (role) {
@@ -4238,6 +4297,7 @@ export function RoleEditDialog({
       setNewName(role.name);
       setDescription(role.description ?? "");
       setCanReview(role.can_review);
+      setScopeMode(role.warehouse_scope_mode === "Terbatas" ? "Terbatas" : "Semua");
     }
   }, [role]);
 
@@ -4263,6 +4323,7 @@ export function RoleEditDialog({
         ...(trimmedName && trimmedName !== role.name ? { name: trimmedName } : {}),
         description: description.trim() === "" ? null : description.trim(),
         can_review: canReview,
+        warehouse_scope_mode: scopeMode,
         access,
       });
       // Bila mengedit role sendiri, peta access sesi langsung basi → sinkronkan
@@ -4364,6 +4425,26 @@ export function RoleEditDialog({
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="min-w-0">
+              <Label htmlFor="role-scope" className="text-sm font-medium">
+                Lingkup Gudang
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Semua = lintas-gudang. Terbatas = user role ini hanya melihat gudang yang ditugaskan
+                (diatur di form user).
+              </p>
+            </div>
+            <Select value={scopeMode} onValueChange={(v) => setScopeMode(v)}>
+              <SelectTrigger id="role-scope" className="w-32 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent side="bottom" avoidCollisions={false}>
+                <SelectItem value="Semua">Semua</SelectItem>
+                <SelectItem value="Terbatas">Terbatas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
               <Label htmlFor="role-can-approve" className="text-sm font-medium">
                 Approval Pengadaan
               </Label>
@@ -4410,6 +4491,7 @@ export function RoleCreateDialog({
   const [canReview, setCanReview] = useState(false);
   const [draft, setDraft] = useState<Record<string, AccessLevel | null>>({});
   const [canApprove, setCanApprove] = useState(false);
+  const [scopeMode, setScopeMode] = useState("Semua");
 
   useEffect(() => {
     if (open) {
@@ -4418,6 +4500,7 @@ export function RoleCreateDialog({
       setCanReview(false);
       setDraft({});
       setCanApprove(false);
+      setScopeMode("Semua");
     }
   }, [open]);
 
@@ -4444,6 +4527,7 @@ export function RoleCreateDialog({
         name: trimmed,
         ...(description.trim() ? { description: description.trim() } : {}),
         can_review: canReview,
+        warehouse_scope_mode: scopeMode,
         access,
       });
       toast.success(`Role "${trimmed}" dibuat — tanpa akses sampai diberi hak`);
@@ -4536,6 +4620,25 @@ export function RoleCreateDialog({
               checked={canReview}
               onCheckedChange={(value) => setCanReview(value === true)}
             />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-new-scope" className="text-sm font-medium">
+                Lingkup Gudang
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Semua = lintas-gudang. Terbatas = hanya gudang yang ditugaskan di form user.
+              </p>
+            </div>
+            <Select value={scopeMode} onValueChange={(v) => setScopeMode(v)}>
+              <SelectTrigger id="role-new-scope" className="w-32 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent side="bottom" avoidCollisions={false}>
+                <SelectItem value="Semua">Semua</SelectItem>
+                <SelectItem value="Terbatas">Terbatas</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="min-w-0">

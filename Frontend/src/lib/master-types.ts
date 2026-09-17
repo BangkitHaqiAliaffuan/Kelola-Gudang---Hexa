@@ -201,6 +201,8 @@ export type MasterUser = {
   role: string;
   default_warehouse_id: number | null;
   warehouse: string | null;
+  /** Gudang tugasan (F7): hanya ada bila relasi dimuat (detail user). */
+  warehouse_ids?: number[] | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -212,6 +214,8 @@ export type RoleCatalog = {
   description: string | null;
   is_system: boolean;
   can_review: boolean;
+  /** 'Semua' = lintas-gudang; 'Terbatas' = hanya gudang user (F7). */
+  warehouse_scope_mode: string;
   user_count: number;
   active_user_count: number;
   access: RoleAccessEntry[];

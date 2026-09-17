@@ -276,6 +276,7 @@ vi.mock("@/hooks/use-auth", () => ({
     status: "authenticated",
     user: { id: 1, name: "Rudi", email: "rudi.hartono@kelolagudang.id", role: "Administrator" },
     access: [],
+    warehouseScope: { mode: "Semua", ids: null },
     login: vi.fn(),
     logout: vi.fn(),
     hasModule: () => true,

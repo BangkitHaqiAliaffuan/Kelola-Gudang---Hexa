@@ -15,6 +15,7 @@ class RoleResource extends JsonResource
             'description' => $this->resource->description,
             'is_system' => $this->resource->is_system,
             'can_review' => $this->resource->can_review,
+            'warehouse_scope_mode' => $this->resource->warehouse_scope_mode,
             'user_count' => $this->resource->userCount(),
             'active_user_count' => $this->resource->activeUserCount(),
             'access' => $this->resource->access(),

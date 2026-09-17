@@ -17,6 +17,10 @@ class UserResource extends JsonResource
             'role' => $this->role,
             'default_warehouse_id' => $this->default_warehouse_id,
             'warehouse' => $this->whenLoaded('defaultWarehouse', fn () => $this->defaultWarehouse?->name),
+            'warehouse_ids' => $this->whenLoaded(
+                'warehouses',
+                fn () => $this->warehouses->pluck('id')->map(fn ($id) => (int) $id)->values()->all()
+            ),
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
