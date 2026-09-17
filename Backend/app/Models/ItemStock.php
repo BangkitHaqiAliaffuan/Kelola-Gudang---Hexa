@@ -20,12 +20,16 @@ class ItemStock extends Model
         'bin_id',
         'stock',
         'reserved',
+        'in_qty',
+        'in_cost',
         'unit_cost_avg',
     ];
 
     protected $casts = [
         'stock' => 'integer',
         'reserved' => 'integer',
+        'in_qty' => 'integer',
+        'in_cost' => 'float',
         'unit_cost_avg' => 'float',
         'updated_at' => 'datetime',
     ];

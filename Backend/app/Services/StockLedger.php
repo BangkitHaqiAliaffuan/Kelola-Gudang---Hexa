@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StockLedger
 {
@@ -18,10 +20,151 @@ class StockLedger
     {
         return DB::transaction(function () use ($attributes) {
             $movement = StockMovement::create($attributes);
-            $this->rebuildForItem($movement->item_id);
+            $occurred = $movement->occurred_at instanceof \DateTimeInterface
+                ? $movement->occurred_at->format('Y-m-d H:i:s')
+                : (string) $movement->occurred_at;
+            $this->refreshForNewMovements($movement->item_id, [$attributes], $occurred);
 
             return $movement;
         });
+    }
+
+    /**
+     * Apply freshly-inserted movements as deltas (Fase 5.1, O(movements)).
+     *
+     * Semantik identik rebuildForItem per lokasi: clamp max(0) per langkah,
+     * avg hanya berubah pada IN via akumulator in_qty/in_cost, guard mismatch
+     * bin↔warehouse (skip + Log::error), totals items.* di akhir.
+     *
+     * BEDA DISENGAJA vs rebuild: baris lokasi basi (ada di item_stock tapi
+     * tanpa movement) TIDAK dihapus — itu tugas rebuildForItem/reconcile.
+     * Hanya untuk movement in-order (occurred_at >= max historis item);
+     * pemanggil memilih jalur karena clamp order-dependent
+     * (lihat StockDocumentService::post).
+     *
+     * @param  list<array{warehouse_id:int,bin_id:?int,direction:string,qty:int,unit_cost:float}>  $movements
+     */
+    public function applyMovements(int $itemId, array $movements): void
+    {
+        // Akumulasi stok lokasi yang di-skip (mismatch) agar items.stock
+        // identik dengan rebuild (yang men-sum fold SEMUA lokasi termasuk
+        // yang skip-tulis — phantom pra-reconcile, dipertahankan demi paritas).
+        $skippedStock = 0;
+
+        foreach ($movements as $m) {
+            $warehouseId = (int) $m['warehouse_id'];
+            $binId = $m['bin_id'] ?? null;
+            $binId = $binId === null ? null : (int) $binId;
+
+            // Guard: sama seperti rebuild — jangan tulis item_stock dengan
+            // warehouse yang tidak cocok dengan bin.rack.warehouse (drift).
+            if ($binId !== null) {
+                $rackWh = Bin::with('rack')->find($binId)?->rack?->warehouse_id;
+                if ($rackWh !== null && $warehouseId !== (int) $rackWh) {
+                    Log::error('StockLedger: warehouse mismatch, skip write — jalankan stock:reconcile-bin-mismatch untuk perbaikan', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
+                    $skippedStock += $this->foldLocationStock($itemId, $warehouseId, $binId);
+
+                    continue;
+                }
+            }
+
+            $row = ItemStock::where('item_id', $itemId)
+                ->where('warehouse_id', $warehouseId)
+                ->when($binId === null, fn ($q) => $q->whereNull('bin_id'), fn ($q) => $q->where('bin_id', $binId))
+                ->first();
+
+            $stock = (int) ($row?->stock ?? 0);
+            $inQty = (int) ($row?->in_qty ?? 0);
+            $inCost = (float) ($row?->in_cost ?? 0);
+            $qty = (int) $m['qty'];
+
+            if ($m['direction'] === 'IN') {
+                $stock += $qty;
+                $inQty += $qty;
+                $inCost += $qty * (float) $m['unit_cost'];
+            } else {
+                $stock = max(0, $stock - $qty);
+            }
+            $average = $inQty > 0 ? $inCost / $inQty : null;
+
+            $values = [
+                'stock' => $stock,
+                'in_qty' => $inQty,
+                'in_cost' => $inCost,
+                'unit_cost_avg' => $average,
+                'updated_at' => now(),
+            ];
+            if ($binId === null) {
+                DB::table('item_stock')->updateOrInsert(
+                    ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => null],
+                    $values
+                );
+            } else {
+                ItemStock::updateOrInsert(
+                    ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId],
+                    $values
+                );
+            }
+        }
+
+        $totalStock = (int) ItemStock::where('item_id', $itemId)->sum('stock') + $skippedStock;
+        Item::where('id', $itemId)->update([
+            'stock' => $totalStock,
+            'reserved' => min((int) ItemStock::where('item_id', $itemId)->sum('reserved'), $totalStock),
+        ]);
+    }
+
+    /**
+     * Fold satu lokasi (clamp per langkah, urutan rebuild) — hanya untuk
+     * jalur langka mismatch-skip agar items.stock paritas dengan rebuild.
+     */
+    private function foldLocationStock(int $itemId, int $warehouseId, int $binId): int
+    {
+        $stock = 0;
+        $movements = StockMovement::where('item_id', $itemId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('bin_id', $binId)
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get(['direction', 'qty']);
+
+        foreach ($movements as $movement) {
+            $stock = $movement->direction === 'IN'
+                ? $stock + (int) $movement->qty
+                : max(0, $stock - (int) $movement->qty);
+        }
+
+        return $stock;
+    }
+
+    /**
+     * Pilih jalur refresh setelah movement baru di-insert (Fase 5.1).
+     *
+     * In-order (tidak ada movement historis dengan occurred_at setelah
+     * $occurredAt) → applyMovements O(m). Backdated → rebuildForItem penuh,
+     * karena clamp max(0) order-dependent: fold terurut ≠ delta-di-akhir.
+     * Movement yang baru dibuat ber-occurred_at == $occurredAt sehingga
+     * dikecualikan oleh perbandingan strict greater-than.
+     *
+     * @param  list<array{warehouse_id:int,bin_id:?int,direction:string,qty:int,unit_cost:float}>  $movements
+     */
+    public function refreshForNewMovements(int $itemId, array $movements, string $occurredAt): void
+    {
+        if ($movements === []) {
+            return;
+        }
+
+        $backdated = StockMovement::where('item_id', $itemId)
+            ->where('occurred_at', '>', $occurredAt)
+            ->exists();
+
+        if ($backdated) {
+            $this->rebuildForItem($itemId);
+
+            return;
+        }
+
+        $this->applyMovements($itemId, $movements);
     }
 
     /**
@@ -66,11 +209,17 @@ class StockLedger
             $cost = $costIn[$key] ?? null;
             $average = $cost && $cost['qty'] > 0 ? $cost['cost'] / $cost['qty'] : null;
 
+            // Akumulator IN (Fase 5.1): rebuild = resync penuh sehingga
+            // reconcile tidak membuat akumulator basi bagi incremental.
+            $inQty = $cost['qty'] ?? 0;
+            $inCost = $cost['cost'] ?? 0;
+
             // Guard: jangan tulis item_stock dengan warehouse yang tidak cocok dengan bin.rack.warehouse (drift)
             if ($binId !== null) {
-                $rackWh = \App\Models\Bin::with('rack')->find($binId)?->rack?->warehouse_id;
+                $rackWh = Bin::with('rack')->find($binId)?->rack?->warehouse_id;
                 if ($rackWh !== null && (int) $warehouseId !== (int) $rackWh) {
-                    \Illuminate\Support\Facades\Log::error('StockLedger: warehouse mismatch, skip write — jalankan stock:reconcile-bin-mismatch untuk perbaikan', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
+                    Log::error('StockLedger: warehouse mismatch, skip write — jalankan stock:reconcile-bin-mismatch untuk perbaikan', ['item_id' => $itemId, 'warehouse_id' => $warehouseId, 'bin_id' => $binId, 'rack_warehouse' => $rackWh]);
+
                     continue;
                 }
             }
@@ -78,12 +227,12 @@ class StockLedger
             if ($binId === null) {
                 DB::table('item_stock')->updateOrInsert(
                     ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => null],
-                    ['stock' => $stock, 'unit_cost_avg' => $average, 'updated_at' => now()]
+                    ['stock' => $stock, 'in_qty' => $inQty, 'in_cost' => $inCost, 'unit_cost_avg' => $average, 'updated_at' => now()]
                 );
             } else {
                 ItemStock::updateOrInsert(
                     ['item_id' => $itemId, 'warehouse_id' => (int) $warehouseId, 'bin_id' => $binId],
-                    ['stock' => $stock, 'unit_cost_avg' => $average, 'updated_at' => now()]
+                    ['stock' => $stock, 'in_qty' => $inQty, 'in_cost' => $inCost, 'unit_cost_avg' => $average, 'updated_at' => now()]
                 );
             }
         }

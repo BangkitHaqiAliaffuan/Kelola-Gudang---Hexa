@@ -49,6 +49,7 @@ class StockDocumentService
             $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
 
             $itemsTouched = [];
+            $newMovements = [];
 
             foreach ($document->lines as $line) {
                 $line->setRelation('document', $document);
@@ -67,6 +68,7 @@ class StockDocumentService
                 foreach ($movements as $attributes) {
                     $this->assertNoNegativeStock($attributes);
                     StockMovement::create($attributes);
+                    $newMovements[$line->item_id][] = $attributes;
                 }
 
                 // Selaraskan unit_cost baris ke biaya posting (rata-rata berjalan
@@ -93,7 +95,13 @@ class StockDocumentService
             }
 
             foreach (array_keys($itemsTouched) as $itemId) {
-                $this->ledger->rebuildForItem($itemId);
+                $this->ledger->refreshForNewMovements(
+                    $itemId,
+                    $newMovements[$itemId] ?? [],
+                    $document->document_date instanceof \DateTimeInterface
+                        ? $document->document_date->format('Y-m-d H:i:s')
+                        : (string) $document->document_date
+                );
             }
 
             $document->update(['status' => 'Selesai', 'posted_at' => now()]);
