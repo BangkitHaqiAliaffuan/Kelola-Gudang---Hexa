@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
-import { Boxes, Download } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Boxes, ChevronsRight, Download, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   ALL,
@@ -13,7 +13,6 @@ import {
   StatCard,
 } from "@/components/wms/kit";
 import { DataTable, type Column } from "@/components/wms/data-table";
-import { RekapLocationsCell, RekapLocationsCompact } from "@/components/wms/rekap-locations-cell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounce";
@@ -23,6 +22,7 @@ import { useStockRows } from "@/hooks/use-persediaan";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { formatIDR, formatIDRCompact, formatNumber } from "@/lib/wms-data";
 import { foldStockRekap, type RekapRow } from "@/lib/stock-rekap";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/persediaan/rekap-stock")({
   head: () => ({
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/persediaan/rekap-stock")({
       { title: "Rekap Stock — KelolaGudang" },
       {
         name: "description",
-        content: "Total stock per barang beserta sebaran lokasi gudang, satu baris per barang.",
+        content: "Total stock per barang beserta rincian tiap gudang, satu baris per barang.",
       },
       { property: "og:title", content: "Rekap Stock — KelolaGudang" },
     ],
@@ -50,6 +50,9 @@ function RekapStock() {
   const whFilter = useWarehouseFilter(warehouses?.data);
   const wh = whFilter.value;
   const [cat, setCat] = useState(ALL);
+  const [fullscreen, setFullscreen] = useState(false);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const highlightId = whFilter.warehouseId;
   const hasActiveFilters = useMemo(() => q !== "" || wh !== ALL || cat !== ALL, [q, wh, cat]);
   const handleClearFilters = useCallback(() => {
     setQ("");
@@ -101,113 +104,152 @@ function RekapStock() {
     [navigate],
   );
 
+  /** Daftar gudang master — tiap gudang menjadi satu kolom qty (0 bila kosong). */
+  const warehouseList = useMemo(() => warehouses?.data ?? [], [warehouses]);
+
+  /** Qty barang di satu gudang; 0 bila tidak ada baris lokasi di gudang itu. */
+  const qtyOf = useCallback(
+    (r: RekapRow, warehouseId: number) =>
+      r.warehouses.find((w) => w.warehouse_id === warehouseId)?.stock ?? 0,
+    [],
+  );
+
+  /** Lompat ke ujung kanan tabel (kolom Total / Available / Total Nilai). */
+  const scrollToTotals = useCallback(() => {
+    const el = tableScrollRef.current;
+    if (el) el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+  }, []);
+
   const handleExport = useCallback(() => {
     const content = toCsv(
-      rows.map((r) => ({
-        nama: r.name,
-        sku: r.sku,
-        satuan: r.unit || "—",
-        kategori: r.category ?? "—",
-        total: r.stock,
-        available: r.available,
-        nilai: Math.round(r.nilai),
-        lokasi:
-          r.warehouses
-            .map((w) => `${w.warehouse}:${w.stock} (tersedia ${w.available})`)
-            .join("; ") || "—",
-      })),
+      rows.map((r) => {
+        const rec: Record<string, unknown> = {
+          nama: r.name,
+          sku: r.sku,
+          satuan: r.unit || "—",
+          kategori: r.category ?? "—",
+        };
+        for (const w of warehouseList) rec[`wh-${w.id}`] = qtyOf(r, w.id);
+        rec["total"] = r.stock;
+        rec["available"] = r.available;
+        rec["nilai"] = Math.round(r.nilai);
+        return rec;
+      }),
       [
         { key: "nama", label: "Barang" },
         { key: "sku", label: "SKU" },
         { key: "satuan", label: "Satuan" },
         { key: "kategori", label: "Kategori" },
+        ...warehouseList.map((w) => ({ key: `wh-${w.id}`, label: w.name })),
         { key: "total", label: "Total Stock" },
         { key: "available", label: "Available" },
         { key: "nilai", label: "Nilai" },
-        { key: "lokasi", label: "Lokasi Stock" },
       ],
     );
     const today = new Date().toISOString().slice(0, 10);
     downloadCsv(`rekap-stock-${today}.csv`, content);
     toast.success(`Export ${rows.length} barang`);
-  }, [rows]);
+  }, [rows, warehouseList, qtyOf]);
 
   const warehouseNames = useMemo(() => warehouses?.data.map((w) => w.name) ?? [], [warehouses]);
   const categoryNames = useMemo(() => cats?.data.map((c) => c.name) ?? [], [cats]);
 
-  const columns: Column<RekapRow>[] = [
-    {
-      key: "name",
-      label: "Barang",
-      className: "min-w-[220px]",
-      sortable: true,
-      render: (r) => (
-        <span>
-          <span className="block max-w-[280px] truncate font-medium" title={r.name}>
-            {r.name}
+  const columns: Column<RekapRow>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Barang",
+        className: "min-w-[220px]",
+        sticky: "left",
+        sortable: true,
+        render: (r) => (
+          <span>
+            <span className="block max-w-[280px] truncate font-medium" title={r.name}>
+              {r.name}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">{r.sku}</span>
           </span>
-          <span className="font-mono text-xs text-muted-foreground">{r.sku}</span>
-        </span>
-      ),
-    },
-    {
-      key: "unit",
-      label: "Satuan",
-      className: "w-[90px] whitespace-nowrap",
-      render: (r) => <Pill tone="neutral">{r.unit || "—"}</Pill>,
-    },
-    {
-      key: "loc",
-      label: "Lokasi Stock",
-      className: "min-w-[260px]",
-      render: (r) => (
-        <RekapLocationsCell
-          row={r}
-          highlightId={whFilter.warehouseId}
-          onWarehouseClick={(wid) => goToCard(r.item_id, wid)}
-        />
-      ),
-    },
-    {
-      key: "total",
-      label: "Total Stock",
-      className: "text-right w-[120px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.stock,
-      render: (r) => (
-        <b>
-          {formatNumber(r.stock)} {r.unit}
-        </b>
-      ),
-    },
-    {
-      key: "avl",
-      label: "Available",
-      className: "text-right w-[120px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.available,
-      render: (r) => (
-        <b>
-          {formatNumber(r.available)} {r.unit}
-        </b>
-      ),
-    },
-    {
-      key: "val",
-      label: "Total Nilai",
-      className: "text-right min-w-[130px] whitespace-nowrap",
-      sortable: true,
-      sortAccessor: (r) => r.nilai,
-      render: (r) => formatIDR(r.nilai),
-    },
-  ];
+        ),
+      },
+      {
+        key: "unit",
+        label: "Satuan",
+        className: "w-[90px] whitespace-nowrap",
+        render: (r) => <Pill tone="neutral">{r.unit || "—"}</Pill>,
+      },
+      // Satu kolom per gudang: qty barang di gudang itu (0 bila kosong).
+      // Kolom gudang yang sedang difilter ikut ditintai agar mudah ditemukan.
+      ...warehouseList.map((w): Column<RekapRow> => ({
+        key: `wh-${w.id}`,
+        label: w.name,
+        className: cn(
+          "text-right min-w-[110px] whitespace-nowrap",
+          highlightId != null && w.id === highlightId && "bg-primary/[0.07]",
+        ),
+        sortable: true,
+        sortAccessor: (r) => qtyOf(r, w.id),
+        render: (r) => {
+          const qty = qtyOf(r, w.id);
+          return (
+            <button
+              type="button"
+              title={`Buka kartu stock ${w.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToCard(r.item_id, w.id);
+              }}
+              className={cn(
+                "font-medium tabular-nums",
+                qty === 0 ? "text-muted-foreground" : "text-foreground",
+              )}
+            >
+              {formatNumber(qty)}
+            </button>
+          );
+        },
+      })),
+      {
+        key: "total",
+        label: "Total Stock",
+        className: "text-right w-[120px] whitespace-nowrap",
+        sortable: true,
+        sortAccessor: (r) => r.stock,
+        render: (r) => (
+          <b>
+            {formatNumber(r.stock)} {r.unit}
+          </b>
+        ),
+      },
+      {
+        key: "avl",
+        label: "Available",
+        className: "text-right w-[120px] whitespace-nowrap",
+        sortable: true,
+        sortAccessor: (r) => r.available,
+        render: (r) => (
+          <b>
+            {formatNumber(r.available)} {r.unit}
+          </b>
+        ),
+      },
+      {
+        key: "val",
+        label: "Total Nilai",
+        className: "text-right min-w-[130px] whitespace-nowrap",
+        sortable: true,
+        sortAccessor: (r) => r.nilai,
+        render: (r) => formatIDR(r.nilai),
+      },
+    ],
+    [warehouseList, highlightId, qtyOf, goToCard],
+  );
 
   return (
     <>
-      <div className="space-y-5">
+      <div inert={fullscreen || undefined} className="space-y-5">
         <PageHeader
           title="Rekap Stock"
-          description="Total per barang + sebaran gudang, tanpa buka satu-satu"
+          description="Total per barang + rincian tiap gudang, tanpa buka satu-satu"
           actions={
             <Button
               variant="outline"
@@ -287,17 +329,42 @@ function RekapStock() {
 
       <Panel
         title="Rekap per Barang"
-        description={`${formatNumber(rows.length)} barang · total & lokasi selalu global · klik baris untuk detail · klik gudang untuk kartu stock`}
+        description={`${formatNumber(rows.length)} barang · 1 kolom per gudang · klik angka untuk kartu stock`}
         actions={
-          <HelpHint label="Penjelasan">
-            <p>Total dan daftar lokasi selalu mencakup SEMUA gudang.</p>
-            <p>
-              Filter gudang hanya menyaring daftar barang (yang ada stock-nya di gudang itu) dan
-              menebalkan barisnya.
-            </p>
-            <p>Klik baris gudang untuk membuka kartu stock gudang tersebut.</p>
-          </HelpHint>
+          <>
+            <HelpHint label="Penjelasan">
+              <p>Satu kolom per gudang berisi qty barang di gudang itu (0 = tidak ada stock).</p>
+              <p>Total, Available & Total Nilai selalu mencakup SEMUA gudang.</p>
+              <p>Filter gudang hanya menyaring daftar barang dan menyorot kolom gudang tersebut.</p>
+              <p>
+                Klik angka qty untuk membuka kartu stock gudang tersebut. Tombol Ke Total melompat
+                ke ujung kanan tabel.
+              </p>
+            </HelpHint>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden rounded-xl md:inline-flex"
+              onClick={scrollToTotals}
+              aria-label="Lompat ke kolom Total di ujung kanan tabel"
+            >
+              <ChevronsRight className="h-4 w-4" /> Ke Total
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl"
+              aria-pressed={fullscreen}
+              aria-label={fullscreen ? "Keluar mode layar penuh" : "Tampilkan layar penuh"}
+              onClick={() => setFullscreen((f) => !f)}
+            >
+              {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {fullscreen ? "Keluar" : "Fullscreen"}
+            </Button>
+          </>
         }
+        className={cn(fullscreen && "fixed inset-0 z-40 flex flex-col !rounded-none !shadow-none")}
+        bodyClassName={cn(fullscreen && "flex-1 overflow-auto")}
       >
         <DataTable
           columns={columns}
@@ -307,6 +374,7 @@ function RekapStock() {
           error={error}
           onRetry={() => refetch()}
           onRowClick={goToDetail}
+          scrollRef={tableScrollRef}
           mobileCard={(r) => (
             <div className="space-y-2">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
@@ -318,11 +386,33 @@ function RekapStock() {
                   {r.warehouses.length > 0 ? `${r.warehouses.length} gudang` : "Tidak ada stock"}
                 </Pill>
               </div>
-              <RekapLocationsCompact
-                row={r}
-                highlightId={whFilter.warehouseId}
-                onWarehouseClick={(wid) => goToCard(r.item_id, wid)}
-              />
+              {warehouseList.length > 0 && (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {warehouseList.map((w) => {
+                    const qty = qtyOf(r, w.id);
+                    const hl = highlightId == null || w.id === highlightId;
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goToCard(r.item_id, w.id);
+                        }}
+                        className={cn(
+                          "flex items-baseline justify-between gap-2 rounded-lg px-2 py-1 text-left text-xs",
+                          hl ? "bg-muted/60 font-medium" : "opacity-50",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                          {w.name}
+                        </span>
+                        <b className="shrink-0 tabular-nums text-foreground">{formatNumber(qty)}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-2 text-center text-xs">
                 <div>
                   <p className="text-muted-foreground">Total</p>

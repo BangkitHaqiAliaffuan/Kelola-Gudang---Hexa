@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type Ref } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -66,6 +66,7 @@ export function DataTable<T extends { id: string | number }>({
   serverTotalPages,
   onServerPageChange,
   selection,
+  scrollRef,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -91,6 +92,8 @@ export function DataTable<T extends { id: string | number }>({
    * dengan pola halaman barang. Klik checkbox tidak memicu onRowClick.
    */
   selection?: TableSelection | undefined;
+  /** Ref ke wadah scroll horizontal tabel (untuk tombol "lompat ke kanan"). */
+  scrollRef?: Ref<HTMLDivElement> | undefined;
 }) {
   const isServer = onServerPageChange != null;
   const [page, setPage] = useState(1);
@@ -214,7 +217,7 @@ export function DataTable<T extends { id: string | number }>({
 
   return (
     <div className="space-y-4">
-      <div className="hidden overflow-x-auto md:block">
+      <div ref={scrollRef} className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[720px] border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
