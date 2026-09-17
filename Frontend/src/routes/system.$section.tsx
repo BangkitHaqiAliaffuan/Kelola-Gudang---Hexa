@@ -18,7 +18,7 @@ import { useDebouncedValue } from "@/hooks/use-debounce";
 import { Label } from "@/components/ui/label";
 import { formatDateTime, formatNumber } from "@/lib/wms-data";
 import { AUDIT_ACTIONS, useAuditLogs, type AuditLogApi } from "@/hooks/use-audit";
-import { useCompanySettings, useUpdateCompanySettings } from "@/hooks/use-settings";
+import { isSafeLogo, useCompanySettings, useUpdateCompanySettings } from "@/hooks/use-settings";
 import { api, fieldError, getAuthToken, isApiError } from "@/lib/api";
 import { API_CATALOG, API_PAYLOAD_EXAMPLES, type ApiCatalogEntry } from "@/lib/api-catalog";
 import { downloadCsv, toCsv } from "@/lib/csv";
@@ -415,7 +415,7 @@ function GeneralSetting() {
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Logo Perusahaan</Label>
               <div className="flex flex-wrap items-center gap-3">
-                {logoValue ? (
+                {logoValue && isSafeLogo(logoValue) ? (
                   <img
                     src={logoValue}
                     alt="Logo perusahaan"
