@@ -228,4 +228,52 @@ class WarehouseScopeWriteTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('warehouse_ids');
     }
+
+    public function test_default_must_match_assigned_warehouses(): void
+    {
+        $this->actingAsMasterAdmin();
+        Role::create(['name' => 'Op Sama', 'warehouse_scope_mode' => 'Terbatas']);
+        $a = Warehouse::factory()->create();
+        $b = Warehouse::factory()->create();
+
+        $base = [
+            'name' => 'Operator Sama',
+            'email' => 'opsama@test.local',
+            'role' => 'Op Sama',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ];
+
+        // Tugasan [A] + default B (di luar tugasan) → 422 default_warehouse_id.
+        $this->postJson('/api/master/users', [
+            ...$base,
+            'warehouse_ids' => [$a->id],
+            'default_warehouse_id' => $b->id,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('default_warehouse_id');
+
+        // Tugasan [A] + default A → 201.
+        $id = $this->postJson('/api/master/users', [
+            ...$base,
+            'warehouse_ids' => [$a->id],
+            'default_warehouse_id' => $a->id,
+        ])->assertCreated()->json('data.id');
+
+        // Tanpa tugasan + default B → 201 (fallback W5).
+        $this->postJson('/api/master/users', [
+            ...$base,
+            'email' => 'opsama2@test.local',
+            'default_warehouse_id' => $b->id,
+        ])->assertCreated();
+
+        // Update: ganti default ke luar tugasan tanpa sentuh pivot → 422
+        // (ids efektif = pivot existing).
+        $this->putJson("/api/master/users/{$id}", [
+            'name' => 'Operator Sama',
+            'email' => 'opsama@test.local',
+            'role' => 'Op Sama',
+            'default_warehouse_id' => $b->id,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('default_warehouse_id');
+    }
 }

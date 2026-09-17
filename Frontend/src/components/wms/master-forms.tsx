@@ -4028,15 +4028,17 @@ export function UserFormDialog({
           rowField(form as never, err, "email");
           rowField(form as never, err, "role");
           rowField(form as never, err, "default_warehouse_id");
-          rowField(form as never, err, "warehouse_ids");
           rowField(form as never, err, "password");
+          // warehouse_ids bukan field RHF terdaftar (checkbox state lokal) —
+          // setError tak terlihat, jadi pesan server ditampilkan via toast.
+          const whScopeError = fieldError(err, "warehouse_ids");
+          if (whScopeError) toast.error(whScopeError);
           if (
             !fieldError(err, "code") &&
             !fieldError(err, "name") &&
             !fieldError(err, "email") &&
             !fieldError(err, "role") &&
             !fieldError(err, "default_warehouse_id") &&
-            !fieldError(err, "warehouse_ids") &&
             !fieldError(err, "password")
           )
             toast.error((err as Error).message);
@@ -4122,11 +4124,20 @@ export function UserFormDialog({
               control={form.control}
               name="default_warehouse_id"
               render={({ field }) => {
-                const options: ComboboxOption[] = (warehouses?.data ?? []).map((w) => ({
-                  value: String(w.id),
-                  label: w.name,
-                  keywords: w.code,
-                }));
+                // F7: role Terbatas + tugasan non-kosong → Default wajib sama
+                // dengan salah satu tugasan; opsi lain disembunyikan.
+                const defRoleName = form.watch("role");
+                const defLimited =
+                  (rolesData?.data ?? []).find((r) => r.name === defRoleName)
+                    ?.warehouse_scope_mode === "Terbatas";
+                const narrowed = defLimited && whIds.length > 0;
+                const options: ComboboxOption[] = (warehouses?.data ?? [])
+                  .filter((w) => !narrowed || whIds.includes(w.id))
+                  .map((w) => ({
+                    value: String(w.id),
+                    label: w.name,
+                    keywords: w.code,
+                  }));
                 return (
                   <FormItem>
                     <FormLabel>
@@ -4138,13 +4149,20 @@ export function UserFormDialog({
                         value={field.value == null || field.value === "" ? "" : String(field.value)}
                         onValueChange={(v) => field.onChange(v === "" ? "" : Number(v))}
                         options={options}
-                        placeholder="Tanpa default — Semua Gudang"
+                        placeholder={
+                          narrowed ? "Pilih dari gudang tugasan" : "Tanpa default — Semua Gudang"
+                        }
                         loading={warehousesLoading}
                         allowEmpty
                         side="bottom"
                         avoidCollisions={false}
                       />
                     </FormControl>
+                    {narrowed && (
+                      <p className="text-xs text-muted-foreground">
+                        Role Terbatas: Default harus salah satu gudang tugasan di bawah.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 );
@@ -4176,6 +4194,17 @@ export function UserFormDialog({
                               setWhIds((ids) =>
                                 v === true ? [...ids, w.id] : ids.filter((id) => id !== w.id),
                               );
+                              // Default wajib sama dengan tugasan: bila gudang
+                              // yang sedang menjadi Default di-uncheck,
+                              // kosongkan Default sekalian (backend juga menolak).
+                              if (v !== true) {
+                                const cur = form.getValues("default_warehouse_id");
+                                if (cur != null && cur !== "" && Number(cur) === w.id) {
+                                  form.setValue("default_warehouse_id", "", {
+                                    shouldValidate: false,
+                                  });
+                                }
+                              }
                             }}
                           />
                           <span className="min-w-0 flex-1 truncate">{w.name}</span>

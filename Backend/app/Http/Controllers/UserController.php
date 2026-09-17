@@ -92,8 +92,10 @@ class UserController extends Controller
     }
 
     /**
-     * Validasi W4: user ber-role 'Terbatas' wajib punya ≥1 gudang di pivot
-     * atau `default_warehouse_id` (fallback W5). Selain itu bebas.
+     * Validasi W4 + kesamaan default-tugasan: user ber-role 'Terbatas' wajib
+     * punya ≥1 gudang di pivot atau `default_warehouse_id` (fallback W5);
+     * bila pivot non-kosong, default wajib salah satu gudang tugasan.
+     * Selain itu bebas.
      *
      * @param  int[]|null  $warehouseIds
      */
@@ -101,12 +103,20 @@ class UserController extends Controller
     {
         $record = Role::query()->where('name', $role)->first();
 
-        if (
-            $record && $record->warehouse_scope_mode === 'Terbatas'
-            && ($warehouseIds === null || $warehouseIds === []) && $defaultWarehouseId === null
-        ) {
+        if (! $record || $record->warehouse_scope_mode !== 'Terbatas') {
+            return;
+        }
+
+        if (($warehouseIds === null || $warehouseIds === []) && $defaultWarehouseId === null) {
             throw ValidationException::withMessages([
                 'warehouse_ids' => ['User ber-role Terbatas wajib memiliki minimal 1 gudang atau gudang default.'],
+            ]);
+        }
+
+        $ids = array_map('intval', $warehouseIds ?? []);
+        if ($ids !== [] && $defaultWarehouseId !== null && ! in_array($defaultWarehouseId, $ids, true)) {
+            throw ValidationException::withMessages([
+                'default_warehouse_id' => ['Gudang Default harus salah satu gudang tugasan user.'],
             ]);
         }
     }
