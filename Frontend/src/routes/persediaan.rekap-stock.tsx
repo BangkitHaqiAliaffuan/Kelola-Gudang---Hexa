@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   ALL,
   ClearFiltersButton,
-  FilterSelect,
+  FilterCombobox,
   HelpHint,
   PageHeader,
   Panel,
@@ -313,7 +313,7 @@ function RekapStock() {
                 className="rounded-xl"
               />
             </div>
-            <FilterSelect
+            <FilterCombobox
               className="w-full min-w-[140px] max-w-[180px] flex-1"
               value={wh}
               onChange={whFilter.onChange}
@@ -322,7 +322,7 @@ function RekapStock() {
               options={warehouseNames}
               loading={warehousesLoading}
             />
-            <FilterSelect
+            <FilterCombobox
               className="w-full min-w-[140px] max-w-[180px] flex-1"
               value={cat}
               onChange={setCat}
