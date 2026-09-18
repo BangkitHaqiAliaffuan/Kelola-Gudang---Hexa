@@ -25,3 +25,13 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Artefak debug ad-hoc (W6 pasca-audit): script sekali-pakai + dump JSON/TXT
+# + file tmp-*. Jangan commit ulang; pakai command resmi stock:reconcile-*.
+/audit.php
+/check-movements.php
+/fix-zombies.php
+/rebuild_drift.php
+/fix-result.json
+/fix-result.txt
+/movements.json
+/tmp-*

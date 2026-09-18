@@ -1,7 +1,13 @@
 <?php
 
+use App\Models\Item;
+use App\Models\ItemStock;
+use App\Models\StockDocumentLine;
+use App\Models\StockMovement;
+use App\Services\StockLedger;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
@@ -11,26 +17,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('rebuild:drift', function () {
-    $affected = [193, 293, 3, 50, 54, 183, 211, 224];
-    $ledger = app(App\Services\StockLedger::class);
-    $i = 0;
-    foreach ($affected as $id) {
-        if (\App\Models\Item::find($id)) {
-            $ledger->rebuildForItem($id);
-            $i++;
-        }
-    }
-    $this->info("Rebuilt $i items");
-});
-
 Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data dan rebuild ledger}', function () {
     $fix = (bool) $this->option('fix');
 
     $this->info($fix ? '=== MODE PERBAIKAN: DETEKSI & REMEDIASI DATA MISMATCH ===' : '=== MODE DETEKSI (DRY-RUN): MEMERIKSA ANOMALI BIN & WAREHOUSE ===');
 
     // 1. Deteksi Stock Movements dengan Bin Mismatch
-    $movements = \App\Models\StockMovement::with(['item', 'bin.rack.warehouse', 'warehouse'])
+    $movements = StockMovement::with(['item', 'bin.rack.warehouse', 'warehouse'])
         ->whereNotNull('bin_id')
         ->get();
 
@@ -51,7 +44,7 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
     }
 
     // 2. Deteksi Stock Document Lines pada Dokumen Selesai dengan Bin Mismatch
-    $lines = \App\Models\StockDocumentLine::with(['document', 'item', 'fromBin.rack.warehouse', 'toBin.rack.warehouse'])
+    $lines = StockDocumentLine::with(['document', 'item', 'fromBin.rack.warehouse', 'toBin.rack.warehouse'])
         ->whereHas('document', fn ($q) => $q->where('status', 'Selesai'))
         ->get();
 
@@ -79,10 +72,10 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
     }
 
     // 3. Deteksi Selisih items.stock vs SUM(item_stock.stock)
-    $items = \App\Models\Item::all();
+    $items = Item::all();
     $driftItems = [];
     foreach ($items as $item) {
-        $itemStockSum = (int) \App\Models\ItemStock::where('item_id', $item->id)->sum('stock');
+        $itemStockSum = (int) ItemStock::where('item_id', $item->id)->sum('stock');
         if ((int) $item->stock !== $itemStockSum) {
             $driftItems[] = [
                 'item_id' => $item->id,
@@ -138,6 +131,7 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
     if (! $fix) {
         $this->line('');
         $this->warn('Petunjuk: Jalankan dengan opsi --fix untuk memperbaiki baris mismatch dan meregenerasi item_stock.');
+
         return 0;
     }
 
@@ -152,7 +146,7 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
         ->unique()
         ->values();
 
-    \Illuminate\Support\Facades\DB::transaction(function () use ($mismatchedMovements, $mismatchedLines, $affectedItemIds) {
+    DB::transaction(function () use ($mismatchedMovements, $mismatchedLines, $affectedItemIds) {
         // A. Reset bin_id & rack_id pada stock_movements mismatch menjadi null (penerimaan lantai yang sah di gudang dokumen)
         foreach ($mismatchedMovements as $entry) {
             $m = $entry['movement'];
@@ -173,7 +167,7 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
         }
 
         // C. Rebuild ledger per item
-        $ledger = app(\App\Services\StockLedger::class);
+        $ledger = app(StockLedger::class);
         foreach ($affectedItemIds as $itemId) {
             $ledger->rebuildForItem($itemId);
         }
@@ -184,4 +178,3 @@ Artisan::command('stock:reconcile-bin-mismatch {--fix : Lakukan perbaikan data d
 
     return 0;
 })->purpose('Deteksi dan perbaiki pergerakan stok dengan bin mismatch');
-
