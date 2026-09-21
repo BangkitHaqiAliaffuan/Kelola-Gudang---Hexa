@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WorkOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -405,5 +406,43 @@ class LaporanKeluarAnalyticsTest extends TestCase
                 ['item_id' => $item->id, 'qty' => $qty, 'unit_cost' => $cost, 'to_bin_id' => $bin->id],
             ],
         ])->assertStatus(201);
+    }
+
+    /**
+     * W3: query analitik harus agregat-SQL dengan jumlah query TERBATAS
+     * (tidak tumbuh bersama jumlah dokumen). 60 dokumen → tetap < 25 query;
+     * pola load-all + relasi per-baris akan meledak dan menggagalkan test ini.
+     */
+    public function test_volume_besar_query_terbatas_dan_angka_benar(): void
+    {
+        $item = $this->makeItem();
+        [$wh, , $bin] = $this->makeLocation();
+        $this->seedInbound($item, $wh, $bin, 1000, 1000);
+        $cust = Customer::factory()->create(['name' => 'PT Volume']);
+
+        $n = 60;
+        for ($i = 0; $i < $n; $i++) {
+            $day = str_pad((string) (($i % 28) + 1), 2, '0', STR_PAD_LEFT);
+            $this->postJson('/api/persediaan/stock-documents', [
+                'type' => 'Pengeluaran',
+                'status' => 'Selesai',
+                'document_date' => "2026-07-{$day}",
+                'warehouse_id' => $wh->id,
+                'customer_id' => $cust->id,
+                'partner' => $cust->name,
+                'lines' => [['item_id' => $item->id, 'qty' => 10, 'from_bin_id' => $bin->id]],
+            ])->assertStatus(201);
+        }
+
+        DB::enableQueryLog();
+        $res = $this->getJson('/api/laporan/keluar-analytics?from=2026-07-01&to=2026-07-31')->assertOk();
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $data = $res->json('data');
+        $this->assertEquals($n, $data['ringkasan']['dokumen']);
+        $this->assertEquals($n * 10, $data['ringkasan']['qty']);
+        $this->assertEquals($n * 10000.0, (float) $data['ringkasan']['nilai']);
+        $this->assertLessThan(25, $queryCount, "Query analitik tumbuh bersama volume: {$queryCount} query untuk {$n} dokumen.");
     }
 }

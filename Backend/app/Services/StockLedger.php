@@ -6,6 +6,7 @@ use App\Models\Bin;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMovement;
+use App\Support\StockItemLock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -19,6 +20,9 @@ class StockLedger
     public function record(array $attributes): StockMovement
     {
         return DB::transaction(function () use ($attributes) {
+            // W2: jalur tulis tunggal ini juga diserialisasi per item agar
+            // konsisten dengan StockDocumentService::post().
+            StockItemLock::acquire([(int) $attributes['item_id']]);
             $movement = StockMovement::create($attributes);
             $occurred = $movement->occurred_at instanceof \DateTimeInterface
                 ? $movement->occurred_at->format('Y-m-d H:i:s')

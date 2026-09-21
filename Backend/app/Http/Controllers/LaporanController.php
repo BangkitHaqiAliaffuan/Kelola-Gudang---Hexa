@@ -158,25 +158,25 @@ class LaporanController extends Controller
         $projMap = Project::query()->pluck('id', 'name')
             ->mapWithKeys(fn ($id, $name) => [mb_strtolower(trim((string) $name)) => ['id' => $id, 'name' => $name]]);
 
-        // Klasifikasi satu dokumen menjadi identitas tujuan teresolusi.
-        $classify = function (StockDocument $d) use ($deptMap, $projMap): array {
-            if ($d->customer_id) {
-                return ['jenis' => 'customer', 'id' => (int) $d->customer_id, 'nama' => $d->customer?->name ?? $d->partner ?? '—', 'segmen' => $d->customer?->segment];
+        // Klasifikasi satu baris dokumen (array skalar, lihat $baseDocs di
+        // bawah) menjadi identitas tujuan teresolusi.
+        $classify = function (array $d) use ($deptMap, $projMap): array {
+            if ($d['customer_id']) {
+                return ['jenis' => 'customer', 'id' => (int) $d['customer_id'], 'nama' => $d['customer_name'] ?? $d['partner'] ?? '—', 'segmen' => $d['customer_segment']];
             }
-            if ($d->department_id) {
-                return ['jenis' => 'departemen', 'id' => (int) $d->department_id, 'nama' => $d->department?->name ?? $d->partner ?? '—', 'segmen' => null];
+            if ($d['department_id']) {
+                return ['jenis' => 'departemen', 'id' => (int) $d['department_id'], 'nama' => $d['department_name'] ?? $d['partner'] ?? '—', 'segmen' => null];
             }
-            if ($d->work_order_id) {
-                $wo = $d->workOrder;
-                $nama = $wo ? $wo->no.($wo->project ? ' · '.$wo->project->name : '') : ($d->partner ?? '—');
+            if ($d['work_order_id']) {
+                $nama = $d['wo_no'] ? $d['wo_no'].($d['wo_project_name'] ? ' · '.$d['wo_project_name'] : '') : ($d['partner'] ?? '—');
 
-                return ['jenis' => 'work_order', 'id' => (int) $d->work_order_id, 'nama' => $nama, 'segmen' => null];
+                return ['jenis' => 'work_order', 'id' => (int) $d['work_order_id'], 'nama' => $nama, 'segmen' => null];
             }
             // Arsip: BK lama bertujuan proyek (project_id tak lagi diisi baru).
-            if ($d->project_id) {
-                return ['jenis' => 'proyek', 'id' => (int) $d->project_id, 'nama' => $d->project?->name ?? $d->partner ?? '—', 'segmen' => null];
+            if ($d['project_id']) {
+                return ['jenis' => 'proyek', 'id' => (int) $d['project_id'], 'nama' => $d['project_name'] ?? $d['partner'] ?? '—', 'segmen' => null];
             }
-            $key = mb_strtolower(trim((string) $d->partner));
+            $key = mb_strtolower(trim((string) $d['partner']));
             if ($key !== '' && isset($deptMap[$key])) {
                 return ['jenis' => 'departemen', 'id' => (int) $deptMap[$key]['id'], 'nama' => $deptMap[$key]['name'], 'segmen' => null];
             }
@@ -184,37 +184,89 @@ class LaporanController extends Controller
                 return ['jenis' => 'proyek', 'id' => (int) $projMap[$key]['id'], 'nama' => $projMap[$key]['name'], 'segmen' => null];
             }
 
-            return ['jenis' => 'lainnya', 'id' => null, 'nama' => $d->partner ?? '—', 'segmen' => null];
+            return ['jenis' => 'lainnya', 'id' => null, 'nama' => $d['partner'] ?? '—', 'segmen' => null];
         };
         $tujuanKey = fn (array $t): string => $t['jenis'].'|'.($t['id'] ?? 'null').'|'.$t['nama'];
 
+        // W3: SATU query agregat — join lines yang di-GROUP BY per dokumen +
+        // join nama relasi. Tanpa hidrasi model, tanpa eager load, tanpa
+        // withSum (3 subquery korelasi per baris). Baris ringan (±20 skalar)
+        // dipetakan ke array; document_date/posted_at di-cast ke Carbon agar
+        // matematika downstream IDENTIK (termasuk pembulatan per-baris).
         $baseDocs = StockDocument::query()
-            ->with(['customer', 'department', 'project', 'workOrder.project'])
-            ->withSum('lines as qty_total', 'qty')
-            ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
-            ->withSum('lines as revenue_total', DB::raw('qty * unit_price'))
-            ->where('type', 'Pengeluaran')
-            ->whereBetween('document_date', [$from, $to])
-            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
-            ->when(isset($data['customer_id']), fn ($q) => $q->where('customer_id', $data['customer_id']))
-            ->when(isset($data['department_id']), fn ($q) => $q->where('department_id', $data['department_id']))
-            ->when(isset($data['project_id']), fn ($q) => $q->where('project_id', $data['project_id']))
-            ->when(isset($data['work_order_id']), fn ($q) => $q->where('work_order_id', $data['work_order_id']))
-            ->orderBy('document_date')
+            ->leftJoin('stock_document_lines as l', 'l.document_id', '=', 'stock_documents.id')
+            ->leftJoin('customers as c', 'c.id', '=', 'stock_documents.customer_id')
+            ->leftJoin('departments as dep', 'dep.id', '=', 'stock_documents.department_id')
+            ->leftJoin('projects as p', 'p.id', '=', 'stock_documents.project_id')
+            ->leftJoin('work_orders as wo', 'wo.id', '=', 'stock_documents.work_order_id')
+            ->leftJoin('projects as wp', 'wp.id', '=', 'wo.project_id')
+            ->where('stock_documents.type', 'Pengeluaran')
+            ->whereBetween('stock_documents.document_date', [$from, $to])
+            ->when($warehouseId !== null, fn ($q) => $q->where('stock_documents.warehouse_id', $warehouseId))
+            ->when(isset($data['customer_id']), fn ($q) => $q->where('stock_documents.customer_id', $data['customer_id']))
+            ->when(isset($data['department_id']), fn ($q) => $q->where('stock_documents.department_id', $data['department_id']))
+            ->when(isset($data['project_id']), fn ($q) => $q->where('stock_documents.project_id', $data['project_id']))
+            ->when(isset($data['work_order_id']), fn ($q) => $q->where('stock_documents.work_order_id', $data['work_order_id']))
+            ->groupBy([
+                'stock_documents.id', 'stock_documents.status', 'stock_documents.document_date',
+                'stock_documents.posted_at', 'stock_documents.partner', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.project_id', 'stock_documents.warehouse_id',
+                'c.name', 'c.segment', 'dep.name', 'p.name',
+                'wo.no', 'wo.project_id', 'wp.name',
+            ])
+            ->orderBy('stock_documents.document_date')
+            ->select([
+                'stock_documents.id', 'stock_documents.status', 'stock_documents.document_date',
+                'stock_documents.posted_at', 'stock_documents.partner', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.project_id', 'stock_documents.warehouse_id',
+                'c.name as customer_name', 'c.segment as customer_segment',
+                'dep.name as department_name', 'p.name as project_name',
+                'wo.no as wo_no', 'wo.project_id as wo_project_id', 'wp.name as wo_project_name',
+            ])
+            ->selectRaw('SUM(l.qty) as qty_total, SUM(l.qty * l.unit_cost) as value_total, SUM(l.qty * l.unit_price) as revenue_total')
             ->get()
-            ->each(fn (StockDocument $d) => $d->setAttribute('_tujuan', $classify($d)));
+            ->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'status' => $r->status,
+                'document_date' => Carbon::parse($r->document_date),
+                'posted_at' => $r->posted_at ? Carbon::parse($r->posted_at) : null,
+                'partner' => $r->partner,
+                'note' => $r->note,
+                'source_document_id' => $r->source_document_id !== null ? (int) $r->source_document_id : null,
+                'customer_id' => $r->customer_id !== null ? (int) $r->customer_id : null,
+                'department_id' => $r->department_id !== null ? (int) $r->department_id : null,
+                'work_order_id' => $r->work_order_id !== null ? (int) $r->work_order_id : null,
+                'project_id' => $r->project_id !== null ? (int) $r->project_id : null,
+                'warehouse_id' => $r->warehouse_id !== null ? (int) $r->warehouse_id : null,
+                'qty_total' => $r->qty_total, 'value_total' => $r->value_total, 'revenue_total' => $r->revenue_total,
+                'customer_name' => $r->customer_name, 'customer_segment' => $r->customer_segment,
+                'department_name' => $r->department_name, 'project_name' => $r->project_name,
+                'wo_no' => $r->wo_no,
+                'wo_project_id' => $r->wo_project_id !== null ? (int) $r->wo_project_id : null,
+                'wo_project_name' => $r->wo_project_name,
+                '_tujuan' => null,
+            ])
+            ->map(function (array $d) use ($classify) {
+                $d['_tujuan'] = $classify($d);
+
+                return $d;
+            });
 
         if (isset($data['jenis_tujuan'])) {
-            $baseDocs = $baseDocs->filter(fn (StockDocument $d) => $d->getAttribute('_tujuan')['jenis'] === $data['jenis_tujuan'])->values();
+            $baseDocs = $baseDocs->filter(fn (array $d) => $d['_tujuan']['jenis'] === $data['jenis_tujuan'])->values();
         }
 
         $posted = $baseDocs->where('status', 'Selesai')->values();
         $tertahan = $baseDocs->whereIn('status', ['Draft', 'Menunggu Approval', 'Dalam Perjalanan'])->values();
 
-        $absQty = fn (StockDocument $d): int => abs((int) ($d->qty_total ?? 0));
-        $absNilai = fn (StockDocument $d): float => round(abs((float) ($d->value_total ?? 0)), 2);
+        $absQty = fn (array $d): int => abs((int) ($d['qty_total'] ?? 0));
+        $absNilai = fn (array $d): float => round(abs((float) ($d['value_total'] ?? 0)), 2);
         // Omzet = harga jual × qty (null bila baris tanpa harga jual).
-        $absOmzet = fn (StockDocument $d): ?float => $d->revenue_total !== null ? round(abs((float) $d->revenue_total), 2) : null;
+        $absOmzet = fn (array $d): ?float => $d['revenue_total'] !== null ? round(abs((float) $d['revenue_total']), 2) : null;
 
         // ---- Ringkasan + MoM (dekomposisi volume vs rata-rata nilai) ----
         $totalNilai = round($posted->sum($absNilai), 2);
@@ -222,7 +274,7 @@ class LaporanController extends Controller
         $perBulan = [];
         foreach ($posted as $d) {
             /** @var Carbon $tgl */
-            $tgl = $d->document_date;
+            $tgl = $d['document_date'];
             $key = $tgl->format('Y-m');
             $perBulan[$key] ??= ['bulan' => $key, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $perBulan[$key]['qty'] += $absQty($d);
@@ -253,14 +305,14 @@ class LaporanController extends Controller
         $aggJenis = [];
         $aggSegmen = [];
         foreach ($posted as $d) {
-            $t = $d->getAttribute('_tujuan');
+            $t = $d['_tujuan'];
             $key = $tujuanKey($t);
             $aggTujuan[$key] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $aggTujuan[$key]['qty'] += $absQty($d);
             $aggTujuan[$key]['nilai'] = round($aggTujuan[$key]['nilai'] + $absNilai($d), 2);
             $aggTujuan[$key]['dokumen']++;
 
-            $bulan = $d->document_date->format('Y-m');
+            $bulan = $d['document_date']->format('Y-m');
             $bk = $key.'|'.$bulan;
             $aggTujuanBulan[$bk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'bulan' => $bulan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $aggTujuanBulan[$bk]['qty'] += $absQty($d);
@@ -298,7 +350,7 @@ class LaporanController extends Controller
         $omzetTujuanBulan = [];
         $aggMargin = [];
         foreach ($posted as $d) {
-            $t = $d->getAttribute('_tujuan');
+            $t = $d['_tujuan'];
             if ($t['jenis'] !== 'customer') {
                 continue;
             }
@@ -309,7 +361,7 @@ class LaporanController extends Controller
             $hpp = $absNilai($d);
             $omzetTotal = round($omzetTotal + $om, 2);
             $hppTerjual = round($hppTerjual + $hpp, 2);
-            $bulan = $d->document_date->format('Y-m');
+            $bulan = $d['document_date']->format('Y-m');
             $key = $tujuanKey($t);
             $bk = $key.'|'.$bulan;
             $omzetTujuanBulan[$bk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'bulan' => $bulan, 'qty' => 0, 'omzet' => 0.0, 'hpp' => 0.0, 'dokumen' => 0];
@@ -375,16 +427,54 @@ class LaporanController extends Controller
         }
 
         // ---- Retur tertaut (Retur Penjualan Selesai periode ini) ----
+        // W3: baris skalar seperti $baseDocs (tanpa with lines/relasi).
         $returs = StockDocument::query()
-            ->with(['lines', 'customer', 'department', 'workOrder.project'])
-            ->withSum('lines as qty_total', 'qty')
-            ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
-            ->withSum('lines as revenue_total', DB::raw('qty * unit_price'))
-            ->where('type', 'Retur Penjualan')
-            ->where('status', 'Selesai')
-            ->whereBetween('document_date', [$from, $to])
-            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
-            ->get();
+            ->leftJoin('stock_document_lines as l', 'l.document_id', '=', 'stock_documents.id')
+            ->leftJoin('customers as c', 'c.id', '=', 'stock_documents.customer_id')
+            ->leftJoin('departments as dep', 'dep.id', '=', 'stock_documents.department_id')
+            ->leftJoin('projects as p', 'p.id', '=', 'stock_documents.project_id')
+            ->leftJoin('work_orders as wo', 'wo.id', '=', 'stock_documents.work_order_id')
+            ->leftJoin('projects as wp', 'wp.id', '=', 'wo.project_id')
+            ->where('stock_documents.type', 'Retur Penjualan')
+            ->where('stock_documents.status', 'Selesai')
+            ->whereBetween('stock_documents.document_date', [$from, $to])
+            ->when($warehouseId !== null, fn ($q) => $q->where('stock_documents.warehouse_id', $warehouseId))
+            ->groupBy([
+                'stock_documents.id', 'stock_documents.document_date', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.project_id', 'stock_documents.partner',
+                'c.name', 'c.segment', 'dep.name', 'p.name',
+                'wo.no', 'wo.project_id', 'wp.name',
+            ])
+            ->select([
+                'stock_documents.id', 'stock_documents.document_date', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.project_id', 'stock_documents.partner',
+                'c.name as customer_name', 'c.segment as customer_segment',
+                'dep.name as department_name', 'p.name as project_name',
+                'wo.no as wo_no', 'wo.project_id as wo_project_id', 'wp.name as wo_project_name',
+            ])
+            ->selectRaw('SUM(l.qty) as qty_total, SUM(l.qty * l.unit_cost) as value_total, SUM(l.qty * l.unit_price) as revenue_total')
+            ->get()
+            ->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'document_date' => Carbon::parse($r->document_date),
+                'note' => $r->note,
+                'source_document_id' => $r->source_document_id !== null ? (int) $r->source_document_id : null,
+                'customer_id' => $r->customer_id !== null ? (int) $r->customer_id : null,
+                'department_id' => $r->department_id !== null ? (int) $r->department_id : null,
+                'work_order_id' => $r->work_order_id !== null ? (int) $r->work_order_id : null,
+                'project_id' => $r->project_id !== null ? (int) $r->project_id : null,
+                'partner' => $r->partner,
+                'qty_total' => $r->qty_total, 'value_total' => $r->value_total, 'revenue_total' => $r->revenue_total,
+                'customer_name' => $r->customer_name, 'customer_segment' => $r->customer_segment,
+                'department_name' => $r->department_name, 'project_name' => $r->project_name,
+                'wo_no' => $r->wo_no,
+                'wo_project_id' => $r->wo_project_id !== null ? (int) $r->wo_project_id : null,
+                'wo_project_name' => $r->wo_project_name,
+            ]);
         $returQty = 0;
         $returNilai = 0.0;
         $returOmzet = 0.0;
@@ -392,20 +482,49 @@ class LaporanController extends Controller
         $returPerTujuan = [];
         $returPerItem = [];
         $sourceDocIds = $returs->pluck('source_document_id')->filter()->unique()->values();
+        // Sumber cukup kolom klasifikasi + nama (untuk $classify fallback) —
+        // tanpa hidrasi model penuh.
         $sourceDocs = $sourceDocIds->isNotEmpty()
-            ? StockDocument::with(['customer', 'department', 'project', 'workOrder.project'])->whereIn('id', $sourceDocIds)->get()->keyBy('id')
+            ? StockDocument::query()
+                ->leftJoin('customers as c', 'c.id', '=', 'stock_documents.customer_id')
+                ->leftJoin('departments as dep', 'dep.id', '=', 'stock_documents.department_id')
+                ->leftJoin('projects as p', 'p.id', '=', 'stock_documents.project_id')
+                ->leftJoin('work_orders as wo', 'wo.id', '=', 'stock_documents.work_order_id')
+                ->leftJoin('projects as wp', 'wp.id', '=', 'wo.project_id')
+                ->whereIn('stock_documents.id', $sourceDocIds)
+                ->select([
+                    'stock_documents.id', 'stock_documents.customer_id',
+                    'stock_documents.department_id', 'stock_documents.work_order_id',
+                    'stock_documents.project_id', 'stock_documents.partner',
+                    'c.name as customer_name', 'c.segment as customer_segment',
+                    'dep.name as department_name', 'p.name as project_name',
+                    'wo.no as wo_no', 'wo.project_id as wo_project_id', 'wp.name as wo_project_name',
+                ])
+                ->get()
+                ->mapWithKeys(fn ($r) => [(int) $r->id => [
+                    'customer_id' => $r->customer_id !== null ? (int) $r->customer_id : null,
+                    'department_id' => $r->department_id !== null ? (int) $r->department_id : null,
+                    'work_order_id' => $r->work_order_id !== null ? (int) $r->work_order_id : null,
+                    'project_id' => $r->project_id !== null ? (int) $r->project_id : null,
+                    'partner' => $r->partner,
+                    'customer_name' => $r->customer_name, 'customer_segment' => $r->customer_segment,
+                    'department_name' => $r->department_name, 'project_name' => $r->project_name,
+                    'wo_no' => $r->wo_no,
+                    'wo_project_id' => $r->wo_project_id !== null ? (int) $r->wo_project_id : null,
+                    'wo_project_name' => $r->wo_project_name,
+                ]])
             : collect();
         foreach ($returs as $r) {
-            $q = abs((int) ($r->qty_total ?? 0));
-            $n = round(abs((float) ($r->value_total ?? 0)), 2);
+            $q = abs((int) ($r['qty_total'] ?? 0));
+            $n = round(abs((float) ($r['value_total'] ?? 0)), 2);
             $returQty += $q;
             $returNilai = round($returNilai + $n, 2);
-            if ($r->revenue_total !== null) {
-                $returOmzet = round($returOmzet + abs((float) $r->revenue_total), 2);
+            if ($r['revenue_total'] !== null) {
+                $returOmzet = round($returOmzet + abs((float) $r['revenue_total']), 2);
             }
 
             $alasan = 'Tanpa Alasan';
-            if (preg_match('/^Alasan:\s*([^\r\n;]+)/m', (string) $r->note, $m)) {
+            if (preg_match('/^Alasan:\s*([^\r\n;]+)/m', (string) $r['note'], $m)) {
                 $alasan = trim($m[1]);
             }
             $perAlasan[$alasan] ??= ['alasan' => $alasan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
@@ -415,19 +534,27 @@ class LaporanController extends Controller
 
             // Tujuan retur = tujuan dokumen Pengeluaran sumber (fallback: tujuan
             // retur itu sendiri — customer/departemen/work_order warisan server).
-            $src = $r->source_document_id ? $sourceDocs->get($r->source_document_id) : null;
+            $src = $r['source_document_id'] ? $sourceDocs->get($r['source_document_id']) : null;
             $t = $src ? $classify($src) : $classify($r);
             $rk = $t['jenis'].'|'.($t['id'] ?? 'null').'|'.$t['nama'];
             $returPerTujuan[$rk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $returPerTujuan[$rk]['qty'] += $q;
             $returPerTujuan[$rk]['nilai'] = round($returPerTujuan[$rk]['nilai'] + $n, 2);
             $returPerTujuan[$rk]['dokumen']++;
-
-            foreach ($r->lines as $ln) {
+        }
+        // Per-item retur: SATU query GROUP BY atas lines retur periode ini
+        // (dulu: eager load SEMUA lines sebagai model + fold PHP).
+        $returIds = $returs->pluck('id');
+        if ($returIds->isNotEmpty()) {
+            $returLineRows = StockDocumentLine::query()->whereIn('document_id', $returIds)
+                ->selectRaw('item_id, SUM(ABS(qty)) as qty, SUM(ABS(qty) * unit_cost) as nilai')
+                ->groupBy('item_id')
+                ->get();
+            foreach ($returLineRows as $ln) {
                 $iid = (int) $ln->item_id;
                 $returPerItem[$iid] ??= ['item_id' => $iid, 'qty' => 0, 'nilai' => 0.0];
-                $returPerItem[$iid]['qty'] += abs((int) ($ln->qty ?? 0));
-                $returPerItem[$iid]['nilai'] = round($returPerItem[$iid]['nilai'] + abs((int) ($ln->qty ?? 0)) * (float) ($ln->unit_cost ?? 0), 2);
+                $returPerItem[$iid]['qty'] += (int) $ln->qty;
+                $returPerItem[$iid]['nilai'] = round($returPerItem[$iid]['nilai'] + (float) $ln->nilai, 2);
             }
         }
         $returItemIds = array_keys($returPerItem);
@@ -447,8 +574,8 @@ class LaporanController extends Controller
         // dari PHP — tidak direplikasi ke SQL agar semantik identik.
         $terakhirPerTujuan = [];
         foreach ($posted as $d) {
-            $k = $tujuanKey($d->getAttribute('_tujuan'));
-            $tgl = $d->document_date;
+            $k = $tujuanKey($d['_tujuan']);
+            $tgl = $d['document_date'];
             if (! isset($terakhirPerTujuan[$k]) || $tgl->gt($terakhirPerTujuan[$k])) {
                 $terakhirPerTujuan[$k] = $tgl;
             }
@@ -473,8 +600,8 @@ class LaporanController extends Controller
         // ---- Kecepatan proses (lead time + aging tertahan) ----
         $leadDays = [];
         foreach ($posted as $d) {
-            if ($d->posted_at && $d->document_date) {
-                $leadDays[] = max(0, $d->document_date->diffInDays($d->posted_at, true));
+            if ($d['posted_at'] && $d['document_date']) {
+                $leadDays[] = max(0, $d['document_date']->diffInDays($d['posted_at'], true));
             }
         }
         sort($leadDays);
@@ -483,7 +610,7 @@ class LaporanController extends Controller
         foreach ($tertahan as $d) {
             $n = $absNilai($d);
             $tertahanNilai = round($tertahanNilai + $n, 2);
-            $age = (int) floor($to->diffInDays($d->document_date, true));
+            $age = (int) floor($to->diffInDays($d['document_date'], true));
             $bucket = $age <= 7 ? '0-7 hari' : ($age <= 30 ? '8-30 hari' : '>30 hari');
             $aging[$bucket]['count']++;
             $aging[$bucket]['nilai'] = round($aging[$bucket]['nilai'] + $n, 2);
@@ -503,19 +630,19 @@ class LaporanController extends Controller
         $proyekOut = [];
         $projBuckets = [];
         foreach ($posted as $d) {
-            $pid = $d->work_order_id !== null ? $d->workOrder?->project_id : ($d->project_id);
+            $pid = $d['work_order_id'] !== null ? $d['wo_project_id'] : $d['project_id'];
             if ($pid === null) {
                 continue;
             }
             $key = 'proyek|'.$pid;
             if (! isset($projBuckets[$key])) {
-                $nama = $d->work_order_id !== null
-                    ? ($d->workOrder?->project?->name ?? $d->partner ?? '—')
-                    : ($d->project?->name ?? $d->partner ?? '—');
+                $nama = $d['work_order_id'] !== null
+                    ? ($d['wo_project_name'] ?? $d['partner'] ?? '—')
+                    : ($d['project_name'] ?? $d['partner'] ?? '—');
                 $projBuckets[$key] = ['jenis' => 'proyek', 'id' => (int) $pid, 'nama' => $nama, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             }
-            $projBuckets[$key]['qty'] += abs((int) ($d->qty_total ?? 0));
-            $projBuckets[$key]['nilai'] = round($projBuckets[$key]['nilai'] + abs((float) ($d->value_total ?? 0)), 2);
+            $projBuckets[$key]['qty'] += abs((int) ($d['qty_total'] ?? 0));
+            $projBuckets[$key]['nilai'] = round($projBuckets[$key]['nilai'] + abs((float) ($d['value_total'] ?? 0)), 2);
             $projBuckets[$key]['dokumen']++;
         }
         $projKeys = collect(array_values($projBuckets));
@@ -527,7 +654,7 @@ class LaporanController extends Controller
             // sama dengan $tujuanKey($a) dari entri $projKeys di atas.
             $projKeyByDocId = [];
             foreach ($posted as $d) {
-                $pid = $d->work_order_id !== null ? $d->workOrder?->project_id : ($d->project_id);
+                $pid = $d['work_order_id'] !== null ? $d['wo_project_id'] : $d['project_id'];
                 if ($pid === null) {
                     continue;
                 }
@@ -536,7 +663,7 @@ class LaporanController extends Controller
                     continue;
                 }
                 $a = $projBuckets[$bkey];
-                $projKeyByDocId[$d->id] = $a['jenis'].'|'.($a['id'] ?? 'null').'|'.$a['nama'];
+                $projKeyByDocId[$d['id']] = $a['jenis'].'|'.($a['id'] ?? 'null').'|'.$a['nama'];
             }
             // [projKey][item_id] => ['qty', 'nilai'] — diakumulasi per chunk agar
             // whereIn tetap kecil; pembulatan akhir 2 desimal sama seperti dulu.
@@ -706,62 +833,110 @@ class LaporanController extends Controller
             return ['jenis' => 'lainnya', 'id' => null, 'nama' => $partner ?? '—'];
         };
 
-        $classify = function (StockDocument $d) use ($type, $matchSupplier, $customerMap): array {
+        $classify = function (array $d) use ($type, $matchSupplier, $customerMap): array {
             if ($type === 'Transfer Gudang') {
-                return ['jenis' => 'gudang', 'id' => $d->destination_warehouse_id !== null ? (int) $d->destination_warehouse_id : null, 'nama' => $d->destination?->name ?? '—'];
+                return ['jenis' => 'gudang', 'id' => $d['destination_warehouse_id'] !== null ? (int) $d['destination_warehouse_id'] : null, 'nama' => $d['destination_name'] ?? '—'];
             }
             if ($type === 'Retur Penjualan') {
-                if ($d->customer_id) {
-                    return ['jenis' => 'customer', 'id' => (int) $d->customer_id, 'nama' => $d->customer?->name ?? $d->partner ?? '—'];
+                if ($d['customer_id']) {
+                    return ['jenis' => 'customer', 'id' => (int) $d['customer_id'], 'nama' => $d['customer_name'] ?? $d['partner'] ?? '—'];
                 }
-                if ($d->department_id) {
-                    return ['jenis' => 'departemen', 'id' => (int) $d->department_id, 'nama' => $d->department?->name ?? $d->partner ?? '—'];
+                if ($d['department_id']) {
+                    return ['jenis' => 'departemen', 'id' => (int) $d['department_id'], 'nama' => $d['department_name'] ?? $d['partner'] ?? '—'];
                 }
-                if ($d->work_order_id) {
-                    $wo = $d->workOrder;
+                if ($d['work_order_id']) {
+                    $nama = $d['wo_no'] ? $d['wo_no'].($d['wo_project_name'] ? ' · '.$d['wo_project_name'] : '') : ($d['partner'] ?? '—');
 
-                    return ['jenis' => 'work_order', 'id' => (int) $d->work_order_id, 'nama' => $wo ? $wo->no.($wo->project ? ' · '.$wo->project->name : '') : ($d->partner ?? '—')];
+                    return ['jenis' => 'work_order', 'id' => (int) $d['work_order_id'], 'nama' => $nama];
                 }
-                $key = mb_strtolower(trim((string) $d->partner));
+                $key = mb_strtolower(trim((string) $d['partner']));
                 if ($key !== '' && isset($customerMap[$key])) {
                     return ['jenis' => 'customer', 'id' => (int) $customerMap[$key]['id'], 'nama' => $customerMap[$key]['name']];
                 }
 
-                return ['jenis' => 'lainnya', 'id' => null, 'nama' => $d->partner ?? '—'];
+                return ['jenis' => 'lainnya', 'id' => null, 'nama' => $d['partner'] ?? '—'];
             }
 
             // Penerimaan & Retur Pembelian: pihak = supplier (snapshot teks).
-            return $matchSupplier($d->partner);
+            return $matchSupplier($d['partner']);
         };
         $pihakKey = fn (array $t): string => TransaksiAnalytics::pihakKey($t['jenis'], $t['id'], $t['nama']);
 
+        // W3: baris skalar agregat-SQL seperti keluarAnalytics — tanpa
+        // hidrasi model, tanpa eager load, tanpa withSum.
         $docs = StockDocument::query()
-            ->with(['customer', 'department', 'workOrder.project', 'warehouse', 'destination'])
-            ->withSum('lines as qty_total', 'qty')
-            ->withSum('lines as value_total', DB::raw('qty * unit_cost'))
-            ->where('type', $type)
-            ->whereBetween('document_date', [$from, $to])
-            ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
+            ->leftJoin('stock_document_lines as l', 'l.document_id', '=', 'stock_documents.id')
+            ->leftJoin('customers as c', 'c.id', '=', 'stock_documents.customer_id')
+            ->leftJoin('departments as dep', 'dep.id', '=', 'stock_documents.department_id')
+            ->leftJoin('work_orders as wo', 'wo.id', '=', 'stock_documents.work_order_id')
+            ->leftJoin('projects as wp', 'wp.id', '=', 'wo.project_id')
+            ->leftJoin('warehouses as w', 'w.id', '=', 'stock_documents.warehouse_id')
+            ->leftJoin('warehouses as dw', 'dw.id', '=', 'stock_documents.destination_warehouse_id')
+            ->where('stock_documents.type', $type)
+            ->whereBetween('stock_documents.document_date', [$from, $to])
+            ->when($warehouseId !== null, fn ($q) => $q->where('stock_documents.warehouse_id', $warehouseId))
             ->when(
                 $type === 'Transfer Gudang' && isset($data['destination_warehouse_id']),
-                fn ($q) => $q->where('destination_warehouse_id', $data['destination_warehouse_id'])
+                fn ($q) => $q->where('stock_documents.destination_warehouse_id', $data['destination_warehouse_id'])
             )
-            ->orderBy('document_date')
+            ->groupBy([
+                'stock_documents.id', 'stock_documents.status', 'stock_documents.document_date',
+                'stock_documents.posted_at', 'stock_documents.partner', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.warehouse_id', 'stock_documents.destination_warehouse_id',
+                'c.name', 'dep.name', 'wo.no', 'wp.name', 'w.name', 'dw.name',
+            ])
+            ->orderBy('stock_documents.document_date')
+            ->select([
+                'stock_documents.id', 'stock_documents.status', 'stock_documents.document_date',
+                'stock_documents.posted_at', 'stock_documents.partner', 'stock_documents.note',
+                'stock_documents.source_document_id', 'stock_documents.customer_id',
+                'stock_documents.department_id', 'stock_documents.work_order_id',
+                'stock_documents.warehouse_id', 'stock_documents.destination_warehouse_id',
+                'c.name as customer_name', 'dep.name as department_name',
+                'wo.no as wo_no', 'wp.name as wo_project_name',
+                'w.name as warehouse_name', 'dw.name as destination_name',
+            ])
+            ->selectRaw('SUM(l.qty) as qty_total, SUM(l.qty * l.unit_cost) as value_total, SUM(l.qty * l.unit_price) as revenue_total')
             ->get()
-            ->each(fn (StockDocument $d) => $d->setAttribute('_pihak', $classify($d)));
+            ->map(fn ($r) => [
+                'id' => (int) $r->id,
+                'status' => $r->status,
+                'document_date' => Carbon::parse($r->document_date),
+                'posted_at' => $r->posted_at ? Carbon::parse($r->posted_at) : null,
+                'partner' => $r->partner,
+                'note' => $r->note,
+                'source_document_id' => $r->source_document_id !== null ? (int) $r->source_document_id : null,
+                'customer_id' => $r->customer_id !== null ? (int) $r->customer_id : null,
+                'department_id' => $r->department_id !== null ? (int) $r->department_id : null,
+                'work_order_id' => $r->work_order_id !== null ? (int) $r->work_order_id : null,
+                'warehouse_id' => $r->warehouse_id !== null ? (int) $r->warehouse_id : null,
+                'destination_warehouse_id' => $r->destination_warehouse_id !== null ? (int) $r->destination_warehouse_id : null,
+                'qty_total' => $r->qty_total, 'value_total' => $r->value_total, 'revenue_total' => $r->revenue_total,
+                'customer_name' => $r->customer_name, 'department_name' => $r->department_name,
+                'wo_no' => $r->wo_no, 'wo_project_name' => $r->wo_project_name,
+                'warehouse_name' => $r->warehouse_name, 'destination_name' => $r->destination_name,
+                '_pihak' => null,
+            ])
+            ->map(function (array $d) use ($classify) {
+                $d['_pihak'] = $classify($d);
+
+                return $d;
+            });
 
         $posted = $docs->where('status', 'Selesai')->values();
         $tertahan = $docs->whereIn('status', ['Draft', 'Menunggu Approval', 'Dalam Perjalanan'])->values();
 
-        $absQty = fn (StockDocument $d): int => abs((int) ($d->qty_total ?? 0));
-        $absNilai = fn (StockDocument $d): float => round(abs((float) ($d->value_total ?? 0)), 2);
+        $absQty = fn (array $d): int => abs((int) ($d['qty_total'] ?? 0));
+        $absNilai = fn (array $d): float => round(abs((float) ($d['value_total'] ?? 0)), 2);
 
         // ---- Ringkasan + MoM ----
         $totalNilai = round($posted->sum($absNilai), 2);
         $totalQty = $posted->sum($absQty);
         $perBulan = [];
         foreach ($posted as $d) {
-            $key = $d->document_date->format('Y-m');
+            $key = $d['document_date']->format('Y-m');
             $perBulan[$key] ??= ['bulan' => $key, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $perBulan[$key]['qty'] += $absQty($d);
             $perBulan[$key]['nilai'] = round($perBulan[$key]['nilai'] + $absNilai($d), 2);
@@ -774,14 +949,14 @@ class LaporanController extends Controller
         $aggPihak = [];
         $aggPihakBulan = [];
         foreach ($posted as $d) {
-            $t = $d->getAttribute('_pihak');
+            $t = $d['_pihak'];
             $key = $pihakKey($t);
             $aggPihak[$key] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $aggPihak[$key]['qty'] += $absQty($d);
             $aggPihak[$key]['nilai'] = round($aggPihak[$key]['nilai'] + $absNilai($d), 2);
             $aggPihak[$key]['dokumen']++;
 
-            $bulan = $d->document_date->format('Y-m');
+            $bulan = $d['document_date']->format('Y-m');
             $bk = $key.'|'.$bulan;
             $aggPihakBulan[$bk] ??= ['jenis' => $t['jenis'], 'id' => $t['id'], 'nama' => $t['nama'], 'bulan' => $bulan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
             $aggPihakBulan[$bk]['qty'] += $absQty($d);
@@ -804,14 +979,14 @@ class LaporanController extends Controller
             foreach ($posted as $r) {
                 $q = $absQty($r);
                 $n = $absNilai($r);
-                if ($r->source_document_id) {
+                if ($r['source_document_id']) {
                     $tertautQty += $q;
                     $tertautNilai = round($tertautNilai + $n, 2);
                 } else {
                     $bebasQty += $q;
                     $bebasNilai = round($bebasNilai + $n, 2);
                 }
-                $alasan = TransaksiAnalytics::parseAlasan($r->note);
+                $alasan = TransaksiAnalytics::parseAlasan($r['note']);
                 $perAlasan[$alasan] ??= ['alasan' => $alasan, 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
                 $perAlasan[$alasan]['qty'] += $q;
                 $perAlasan[$alasan]['nilai'] = round($perAlasan[$alasan]['nilai'] + $n, 2);
@@ -927,9 +1102,9 @@ class LaporanController extends Controller
             $lanes = [];
             $net = [];
             foreach ($posted as $d) {
-                $fromId = $d->warehouse_id !== null ? (int) $d->warehouse_id : null;
-                $fromName = $d->warehouse?->name ?? '—';
-                $t = $d->getAttribute('_pihak');
+                $fromId = $d['warehouse_id'] !== null ? (int) $d['warehouse_id'] : null;
+                $fromName = $d['warehouse_name'] ?? '—';
+                $t = $d['_pihak'];
                 $lk = ($fromId ?? 'null').'|'.($t['id'] ?? 'null');
                 $lanes[$lk] ??= ['from_id' => $fromId, 'dari' => $fromName, 'to_id' => $t['id'], 'ke' => $t['nama'], 'qty' => 0, 'nilai' => 0.0, 'dokumen' => 0];
                 $lanes[$lk]['qty'] += $absQty($d);
@@ -950,8 +1125,8 @@ class LaporanController extends Controller
         // Fase 2.3: satu pass O(T) seperti aktivitas tujuan di keluarAnalytics.
         $terakhirPerPihak = [];
         foreach ($posted as $d) {
-            $k = $pihakKey($d->getAttribute('_pihak'));
-            $tgl = $d->document_date;
+            $k = $pihakKey($d['_pihak']);
+            $tgl = $d['document_date'];
             if (! isset($terakhirPerPihak[$k]) || $tgl->gt($terakhirPerPihak[$k])) {
                 $terakhirPerPihak[$k] = $tgl;
             }
@@ -976,8 +1151,8 @@ class LaporanController extends Controller
         // ---- Kecepatan proses ----
         $leadDays = [];
         foreach ($posted as $d) {
-            if ($d->posted_at && $d->document_date) {
-                $leadDays[] = max(0, $d->document_date->diffInDays($d->posted_at, true));
+            if ($d['posted_at'] && $d['document_date']) {
+                $leadDays[] = max(0, $d['document_date']->diffInDays($d['posted_at'], true));
             }
         }
         sort($leadDays);
@@ -986,7 +1161,7 @@ class LaporanController extends Controller
         foreach ($tertahan as $d) {
             $n = $absNilai($d);
             $tertahanNilai = round($tertahanNilai + $n, 2);
-            $bucket = TransaksiAnalytics::agingBucket((int) floor($to->diffInDays($d->document_date, true)));
+            $bucket = TransaksiAnalytics::agingBucket((int) floor($to->diffInDays($d['document_date'], true)));
             $aging[$bucket]['count']++;
             $aging[$bucket]['nilai'] = round($aging[$bucket]['nilai'] + $n, 2);
         }

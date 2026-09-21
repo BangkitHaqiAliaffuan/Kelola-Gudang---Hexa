@@ -22,6 +22,9 @@ ngrok.yml
 # Manual browser-test docs (session-local, UI-only guides — lihat AGENTS.md)
 Frontend/docs/*.txt
 
+# Playwright evidence screenshots/specs (session-local, 9MB+ PNG — lihat AGENTS.md)
+Frontend/e2e/evidence/
+
 # Build output / deps (sub-projects cover these too)
 node_modules/
 dist/

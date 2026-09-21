@@ -110,9 +110,9 @@ Keenam file artefak **SUDAH ter-track** (`git ls-files`; commit `28e844f`). Tamb
 
 ---
 
-## FASE 1 — Perbaikan KRITIS (isolated, risiko rendah, dampak langsung) ✅ SELESAI (uncommitted)
+## FASE 1 — Perbaikan KRITIS (isolated, risiko rendah, dampak langsung) ✅ SELESAI (committed `a5d78ca`)
 
-> **STATUS: SUDAH DIEKSEKUSI** (working tree, belum di-commit) — lihat §F1-Hasil di bawah. **JANGAN ulangi F1.** Mulai eksekusi dari **FASE 2**.
+> **STATUS: SUDAH DIEKSEKUSI & DI-COMMIT** (`a5d78ca fix(security): gate tulis user/role/settings ke Administrator + guard admin terakhir`) — lihat §F1-Hasil di bawah. **JANGAN ulangi F1.** Status dokumen disinkronkan 2026-09-18 (sebelumnya tertulis "uncommitted" — keliru).
 
 **Tujuan**: menutup jalur eskalasi privilege & lockout admin. Semua perubahan bersifat tambahan (middleware/policy + guard) tanpa mengubah alur normal.
 
@@ -220,7 +220,9 @@ Cakupan minimal:
 
 ---
 
-## FASE 2 — Pertahanan Berlapis Otorisasi (defense-in-depth)
+## FASE 2 — Pertahanan Berlapis Otorisasi (defense-in-depth) ✅ SELESAI (committed `7d0a716`)
+
+> **STATUS: SUDAH DIEKSEKUSI & DI-COMMIT** (`7d0a716 fix(security): authorize() FormRequest cerminkan gate modul & administrator (F2/T2)`, termasuk follow-up trait `AuthorizesAdministrator` §2.3). **JANGAN ulangi F2.** Status disinkronkan 2026-09-18.
 
 **Tujuan**: `authorize()` bukan lagi `return true` buta; bila suatu saat ada route lupa dibungkus middleware, otorisasi tetap dicek.
 
@@ -261,7 +263,9 @@ Cakupan minimal:
 
 ---
 
-## FASE 3 — Hardening Konfigurasi & Input (SEDANG, cepat)
+## FASE 3 — Hardening Konfigurasi & Input (SEDANG, cepat) ✅ SELESAI (committed `4dd3081` + `9df0eac`)
+
+> **STATUS: SUDAH DIEKSEKUSI & DI-COMMIT** (`4dd3081 fix(security): hardening konfigurasi & input — fillable stock, throttle endpoint berat, allowlist logo (F3)` + `9df0eac fix(security): allowlist logo juga di render halaman Pengaturan (F3.3)`). Mencakup 3.1 (komentar deploy `.env.example`), 3.2 (`stock`/`reserved` keluar `$fillable`), 3.3 (`SAFE_LOGO_PATTERN`), 3.4 (limiter `mutasi`/`bulk`/`laporan`). Status disinkronkan 2026-09-18.
 
 ### 3.1 `.env.example` produksi-safe
 - `Backend/.env.example:2,4` → `APP_ENV=production`? **Tidak** — biarkan `local` untuk dev, tapi tambahkan komentar tegas + panduan deploy: di produksi WAJIB `APP_DEBUG=false`. Bila proyek punya `railway.toml` (terlihat pernah ada), set di sana.
@@ -285,7 +289,9 @@ Cakupan minimal:
 
 ---
 
-## FASE 4 — Skalabilitas Frontend: Server-side Pagination
+## FASE 4 — Skalabilitas Frontend: Server-side Pagination ✅ SELESAI parsial (committed `659afa7`)
+
+> **STATUS: 3 halaman berat dimigrasi & di-commit** (`659afa7 feat: server-side pagination stock/mutasi/barang + filter sub-kategori/merk (fase4)`): `persediaan/stock`, `persediaan/mutasi`, `master/barang` via `use-server-table.ts`. Sisa: halaman agregat masih `fetchAll`/cap (lihat paket pasca-audit W4 — valuation >500 item terpotong). Status disinkronkan 2026-09-18.
 
 **Tujuan**: menghentikan `fetchAll()` (cap 50.000 baris) di halaman berat. Lihat `roadmap-final-skalabilitas-wms.md` Fase 1 (sudah menyiapkan `per_page` + index).
 
@@ -312,7 +318,9 @@ Urutan (berat → ringan):
 
 **Tujuan**: memangkas O(n) per transaksi & pemuatan dokumen besar ke memori.
 
-### 5.1 `StockLedger`: incremental update (bukan full rebuild)
+### 5.1 `StockLedger`: incremental update (bukan full rebuild) ✅ SELESAI (committed `47abe78`)
+
+> **STATUS: SUDAH DIEKSEKUSI & DI-COMMIT** (`47abe78 perf(ledger): incremental stock update via in_qty/in_cost + parity test (F5.1)`): `applyMovements`/`refreshForNewMovements` + `rebuildForItem` sebagai fallback + `LedgerParityTest`. Sisa risiko: race konkurensi tanpa lock (lihat paket pasca-audit W2). Status disinkronkan 2026-09-18.
 - **File**: `Backend/app/Services/StockLedger.php`.
 - **Pendekatan**: `rebuildForItem` saat ini memuat SELURUH movement lalu fold ulang. Ganti dengan update **delta** per movement pada `item_stock` (tambah/kurangi `stock`, update `unit_cost_avg` via weighted formula) — dengan catatan: weighted average hanya berubah pada IN (sesuai semantik saat ini). Sediakan `rebuildForItem` sebagai **fallback/reconciliation** (dipakai command perbaikan `stock:reconcile-*`).
 - **PENTING**: harus ada **test parity** yang membandingkan hasil incremental vs full-fold untuk serangkaian movement acak (deterministik). **Catatan**: `ScaleFase2ParityTest` **tidak ada** — parity test dibangun **dari nol**, dengan `tests/Unit/FifoFoldTest.php` sebagai pola dan `tests/Feature/ReconcileBinMismatchCommandTest.php` sebagai contoh assertion pergerakan stok.
@@ -394,6 +402,9 @@ Urutan (berat → ringan):
 | 2026-09-16 | **Revisi pasca-review Opencode** — verifikasi independen 3 keberatan reviewer (semua akurat): turunkan severity P0-1→TINGGI, P0-3→SEDANG, P2-2/P2-3→RENDAH; revisi F1.2 (gate tulis saja, S8); drop F6.2-1 (S9); koreksi atribusi P3-3 ke `barcode-label.ts`; putuskan kontradiksi §1.3 (S10); tambah §0c + §6.3 (artefak debug) + test regresi baca |
 | 2026-09-16 | **Sinkronisasi kode berevolusi (§0e)** — deteksi sesi `flex-roles` mengubah 26 file (role dinamis + `can_review`); verifikasi empiris jalur eskalasi baru (`POST roles`=201, `PUT roles/{lain}`=200 bypass self-lockout, `DELETE roles`=403); perluas F1.2 ke `POST/DELETE roles`; tandai koordinasi (tunggu sesi lain commit sebelum F1) |
 | 2026-09-16 | **F1 DIEKSEKUSI** (uncommitted) — middleware `EnsureAdministrator` + alias, gate tulis users/roles/settings, guard admin-terakhir & self-mutation (model-level), test `AdministratorGuardTest` (11 kasus). Suite **523 passed / 1 skipped**. Test lama disesuaikan (`TestCase::actingAsMasterAdmin` → role `Administrator`). Lihat §F1-Hasil. **Berikutnya: F2.** |
+| 2026-09-18 | **Sinkronisasi status (W0)** — F1–F4 + F5.1 ternyata sudah di-commit (`a5d78ca`, `7d0a716`, `4dd3081`+`9df0eac`, `659afa7`, `47abe78`); klaim "uncommitted" dikoreksi. Crosscheck menemukan sisa masalah masa depan → paket pasca-audit W0–W6: W1 guard anti-rename `Administrator`, W2 advisory lock ledger (TOCTOU assert+write), W3 agregasi SQL analitik, W4 valuation >500 item, W5 header Vercel, W6 `git rm` artefak. |
+
+| 2026-09-18 | **Paket pasca-audit W0–W6 DIEKSEKUSI.** W1: `RoleController::update` tolak 422 rename role `Administrator` (+2 test, `AdministratorGuardTest` 15 passed). W2: `App\Support\StockItemLock` (`pg_advisory_xact_lock` per item, ascending) dipakai `StockDocumentService::post()` + `StockLedger::record()` + `StockPostConcurrencyTest` (3 passed). W3: `keluarAnalytics` + `transaksiAnalytics` → 1 query agregat baris-skalar (JOIN lines GROUP BY + JOIN nama), matematika downstream identik; oracle existing hijau + test batas query (<25 untuk 60 dokumen). Suite backend **646 tests / 645 passed / 1 skipped**. W4: `useStockValuation` → `fetchAll()` loop + spec 2-halaman. W5: header CSP/HSTS/dsb di `Frontend/vercel.json` (build tanpa inline script terverifikasi). W6: **committed `75569b8`** (`git rm` 7 artefak + gitignore + hapus `rebuild:drift`). Sisa W1–W5 **uncommitted** (butuh perintah commit). Susulan: W3b fold `stockCard` genesis, F5.3 heal `pluck→MAX`, F6.2-2/3/4. |
 
 ---
 

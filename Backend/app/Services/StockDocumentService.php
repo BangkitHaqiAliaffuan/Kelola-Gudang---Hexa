@@ -9,6 +9,7 @@ use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
 use App\Support\CodeGenerator;
+use App\Support\StockItemLock;
 use App\Support\WarehouseScope;
 use Illuminate\Support\Facades\DB;
 
@@ -47,6 +48,11 @@ class StockDocumentService
 
         DB::transaction(function () use ($document) {
             $document->loadMissing(['lines.item', 'lines.fromBin.rack', 'lines.toBin.rack']);
+
+            // W2: serialisasi per item SEBELUM assert stok (assertNoNegativeStock
+            // membaca tanpa lock). Urutan ascending → bebas deadlock antar
+            // dokumen dengan susunan baris berbeda.
+            StockItemLock::acquire($document->lines->map(fn ($line) => $line->item_id)->all());
 
             $itemsTouched = [];
             $newMovements = [];

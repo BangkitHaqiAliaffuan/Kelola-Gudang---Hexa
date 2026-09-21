@@ -67,6 +67,19 @@ class RoleController extends Controller
         $validated = $request->validated();
         $newName = $validated['name'] ?? $record->name;
 
+        // Guard nama role sistem (W1 pasca-audit): gate administrator
+        // (EnsureAdministrator/AuthorizesAdministrator/guardLastAdministrator)
+        // mencocokkan string 'Administrator'. Rename role ini mempropagasi ke
+        // users.role (di bawah) sehingga seketika nol admin → lockout total
+        // yang hanya pulih via DB/console. Nama immutable; deskripsi/akses
+        // tetap boleh diubah.
+        if ($record->name === 'Administrator' && $newName !== 'Administrator') {
+            return response()->json([
+                'message' => 'Role sistem Administrator tidak dapat diubah namanya.',
+                'errors' => ['name' => ['Role sistem Administrator tidak dapat diubah namanya.']],
+            ], 422);
+        }
+
         // Self-lockout guard: user tak boleh mencabut System/Kelola dari
         // role-nya sendiri (akan mengunci diri keluar dari manajemen akses).
         $authUser = $request->user('sanctum') ?? $request->user();

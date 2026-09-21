@@ -209,4 +209,32 @@ class AdministratorGuardTest extends TestCase
     {
         $this->postJson('/api/master/roles', ['name' => 'X'])->assertUnauthorized();
     }
+
+    // ---- W1: nama role sistem Administrator immutable ----
+
+    public function test_admin_cannot_rename_administrator_role(): void
+    {
+        $actor = $this->administrator();
+        Role::firstOrCreate(['name' => 'Administrator']);
+
+        $this->actingAs($actor, 'sanctum')
+            ->putJson('/api/master/roles/Administrator', ['name' => 'Superadmin'])
+            ->assertUnprocessable();
+
+        $this->assertDatabaseHas('roles', ['name' => 'Administrator']);
+        $this->assertDatabaseMissing('roles', ['name' => 'Superadmin']);
+        $this->assertSame('Administrator', $actor->fresh()->role);
+    }
+
+    public function test_admin_can_rename_regular_role(): void
+    {
+        $actor = $this->administrator();
+        Role::firstOrCreate(['name' => 'Supervisor']);
+
+        $this->actingAs($actor, 'sanctum')
+            ->putJson('/api/master/roles/Supervisor', ['name' => 'Pengawas'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('roles', ['name' => 'Pengawas']);
+    }
 }
