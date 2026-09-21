@@ -155,4 +155,15 @@ class SqlValidatorTest extends TestCase
         $this->assertAccepted('SELECT id FROM stock_documents WHERE EXTRACT(YEAR FROM document_date) = 2026');
         $this->assertAccepted('WITH x AS (SELECT 1 AS n) SELECT n FROM x');
     }
+
+    public function test_accepts_schema_v2_columns_segment_and_movement_link(): void
+    {
+        // Kolom yang ditambahkan saat koreksi skema (insiden P1 + document_id).
+        $this->assertAccepted(
+            "SELECT c.segment, SUM(ABS(l.qty * l.unit_price)) AS total FROM stock_document_lines l JOIN stock_documents d ON d.id = l.document_id LEFT JOIN customers c ON c.id = d.customer_id WHERE d.type = 'Pengeluaran' AND d.status = 'Selesai' GROUP BY c.segment ORDER BY total DESC"
+        );
+        $this->assertAccepted(
+            'SELECT m.direction, SUM(m.qty) AS total FROM stock_movements m JOIN stock_documents d ON d.id = m.stock_document_id GROUP BY m.direction'
+        );
+    }
 }
