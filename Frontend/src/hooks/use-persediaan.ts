@@ -13,9 +13,8 @@ import type {
 } from "@/lib/persediaan-types";
 
 // Backend membatasi `per_page` maks 100 (Fase 1.2 skalabilitas): daftar yang
-// butuh seluruh baris diambil via fetchAll() (loop halaman 100). Valuasi
-// tetap request tunggal per_page=500 (batas endpoint agregat, K6).
-const PER_PAGE = 500;
+// butuh seluruh baris diambil via fetchAll() (loop halaman 100, maks 500
+// halaman). Valuasi ikut loop agar total/share truthful di atas 500 item (W4).
 // Stock documents are seeded in the thousands — fetch them all so
 // the client-side type/status/warehouse filters stay truthful.
 
@@ -365,15 +364,18 @@ export function useStockValuation(
       moving ?? null,
     ],
     queryFn: () => {
-      const sp = new URLSearchParams({ per_page: String(PER_PAGE) });
-      if (warehouseId != null) sp.set("warehouse_id", String(warehouseId));
-      if (categoryId != null) sp.set("category_id", String(categoryId));
-      if (search) sp.set("search", search);
+      // W4: loop seluruh halaman (bukan satu GET per_page=500) — total,
+      // share, dan klasifikasi moving dihitung dari `rows` sehingga
+      // terpotong diam-diam saat item > 500.
+      const params: Record<string, string> = {};
+      if (warehouseId != null) params["warehouse_id"] = String(warehouseId);
+      if (categoryId != null) params["category_id"] = String(categoryId);
+      if (search) params["search"] = search;
       // Filter server-side (didukung backend setelah param `moving` mendarat di
       // StockController::valuation; sebelum itu diabaikan backend dan filter
       // client-side di bawah yang menentukan).
-      if (moving) sp.set("moving", moving);
-      return api.get<Paginated<StockValuationApi>>(`/persediaan/valuation?${sp.toString()}`);
+      if (moving) params["moving"] = moving;
+      return fetchAll<StockValuationApi>("/persediaan/valuation", params);
     },
     enabled: typeof window !== "undefined",
   });

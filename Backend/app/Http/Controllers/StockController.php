@@ -315,7 +315,7 @@ class StockController extends Controller
         // Fase 2.1: paginasi items di SQL dulu, lalu fold ledger HANYA untuk id
         // di halaman aktif (dulu: load semua item + semua movement ke memori PHP).
         // Urutan (items.name), envelope, dan meta.total dipertahankan persis agar
-        // konsumen per_page=500 (FE + test) melihat halaman-1 yang sama.
+        // konsumen loop fetchAll (FE, W4) melihat halaman yang sama.
         // Average tetap moving-average fold (bukan item_stock.unit_cost_avg yang
         // merupakan simple-average-IN) — paritas angka dengan implementasi lama.
         $paginator = $query->orderBy('items.name')->paginate($request->integer('per_page', 20));
