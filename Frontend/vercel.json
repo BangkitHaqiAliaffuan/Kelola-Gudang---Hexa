@@ -14,14 +14,15 @@
     }
   ],
   "cleanUrls": true,
+  // Catatan CSP (W5.1): JANGAN tambah header Content-Security-Policy statis
+  // di sini. HTML SSR diserve oleh server function (src/server.ts) yang
+  // memasang CSP dinamis + nonce per-request; dua header CSP (statis +
+  // dinamis) ditegakkan keduanya oleh browser sehingga nonce sia-sia.
+  // Header hardening lain di bawah tetap berlaku untuk semua respons.
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob:; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'"
-        },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
