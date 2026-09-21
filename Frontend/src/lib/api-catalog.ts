@@ -426,6 +426,41 @@ export const API_CATALOG: ApiCatalogGroup[] = [
       },
     ],
   },
+  {
+    group: "AI Assistant",
+    entries: [
+      {
+        method: "GET",
+        path: "/ai/status",
+        desc: "Status AI + kuota harian (gate UI Copilot)",
+        gate: BACA("Persediaan"),
+      },
+      {
+        method: "POST",
+        path: "/ai/chat",
+        desc: "Tanya AI — hanya usul, tak mengeksekusi",
+        gate: TULIS("Persediaan"),
+      },
+      {
+        method: "POST",
+        path: "/ai/execute",
+        desc: "Eksekusi proposal terkonfirmasi (Draft-only)",
+        gate: TULIS("Persediaan"),
+      },
+      {
+        method: "POST",
+        path: "/ai/reject",
+        desc: "Tolak proposal",
+        gate: TULIS("Persediaan"),
+      },
+      {
+        method: "GET",
+        path: "/ai/proposals/{id}",
+        desc: "Status satu proposal",
+        gate: BACA("Persediaan"),
+      },
+    ],
+  },
 ];
 
 /** Contoh payload nyata (tombol salin di halaman Developer). */

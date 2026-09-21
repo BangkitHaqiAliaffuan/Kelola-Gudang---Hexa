@@ -1,0 +1,47 @@
+%% =====================================================================
+%% ERD 02 — User dan Role (5 entitas, versi ringkas fokus relasi)
+%% Kelola Gudang Pro. Sumber kolom lengkap: 61 migrasi Backend.
+%% PENTING: users.role dan role_permissions.role adalah STRING biasa,
+%% bukan FK ke roles.id — relasi logis ditegakkan di aplikasi
+%% (Rule::exists). Tandai garis putus-putus manual setelah import/draw.
+%% warehouses STUB (lengkap di erd-01).
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% =====================================================================
+erDiagram
+    warehouses ||--o{ user_warehouse : "dicakup"
+    users ||--o{ user_warehouse : "dicakup"
+    users ||--o{ roles : "berperan sebagai (logis, non-FK)"
+    roles ||--o{ role_permissions : "diatur (logis, non-FK)"
+
+    warehouses {
+        int id PK
+        string code UK
+        string name UK
+    }
+    users {
+        int id PK
+        string code UK
+        string name
+        string email UK
+        string role
+        boolean is_active
+        int default_warehouse_id FK
+    }
+    roles {
+        int id PK
+        string name UK
+        boolean can_review
+        string warehouse_scope_mode
+    }
+    role_permissions {
+        int id PK
+        string role
+        string module
+        string level
+    }
+    user_warehouse {
+        int id PK
+        int user_id FK
+        int warehouse_id FK
+    }

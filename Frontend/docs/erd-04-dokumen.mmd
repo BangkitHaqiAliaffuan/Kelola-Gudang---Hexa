@@ -1,0 +1,96 @@
+%% =====================================================================
+%% ERD 04 — Dokumen Persediaan + Opname (10 entitas, ringkas fokus relasi)
+%% Kelola Gudang Pro. Sumber kolom lengkap: 61 migrasi Backend.
+%% Stub (lengkap di file lain): warehouses/bins/items (erd-01),
+%% users/customers/departments/projects/work_orders (erd-01/02).
+%% type: Penerimaan/Pengeluaran/Transfer/Adjustment/Opname/Retur.
+%% status: Draft/Menunggu/Selesai/Dibatalkan/Dalam Perjalanan
+%%   (Dalam Perjalanan terdefinisi, belum ada transisi yang mengeset).
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% =====================================================================
+erDiagram
+    warehouses ||--o{ stock_documents : "gudang asal"
+    warehouses ||--o{ stock_documents : "gudang tujuan"
+    stock_documents ||--o{ stock_documents : "sumber (retur / koreksi opname)"
+    customers ||--o{ stock_documents : "tujuan"
+    departments ||--o{ stock_documents : "tujuan"
+    projects ||--o{ stock_documents : "tujuan"
+    work_orders ||--o{ stock_documents : "tujuan"
+    users ||--o{ stock_documents : "requester dan approver"
+    stock_documents ||--|{ stock_document_lines : "baris"
+    items ||--|{ stock_document_lines : "barang"
+    bins ||--o{ stock_document_lines : "bin asal/tujuan"
+    stock_document_lines ||--o{ stock_document_lines : "baris sumber retur"
+    users ||--o{ stock_document_lines : "penghitung"
+
+    warehouses {
+        int id PK
+        string code UK
+        string name UK
+    }
+    bins {
+        int id PK
+        string code UK
+        string name UK
+    }
+    items {
+        int id PK
+        string sku UK
+        string name UK
+    }
+    users {
+        int id PK
+        string code UK
+        string name
+    }
+    customers {
+        int id PK
+        string code UK
+        string name UK
+    }
+    departments {
+        int id PK
+        string code UK
+        string name UK
+    }
+    projects {
+        int id PK
+        string code UK
+        string name UK
+    }
+    work_orders {
+        int id PK
+        string no UK
+    }
+    stock_documents {
+        int id PK
+        string no UK
+        string type
+        string status
+        int warehouse_id FK
+        int destination_warehouse_id FK
+        int source_document_id FK
+        string reference_no
+        int customer_id FK
+        int department_id FK
+        int project_id FK
+        int work_order_id FK
+        int requester_user_id FK
+        int approver_user_id FK
+        timestamp posted_at
+    }
+    stock_document_lines {
+        int id PK
+        int document_id FK
+        int line_no
+        int item_id FK
+        int qty
+        int system_qty
+        int actual_qty
+        int from_bin_id FK
+        int to_bin_id FK
+        int source_line_id FK
+        decimal unit_cost
+        string reason_code
+    }

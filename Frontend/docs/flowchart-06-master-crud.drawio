@@ -1,0 +1,88 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Master CRUD" id="master-crud">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="File 6 — Pola CRUD Master Data (berlaku untuk 16 entitas)" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="747" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="Draft" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="43" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="Menunggu" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="213" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="Selesai" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="383" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="Terminal / Error" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="553" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="start" value="Pengguna membuka menu Master Data" style="ellipse;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="380" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="pilih" value="Pilih entitas: Kategori, Sub Kategori, Merk, Satuan, Gudang, Rak, Bin, Supplier, Customer, Vendor, Barang, Departemen, Proyek, Work Order, User, Role" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="190" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="form" value="Form tambah / ubah: kode auto-generate (CodeGenerator) bila dikosongkan; nama dan kode unik" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="312" width="380" height="96" as="geometry" />
+        </mxCell>
+        <mxCell id="dec-v" value="Validasi FormRequest lolos? (unik, relasi FK, format NIB/NPWP)" style="rhombus;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="55" y="430" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="err-v" value="Tidak: 422 + errors per field — kembali ke form" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="450" y="440" width="337" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="simpan" value="Simpan — audit tercatat otomatis (AuditObserver)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="572" width="380" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="hapus" value="Tombol hapus (butuh level Kelola)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="380" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="dec-r" value="Data masih dirujuk entitas lain?" style="rhombus;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="55" y="728" width="350" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="err-r" value="Ya: 422 ditolak — kategori beranak, rak/bin/gudang terpakai, supplier dirujuk barang, proyek ber-work order, barang di work order, role berpenghuni" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="450" y="738" width="337" height="96" as="geometry" />
+        </mxCell>
+        <mxCell id="done" value="SELESAI — hapus + audit (atau nonaktifkan is_active untuk offboarding user)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="870" width="380" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Pengecualian: tulis User dan Role serta PUT /system/settings HANYA Administrator (role.administrator) — baca tetap di bawah gate modul agar form non-admin berfungsi." style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;spacing=10;fillColor=#ddebf7;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="982" width="747" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="start" target="pilih">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="pilih" target="form">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="form" target="dec-v">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="Tidak" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#b85450;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dec-v" target="err-v">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="Ya" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#38761d;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dec-v" target="simpan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="simpan" target="hapus">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="hapus" target="dec-r">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="Ya" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#b85450;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dec-r" target="err-r">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="Tidak" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#38761d;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dec-r" target="done">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="done" target="note">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

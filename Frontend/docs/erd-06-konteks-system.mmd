@@ -1,0 +1,65 @@
+%% =====================================================================
+%% ERD 06 — Konteks Antar-Modul + Tabel System (ringkas fokus relasi)
+%% Kelola Gudang Pro.
+%% mod_* = SATU BOX per modul untuk diagram konteks pembuka bab.
+%% Dikeluarkan: tabel infra Laravel (cache/jobs/sessions/password_resets/
+%% personal_access_tokens) dan ai_proposals (uncommitted sesi lain).
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% =====================================================================
+erDiagram
+    mod_master ||--o{ mod_ledger : "stok per item-gudang-bin"
+    mod_master ||--o{ mod_dokumen : "barang pada baris (RESTRICT)"
+    mod_master ||--o{ mod_pengadaan : "barang pada baris (RESTRICT)"
+    mod_master ||--o{ mod_ledger : "lokasi gudang"
+    mod_master ||--o{ mod_dokumen : "lokasi dan tujuan"
+    mod_master ||--o{ mod_pengadaan : "dept pemohon dan gudang"
+    mod_user_role ||--o{ mod_dokumen : "requester/approver/pencatat"
+    mod_user_role ||--o{ mod_pengadaan : "requester/approver"
+    mod_dokumen ||--o{ mod_ledger : "posting ke movement"
+    mod_pengadaan ||--o{ mod_dokumen : "penerimaan ref nomor PO"
+    mod_user_role ||--o{ audit_logs : "tercatat"
+    mod_dokumen ||--o{ audit_logs : "tercatat (polimorfik)"
+    mod_pengadaan ||--o{ audit_logs : "tercatat (polimorfik)"
+    mod_master ||--o{ audit_logs : "tercatat (polimorfik)"
+    mod_user_role ||--o{ settings : "pengubah"
+
+    mod_master {
+        string modul
+        string kunci
+    }
+    mod_user_role {
+        string modul
+        string kunci
+    }
+    mod_ledger {
+        string modul
+        string kunci
+    }
+    mod_dokumen {
+        string modul
+        string kunci
+    }
+    mod_pengadaan {
+        string modul
+        string kunci
+    }
+    audit_logs {
+        int id PK
+        timestamp occurred_at
+        int user_id FK
+        string action
+        string module
+        string record_no
+    }
+    settings {
+        int id PK
+        string key UK
+        json value
+        int updated_by_user_id FK
+    }
+    document_counters {
+        string scope PK
+        string counter_key PK
+        int current_number
+    }

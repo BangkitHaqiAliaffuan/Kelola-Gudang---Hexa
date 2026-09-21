@@ -1,0 +1,72 @@
+%% =====================================================================
+%% ERD 03 — Ledger Persediaan (8 entitas, versi ringkas fokus relasi)
+%% Kelola Gudang Pro. Sumber kolom lengkap: 61 migrasi Backend.
+%% item_stock TANPA primary key (di-drop di migrasi); keunikan via
+%% partial unique index — anotasi manual. CHECK DB: reserved <= stock.
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% =====================================================================
+erDiagram
+    items ||--o{ item_stock : "stok per lokasi"
+    items ||--o{ stock_movements : "riwayat gerak"
+    warehouses ||--o{ item_stock : "lokasi"
+    warehouses ||--o{ stock_movements : "lokasi"
+    bins ||--o{ item_stock : "lokasi"
+    bins ||--o{ stock_movements : "lokasi"
+    racks ||--o{ stock_movements : "rak"
+    users ||--o{ stock_movements : "pencatat"
+    stock_documents ||--o{ stock_movements : "sumber posting"
+    stock_movements ||--o{ stock_movements : "pasangan transfer (pair)"
+
+    items {
+        int id PK
+        string sku UK
+        string name
+    }
+    warehouses {
+        int id PK
+        string code UK
+        string name UK
+    }
+    bins {
+        int id PK
+        string code UK
+        string name UK
+    }
+    racks {
+        int id PK
+        string code UK
+        string name UK
+    }
+    users {
+        int id PK
+        string code UK
+        string name
+    }
+    stock_documents {
+        int id PK
+        string no UK
+    }
+    item_stock {
+        int item_id FK
+        int warehouse_id FK
+        int bin_id FK
+        int stock
+        int reserved
+        decimal unit_cost_avg
+    }
+    stock_movements {
+        int id PK
+        int item_id FK
+        int warehouse_id FK
+        int rack_id FK
+        int bin_id FK
+        string direction
+        int qty
+        string movement_type
+        decimal unit_cost
+        timestamp occurred_at
+        int created_by FK
+        int stock_document_id FK
+        int pair_id FK
+    }

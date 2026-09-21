@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Observers\AuditObserver;
+use App\Services\Ai\AiProvider;
+use App\Services\Ai\AiProviderFactory;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -14,7 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Provider AI dipilih dari config (groq/null) — lapisan atas hanya
+        // bergantung pada antarmuka AiProvider (provider-agnostic).
+        $this->app->singleton(AiProvider::class, fn () => AiProviderFactory::make());
     }
 
     /**
@@ -36,5 +40,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('mutasi', fn () => $testBypass ?? Limit::perMinute(60));
         RateLimiter::for('bulk', fn () => $testBypass ?? Limit::perMinute(10));
         RateLimiter::for('laporan', fn () => $testBypass ?? Limit::perMinute(60));
+
+        // AI Assistant (F8): batas laju panggilan AI per user. Kuota HARIAN
+        // (config ai.daily_quota) ditegakkan di lapisan atas (orchestrator)
+        // agar bisa dihitung lintas-menit; limiter ini meredam burst.
+        RateLimiter::for('ai', fn ($request) => $testBypass ?? Limit::perMinute(10)
+            ->by('ai:'.($request->user()?->id ?? $request->ip())));
     }
 }

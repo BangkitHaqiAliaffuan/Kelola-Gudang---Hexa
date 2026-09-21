@@ -12,6 +12,18 @@ Laravel 13 API (`/api`) powering the master data module (Kategori, Sub Kategori,
 - `laravel/boost` is NOT installed (README mentions it; ignore).
 - Deploy safety (F3.1): `.env.example` is dev-default (`APP_ENV=local`, `APP_DEBUG=true`). In production **must** set `APP_ENV=production` + `APP_DEBUG=false` via deployment env (debug leaks stack traces/SQL into API responses; `bootstrap/app.php` only masks errors when debug is off).
 
+## AI Assistant (F8)
+
+Opt-in, **default OFF** (`AI_ENABLED=false`) — no outbound call until enabled. Provider-agnostic (`AiProvider` interface) implemented by a single `OpenAiCompatibleProvider` (any OpenAI-protocol backend via config): `groq` (api.groq.com), **`9router`** (local gateway `http://127.0.0.1:20128/v1`, multi-provider + auto-fallback), `openai_compatible` (custom `AI_BASE_URL`/`AI_API_KEY`), `ollama` (local, no key), `null`. Switch provider with `AI_PROVIDER=` — no code change. Config: `config/ai.php` (behavior) + `config/services.php` (keys). Providers live in `app/Services/Ai/`.
+
+- **Endpoints** (`routes/api.php`, prefix `/api/ai`, middleware `auth:sanctum, user.active, scope.warehouse, role.access:Persediaan, throttle:ai`): `GET status`, `POST chat` (propose only), `POST execute`, `POST reject`, `GET proposals/{id}`. Gate `role.access` diturunkan dari verb: endpoint POST butuh Persediaan **Tulis** (Auditor/Baca-only → 403 dengan toast pesan server), endpoint GET cukup **Baca**.
+- **HITL (kunci)**: `POST chat` NEVER executes writes — model tool calls to write tools create an `ai_proposals` row (`pending`) returned to the user. Execution happens only via `POST execute {proposal_id}` by the same user, before expiry (15 min), and dispatches through the **real route** (`/api/persediaan/stock-documents`) with the user's identity → full RBAC + warehouse scope + FormRequest + audit apply identically. Writes are forced `status=Draft`.
+- **Tool whitelist** (`ToolRegistry`): closed allowlist, deny-by-default. Tools filtered per role (a reader never "sees" write tools). AI inherits user permissions — never has its own.
+- **Text-to-SQL read-only** (`analisis_data` tool): `SqlValidator` (L0 sanitize → L1 `assertReadOnlySelect` → L2 independent `validateQuery` → allowlist tabel `WmsSchema`), `SqlScopeInjector` (injeksi predicate `warehouse_id` fail-closed untuk user Terbatas; WITH/UNION/subquery ditolak untuk mereka), transaction `READ ONLY` + `statement_timeout` + LIMIT wrap, connection `ai_readonly` (set `AI_DB_USERNAME`/`AI_DB_PASSWORD` via `php artisan ai:setup-reader`, + `AI_ENFORCE_READER=true` di prod agar menolak tanpa role khusus). Blind schema in `WmsSchema`.
+- **Guardrail**: `GROQ` `llama-prompt-guard-2` scores input (`guardScore`); high score → rejected. Daily quota per user (`ai.daily_quota`, cache). All AI actions audited (`AuditLogger`, `AiProposal`). Proposal execute diklaim atomik (`pending→executing`, anti double-execute/replay); gagal kembali ke `pending` agar bisa dikoreksi.
+- **Smoke test** (opt-in, not in suite): `AI_ENABLED=true php artisan ai:smoke`.
+- Tests use `Tests\Support\FakeAiProvider` (no network).
+
 ## Commands
 
 ```sh

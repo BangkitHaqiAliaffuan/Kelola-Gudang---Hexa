@@ -35,4 +35,32 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Assistant (F8) — kredensial penyedia LLM.
+    |--------------------------------------------------------------------------
+    | `groq` memakai API OpenAI-compatible. Key HANYA di .env (tak pernah
+    | di-commit). Konfigurasi perilaku AI ada di config/ai.php.
+    */
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | 9Router (AI gateway lokal, OpenAI-compatible)
+    |--------------------------------------------------------------------------
+    | Gateway multi-provider yang jalan lokal (Docker, default port 20128).
+    | Base URL default http://127.0.0.1:20128/v1 (pakai 127.0.0.1, bukan
+    | localhost, agar tidak kena isu resolusi IPv6). API key dari dashboard
+    | 9Router. Aktifkan dengan AI_PROVIDER=9router.
+    */
+
+    'nine_router' => [
+        'key' => env('NINEROUTER_API_KEY'),
+        'base_url' => env('NINEROUTER_BASE_URL', 'http://127.0.0.1:20128/v1'),
+    ],
+
 ];

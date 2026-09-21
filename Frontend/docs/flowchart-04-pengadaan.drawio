@@ -1,0 +1,140 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Pengadaan" id="pengadaan">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="File 4 — Pengadaan PR ke PO ke Receive Goods" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="1089" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="Draft" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="43" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="Menunggu" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="213" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="Selesai" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="383" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="Terminal / Error" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="553" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-p" value="PEMOHON" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#e2efd9;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-a" value="APPROVER DITUGASKAN" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#fce5cd;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="410" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-s" value="SISTEM" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#ddebf7;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="p-pr" value="Buat PR (nomor PR/YYYY otomatis): DRAFT privat — hanya pembuat + Pengadaan Kelola" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="152" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s-num" value="PO wajib merujuk PR Disetujui (source_proc_doc_id); nomor PO/YYYY" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="152" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-submit" value="POST submit dari Draft milik sendiri" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="246" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s-resolve" value="resolveApprover: PR ke kepala dept, lalu role Approval Pengadaan, lalu Kelola; PO ke Approval Pengadaan" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="246" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="a-wait" value="MENUNGGU APPROVAL (approver terisi)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="410" y="340" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="a-approve" value="approve — HANYA assignee, tanpa override role; requester selalu ditolak (SoD)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="410" y="434" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="p-reassign" value="reassign (Pengadaan Kelola): target aktif dan bukan requester" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="434" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="a-reject" value="reject (catatan opsional) ke DITOLAK" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="410" y="540" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-cancel" value="cancel: dari Draft/Menunggu/Disetujui; PR yang sudah jadi PO terkunci" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="540" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="end-agree" value="DISETUJUI — PR menjadi PO (siklus sama); Receive dicatat sebagai Penerimaan ref nomor PO" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="410" y="634" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="end-dead" value="DITOLAK / DIBATALKAN — terminal, buat baru" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="634" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="notes" value="Temuan: kind GR terdaftar di model tetapi ditolak validasi create (hanya PR/PO) — disiapkan untuk pengembangan." style="text;html=1;fontSize=11;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="724" width="1050" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-pr" target="p-submit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-submit" target="s-resolve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="eligible" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#38761d;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="s-resolve" target="a-wait">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="745" y="286" />
+              <mxPoint x="745" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-wait" target="a-approve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-approve" target="end-agree">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="tolak" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="a-wait" target="a-reject">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="380" />
+              <mxPoint x="750" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="alih approver" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="a-wait" target="p-reassign">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="380" />
+              <mxPoint x="380" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="tetap Menunggu" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-reassign" target="a-wait">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-wait" target="p-cancel">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="388" y="400" />
+              <mxPoint x="388" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="batalkan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-pr" target="p-cancel">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="24" y="192" />
+              <mxPoint x="24" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-cancel" target="end-dead">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-reject" target="end-dead">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="376" y="580" />
+              <mxPoint x="376" y="674" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

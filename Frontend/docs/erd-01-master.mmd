@@ -1,0 +1,123 @@
+%% =====================================================================
+%% ERD 01 — Master Data (14 entitas, versi ringkas fokus relasi)
+%% Kelola Gudang Pro. Sumber kolom lengkap: 61 migrasi Backend.
+%% Atribut non-prioritas (timestamp, alamat, detail PT-bank) disembunyikan.
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% FK lintas file: departments.head_user_id, projects.pic_user_id,
+%% work_orders.pic_user_id → users (lihat erd-02).
+%% =====================================================================
+erDiagram
+    categories ||--o{ sub_categories : "memiliki"
+    categories ||--|{ items : "dipakai"
+    sub_categories ||--o{ items : "dipakai"
+    merks ||--o{ items : "merek"
+    units ||--o{ items : "satuan"
+    units ||--o{ work_orders : "satuan"
+    suppliers ||--o{ items : "pemasok utama"
+    warehouses ||--o{ racks : "memiliki"
+    warehouses ||--o{ items : "gudang default"
+    racks ||--o{ bins : "memiliki"
+    racks ||--o{ items : "rak default"
+    bins ||--o{ items : "bin default"
+    vendors ||--o{ projects : "vendor"
+    projects ||--|{ work_orders : "memiliki"
+    items ||--|{ work_orders : "bahan"
+
+    categories {
+        int id PK
+        string code UK
+        string name UK
+        boolean is_active
+    }
+    sub_categories {
+        int id PK
+        int category_id FK
+        string code UK
+        string name
+    }
+    merks {
+        int id PK
+        string code UK
+        string name UK
+    }
+    units {
+        int id PK
+        string code UK
+        string name UK
+    }
+    warehouses {
+        int id PK
+        string code UK
+        string name UK
+    }
+    racks {
+        int id PK
+        int warehouse_id FK
+        string code UK
+        string name
+    }
+    bins {
+        int id PK
+        int rack_id FK
+        string code UK
+        string name
+    }
+    suppliers {
+        int id PK
+        string code UK
+        string name UK
+    }
+    customers {
+        int id PK
+        string code UK
+        string name UK
+        string segment
+    }
+    vendors {
+        int id PK
+        string code UK
+        string name UK
+    }
+    departments {
+        int id PK
+        string code UK
+        string name UK
+        int head_user_id FK
+    }
+    projects {
+        int id PK
+        string code UK
+        string name UK
+        int pic_user_id FK
+        int vendor_id FK
+        string status
+        decimal budget
+    }
+    work_orders {
+        int id PK
+        string no UK
+        int project_id FK
+        int item_id FK
+        int unit_id FK
+        int target_qty
+        string status
+    }
+    items {
+        int id PK
+        string sku UK
+        string name
+        int category_id FK
+        int sub_category_id FK
+        int brand_id FK
+        int unit_id FK
+        int preferred_supplier_id FK
+        int default_warehouse_id FK
+        int default_rack_id FK
+        int default_bin_id FK
+        decimal cost
+        decimal price
+        int min_stock
+        int stock
+        string status
+    }

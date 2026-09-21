@@ -1,0 +1,80 @@
+%% =====================================================================
+%% ERD 05 — Pengadaan (9 entitas, versi ringkas fokus relasi)
+%% Kelola Gudang Pro. Sumber kolom lengkap: 61 migrasi Backend.
+%% Stub (lengkap di file lain): users/departments/suppliers/warehouses/
+%% items/units (erd-01/02). kind: PR/PO (GR ditolak saat create).
+%% need_date SUDAH DI-DROP — tidak ada di diagram.
+%% Buka: mermaid.live / plugin Mermaid VSCode / draw.io
+%%   (Arrange → Insert → Advanced → Mermaid) → export PNG/SVG untuk laporan.
+%% =====================================================================
+erDiagram
+    users ||--o{ proc_docs : "pemohon dan approver"
+    departments ||--o{ proc_docs : "departemen pemohon"
+    suppliers ||--o{ proc_docs : "pemasok"
+    warehouses ||--o{ proc_docs : "gudang tujuan"
+    proc_docs ||--o{ proc_docs : "PO merujuk PR disetujui"
+    proc_docs ||--|{ proc_doc_lines : "baris"
+    items ||--|{ proc_doc_lines : "barang"
+    units ||--o{ proc_doc_lines : "satuan"
+    proc_docs ||--o{ proc_doc_approvals : "riwayat putusan"
+    users ||--o{ proc_doc_approvals : "approver"
+
+    users {
+        int id PK
+        string code UK
+        string name
+    }
+    departments {
+        int id PK
+        string code UK
+        string name UK
+    }
+    suppliers {
+        int id PK
+        string code UK
+        string name UK
+    }
+    warehouses {
+        int id PK
+        string code UK
+        string name UK
+    }
+    items {
+        int id PK
+        string sku UK
+        string name UK
+    }
+    units {
+        int id PK
+        string code UK
+        string name UK
+    }
+    proc_docs {
+        int id PK
+        string no UK
+        string kind
+        string status
+        int requester_user_id FK
+        int department_id FK
+        int supplier_id FK
+        int warehouse_id FK
+        int source_proc_doc_id FK
+        int approver_user_id FK
+        string decision_note
+    }
+    proc_doc_lines {
+        int id PK
+        int proc_doc_id FK
+        int line_no
+        int item_id FK
+        int qty
+        int unit_id FK
+        decimal price
+    }
+    proc_doc_approvals {
+        int id PK
+        int proc_doc_id FK
+        int level
+        string status
+        int approver_user_id FK
+    }

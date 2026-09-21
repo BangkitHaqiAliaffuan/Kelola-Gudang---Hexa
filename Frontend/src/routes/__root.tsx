@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/wms/app-shell";
+import { NavigationProgress } from "@/components/wms/navigation-progress";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/components/wms/theme";
 import { Toaster } from "@/components/ui/sonner";
@@ -137,6 +138,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <NavigationProgress />
         <AuthProvider>
           <AppShell>
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}

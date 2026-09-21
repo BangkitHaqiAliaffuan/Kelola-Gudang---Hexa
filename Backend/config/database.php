@@ -114,6 +114,34 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        /*
+        |----------------------------------------------------------------------
+        | Koneksi BACA SAJA untuk AI text-to-SQL (F8.5, L4).
+        |----------------------------------------------------------------------
+        | Idealnya user PostgreSQL khusus `ai_reader` yang HANYA punya SELECT
+        | (lihat catatan setup). Bila kredensial khusus belum diisi, jatuh ke
+        | kredensial default (validator L0–L2 + statement_timeout tetap aktif,
+        | tapi pertahanan DB-level tak ada — tak disarankan untuk produksi).
+        | `statement_timeout` (ms) dipasang per-koneksi via options.
+        */
+        'ai_readonly' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('AI_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('AI_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'options' => array_filter([
+                // Timeout per-pernyataan (detik) — permintaan AI tak boleh menggantung.
+                PDO::ATTR_TIMEOUT => (int) env('AI_DB_TIMEOUT', 10),
+            ]),
+        ],
+
     ],
 
     /*

@@ -1,0 +1,140 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Gerbang Akses" id="gerbang-akses">
+    <mxGraphModel dx="2020" dy="1293" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-597" parent="1" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" value="File 4 — Pengadaan PR ke PO ke Receive Goods" vertex="1">
+          <mxGeometry height="26" width="1089" x="40" y="8" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-598" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;" value="Draft" vertex="1">
+          <mxGeometry height="40" width="150" x="43" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-599" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#ffe6cc;strokeColor=#d79b00;" value="Menunggu" vertex="1">
+          <mxGeometry height="40" width="150" x="213" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-600" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;" value="Selesai" vertex="1">
+          <mxGeometry height="40" width="150" x="383" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-601" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#f8cecc;strokeColor=#b85450;" value="Terminal / Error" vertex="1">
+          <mxGeometry height="40" width="150" x="553" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-602" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#e2efd9;strokeColor=#82b366;" value="PEMOHON" vertex="1">
+          <mxGeometry height="34" width="310" x="40" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-603" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#fce5cd;strokeColor=#d79b00;" value="APPROVER DITUGASKAN" vertex="1">
+          <mxGeometry height="34" width="310" x="410" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-604" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#ddebf7;strokeColor=#6c8ebf;" value="SISTEM" vertex="1">
+          <mxGeometry height="34" width="310" x="780" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-605" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" value="Buat PR (nomor PR/YYYY otomatis): DRAFT privat — hanya pembuat + Pengadaan Kelola" vertex="1">
+          <mxGeometry height="80" width="310" x="40" y="152" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-606" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="PO wajib merujuk PR Disetujui (source_proc_doc_id); nomor PO/YYYY" vertex="1">
+          <mxGeometry height="80" width="310" x="780" y="152" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-607" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="POST submit dari Draft milik sendiri" vertex="1">
+          <mxGeometry height="80" width="310" x="40" y="246" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-608" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="resolveApprover: PR ke kepala dept, lalu role Approval Pengadaan, lalu Kelola; PO ke Approval Pengadaan" vertex="1">
+          <mxGeometry height="80" width="310" x="780" y="246" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-609" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" value="MENUNGGU APPROVAL (approver terisi)" vertex="1">
+          <mxGeometry height="80" width="310" x="410" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-610" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="approve — HANYA assignee, tanpa override role; requester selalu ditolak (SoD)" vertex="1">
+          <mxGeometry height="92" width="310" x="410" y="434" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-611" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="reassign (Pengadaan Kelola): target aktif dan bukan requester" vertex="1">
+          <mxGeometry height="92" width="310" x="40" y="434" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-612" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="reject (catatan opsional) ke DITOLAK" vertex="1">
+          <mxGeometry height="80" width="310" x="410" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-613" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="cancel: dari Draft/Menunggu/Disetujui; PR yang sudah jadi PO terkunci" vertex="1">
+          <mxGeometry height="80" width="310" x="40" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-614" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" value="DISETUJUI — PR menjadi PO (siklus sama); Receive dicatat sebagai Penerimaan ref nomor PO" vertex="1">
+          <mxGeometry height="80" width="310" x="410" y="634" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-615" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" value="DITOLAK / DIBATALKAN — terminal, buat baru" vertex="1">
+          <mxGeometry height="80" width="310" x="40" y="634" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-616" parent="1" style="text;html=1;fontSize=11;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;" value="Temuan: kind GR terdaftar di model tetapi ditolak validasi create (hanya PR/PO) — disiapkan untuk pengembangan." vertex="1">
+          <mxGeometry height="50" width="1050" x="40" y="724" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-617" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-605" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-607">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-618" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-607" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-608">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-619" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-608" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontColor=#38761d;labelBackgroundColor=#ffffff;" target="3E_fv3Nrvq7v-ThZdPrY-609" value="eligible">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="745" y="286" />
+              <mxPoint x="745" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-620" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-609" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-610">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-621" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-610" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-614">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-622" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-609" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" target="3E_fv3Nrvq7v-ThZdPrY-612" value="tolak">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="380" />
+              <mxPoint x="750" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-623" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-609" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" target="3E_fv3Nrvq7v-ThZdPrY-611" value="alih approver">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="380" />
+              <mxPoint x="380" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-624" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-611" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" target="3E_fv3Nrvq7v-ThZdPrY-609" value="tetap Menunggu">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-625" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-609" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-613">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="388" y="400" />
+              <mxPoint x="388" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-626" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-605" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" target="3E_fv3Nrvq7v-ThZdPrY-613" value="batalkan">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="24" y="192" />
+              <mxPoint x="24" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-627" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-613" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-615">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="3E_fv3Nrvq7v-ThZdPrY-628" edge="1" parent="1" source="3E_fv3Nrvq7v-ThZdPrY-612" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" target="3E_fv3Nrvq7v-ThZdPrY-615">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="376" y="580" />
+              <mxPoint x="376" y="674" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

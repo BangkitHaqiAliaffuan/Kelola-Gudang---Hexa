@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BinController;
 use App\Http\Controllers\CategoryController;
@@ -129,3 +130,16 @@ Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->gro
     // perubahan identitas/kop dokumen oleh role non-admin.
     Route::put('settings', [SettingController::class, 'update'])->middleware('role.administrator');
 });
+
+// AI Assistant (F8). Gate role.access:Persediaan diturunkan dari verb:
+// endpoint POST (chat/execute/reject) butuh Tulis, endpoint GET cukup Baca.
+// AI mewarisi izin user; setiap tool call dicek ulang ke role.
+Route::prefix('ai')
+    ->middleware(['auth:sanctum', 'user.active', 'scope.warehouse', 'role.access:Persediaan', 'throttle:ai'])
+    ->group(function () {
+        Route::get('status', [AiAssistantController::class, 'status']);
+        Route::post('chat', [AiAssistantController::class, 'chat']);
+        Route::post('execute', [AiAssistantController::class, 'execute']);
+        Route::post('reject', [AiAssistantController::class, 'reject']);
+        Route::get('proposals/{id}', [AiAssistantController::class, 'show'])->whereNumber('id');
+    });

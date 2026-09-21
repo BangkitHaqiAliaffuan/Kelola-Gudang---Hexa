@@ -1,0 +1,130 @@
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Dokumen Persediaan" id="dokumen-persediaan">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="File 2 — Siklus Dokumen Persediaan (Adjustment ber-approval, tipe lain posting langsung)" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="40" y="8" width="1089" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="Draft" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="43" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="Menunggu" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="213" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="Selesai" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="383" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="Terminal / Error" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;align=center;verticalAlign=middle;spacing=6;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="553" y="50" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-p" value="PELAKSANA (Operator / Supervisor)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#e2efd9;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="40" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-a" value="PENYETUJU (Auditor / Persediaan Kelola)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#fce5cd;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="410" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="lane-s" value="SISTEM" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=6;fillColor=#ddebf7;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="104" width="310" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="s-create" value="store: nomor BM/BK/TF/ADJ/SO/RP/RJ, status awal Draft; Adjustment wajib reason_code" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="152" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-draft" value="DRAFT — dibuat dan masih bisa diedit" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="152" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-submit" value="POST submit-approval — KHUSUS Stock Adjustment dari Draft" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="262" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="a-wait" value="MENUNGGU APPROVAL" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="410" y="262" width="310" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="p-post" value="POST /post LANGSUNG: Penerimaan, Pengeluaran, Transfer, Retur" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="372" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="a-approve" value="POST approve — SoD requester; pemutus canReview ATAU Kelola; posting otomatis" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="410" y="372" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="s-ledger" value="Service post: movement + rebuild ledger; 422 bila stok tak cukup" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="780" y="372" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="p-cancel" value="POST cancel selama belum posting; pembuat tak boleh batalkan non-Draft sendiri" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="494" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="a-reject" value="POST reject dari Menunggu ke Dibatalkan" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;spacing=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="410" y="494" width="310" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="end-cancel" value="DIBATALKAN (terminal)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="410" y="616" width="310" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="end-done" value="SELESAI (posted_at terisi)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;spacing=10;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="616" width="310" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="notes" value="post() pada Menunggu Approval ditolak 422 (gunakan Approve). approve() pada dokumen Selesai = no-op. Stock Opname memakai jalur review terpisah — lihat File 3." style="text;html=1;fontSize=11;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="706" width="1050" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s-create" target="p-draft">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Adjustment" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-draft" target="p-submit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-submit" target="a-wait">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="BM / BK / TF / Retur" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-draft" target="p-post">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="370" y="192" />
+              <mxPoint x="370" y="418" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="posting" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-post" target="s-ledger">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="479" />
+              <mxPoint x="935" y="479" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-wait" target="a-approve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-approve" target="s-ledger">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="s-ledger" target="end-done">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="tolak" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="a-wait" target="a-reject">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="302" />
+              <mxPoint x="750" y="540" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="batalkan" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="p-draft" target="p-cancel">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="382" y="192" />
+              <mxPoint x="382" y="540" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="p-cancel" target="end-cancel">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="195" y="651" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="a-reject" target="end-cancel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
