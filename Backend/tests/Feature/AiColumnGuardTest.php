@@ -29,6 +29,7 @@ class AiColumnGuardTest extends TestCase
         Role::firstOrCreate(['name' => 'Analis Tulis'], ['is_system' => true, 'warehouse_scope_mode' => 'Semua']);
         RolePermission::firstOrCreate(['role' => 'Analis Tulis', 'module' => 'Persediaan'], ['level' => 'Tulis']);
         RolePermission::firstOrCreate(['role' => 'Analis Tulis', 'module' => 'Laporan'], ['level' => 'Baca']);
+        RolePermission::firstOrCreate(['role' => 'Analis Tulis', 'module' => 'AI Assistant'], ['level' => 'Baca']);
 
         return User::factory()->create(['role' => 'Analis Tulis', 'is_active' => true]);
     }

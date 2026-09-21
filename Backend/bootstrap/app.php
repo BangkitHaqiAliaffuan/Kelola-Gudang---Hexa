@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdministrator;
+use App\Http\Middleware\EnsureAiAccess;
 use App\Http\Middleware\EnsureRoleAccess;
 use App\Http\Middleware\EnsureUserActive;
 use App\Http\Middleware\EnsureWarehouseScope;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role.access' => EnsureRoleAccess::class,
             'role.administrator' => EnsureAdministrator::class,
+            'ai.access' => EnsureAiAccess::class,
             'scope.warehouse' => EnsureWarehouseScope::class,
             'user.active' => EnsureUserActive::class,
         ]);

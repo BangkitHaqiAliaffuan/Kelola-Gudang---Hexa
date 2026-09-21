@@ -4339,12 +4339,14 @@ export function RoleEditDialog({
     if (!role) return;
 
     const access: RoleAccessEntry[] = ACCESS_MODULES.filter(
-      (m) => m !== "Approval Pengadaan",
+      (m) => m !== "Approval Pengadaan" && m !== "AI Assistant",
     ).flatMap((module) => {
       const level = draft[module];
       return level ? [{ module, level }] : [];
     });
     if (canApprove) access.push({ module: "Approval Pengadaan", level: "Kelola" });
+    // AI Assistant biner: toggle Gunakan → baris Baca (level diabaikan gate ai.access).
+    if (draft["AI Assistant"] != null) access.push({ module: "AI Assistant", level: "Baca" });
 
     try {
       const trimmedName = newName.trim();
@@ -4408,35 +4410,54 @@ export function RoleEditDialog({
               <span>Modul</span>
               <span className="w-32 text-right">Hak Akses</span>
             </div>
-            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan").map((module) => (
-              <div
-                key={module}
-                className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
-              >
-                <span className="text-sm">{module}</span>
-                <Select
-                  value={draft[module] ?? "NONE"}
-                  onValueChange={(value) =>
-                    setDraft((draft) => ({
-                      ...draft,
-                      [module]: value === "NONE" ? null : (value as AccessLevel),
-                    }))
-                  }
+            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan" && m !== "AI Assistant").map(
+              (module) => (
+                <div
+                  key={module}
+                  className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
                 >
-                  <SelectTrigger className="w-32 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent side="bottom" avoidCollisions={false}>
-                    <SelectItem value="NONE">Tidak Ada</SelectItem>
-                    {ACCESS_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {level}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+                  <span className="text-sm">{module}</span>
+                  <Select
+                    value={draft[module] ?? "NONE"}
+                    onValueChange={(value) =>
+                      setDraft((draft) => ({
+                        ...draft,
+                        [module]: value === "NONE" ? null : (value as AccessLevel),
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-32 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" avoidCollisions={false}>
+                      <SelectItem value="NONE">Tidak Ada</SelectItem>
+                      {ACCESS_LEVELS.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ),
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-ai-access" className="text-sm font-medium">
+                AI Assistant
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Gunakan asisten AI (biner — tool tulis tetap mengikuti hak tiap modul).
+              </p>
+            </div>
+            <Switch
+              id="role-ai-access"
+              checked={draft["AI Assistant"] != null}
+              onCheckedChange={(value) =>
+                setDraft((draft) => ({ ...draft, ["AI Assistant"]: value ? "Baca" : null }))
+              }
+            />
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="min-w-0">
@@ -4545,12 +4566,14 @@ export function RoleCreateDialog({
     }
 
     const access: RoleAccessEntry[] = ACCESS_MODULES.filter(
-      (m) => m !== "Approval Pengadaan",
+      (m) => m !== "Approval Pengadaan" && m !== "AI Assistant",
     ).flatMap((module) => {
       const level = draft[module];
       return level ? [{ module, level }] : [];
     });
     if (canApprove) access.push({ module: "Approval Pengadaan", level: "Kelola" });
+    // AI Assistant biner: toggle Gunakan → baris Baca (level diabaikan gate ai.access).
+    if (draft["AI Assistant"] != null) access.push({ module: "AI Assistant", level: "Baca" });
 
     try {
       await create.mutateAsync({
@@ -4606,35 +4629,54 @@ export function RoleCreateDialog({
               <span>Modul</span>
               <span className="w-32 text-right">Hak Akses</span>
             </div>
-            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan").map((module) => (
-              <div
-                key={module}
-                className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
-              >
-                <span className="text-sm">{module}</span>
-                <Select
-                  value={draft[module] ?? "NONE"}
-                  onValueChange={(value) =>
-                    setDraft((draft) => ({
-                      ...draft,
-                      [module]: value === "NONE" ? null : (value as AccessLevel),
-                    }))
-                  }
+            {ACCESS_MODULES.filter((m) => m !== "Approval Pengadaan" && m !== "AI Assistant").map(
+              (module) => (
+                <div
+                  key={module}
+                  className="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-border px-4 py-2 last:border-0"
                 >
-                  <SelectTrigger className="w-32 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent side="bottom" avoidCollisions={false}>
-                    <SelectItem value="NONE">Tidak Ada</SelectItem>
-                    {ACCESS_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {level}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+                  <span className="text-sm">{module}</span>
+                  <Select
+                    value={draft[module] ?? "NONE"}
+                    onValueChange={(value) =>
+                      setDraft((draft) => ({
+                        ...draft,
+                        [module]: value === "NONE" ? null : (value as AccessLevel),
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-32 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" avoidCollisions={false}>
+                      <SelectItem value="NONE">Tidak Ada</SelectItem>
+                      {ACCESS_LEVELS.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ),
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <Label htmlFor="role-new-ai-access" className="text-sm font-medium">
+                AI Assistant
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Gunakan asisten AI (biner — tool tulis tetap mengikuti hak tiap modul).
+              </p>
+            </div>
+            <Switch
+              id="role-new-ai-access"
+              checked={draft["AI Assistant"] != null}
+              onCheckedChange={(value) =>
+                setDraft((draft) => ({ ...draft, ["AI Assistant"]: value ? "Baca" : null }))
+              }
+            />
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="min-w-0">

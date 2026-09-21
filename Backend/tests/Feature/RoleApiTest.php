@@ -71,8 +71,11 @@ class RoleApiTest extends TestCase
         $this->assertSame('Kelola', $byName['Administrator']['access'][0]['level']);
         $this->assertSame('Baca', $byName['Supervisor']['access'][0]['level']);
         $this->assertSame('Baca', $byName['Operator Gudang']['access'][0]['level']);
-        $this->assertCount(7, $byName['Auditor']['access']);
+        $this->assertCount(8, $byName['Auditor']['access']);
         $this->assertSame('Baca', $byName['Auditor']['access'][0]['level']);
+        // Modul AI Assistant biner: keempat role seed membawa barisnya.
+        $aiModules = collect($byName['Auditor']['access'])->pluck('module')->all();
+        $this->assertContains('AI Assistant', $aiModules);
 
         // Auditor tanpa modul System (Tidak Ada = tanpa baris).
         $auditorAccess = $byName['Auditor']['access'];

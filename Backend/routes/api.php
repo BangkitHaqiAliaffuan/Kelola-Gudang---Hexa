@@ -131,11 +131,11 @@ Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->gro
     Route::put('settings', [SettingController::class, 'update'])->middleware('role.administrator');
 });
 
-// AI Assistant (F8). Gate role.access:Persediaan diturunkan dari verb:
-// endpoint POST (chat/execute/reject) butuh Tulis, endpoint GET cukup Baca.
-// AI mewarisi izin user; setiap tool call dicek ulang ke role.
+// AI Assistant (F8.7). Gate biner ai.access: role punya baris
+// 'AI Assistant' = gunakan, tanpa baris = tidak. Granularitas tulis/baca
+// tetap di ToolRegistry per-tool + dispatch route nyata sebagai user.
 Route::prefix('ai')
-    ->middleware(['auth:sanctum', 'user.active', 'scope.warehouse', 'role.access:Persediaan', 'throttle:ai'])
+    ->middleware(['auth:sanctum', 'user.active', 'scope.warehouse', 'ai.access', 'throttle:ai'])
     ->group(function () {
         Route::get('status', [AiAssistantController::class, 'status']);
         Route::post('chat', [AiAssistantController::class, 'chat']);

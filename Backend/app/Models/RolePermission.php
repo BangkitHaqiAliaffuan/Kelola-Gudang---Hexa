@@ -16,6 +16,7 @@ class RolePermission extends Model
         'Laporan',
         'System',
         'Audit Trails',
+        'AI Assistant',
     ];
 
     public const LEVELS = ['Baca', 'Tulis', 'Kelola'];

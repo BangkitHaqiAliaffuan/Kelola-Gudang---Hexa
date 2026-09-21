@@ -8,6 +8,7 @@ import {
   FileBarChart,
   ShoppingCart,
   ShieldCheck,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -113,6 +114,11 @@ export const navGroups: NavGroup[] = [
       { label: "Dead Stock", to: "/laporan/dead-stock" },
       { label: "Fast Moving Item", to: "/laporan/fast-moving" },
     ],
+  },
+  {
+    label: "AI Assistant",
+    icon: Sparkles,
+    to: "/ai-assistant",
   },
   {
     label: "System",

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AiAssistantRouteImport } from './routes/ai-assistant'
 import { Route as BarcodeRouteImport } from './routes/barcode'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PengaturanRouteImport } from './routes/pengaturan'
@@ -57,6 +58,11 @@ import { Route as TransaksiEntriSectionIdRouteImport } from './routes/transaksi.
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiAssistantRoute = AiAssistantRouteImport.update({
+  id: '/ai-assistant',
+  path: '/ai-assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BarcodeRoute = BarcodeRouteImport.update({
@@ -288,6 +294,7 @@ const TransaksiEntriSectionIdRoute = TransaksiEntriSectionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-assistant': typeof AiAssistantRoute
   '/barcode': typeof BarcodeRoute
   '/login': typeof LoginRoute
   '/pengaturan': typeof PengaturanRoute
@@ -334,6 +341,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-assistant': typeof AiAssistantRoute
   '/barcode': typeof BarcodeRoute
   '/login': typeof LoginRoute
   '/pengaturan': typeof PengaturanRoute
@@ -376,6 +384,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-assistant': typeof AiAssistantRoute
   '/barcode': typeof BarcodeRoute
   '/login': typeof LoginRoute
   '/pengaturan': typeof PengaturanRoute
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-assistant'
     | '/barcode'
     | '/login'
     | '/pengaturan'
@@ -470,6 +480,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-assistant'
     | '/barcode'
     | '/login'
     | '/pengaturan'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai-assistant'
     | '/barcode'
     | '/login'
     | '/pengaturan'
@@ -558,6 +570,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiAssistantRoute: typeof AiAssistantRoute
   BarcodeRoute: typeof BarcodeRoute
   LoginRoute: typeof LoginRoute
   PengaturanRoute: typeof PengaturanRoute
@@ -596,6 +609,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-assistant': {
+      id: '/ai-assistant'
+      path: '/ai-assistant'
+      fullPath: '/ai-assistant'
+      preLoaderRoute: typeof AiAssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/barcode': {
@@ -997,6 +1017,7 @@ const TransaksiEntriSectionRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiAssistantRoute: AiAssistantRoute,
   BarcodeRoute: BarcodeRoute,
   LoginRoute: LoginRoute,
   PengaturanRoute: PengaturanRoute,

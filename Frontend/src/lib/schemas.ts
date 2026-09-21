@@ -272,6 +272,7 @@ export const ACCESS_MODULES = [
   "Laporan",
   "System",
   "Audit Trails",
+  "AI Assistant",
 ] as const;
 
 const emailRequired = z

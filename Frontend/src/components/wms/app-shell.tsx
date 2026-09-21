@@ -81,6 +81,7 @@ const routeModuleMap: { prefix: string; module: string }[] = [
   { prefix: "/laporan", module: "Laporan" },
   { prefix: "/system/audit-trails", module: "Audit Trails" },
   { prefix: "/system", module: "System" },
+  { prefix: "/ai-assistant", module: "AI Assistant" },
 ];
 
 function moduleForPath(pathname: string): string | null {
@@ -674,7 +675,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <div className="flex items-center gap-0.5 sm:gap-1">
               <ThemePicker />
-              {hasModule("Persediaan") && (
+              {hasModule("AI Assistant") && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -772,7 +773,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         canAccess={hasModule}
       />
 
-      {hasModule("Persediaan") && (
+      {hasModule("AI Assistant") && pathname !== "/ai-assistant" && (
         <CopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} />
       )}
     </div>

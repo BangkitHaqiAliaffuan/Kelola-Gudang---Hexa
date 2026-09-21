@@ -23,6 +23,8 @@ class RolePermissionSeeder extends Seeder
                     ['module' => 'Laporan', 'level' => 'Kelola'],
                     ['module' => 'System', 'level' => 'Kelola'],
                     ['module' => 'Audit Trails', 'level' => 'Kelola'],
+                    // AI Assistant biner (gunakan/tidak — level diabaikan gate ai.access).
+                    ['module' => 'AI Assistant', 'level' => 'Baca'],
                 ],
             ],
             'Supervisor' => [
@@ -36,6 +38,7 @@ class RolePermissionSeeder extends Seeder
                     ['module' => 'Pengadaan', 'level' => 'Tulis'],
                     ['module' => 'Approval Pengadaan', 'level' => 'Baca'],
                     ['module' => 'Laporan', 'level' => 'Baca'],
+                    ['module' => 'AI Assistant', 'level' => 'Baca'],
                 ],
             ],
             'Operator Gudang' => [
@@ -47,6 +50,7 @@ class RolePermissionSeeder extends Seeder
                     ['module' => 'Persediaan', 'level' => 'Tulis'],
                     ['module' => 'Stock Opname', 'level' => 'Tulis'],
                     ['module' => 'Pengadaan', 'level' => 'Baca'],
+                    ['module' => 'AI Assistant', 'level' => 'Baca'],
                 ],
             ],
             'Auditor' => [
@@ -62,6 +66,7 @@ class RolePermissionSeeder extends Seeder
                     // System: Tidak Ada (tanpa baris = tanpa akses; grup System
                     // + /system/* + API System tak terlihat oleh non-admin).
                     ['module' => 'Audit Trails', 'level' => 'Baca'],
+                    ['module' => 'AI Assistant', 'level' => 'Baca'],
                 ],
             ],
         ];
