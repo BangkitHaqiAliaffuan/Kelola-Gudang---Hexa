@@ -29,6 +29,7 @@ final class SqlValidator
         self::assertReadOnlySelect($sql); // L1
         self::validateQuery($sql);        // L2 (independen)
         self::assertKnownTables($sql);    // allowlist skema WMS
+        self::assertKnownColumns($sql);   // kolom harus ada di skema WMS
 
         return $sql;
     }
@@ -256,6 +257,182 @@ final class SqlValidator
         }
 
         // Semicolon tunggal di akhir boleh; di tengah sudah ditolak L0.
+    }
+
+    /**
+     * Cek kolom: setiap rujukan `alias.kolom` harus ada di kolom tabel yang
+     * di-resolve dari FROM/JOIN; kolom telanjang dicek bila query hanya
+     * melibatkan SATU tabel (multi-tabel telanjang dilewati agar tak ada
+     * false-positive — DB 42703 translator menjadi cadangan).
+     *
+     * Presisi di atas kelengkapan: qualifier tak dikenal (alias subquery/CTE),
+     * nama fungsi, keyword, dan alias output SELECT selalu dilewati. Kegagalan
+     * melempar saran "Maksud Anda …?" agar model koreksi dalam 1 ronde —
+     * sumber kebenaran tunggal = WmsSchema::tables() (sama dengan prompt).
+     */
+    public static function assertKnownColumns(string $sql): void
+    {
+        $tables = WmsSchema::tables();
+        $masked = self::blankSpecialFrom(self::blankLiterals($sql));
+
+        // alias (lowercase) => tabel (lowercase) dari FROM/JOIN.
+        $aliasMap = [];
+        if (preg_match_all('/\b(?:FROM|JOIN)\s+(?:([a-zA-Z_]\w*)\s*\.\s*)?"?([a-zA-Z_]\w*)"?(\s+(?:\bAS\b\s+)?"?([a-zA-Z_]\w*)"?)?/i', $masked, $m, PREG_SET_ORDER)) {
+            foreach ($m as $row) {
+                $table = strtolower($row[2]);
+                if (! isset($tables[$table])) {
+                    continue;
+                }
+                $alias = isset($row[4]) && $row[4] !== '' ? strtolower($row[4]) : $table;
+                if (in_array(strtoupper($alias), self::CLAUSE_KEYWORDS, true)) {
+                    $alias = $table;
+                }
+                $aliasMap[$alias] = $table;
+            }
+        }
+        $involved = array_values(array_unique(array_values($aliasMap)));
+
+        // Nama tabel/CTE/alias yang dirujuk bukan kolom — kecualikan.
+        $knownNames = array_merge($involved, array_keys($aliasMap));
+        if (preg_match_all('/\bWITH\b\s+([a-zA-Z_]\w*)\s+AS\b/i', $masked, $m)) {
+            $knownNames = array_merge($knownNames, array_map('strtolower', $m[1]));
+        }
+        if (preg_match_all('/,\s*([a-zA-Z_]\w*)\s+AS\s*\(/i', $masked, $m)) {
+            $knownNames = array_merge($knownNames, array_map('strtolower', $m[1]));
+        }
+        $knownNames = array_unique($knownNames);
+
+        // Alias output SELECT (`AS x`) dikecualikan (mis. ORDER BY total).
+        $outputAliases = [];
+        if (preg_match_all('/\bAS\s+"?([a-zA-Z_]\w*)"?/i', $masked, $m)) {
+            $outputAliases = array_map('strtolower', $m[1]);
+        }
+        // Alias implisit `) alias` di daftar SELECT (tanpa AS).
+        if (preg_match('/\bSELECT\b(.*?)\bFROM\b/is', $masked, $m)) {
+            if (preg_match_all('/\)\s+"?([a-zA-Z_]\w*)"?/i', $m[1], $mm)) {
+                $outputAliases = array_merge($outputAliases, array_map('strtolower', $mm[1]));
+            }
+        }
+        $outputAliases = array_unique($outputAliases);
+
+        if (! preg_match_all('/"?([a-zA-Z_]\w*)"?(\s*\.\s*"?([a-zA-Z_]\w*)"?)?/', $masked, $toks, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            return;
+        }
+
+        foreach ($toks as $tok) {
+            $hasDot = isset($tok[3]) && $tok[3][0] !== '';
+            if ($hasDot) {
+                $qualifier = strtolower($tok[1][0]);
+                $col = strtolower($tok[3][0]);
+                if (! isset($aliasMap[$qualifier])) {
+                    continue; // alias subquery/CTE/skema asing — jangan tebak
+                }
+                $table = $aliasMap[$qualifier];
+                if (! in_array($col, $tables[$table], true)) {
+                    throw self::unknownColumnError($tok[1][0].'.'.$tok[3][0], $table, $tables[$table]);
+                }
+
+                continue;
+            }
+
+            $raw = $tok[1][0];
+            $ident = strtolower($raw);
+            if (in_array(strtoupper($raw), self::CLAUSE_KEYWORDS, true)) {
+                continue;
+            }
+            if (in_array($ident, $knownNames, true)) {
+                continue; // nama tabel/CTE/alias di FROM/JOIN
+            }
+            if (in_array($ident, $outputAliases, true)) {
+                continue;
+            }
+            // Nama fungsi: identifier yang posisinya tepat diikuti '('.
+            $end = $tok[1][1] + strlen($raw);
+            if (str_starts_with(ltrim(substr($masked, $end)), '(')) {
+                continue;
+            }
+            if (count($involved) !== 1) {
+                continue; // ambigu antar-tabel — serahkan ke DB/translator
+            }
+            $table = $involved[0];
+            if (! in_array($ident, $tables[$table], true)) {
+                throw self::unknownColumnError($raw, $table, $tables[$table]);
+            }
+        }
+    }
+
+    /**
+     * Kata kunci/klausa yang bukan rujukan kolom (huruf besar saat banding).
+     */
+    private const CLAUSE_KEYWORDS = [
+        'SELECT', 'FROM', 'WHERE', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT',
+        'OFFSET', 'AS', 'ON', 'AND', 'OR', 'NOT', 'NULL', 'IN', 'LIKE',
+        'ILIKE', 'BETWEEN', 'IS', 'DISTINCT', 'ASC', 'DESC', 'JOIN', 'LEFT',
+        'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS', 'WITH', 'UNION', 'ALL',
+        'EXISTS', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'CAST', 'EXTRACT',
+        'YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND', 'CURRENT_DATE',
+        'CURRENT_TIMESTAMP', 'NOW', 'INTERVAL', 'TRUE', 'FALSE', 'COALESCE',
+        'NULLIF', 'OVER', 'PARTITION',
+    ];
+
+    private static function unknownColumnError(string $got, string $table, array $columns): AiProviderException
+    {
+        $suggest = self::suggestColumn($got, $columns);
+        $hint = $suggest !== null ? " Maksud Anda '{$suggest}'?" : '';
+        $list = implode(', ', $columns);
+
+        return new AiProviderException(
+            "Kolom '{$got}' tidak dikenal di tabel '{$table}'.{$hint} Kolom yang tersedia: {$list}."
+        );
+    }
+
+    /**
+     * Saran kolom: akhiran setelah underscore (`document_type` → `type`),
+     * lalu Levenshtein dekat, lalu substring (kandidat ≥3 huruf agar `id`
+     * tak cocok sembarang).
+     */
+    private static function suggestColumn(string $unknown, array $columns): ?string
+    {
+        // Kupas qualifier alias bila ada (d.document_type → document_type).
+        $base = $unknown;
+        if (str_contains($base, '.')) {
+            $base = substr($base, strrpos($base, '.') + 1);
+        }
+        $u = strtolower(trim($base, '"'));
+
+        foreach ($columns as $c) {
+            $lc = strtolower($c);
+            if ($u === $lc) {
+                return $c;
+            }
+            if (str_ends_with($u, '_'.$lc)) {
+                return $c;
+            }
+        }
+
+        $best = null;
+        $bestScore = PHP_INT_MAX;
+        foreach ($columns as $c) {
+            $lc = strtolower($c);
+            $d = levenshtein($u, $lc);
+            $threshold = max(2, (int) floor(min(strlen($u), strlen($lc)) / 3));
+            if ($d <= $threshold && $d < $bestScore) {
+                $best = $c;
+                $bestScore = $d;
+            }
+        }
+        if ($best !== null) {
+            return $best;
+        }
+
+        foreach ($columns as $c) {
+            $lc = strtolower($c);
+            if (strlen($lc) >= 3 && (str_contains($u, $lc) || str_contains($lc, $u))) {
+                return $c;
+            }
+        }
+
+        return null;
     }
 
     /**

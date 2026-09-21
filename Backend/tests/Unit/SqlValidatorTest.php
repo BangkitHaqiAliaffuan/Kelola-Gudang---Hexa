@@ -113,4 +113,46 @@ class SqlValidatorTest extends TestCase
             "SELECT no FROM stock_documents WHERE document_date >= '2026-01-01' AND document_date < '2027-01-01'"
         );
     }
+
+    // ---------- F8.x cek kolom deterministik (anti-confabulation) ----------
+
+    private function assertRejectedWithSuggestion(string $sql, string $suggestion): void
+    {
+        try {
+            SqlValidator::assertSafe($sql);
+            $this->fail("SQL seharusnya ditolak: {$sql}");
+        } catch (AiProviderException $e) {
+            $this->assertStringContainsString("Maksud Anda '{$suggestion}'", $e->getMessage());
+        }
+    }
+
+    public function test_rejects_unknown_column_with_suggestion(): void
+    {
+        // Insiden prod: model menulis d.document_type (kolom asli: type).
+        $this->assertRejectedWithSuggestion(
+            "SELECT i.name, SUM(l.qty) AS total_qty FROM stock_document_lines l JOIN stock_documents d ON d.id = l.document_id JOIN items i ON i.id = l.item_id WHERE d.document_type = 'Pengeluaran' GROUP BY i.name ORDER BY total_qty DESC LIMIT 10",
+            'type'
+        );
+        // Kolom telanjang di satu tabel + typo dekat.
+        $this->assertRejectedWithSuggestion('SELECT nama FROM items', 'name');
+    }
+
+    public function test_rejects_unknown_column_lists_available_columns(): void
+    {
+        try {
+            SqlValidator::assertSafe('SELECT xyz FROM items');
+            $this->fail('SQL seharusnya ditolak');
+        } catch (AiProviderException $e) {
+            $this->assertStringContainsString("'items'", $e->getMessage());
+            $this->assertStringContainsString('name', $e->getMessage());
+        }
+    }
+
+    public function test_accepts_functions_aggregates_and_output_alias(): void
+    {
+        $this->assertAccepted('SELECT COUNT(*) FROM items');
+        $this->assertAccepted('SELECT name, SUM(stock) AS total FROM items GROUP BY name ORDER BY total DESC LIMIT 5');
+        $this->assertAccepted('SELECT id FROM stock_documents WHERE EXTRACT(YEAR FROM document_date) = 2026');
+        $this->assertAccepted('WITH x AS (SELECT 1 AS n) SELECT n FROM x');
+    }
 }

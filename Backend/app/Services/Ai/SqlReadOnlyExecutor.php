@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -32,15 +33,20 @@ final class SqlReadOnlyExecutor
         $connection = config('ai.sql_connection', 'ai_readonly');
         $timeoutMs = (int) config('ai.sql_timeout_ms', 10000);
 
-        $rows = DB::connection($connection)->transaction(function ($db) use ($limited, $timeoutMs) {
-            // Transaksi READ ONLY: setiap upaya tulis otomatis gagal di level DB.
-            // SET LOCAL (bukan SET TRANSACTION) agar tetap valid saat koneksi
-            // sudah berada dalam transaksi/savepoint (mis. suite test).
-            $db->statement('SET LOCAL transaction_read_only = ON');
-            $db->statement("SET LOCAL statement_timeout = {$timeoutMs}");
+        $rows = [];
+        try {
+            $rows = DB::connection($connection)->transaction(function ($db) use ($limited, $timeoutMs) {
+                // Transaksi READ ONLY: setiap upaya tulis otomatis gagal di level DB.
+                // SET LOCAL (bukan SET TRANSACTION) agar tetap valid saat koneksi
+                // sudah berada dalam transaksi/savepoint (mis. suite test).
+                $db->statement('SET LOCAL transaction_read_only = ON');
+                $db->statement("SET LOCAL statement_timeout = {$timeoutMs}");
 
-            return $db->select($limited);
-        });
+                return $db->select($limited);
+            });
+        } catch (QueryException $e) {
+            throw self::translateQueryError($e);
+        }
 
         $truncated = count($rows) > $this->maxRows;
         $rows = array_slice($rows, 0, $this->maxRows);
@@ -63,5 +69,33 @@ final class SqlReadOnlyExecutor
             'row_count' => count($out),
             'truncated' => $truncated,
         ];
+    }
+
+    /**
+     * Terjemah error DB menjadi pesan aman untuk model (cadangan bila lolos
+     * validator statis — mis. ambiguitas). Hanya SQLSTATE 42703 (kolom/tabel
+     * tak dikenal) yang diteruskan beserta HINT Postgres (identifier saja,
+     * tanpa data); sisanya dilempar ulang generik tanpa bocor SQL.
+     */
+    private static function translateQueryError(QueryException $e): \Throwable
+    {
+        $msg = $e->getMessage();
+        if (! str_contains($msg, '42703')) {
+            return $e;
+        }
+
+        $detail = '';
+        if (preg_match('/column\s+"?([\w.]+)"?\s+does not exist/i', $msg, $c)) {
+            $detail .= "Kolom '{$c[1]}' tidak dikenal. ";
+        } elseif (preg_match('/relation\s+"?([\w.]+)"?\s+does not exist/i', $msg, $c)) {
+            $detail .= "Tabel '{$c[1]}' tidak dikenal. ";
+        }
+        if (preg_match('/HINT:\s*(.+?)(\s*\(|$)/s', $msg, $h)) {
+            $detail .= 'Petunjuk database: '.trim($h[1]).' ';
+        }
+
+        return new AiProviderException(
+            trim($detail).' Gunakan hanya tabel/kolom pada skema WMS dan coba lagi.'
+        );
     }
 }

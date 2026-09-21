@@ -47,6 +47,7 @@ final class WmsSchema
             .'`stock` (bukan `stok`), `min_stock` (bukan `stok_minimum`/`minimum`), '
             ."`max_stock`, `qty` (bukan `jumlah`), `warehouse_id`. JANGAN menerjemahkan nama kolom.\n"
             ."Contoh benar: SELECT name, sku, stock, min_stock FROM items WHERE stock < min_stock ORDER BY (min_stock - stock) DESC.\n"
+            ."Contoh agregasi dokumen (perhatikan kolom jenis = `type`, BUKAN `document_type`): SELECT i.name, SUM(l.qty) AS total_qty FROM stock_document_lines l JOIN stock_documents d ON d.id = l.document_id JOIN items i ON i.id = l.item_id WHERE d.type = 'Pengeluaran' AND d.status = 'Selesai' GROUP BY i.name ORDER BY total_qty DESC LIMIT 10.\n"
             .'DILARANG query katalog sistem (information_schema, pg_catalog, pg_*) — tabel itu akan ditolak '
             ."validator dan tidak perlu: seluruh tabel & kolom yang boleh dipakai sudah tercantum di daftar berikut.\n"
             ."Tabel yang tersedia:\n".implode("\n", $lines);
