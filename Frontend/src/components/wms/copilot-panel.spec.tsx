@@ -85,6 +85,43 @@ describe("FormattedMessage", () => {
     const { container } = render(<FormattedMessage text="[klik](javascript:alert(1))" />);
     expect(container.querySelector("a")).toBeNull();
   });
+
+  it("merender heading markdown (##/###) sebagai heading, bukan teks mentah", () => {
+    const { container } = render(<FormattedMessage text={"## Stok Menipis\n### Rincian"} />);
+    const h3s = container.querySelectorAll("h3");
+    const h4s = container.querySelectorAll("h4");
+    expect(h3s.length).toBe(1);
+    expect(h4s.length).toBe(1);
+    expect(h3s[0]?.textContent).toBe("Stok Menipis");
+    expect(h4s[0]?.textContent).toBe("Rincian");
+    // Tidak ada lagi tanda '#' mentah.
+    expect(container.textContent).not.toContain("#");
+  });
+
+  it("merender blockquote dan garis horizontal", () => {
+    const { container } = render(
+      <FormattedMessage text={"> Catatan penting\n\n---\n\nSelesai."} />,
+    );
+    const bq = container.querySelector("blockquote");
+    expect(bq).not.toBeNull();
+    expect(bq?.textContent).toContain("Catatan penting");
+    expect(container.querySelector("hr")).not.toBeNull();
+  });
+
+  it("merender tabel markdown sebagai <table> (bukan pipe mentah)", () => {
+    const md = "| SKU | Nama | Stok |\n| --- | --- | --- |\n| SKU-1 | Baut M8 | 4 |";
+    const { container } = render(<FormattedMessage text={md} />);
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(container.querySelectorAll("th").length).toBe(3);
+    expect(container.querySelectorAll("tbody tr").length).toBe(1);
+    expect(screen.getByText("Baut M8").closest("td")).not.toBeNull();
+    expect(container.textContent).not.toContain("|");
+  });
+
+  it("tidak salah mengenali baris ber-pipe tunggal sebagai tabel", () => {
+    const { container } = render(<FormattedMessage text="Gunakan filter | untuk memisah" />);
+    expect(container.querySelector("table")).toBeNull();
+  });
 });
 
 describe("CopilotPanel konfirmasi Bersihkan", () => {
