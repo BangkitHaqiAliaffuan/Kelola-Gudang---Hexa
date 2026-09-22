@@ -70,7 +70,7 @@ function AiAssistantPage() {
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8.5rem)] w-full max-w-6xl flex-col gap-3 min-h-[550px] supports-[height:calc(100dvh-8.5rem)]:h-[calc(100dvh-8.5rem)]">
+    <div className="mx-auto flex h-[calc(100vh-8.5rem)] w-full max-w-none min-w-0 flex-col gap-3 min-h-[550px] supports-[height:calc(100dvh-8.5rem)]:h-[calc(100dvh-8.5rem)]">
       {/* Header bar halaman AI */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -248,7 +248,7 @@ function AiAssistantPage() {
               })}
           </div>
         </aside>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3.5 shadow-xs">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3.5 shadow-xs">
           <AiChatView copilot={copilot} variant="page" />
         </div>
       </div>

@@ -680,7 +680,7 @@ export function AiChatView({
         aria-live="polite"
         className={
           variant === "page"
-            ? "grid flex-1 content-start gap-4 overflow-y-auto px-1 py-1"
+            ? "grid min-w-0 flex-1 content-start gap-4 overflow-x-hidden overflow-y-auto px-1 py-1"
             : "flex-1 space-y-3 overflow-y-auto px-3 py-3"
         }
       >
@@ -837,7 +837,7 @@ export function AiChatView({
 
               <div
                 className={cn(
-                  "relative max-w-[85%] rounded-2xl text-sm transition-all",
+                  "relative max-w-[85%] min-w-0 rounded-2xl text-sm break-words transition-all",
                   variant === "page" ? "px-3.5 py-2 leading-relaxed" : "px-3 py-1.5",
                   isUser
                     ? "bg-primary text-primary-foreground"
