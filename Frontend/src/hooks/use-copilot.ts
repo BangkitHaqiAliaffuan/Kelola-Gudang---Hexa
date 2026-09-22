@@ -61,7 +61,15 @@ export function useCopilot() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.sessionStorage.setItem("kg-ai-chat", JSON.stringify(turns.slice(-40)));
+      // Simpan ringkas: role+teks+status saja (tanpa toolResults/tabel) agar
+      // kuota sessionStorage hemat dan data sensitif tidak mengendap.
+      const compact = turns.slice(-30).map(({ id, role, text, status }) => ({
+        id,
+        role,
+        text,
+        status,
+      }));
+      window.sessionStorage.setItem("kg-ai-chat", JSON.stringify(compact));
     } catch {
       /* abaikan */
     }
