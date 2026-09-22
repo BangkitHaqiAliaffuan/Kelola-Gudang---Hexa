@@ -1,4 +1,4 @@
-# ROADMAP PERBAIKAN KEAMANAN & SKALABILITAS — Kelola Gudang Pro
+# ROADMAP PERBAIKAN KEAMANAN & SKALABILITAS — KelolaGudang
 
 **Tanggal**: 2026-09-16 · **Status**: Draft, siap dieksekusi bertahap
 **Sumber**: Audit mendalam frontend + backend (static review per `file:line`) + verifikasi empiris via test ad-hoc (`php artisan test`).

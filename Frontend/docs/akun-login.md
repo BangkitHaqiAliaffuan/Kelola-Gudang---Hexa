@@ -1,4 +1,4 @@
-# Akun Login Kelola Gudang Pro
+# Akun Login KelolaGudang
 
 Daftar akun yang di-seed oleh backend (`Backend/database/seeders/UserSeeder.php`) dan bisa dipakai untuk login di halaman `localhost:8080`.
 

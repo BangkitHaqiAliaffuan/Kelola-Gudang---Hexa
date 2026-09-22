@@ -20,7 +20,8 @@ describe("buildPrintDoc", () => {
     expect(html).toContain("<title>PO/2026/0001 &lt;x&gt;</title>");
     expect(html).toContain("<p>kop</p>");
     expect(html).toContain("<h1>Isi</h1>");
-    expect(html).toContain("KelolaGudang Pro");
+    expect(html).toContain("KelolaGudang");
+    expect(html).not.toContain("KelolaGudang Pro");
     expect(html).not.toMatch(/<aside|<header|<nav|sidebar|bottom-nav/i);
   });
 

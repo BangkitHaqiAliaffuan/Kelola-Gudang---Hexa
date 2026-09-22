@@ -57,7 +57,7 @@ export function buildPrintDoc(opts: {
 </style></head><body>
 ${opts.kopHtml}
 ${opts.bodyHtml}
-<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang Pro</span></div>
+<div class="foot"><span>Dicetak: ${new Date().toLocaleString("id-ID")}</span><span>KelolaGudang</span></div>
 </body></html>`;
 }
 

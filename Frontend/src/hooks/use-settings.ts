@@ -43,7 +43,7 @@ export const escHtml = (v: string) =>
 
 /** Baris kop perusahaan untuk template cetak (window.print). */
 export function companyKopHtml(company: CompanySettings | undefined): string {
-  const name = company?.["company.name"]?.trim() || "KelolaGudang Pro";
+  const name = company?.["company.name"]?.trim() || "KelolaGudang";
   const meta = [company?.["company.address"]?.trim(), company?.["company.phone"]?.trim()]
     .filter(Boolean)
     .join(" · ");

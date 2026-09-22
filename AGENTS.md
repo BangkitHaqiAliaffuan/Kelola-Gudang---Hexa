@@ -1,4 +1,4 @@
-# Kelola Gudang Pro
+# KelolaGudang
 
 WMS monorepo — no root manifest (stray root `package-lock.json` is 99B, ignore it). Git lives at root (`main`); commit from root, never inside `Frontend/`/`Backend/`. Lovable-connected → never force-push / rebase / amend pushed history. Two siblings: `Frontend/` (TanStack Start + React 19, Indonesian UI) and `Backend/` (Laravel 13 API, PHP 8.3+). Read `Frontend/AGENTS.md` / `Backend/AGENTS.md` before touching that side — they are authoritative, this file is only the cross-cutting surface. No CI (no `.github/`), no `opencode.json`/`.opencode/`.
 
@@ -40,7 +40,7 @@ WMS monorepo — no root manifest (stray root `package-lock.json` is 99B, ignore
 - `Frontend/docs/`: manual/test docs always `.txt` (`tes-*`, `retest-*`, `testing-*`, `ringkasan-*`); specs/ERD/login stay `.md`/`.mmd` (`erd-*.mmd`, `akun-login.md`).
 - Test docs are browser-manual guides in plain Bahasa Indonesia (`http://localhost:8080` + `http://127.0.0.1:8000`): `Buka menu → Klik → Isi → Simpan → Cek toast/tabel` + `[LULUS/GAGAL]` checklist. **DILARANG** `psql`/`SELECT`/`query`/`migrate:fresh --seed`/`db:seed`/`seeder`/`curl`/`GET /api` inside them — UI verification only. Each `*.txt` needs: `Prasyarat (2 server + akun dari akun-login.md)` → `Langkah klik` → `Expected (toast/status/stok)` → `[LULUS/GAGAL]` → `Tanggal/Penguji/Catatan` footer.
 - Don't create new test docs or `stage` them unless the user explicitly asks (archive of a bug finding), then `git add <explicit-path>` (note: `Frontend/docs/*.txt` is gitignored, so staging fails silently unless forced with `-f`).
-- Saat user minta "ringkaskan" commit (laporan OJT): baca `git log --stat` pada rentang tanggal, abaikan merge + `Change NGROK URL`; keluarkan **Bab Materi / Tugas** + **Detail Aktivitas** Bahasa Indonesia past-tense, **maks 3 kalimat singkat** — potong yang tidak penting. Tanpa URL/teknis dalam; perincian per-commit hanya bila diminta.
+- Saat user minta "ringkaskan" commit (laporan OJT): baca `git log --stat` pada rentang tanggal, abaikan merge + `Change NGROK URL`; keluarkan **Bab Materi / Tugas** + **Detail Aktivitas** Bahasa Indonesia past-tense, **maks 1 kalimat lengkap per tanggal** — potong yang tidak penting. Wajib bahasa polos user-facing; **DILARANG kode internal (F1–F8, W1–W6, dsb.) dan istilah teknis** (tulis fungsinya saja, mis. "asisten AI" bukan "F8", "penguatan keamanan" bukan "W1-W3"); tanpa URL dalam; perincian per-commit hanya bila diminta.
 
 ## Git rules
 

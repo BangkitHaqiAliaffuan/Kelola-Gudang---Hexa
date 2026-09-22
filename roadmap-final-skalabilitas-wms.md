@@ -1,4 +1,4 @@
-# ROADMAP FINAL SKALABILITAS JANGKA PANJANG — Kelola Gudang Pro
+# ROADMAP FINAL SKALABILITAS JANGKA PANJANG — KelolaGudang
 **Target desain**: ~50.000 SKU · ~1.000.000 movement/tahun · dokumen ratusan baris · multi-gudang · multi-operator paralel
 **Tanggal**: 2026-09-09 · **Status**: Final, siap dieksekusi bertahap
 **Sumber**: `blueprint-roadmap-skalabilitas-wms.md` (Antigravity) + crosscheck faktual per `file:line` + koreksi kritis.

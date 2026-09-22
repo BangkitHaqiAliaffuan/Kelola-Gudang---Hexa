@@ -1,5 +1,5 @@
 # DOKUMEN BLUEPRINT & ROADMAP PERBAIKAN SKALABILITAS JANGKA PANJANG
-## Kelola Gudang Pro (WMS Monorepo) — Target: Skala Menengah-Besar
+## KelolaGudang (WMS Monorepo) — Target: Skala Menengah-Besar
 **Target Skala**: ~50.000 SKU | ~1.000.000 movement/tahun | Dokumen ratusan baris | Multi-gudang | Multi-operator paralel  
 **Tanggal**: 2026-09-09  
 **Status**: Siap untuk Dieksekusi Bertahap  
@@ -8,7 +8,7 @@
 
 ## 1. RINGKASAN EKSEKUTIF & PRINSIP ARSITEKTUR
 
-Audit mendalam terhadap performa dan ketahanan menunjukkan bahwa Kelola Gudang Pro saat ini mengandalkan pendekatan *in-memory collection processing* di PHP dan *fetch-all client-side pagination* di React. Pola ini bekerja baik pada dataset demo (<500 SKU), namun akan mengalami **OOM (Out Of Memory), HTTP 504 Timeout, Concurrency Deadlock, dan Truncation Data Finansial** pada target skala 50.000 SKU dan 1.000.000 pergerakan/tahun.
+Audit mendalam terhadap performa dan ketahanan menunjukkan bahwa KelolaGudang saat ini mengandalkan pendekatan *in-memory collection processing* di PHP dan *fetch-all client-side pagination* di React. Pola ini bekerja baik pada dataset demo (<500 SKU), namun akan mengalami **OOM (Out Of Memory), HTTP 504 Timeout, Concurrency Deadlock, dan Truncation Data Finansial** pada target skala 50.000 SKU dan 1.000.000 pergerakan/tahun.
 
 ### 5 Pilar Arsitektur Baru:
 1. **SQL-First Aggregation**: Semua perhitungan matematis, saldo berjalan, opening balance, dan agregasi analitik dilakukan oleh engine PostgreSQL menggunakan query terindeks, Window Functions, dan CTE — bukan `Collection::get()->map()->reduce()` di RAM PHP.

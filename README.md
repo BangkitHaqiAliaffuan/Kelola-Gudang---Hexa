@@ -1,4 +1,4 @@
-# Kelola Gudang Pro
+# KelolaGudang
 
 Sistem Manajemen Gudang (Warehouse Management System / WMS) berbahasa Indonesia — monorepo berisi frontend React dan API backend Laravel yang sudah terintegrasi dan siap dipakai operasional gudang: master data, persediaan, transaksi barang, stock opname, pengadaan, laporan, barcode, sampai kontrol akses berbasis role.
 

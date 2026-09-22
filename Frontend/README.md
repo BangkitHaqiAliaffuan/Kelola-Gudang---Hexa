@@ -1,4 +1,4 @@
-# Kelola Gudang Pro
+# KelolaGudang
 
 Buat sebuah aplikasi web responsive bernama <strong>Kelola</strong>Gudang.
 
