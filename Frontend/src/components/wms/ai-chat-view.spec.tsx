@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 
@@ -161,5 +161,98 @@ describe("AiChatView hidrasi riwayat (TC-04)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("AiChatView tombol Ke pesan terbaru", () => {
+  const proto = Element.prototype as unknown as Record<string, unknown>;
+  const origScrollTo = proto["scrollTo"];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    proto["scrollTo"] = origScrollTo;
+    vi.useRealTimers();
+  });
+
+  // jsdom tanpa layout: scrollHeight/clientHeight/scrollTop selalu 0.
+  // Mock metrik + scrollTo fungsional (set scrollTop + tembak event scroll).
+  function mockScroller(metrics: { scrollHeight: number; clientHeight: number; top: number }) {
+    // Kontainer scroll = satu-satunya [aria-live] di komponen.
+    const scroller = document.querySelector('[aria-live="polite"]');
+    if (!scroller) throw new Error("kontainer scroll chat tidak ditemukan");
+    let top = metrics.top;
+    Object.defineProperty(scroller, "scrollHeight", {
+      configurable: true,
+      value: metrics.scrollHeight,
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: metrics.clientHeight,
+    });
+    Object.defineProperty(scroller, "scrollTop", {
+      configurable: true,
+      get: () => top,
+      set: (v: number) => {
+        top = v;
+      },
+    });
+    proto["scrollTo"] = function (this: Element, opts: ScrollToOptions) {
+      (this as unknown as { scrollTop: number }).scrollTop = opts.top ?? 0;
+      this.dispatchEvent(new Event("scroll"));
+    };
+    return {
+      scroller,
+      setTop: (v: number) => {
+        top = v;
+      },
+    };
+  }
+
+  it("scroll manual ke atas menampilkan tombol; klik tombol kembali ke bawah + tombol hilang", () => {
+    vi.useFakeTimers();
+    render(<AiChatView copilot={fakeCopilot()} variant="page" />, { wrapper });
+    const { scroller, setTop } = mockScroller({ scrollHeight: 1000, clientHeight: 400, top: 600 });
+
+    // Sudah di bawah: tombol sembunyi.
+    fireEvent.scroll(scroller);
+    expect(screen.queryByRole("button", { name: "Ke pesan terbaru" })).toBeNull();
+
+    // Scroll manual ke atas: tombol muncul.
+    setTop(0);
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Ke pesan terbaru" })).toBeTruthy();
+
+    // Klik: scroll programatik ke bawah; event di tengah jalan ditelan guard.
+    fireEvent.click(screen.getByRole("button", { name: "Ke pesan terbaru" }));
+    expect(scroller.scrollTop).toBe(1000);
+
+    // Setelah animasi/fallback selesai, posisi diukur ulang → tombol hilang.
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.queryByRole("button", { name: "Ke pesan terbaru" })).toBeNull();
+  });
+
+  it("Bersihkan Chat (konten menyusut tanpa event scroll) membersihkan tombol basi", async () => {
+    const { rerender } = render(<AiChatView copilot={fakeCopilot()} variant="page" />, {
+      wrapper,
+    });
+    const { scroller } = mockScroller({ scrollHeight: 1000, clientHeight: 400, top: 0 });
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Ke pesan terbaru" })).toBeTruthy();
+
+    // Simulasi Bersihkan Chat / ganti sesi: turns kosong + konten muat penuh.
+    const emptied = { ...fakeCopilot(), turns: [] };
+    rerender(<AiChatView copilot={emptied} variant="page" />);
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 100 });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Ke pesan terbaru" })).toBeNull();
+    });
   });
 });

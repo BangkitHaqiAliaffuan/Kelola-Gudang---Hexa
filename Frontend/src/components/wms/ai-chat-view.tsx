@@ -559,33 +559,80 @@ export function AiChatView({
     setShowFullWelcome(false);
   }, []);
 
+  // Ambang "dianggap sudah di bawah" — samakan dengan handleScroll agar
+  // tombol "Ke pesan terbaru" tampil/hilang konsisten.
+  const SCROLL_UP_THRESHOLD = 150;
+  // Toleransi sub-piksel agar posisi yang praktisnya di bawah tidak memicu
+  // scroll + guard sia-sia.
+  const AT_BOTTOM_EPS = 2;
+
   // Guard scroll programatik: event scroll di tengah animasi smooth tidak
   // boleh menyetel ulang isScrolledUp (tombol berkedip + auto-scroll macet).
   const isAutoScrollingRef = useRef(false);
   const autoScrollTimerRef = useRef<number | null>(null);
+  const scrollEndHandlerRef = useRef<(() => void) | null>(null);
+
+  const distFromBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return 0;
+    return el.scrollHeight - el.scrollTop - el.clientHeight;
+  };
+
+  // Menutup scroll programatik: matikan guard lalu ukur ulang posisi nyata.
+  // Tanpa pengukuran ulang ini, event scroll yang ditelan guard membuat
+  // isScrolledUp basi `true` — tombol "Ke pesan terbaru" nempel walau sudah
+  // di bawah (atau setelah Bersihkan Chat / ganti sesi).
+  const settleAutoScroll = () => {
+    if (autoScrollTimerRef.current !== null) {
+      window.clearTimeout(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
+    }
+    const el = scrollRef.current;
+    if (el && scrollEndHandlerRef.current) {
+      el.removeEventListener("scrollend", scrollEndHandlerRef.current);
+      scrollEndHandlerRef.current = null;
+    }
+    isAutoScrollingRef.current = false;
+    if (scrollRef.current) {
+      setIsScrolledUp(distFromBottom() > SCROLL_UP_THRESHOLD);
+    }
+  };
 
   const scrollToBottom = (smooth = true) => {
     const el = scrollRef.current;
     if (!el) return;
+    // Sudah di bawah: jangan scroll, jangan pasang guard — guard sia-sia
+    // menelan scroll manual user (mis. tiap tick typewriter saat streaming).
+    if (distFromBottom() <= AT_BOTTOM_EPS) return;
     isAutoScrollingRef.current = true;
     if (autoScrollTimerRef.current !== null) window.clearTimeout(autoScrollTimerRef.current);
+    if (scrollEndHandlerRef.current) {
+      el.removeEventListener("scrollend", scrollEndHandlerRef.current);
+      scrollEndHandlerRef.current = null;
+    }
     el.scrollTo({
       top: el.scrollHeight,
       behavior: smooth ? "smooth" : "auto",
     });
+    // Penutup presisi: scrollend (didukung Chrome/FF/Safari baru). Fallback
+    // timer untuk browser lama — siapa pun duluan, idempoten via settle.
+    if ("onscrollend" in el) {
+      const onEnd = () => settleAutoScroll();
+      scrollEndHandlerRef.current = onEnd;
+      el.addEventListener("scrollend", onEnd, { once: true });
+    }
     // Safari smooth-scroll ~500ms; beri jeda sebelum dengar scroll user lagi.
-    autoScrollTimerRef.current = window.setTimeout(
-      () => {
-        isAutoScrollingRef.current = false;
-        autoScrollTimerRef.current = null;
-      },
-      smooth ? 600 : 100,
-    );
+    autoScrollTimerRef.current = window.setTimeout(() => settleAutoScroll(), smooth ? 600 : 100);
   };
 
   useEffect(
     () => () => {
       if (autoScrollTimerRef.current !== null) window.clearTimeout(autoScrollTimerRef.current);
+      const el = scrollRef.current;
+      if (el && scrollEndHandlerRef.current) {
+        el.removeEventListener("scrollend", scrollEndHandlerRef.current);
+      }
+      scrollEndHandlerRef.current = null;
     },
     [],
   );
@@ -594,9 +641,34 @@ export function AiChatView({
     if (isAutoScrollingRef.current) return;
     const el = scrollRef.current;
     if (!el) return;
-    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setIsScrolledUp(dist > 150);
+    setIsScrolledUp(distFromBottom() > SCROLL_UP_THRESHOLD);
   };
+
+  // Resync pasif: konten bisa menyusut tanpa event scroll (Bersihkan Chat,
+  // ganti sesi, potong 100-turn) — flag basi `true` harus dibersihkan.
+  // Hanya boleh mengeset false (konten muat = pasti di bawah); transisi ke
+  // true tetap milik event scroll manual user.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof window === "undefined") return;
+    const clearIfFits = () => {
+      const target = scrollRef.current;
+      if (!target || isAutoScrollingRef.current) return;
+      if (target.scrollHeight - target.clientHeight <= SCROLL_UP_THRESHOLD) {
+        setIsScrolledUp(false);
+      }
+    };
+    const raf = window.requestAnimationFrame(clearIfFits);
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(clearIfFits);
+      observer.observe(el);
+    }
+    return () => {
+      window.cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [copilot.turns.length]);
 
   useEffect(() => {
     if (!isScrolledUp) {
