@@ -20,6 +20,7 @@ use App\Services\StockDocumentService;
 use App\Support\CodeGenerator;
 use App\Support\WarehouseScope;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -732,6 +733,12 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat ditolak.'], 422);
         }
 
+        // Cegah user ber-lingkup gudang 'Terbatas' menolak dokumen di luar
+        // lingkupnya (route group ini tanpa middleware scope.warehouse).
+        if ($denied = $this->assertDocumentInScope($request, $stockDocument)) {
+            return $denied;
+        }
+
         $user = $request->user('sanctum') ?? $request->user();
         $authId = $user?->id;
         if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
@@ -834,6 +841,11 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Hanya dokumen berstatus Menunggu Approval yang dapat ditolak.'], 422);
         }
 
+        // Lingkup gudang (route group ini tanpa middleware scope.warehouse).
+        if ($denied = $this->assertDocumentInScope($request, $stockDocument)) {
+            return $denied;
+        }
+
         $user = $request->user('sanctum') ?? $request->user();
         $authId = $user?->id;
         if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
@@ -899,6 +911,33 @@ class StockDocumentController extends Controller
         return RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
     }
 
+    /**
+     * Guard lingkup gudang untuk aksi approval yang berada di grup route TANPA
+     * middleware `scope.warehouse` (reject/reject-review/force-unlock). Mengembalikan
+     * JsonResponse 403 bila gudang dokumen di luar lingkup user Terbatas, atau null
+     * bila lolos. Mode 'Semua' (effectiveIdsFor null) tidak dibatasi.
+     */
+    private function assertDocumentInScope(Request $request, StockDocument $stockDocument): ?JsonResponse
+    {
+        $user = $request->user('sanctum') ?? $request->user();
+        if (! $user) {
+            return null; // auth:sanctum sudah menjamin ini; defensif saja.
+        }
+
+        $allowed = WarehouseScope::effectiveIdsFor($user);
+        if ($allowed === null) {
+            return null;
+        }
+
+        if (! in_array((int) $stockDocument->warehouse_id, $allowed, true)) {
+            return response()->json([
+                'message' => 'Dokumen ini berada di luar lingkup gudang Anda.',
+            ], 403);
+        }
+
+        return null;
+    }
+
     public function lock(Request $request, StockDocument $stockDocument)
     {
         if ($stockDocument->type !== 'Stock Opname') {
@@ -961,6 +1000,12 @@ class StockDocumentController extends Controller
         if ($stockDocument->type !== 'Stock Opname') {
             return response()->json(['message' => 'Hanya dokumen Stock Opname.'], 422);
         }
+
+        // Lingkup gudang (route group ini tanpa middleware scope.warehouse).
+        if ($denied = $this->assertDocumentInScope($request, $stockDocument)) {
+            return $denied;
+        }
+
         $oldLocker = $stockDocument->locker?->name ?? (string) ($stockDocument->locked_by_user_id ?? 'unknown');
         $reason = $request->input('reason');
 

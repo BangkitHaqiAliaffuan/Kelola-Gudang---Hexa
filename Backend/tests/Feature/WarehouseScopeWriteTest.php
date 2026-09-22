@@ -276,4 +276,101 @@ class WarehouseScopeWriteTest extends TestCase
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('default_warehouse_id');
     }
+
+    /**
+     * Role Terbatas dengan hak putus (can_review=true → Auditor-like) untuk
+     * menguji guard lingkup gudang pada aksi approval (S1).
+     */
+    private function makeTerbatasReviewer(string $name): void
+    {
+        Role::create([
+            'name' => $name,
+            'description' => null,
+            'is_system' => false,
+            'can_review' => true,
+            'warehouse_scope_mode' => 'Terbatas',
+        ]);
+    }
+
+    public function test_reject_stock_adjustment_is_scoped(): void
+    {
+        $this->makeTerbatasReviewer('Rev Reject');
+        $a = Warehouse::factory()->create();
+        $b = Warehouse::factory()->create();
+
+        $matching = StockDocument::create([
+            'no' => 'ADJ/2026/00801', 'type' => 'Stock Adjustment', 'status' => 'Menunggu Approval',
+            'document_date' => '2026-03-01', 'warehouse_id' => $a->id,
+        ]);
+        $foreign = StockDocument::create([
+            'no' => 'ADJ/2026/00802', 'type' => 'Stock Adjustment', 'status' => 'Menunggu Approval',
+            'document_date' => '2026-03-01', 'warehouse_id' => $b->id,
+        ]);
+
+        Sanctum::actingAs($this->makeScopedUser('Rev Reject', $a));
+
+        // Gudang sendiri → lolos guard scope (200).
+        $this->postJson("/api/persediaan/stock-documents/{$matching->id}/reject")
+            ->assertOk();
+
+        // Gudang asing → 403 oleh guard scope.
+        $this->postJson("/api/persediaan/stock-documents/{$foreign->id}/reject")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Dokumen ini berada di luar lingkup gudang Anda.');
+
+        // Dokumen asing tidak berubah status.
+        $this->assertSame('Menunggu Approval', $foreign->fresh()->status);
+    }
+
+    public function test_reject_review_opname_is_scoped(): void
+    {
+        $this->makeTerbatasReviewer('Rev Rev');
+        $a = Warehouse::factory()->create();
+        $b = Warehouse::factory()->create();
+
+        $foreign = StockDocument::create([
+            'no' => 'SO/2026/00803', 'type' => 'Stock Opname', 'status' => 'Menunggu Approval',
+            'document_date' => '2026-03-01', 'warehouse_id' => $b->id,
+        ]);
+
+        Sanctum::actingAs($this->makeScopedUser('Rev Rev', $a));
+
+        $this->postJson("/api/persediaan/stock-documents/{$foreign->id}/reject-review")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Dokumen ini berada di luar lingkup gudang Anda.');
+
+        $this->assertSame('Menunggu Approval', $foreign->fresh()->status);
+    }
+
+    public function test_force_unlock_is_scoped(): void
+    {
+        $this->makeTerbatasReviewer('Rev Unlock');
+        $a = Warehouse::factory()->create();
+        $b = Warehouse::factory()->create();
+
+        $matching = StockDocument::create([
+            'no' => 'SO/2026/00804', 'type' => 'Stock Opname', 'status' => 'Draft',
+            'document_date' => '2026-03-01', 'warehouse_id' => $a->id,
+            'locked_by_user_id' => null,
+        ]);
+        $foreign = StockDocument::create([
+            'no' => 'SO/2026/00805', 'type' => 'Stock Opname', 'status' => 'Draft',
+            'document_date' => '2026-03-01', 'warehouse_id' => $b->id,
+            'locked_by_user_id' => null,
+        ]);
+
+        $user = $this->makeScopedUser('Rev Unlock', $a);
+        Sanctum::actingAs($user);
+
+        // Gudang sendiri → lolos guard scope (200; force-unlock sah untuk opname).
+        $this->postJson("/api/persediaan/stock-documents/{$matching->id}/force-unlock")
+            ->assertOk();
+
+        // Gudang asing → 403 oleh guard scope (bukan menyentuh dokumennya).
+        $this->postJson("/api/persediaan/stock-documents/{$foreign->id}/force-unlock")
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Dokumen ini berada di luar lingkup gudang Anda.');
+
+        $this->assertNull($foreign->fresh()->locked_by_user_id);
+    }
 }
