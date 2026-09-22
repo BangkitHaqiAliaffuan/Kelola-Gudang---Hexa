@@ -39,6 +39,12 @@ return [
     // butuh output panjang. Naikkan bila jawaban analitik terpotong.
     'max_tokens' => (int) env('AI_MAX_TOKENS', 1024),
 
+    // Jendela riwayat klarifikasi multi-turn (diselaraskan ChatAiRequest +
+    // AiOrchestrator): N turn terakhir, tiap teks ≤ M karakter. Naikkan
+    // bila konteks klarifikasi terasa sempit; biaya token ikut naik.
+    'history_max_turns' => (int) env('AI_HISTORY_MAX_TURNS', 10),
+    'history_per_turn' => (int) env('AI_HISTORY_PER_TURN', 1000),
+
     // Text-to-SQL read-only (F8.5). Koneksi DB baca-saja + batas.
     'sql_connection' => env('AI_SQL_CONNECTION', 'ai_readonly'),
     'sql_timeout_ms' => (int) env('AI_SQL_TIMEOUT_MS', 10000),

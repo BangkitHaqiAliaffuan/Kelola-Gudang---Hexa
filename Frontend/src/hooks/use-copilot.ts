@@ -26,6 +26,8 @@ export type ChatSessionMeta = {
 export const AI_CHAT_LEGACY_KEY = "kg-ai-chat";
 /** Batas turns tersimpan per sesi (teks ringkas, tanpa toolResults). */
 export const AI_MAX_TURNS = 30;
+/** Potong teks riwayat per turn sebelum dikirim (selaras config ai.history_per_turn backend — server sumber kebenaran). */
+export const AI_HISTORY_PER_TURN = 1000;
 /** Batas jumlah sesi per user (paling lama dibuang). */
 export const AI_MAX_SESSIONS = 20;
 /** Panjang judul otomatis dari pesan pertama. */
@@ -352,12 +354,17 @@ export function useCopilot(userId?: number | null) {
 
   // Kirim 10 turn terakhir sebagai konteks (klarifikasi multi-turn).
   // Hanya role+text yang dikirim — toolResults/id/status (tabel/meta lokal)
-  // tidak perlu ke backend. Echo user ditampilkan optimistis agar langsung
-  // terlihat saat loading; statusnya diperbarui di onSuccess/onError.
+  // tidak perlu ke backend. Teks dipotong per turn agar jawaban AI yang
+  // panjang di turn lama tak meledak jadi 422 (hemat bandwidth; server
+  // tetap memangkas ulang sebagai sumber kebenaran). Echo user
+  // ditampilkan optimistis agar langsung terlihat saat loading;
+  // statusnya diperbarui di onSuccess/onError.
   const send = useCallback(
     (message: string, baseTurns?: ChatTurn[]) => {
       const base = baseTurns ?? turnsRef.current;
-      const history = base.slice(-10).map(({ role, text }) => ({ role, text }));
+      const history = base
+        .slice(-10)
+        .map(({ role, text }) => ({ role, text: text.slice(0, AI_HISTORY_PER_TURN) }));
       const turnId = nextId();
       // Pesan pertama sesi kosong → jadikan judul otomatis (mode namespaced).
       const sid = sessionIdRef.current;

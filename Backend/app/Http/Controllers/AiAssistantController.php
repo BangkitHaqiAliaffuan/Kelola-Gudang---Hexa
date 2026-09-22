@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ChatAiRequest;
 use App\Models\AiProposal;
 use App\Services\Ai\AiExecutor;
 use App\Services\Ai\AiOrchestrator;
@@ -35,17 +36,12 @@ class AiAssistantController extends Controller
         ]);
     }
 
-    public function chat(Request $request, AiOrchestrator $orchestrator): JsonResponse
+    public function chat(ChatAiRequest $request, AiOrchestrator $orchestrator): JsonResponse
     {
-        $data = $request->validate([
-            'message' => ['required', 'string', 'max:4000'],
-            // Riwayat opsional agar klarifikasi multi-turn punya konteks
-            // (maks 10 turn terakhir, tiap teks ≤1000 karakter — selaras dengan
-            // pemotongan orkestrator agar tak ada pemangkasan diam-diam).
-            'history' => ['sometimes', 'array', 'max:10'],
-            'history.*.role' => ['required_with:history', 'in:user,assistant'],
-            'history.*.text' => ['required_with:history', 'string', 'max:1000'],
-        ]);
+        // ChatAiRequest sudah menormalisasi riwayat (potong N turn × M
+        // karakter) via prepareForValidation, jadi validated() selalu lolos
+        // untuk input normal — tak ada lagi 422 panjang-riwayat.
+        $data = $request->validated();
 
         try {
             $result = $orchestrator->chat($request->user(), $data['message'], $data['history'] ?? []);

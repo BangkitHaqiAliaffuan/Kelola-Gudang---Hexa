@@ -54,13 +54,17 @@ final class AiOrchestrator
         $toolDefs = ToolRegistry::definitions($tools);
 
         $messages = [AiMessage::system($this->systemPrompt($user))];
-        // Riwayat: maksimal 10 turn terakhir, tiap teks ≤1000 karakter.
-        foreach (array_slice($history, -10) as $turn) {
+        // Riwayat: N turn terakhir, tiap teks ≤ M karakter (config ai.* —
+        // selaras dengan normalisasi ChatAiRequest; di sini tetap dipotong
+        // ulang sebagai safety net bila dipanggil di luar request HTTP).
+        $maxTurns = (int) config('ai.history_max_turns', 10);
+        $perTurn = (int) config('ai.history_per_turn', 1000);
+        foreach (array_slice($history, -$maxTurns) as $turn) {
             $text = trim((string) ($turn['text'] ?? ''));
             if ($text === '') {
                 continue;
             }
-            $text = mb_substr($text, 0, 1000);
+            $text = mb_substr($text, 0, $perTurn);
             $messages[] = ($turn['role'] ?? 'user') === 'assistant'
                 ? AiMessage::assistant($text)
                 : AiMessage::user($text);
@@ -521,10 +525,12 @@ final class AiOrchestrator
         // Saring juga riwayat (instruksi jahat bisa diselundupkan lewat turn
         // lama); digabung dalam satu pemanggilan guard agar hemat kuota.
         $parts = [$prompt];
-        foreach (array_slice($history, -10) as $turn) {
+        $maxTurns = (int) config('ai.history_max_turns', 10);
+        $perTurn = (int) config('ai.history_per_turn', 1000);
+        foreach (array_slice($history, -$maxTurns) as $turn) {
             $text = trim((string) ($turn['text'] ?? ''));
             if ($text !== '') {
-                $parts[] = mb_substr($text, 0, 1000);
+                $parts[] = mb_substr($text, 0, $perTurn);
             }
         }
 
