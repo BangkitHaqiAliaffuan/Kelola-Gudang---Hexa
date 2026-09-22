@@ -172,9 +172,14 @@ class StockController extends Controller
         $from = $data['from'] ?? null;
         $to = $data['to'] ?? null;
 
+        // F5.2-sisa: batas `to` didorong ke SQL (identik dengan `break`
+        // di PHP — keduanya membandingkan terhadap tengah malam tanggal
+        // `to`) agar baris setelah periode tak ikut ditransfer. Sisi `from`
+        // tetap fold dari genesis (FIFO/average order-dependent).
         $movements = StockMovement::with(['warehouse', 'stockDocument.destination', 'stockDocument.warehouse'])
             ->where('item_id', $item->id)
             ->when($data['warehouse_id'] ?? null, fn ($q, $warehouseId) => $q->where('warehouse_id', $warehouseId))
+            ->when($to !== null, fn ($q) => $q->where('occurred_at', '<=', $to))
             ->orderBy('occurred_at')
             ->orderBy('id')
             ->get();

@@ -199,8 +199,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refreshSession: () => requestResync(),
+      // Fail-closed (F6.2-2): false selama sesi belum resolved — sama
+      // seperti hasModuleLevel. Konsumen tak perlu cek status sendiri.
       hasModule: (module) =>
-        status !== "authenticated" ||
+        status === "authenticated" &&
         session!.access.some((a) => a.module === module || a.module === "Semua Modul"),
       hasModuleLevel: (module, minLevel) => {
         const level = status === "authenticated" ? moduleLevel(session!.access, module) : null;

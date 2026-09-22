@@ -522,7 +522,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           if (!g.children || isPublic) return g;
           const groupModule = g.module ?? g.label;
           // F7: anak ber-scope "Semua" (mis. Rekap Stock) disembunyikan dari
-          // user Terbatas. Cermin hasModule: lolos saat sesi belum resolved.
+          // user Terbatas. hasModule fail-closed (F6.2-2) — paint ditahan
+          // spinner sampai status authenticated (lihat bawah).
           const children = g.children.filter(
             (c) =>
               hasModule(c.module ?? groupModule) &&

@@ -78,12 +78,15 @@ class LaporanController extends Controller
             ->keyBy('item_id');
 
         // Basis moving-average untuk nilai_akhir: full history ≤ to per item halaman.
+        // F5.2-sisa: proyeksi kolom yang dipakai fold saja (tanpa hidrasi
+        // atribut/relasi penuh) untuk menekan memori per request.
         $movements = StockMovement::query()
             ->whereIn('item_id', $pageIds)
             ->when($warehouseId !== null, fn ($q) => $q->where('warehouse_id', $warehouseId))
             ->where('occurred_at', '<=', $toStr)
             ->orderBy('occurred_at')
             ->orderBy('id')
+            ->select(['id', 'item_id', 'warehouse_id', 'direction', 'qty', 'unit_cost', 'occurred_at'])
             ->get()
             ->groupBy('item_id');
 

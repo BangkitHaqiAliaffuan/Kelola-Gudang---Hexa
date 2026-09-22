@@ -825,7 +825,14 @@ export async function downloadLabelsAsPngOrZip(
   return zipName;
 }
 
-/** Cetak dokumen HTML lewat iframe tersembunyi (anti popup-blocker). */
+/**
+ * Cetak dokumen HTML lewat iframe tersembunyi (anti popup-blocker).
+ *
+ * F6.2-3: iframe ini SENGAJA tanpa `sandbox` — cetak butuh akses
+ * `contentWindow.document` + `win.print()` yang diblokir mode sandbox.
+ * Mitigasi XSS adalah `escapeHtml()` pada name/meta (l.svg murni output
+ * bwip-js, bukan input user). Preview memakai `sandbox=""` (barcode.tsx).
+ */
 export function printHtml(html: string): void {
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");

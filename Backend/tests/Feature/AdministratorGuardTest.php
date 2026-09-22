@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Requests\BulkItemDeleteRequest;
 use App\Http\Requests\SettingUpdateRequest;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\StoreUserRequest;
@@ -208,6 +209,40 @@ class AdministratorGuardTest extends TestCase
     public function test_unauthenticated_is_rejected(): void
     {
         $this->postJson('/api/master/roles', ['name' => 'X'])->assertUnauthorized();
+    }
+
+    // ---- Sisa pasca-audit: user.active di grup system + trait bulk-delete ----
+
+    public function test_inactive_user_rejected_on_system_settings(): void
+    {
+        $user = User::factory()->create(['role' => 'Supervisor', 'is_active' => false]);
+        RolePermission::create(['role' => 'Supervisor', 'module' => 'System', 'level' => 'Baca']);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/system/settings')
+            ->assertUnauthorized();
+    }
+
+    public function test_bulk_delete_authorize_mirrors_master_data_level(): void
+    {
+        $tulis = $this->supervisorWithMasterTulis();
+        $baca = User::factory()->create(['role' => 'Operator Gudang', 'is_active' => true]);
+        RolePermission::create(['role' => 'Operator Gudang', 'module' => 'Master Data', 'level' => 'Baca']);
+
+        $allowed = new BulkItemDeleteRequest;
+        $allowed->setUserResolver(fn () => $tulis);
+        $allowed->setMethod('POST');
+        $this->assertTrue($allowed->authorize(), 'BulkItemDeleteRequest::authorize harus true utk Master Data Tulis');
+
+        $denied = new BulkItemDeleteRequest;
+        $denied->setUserResolver(fn () => $baca);
+        $denied->setMethod('POST');
+        $this->assertFalse($denied->authorize(), 'BulkItemDeleteRequest::authorize harus false utk Master Data Baca');
+
+        $guest = new BulkItemDeleteRequest;
+        $guest->setUserResolver(fn () => null);
+        $guest->setMethod('POST');
+        $this->assertFalse($guest->authorize(), 'BulkItemDeleteRequest::authorize harus false tanpa user');
     }
 
     // ---- W1: nama role sistem Administrator immutable ----

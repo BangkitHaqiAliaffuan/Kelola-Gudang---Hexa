@@ -64,18 +64,13 @@ class CodeGenerator
 
     /**
      * Jalur penyembuh: bila kode hasil counter sudah dipakai (nomor manual /
-     * legacy di atas counter), hitung ulang MAX seperti implementasi lama
-     * lalu sinkronkan counter. Biaya O(n) hanya pada kasus langka ini;
-     * jalur normal tetap O(1) + 1 query exists().
+     * legacy di atas counter), hitung ulang MAX lalu sinkronkan counter.
+     * MAX dihitung di SQL atas sufiks numerik (F5.3) — 1 baris kembali,
+     * bukan full-column transfer; jalur normal tetap O(1) + 1 query exists().
      */
     protected static function heal(Model $instance, string $column, string $like, callable $parse, string $scope, string $key, callable $format): string
     {
-        $max = $instance->query()
-            ->where($column, 'like', $like)
-            ->pluck($column)
-            ->reduce(function (?int $carry, string $code) use ($parse) {
-                return max($carry ?? 0, $parse($code));
-            }, null) ?? 0;
+        $max = self::maxNumericSuffix($instance, $column, $like, $parse);
 
         $next = $max + 1;
         DB::table('document_counters')
@@ -92,6 +87,34 @@ class CodeGenerator
         ]);
 
         return $format($next);
+    }
+
+    /**
+     * MAX sufiks numerik trailing (`([0-9]+)$`) — ekuivalen dengan `$parse`
+     * pemanggil (`(int)` setelah delimiter terakhir) untuk semua format
+     * (`PREFIX-NNN`, `PREFIX/YEAR/NNNN`), termasuk lebar campuran/overflow.
+     * pgsql: 1 query agregat. Driver lain / hasil NULL (tak ada sufiks
+     * numerik): fallback ke fold PHP lama agar semantik tak berubah.
+     */
+    protected static function maxNumericSuffix(Model $instance, string $column, string $like, callable $parse): int
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            $value = $instance->query()
+                ->where($column, 'like', $like)
+                ->selectRaw('MAX(CAST(SUBSTRING("'.$column.'" FROM \'([0-9]+)$\') AS INTEGER)) as aggregate')
+                ->value('aggregate');
+
+            if ($value !== null) {
+                return (int) $value;
+            }
+        }
+
+        return $instance->query()
+            ->where($column, 'like', $like)
+            ->pluck($column)
+            ->reduce(function (?int $carry, string $code) use ($parse) {
+                return max($carry ?? 0, $parse($code));
+            }, null) ?? 0;
     }
 
     /**

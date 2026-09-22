@@ -2,14 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\AuthorizesModule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BulkItemDeleteRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user() !== null;
-    }
+    // Defense-in-depth (F2): cerminkan gate middleware
+    // `role.access:Master Data` — POST menuntut level Tulis.
+    use AuthorizesModule;
 
     public function rules(): array
     {

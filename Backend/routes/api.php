@@ -124,7 +124,7 @@ Route::prefix('laporan')->middleware(['auth:sanctum', 'user.active', 'role.acces
     Route::get('fast-moving', [LaporanFastMovingController::class, 'index']);
 });
 
-Route::prefix('system')->middleware(['auth:sanctum', 'role.access:System'])->group(function () {
+Route::prefix('system')->middleware(['auth:sanctum', 'user.active', 'role.access:System'])->group(function () {
     Route::get('settings', [SettingController::class, 'index']);
     // Tulis pengaturan (profil perusahaan) hanya Administrator — mencegah
     // perubahan identitas/kop dokumen oleh role non-admin.

@@ -3,7 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { Barcode, ChevronLeft, Eye, X } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader, Panel, Pill } from "@/components/wms/kit";
-import { getAuthToken } from "@/lib/api";
+import { API_BASE, getAuthToken } from "@/lib/api";
 import { OpnameReviewDialog } from "@/components/wms/opname/opname-review-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -360,7 +360,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (lastSentRef.current === hash) return;
     try {
       const token = getAuthToken();
-      const url = `/api/persediaan/stock-documents/${session.id}`;
+      const url = `${API_BASE}/persediaan/stock-documents/${session.id}`;
       const body = JSON.stringify({
         document_date: session.document_date,
         pic: session.pic,
@@ -485,7 +485,7 @@ export function OpnameCountPage({ docId }: { docId: number }) {
     if (!hasEditLock) return;
     const doUnlock = () => {
       const token = getAuthToken();
-      fetch(`/api/persediaan/stock-documents/${docId}/unlock`, {
+      fetch(`${API_BASE}/persediaan/stock-documents/${docId}/unlock`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
