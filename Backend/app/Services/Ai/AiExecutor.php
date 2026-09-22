@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Models\AiProposal;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\WarehouseScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -65,10 +66,22 @@ final class AiExecutor
             throw new AiProviderException('Proposal tidak valid untuk dieksekusi.');
         }
 
-        // Gabungkan koreksi user (kalau ada) — user boleh mengoreksi parameter.
-        $payload = array_replace($proposal->payload, $corrections ?? []);
+        // Cek ulang izin role saat eksekusi (bukan hanya saat proposal dibuat):
+        // role yang diturunkan setelah usulan dibuat tidak boleh eksekusi.
+        if (! isset(ToolRegistry::forRole($user->role)[$tool->name])) {
+            $proposal->update(['status' => AiProposal::STATUS_PENDING]);
+            throw new AiProviderException('Role Anda tidak lagi berizin mengeksekusi usulan ini.');
+        }
+
+        // Gabungkan koreksi user yang sudah disanitasi (whitelist + batas).
+        $payload = array_replace($proposal->payload, $this->sanitizeCorrections($tool->name, $corrections ?? []));
 
         try {
+            // Guard lingkup gudang untuk koreksi: gudang di luar lingkup user
+            // langsung ditolak di sini (FormRequest + scope route tetap penegak
+            // akhir). Di dalam try agar status kembali pending saat gagal.
+            $this->assertPayloadInScope($user, $payload);
+
             $result = match ($tool->name) {
                 'buat_draft_dokumen_stok' => $this->createStockDocument($user, $payload),
                 default => throw new AiProviderException("Eksekusi tool '{$tool->name}' belum didukung."),
@@ -99,6 +112,97 @@ final class AiExecutor
         ]);
 
         return $result;
+    }
+
+    /**
+     * Sanitasi koreksi user: hanya kunci yang dikenal, dengan batas.
+     * Kunci asing (status, _preview, dsb.) dibuang agar tak bisa menyelundup
+     * lewat shallow-merge ke payload.
+     *
+     * @param  array<string, mixed>|null  $corrections
+     * @return array<string, mixed>
+     */
+    private function sanitizeCorrections(string $toolName, ?array $corrections): array
+    {
+        if ($corrections === null || $corrections === []) {
+            return [];
+        }
+
+        if ($toolName !== 'buat_draft_dokumen_stok') {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach (['partner', 'note', 'reference_no'] as $key) {
+            if (isset($corrections[$key]) && is_string($corrections[$key])) {
+                $clean[$key] = mb_substr(trim($corrections[$key]), 0, 500);
+            }
+        }
+
+        if (isset($corrections['document_date']) && is_string($corrections['document_date'])) {
+            $date = trim($corrections['document_date']);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+                $clean['document_date'] = $date;
+            }
+        }
+
+        foreach (['warehouse_id', 'destination_warehouse_id'] as $key) {
+            if (isset($corrections[$key]) && is_numeric($corrections[$key])) {
+                $clean[$key] = (int) $corrections[$key];
+            }
+        }
+
+        if (isset($corrections['lines']) && is_array($corrections['lines'])) {
+            $lines = [];
+            foreach (array_slice(array_values($corrections['lines']), 0, 20) as $line) {
+                if (! is_array($line)) {
+                    continue;
+                }
+                $itemId = (int) ($line['item_id'] ?? 0);
+                $qty = (int) ($line['qty'] ?? 0);
+                if ($itemId <= 0 || $qty < 1 || $qty > 10000) {
+                    continue;
+                }
+                $row = ['item_id' => $itemId, 'qty' => $qty];
+                foreach (['from_bin_id', 'to_bin_id'] as $binKey) {
+                    if (isset($line[$binKey]) && is_numeric($line[$binKey]) && (int) $line[$binKey] > 0) {
+                        $row[$binKey] = (int) $line[$binKey];
+                    }
+                }
+                if (isset($line['unit_cost']) && is_numeric($line['unit_cost']) && (float) $line['unit_cost'] >= 0) {
+                    $row['unit_cost'] = (float) $line['unit_cost'];
+                }
+                $lines[] = $row;
+            }
+            if ($lines !== []) {
+                // Koreksi lines mengganti array UTUH (konsisten dengan kontrak
+                // frontend), bukan patch per-baris.
+                $clean['lines'] = $lines;
+            }
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Tolak payload yang gudangnya di luar lingkup user Terbatas.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertPayloadInScope(User $user, array $payload): void
+    {
+        $allowed = WarehouseScope::effectiveIdsFor($user);
+        if ($allowed === null) {
+            return; // mode Semua — tanpa batas
+        }
+
+        foreach (['warehouse_id', 'destination_warehouse_id'] as $key) {
+            $id = (int) ($payload[$key] ?? 0);
+            if ($id > 0 && ! in_array($id, $allowed, true)) {
+                throw new AiProviderException('Gudang pada usulan di luar lingkup akses Anda.');
+            }
+        }
     }
 
     /**

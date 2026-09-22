@@ -141,6 +141,10 @@ final class AiToolHandler
 
         return [
             'count' => $rows->count(),
+            // Keterbukaan cakupan: stok_total di sini adalah angka GLOBAL
+            // (seluruh gudang). Untuk stok per gudang yang ter-scope, model
+            // harus memakai tool stok_barang.
+            'scope_note' => 'stok_total adalah total global; gunakan stok_barang untuk angka per gudang sesuai akses Anda.',
             'items' => $rows->map(fn (Item $i) => [
                 'id' => $i->id,
                 'sku' => $i->sku,

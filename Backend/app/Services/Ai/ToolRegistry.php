@@ -150,11 +150,12 @@ final class ToolRegistry
                         'lines' => [
                             'type' => 'array',
                             'minItems' => 1,
+                            'maxItems' => 20,
                             'items' => [
                                 'type' => 'object',
                                 'properties' => [
                                     'item_id' => ['type' => 'integer'],
-                                    'qty' => ['type' => 'integer', 'minimum' => 1],
+                                    'qty' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 10000],
                                     'from_bin_id' => ['type' => 'integer', 'description' => 'Bin asal (opsional; kosong = lantai/gudang)'],
                                     'to_bin_id' => ['type' => 'integer', 'description' => 'Bin tujuan (Penerimaan/Transfer)'],
                                     'unit_cost' => ['type' => 'number'],

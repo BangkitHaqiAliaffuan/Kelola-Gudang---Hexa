@@ -31,6 +31,10 @@ return [
     // Timeout HTTP (detik) untuk panggilan penyedia.
     'timeout' => (int) env('AI_TIMEOUT', 60),
 
+    // Deadline keseluruhan satu chat (detik): orkestrator menyetop loop tool
+    // bila anggaran ini terlampaui agar request tak gantung (risiko 504).
+    'chat_deadline' => (int) env('AI_CHAT_DEADLINE', 90),
+
     // Batas token output per panggilan. Kecil = hemat kuota; tool call tidak
     // butuh output panjang. Naikkan bila jawaban analitik terpotong.
     'max_tokens' => (int) env('AI_MAX_TOKENS', 1024),

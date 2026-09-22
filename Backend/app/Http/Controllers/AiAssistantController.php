@@ -40,10 +40,11 @@ class AiAssistantController extends Controller
         $data = $request->validate([
             'message' => ['required', 'string', 'max:4000'],
             // Riwayat opsional agar klarifikasi multi-turn punya konteks
-            // (maks 10 turn terakhir, tiap teks ≤2000 karakter).
+            // (maks 10 turn terakhir, tiap teks ≤1000 karakter — selaras dengan
+            // pemotongan orkestrator agar tak ada pemangkasan diam-diam).
             'history' => ['sometimes', 'array', 'max:10'],
             'history.*.role' => ['required_with:history', 'in:user,assistant'],
-            'history.*.text' => ['required_with:history', 'string', 'max:2000'],
+            'history.*.text' => ['required_with:history', 'string', 'max:1000'],
         ]);
 
         try {

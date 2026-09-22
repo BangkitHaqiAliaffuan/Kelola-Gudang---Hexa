@@ -48,7 +48,7 @@ final class AiOrchestrator
         }
 
         $this->enforceQuota($user);
-        $this->screenInput($prompt);
+        $this->screenInput($prompt, $history);
 
         $tools = ToolRegistry::forRole($user->role);
         $toolDefs = ToolRegistry::definitions($tools);
@@ -70,8 +70,20 @@ final class AiOrchestrator
         $proposals = [];
         $toolResults = [];
         $model = '';
+        $startedAt = microtime(true);
+        $deadline = (int) config('ai.chat_deadline', 90);
 
         for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
+            if ($deadline > 0 && (microtime(true) - $startedAt) > $deadline) {
+                Log::warning('AiOrchestrator: deadline chat terlampaui, kembalikan hasil parsial.');
+                $partial = $proposals !== [] || $toolResults !== [] || $model !== ''
+                    ? ['message' => $this->stripMarkdownTables($this->fallbackSummary($toolResults, $proposals)), 'proposals' => $proposals, 'tool_results' => $toolResults, 'model' => $model]
+                    : null;
+                if ($partial !== null) {
+                    return $partial;
+                }
+                throw new AiProviderException('Waktu proses AI habis. Coba pertanyaan yang lebih ringkas.');
+            }
             try {
                 $res = $this->provider->chat($messages, $toolDefs);
             } catch (AiProviderException $e) {
@@ -81,7 +93,7 @@ final class AiOrchestrator
                     Log::warning('AiOrchestrator: ronde tool gagal, kembalikan hasil parsial.', ['error' => $e->getMessage()]);
 
                     return [
-                        'message' => $this->fallbackSummary($toolResults, $proposals),
+                        'message' => $this->stripMarkdownTables($this->fallbackSummary($toolResults, $proposals)),
                         'proposals' => $proposals,
                         'tool_results' => $toolResults,
                         'model' => $model,
@@ -101,7 +113,7 @@ final class AiOrchestrator
                 }
 
                 return [
-                    'message' => $text,
+                    'message' => $this->stripMarkdownTables($text),
                     'proposals' => $proposals,
                     'tool_results' => $toolResults,
                     'model' => $model,
@@ -186,12 +198,91 @@ final class AiOrchestrator
             $finalModel = $model;
         }
 
+        // Buang tabel markdown dari teks final: data tabular sudah dirender
+        // klien dari `tool_results` (AiResultTables), jadi tabel di dalam teks
+        // selalu redundan → tabel tampil ganda. Ini penegakan deterministik
+        // (bukan mengandalkan kepatuhan model pada aturan prompt).
+        // Berlaku untuk kedua jalur: jawaban model maupun ringkasan fallback.
+        $finalText = $this->stripMarkdownTables($finalText ?? '');
+
         return [
             'message' => $finalText,
             'proposals' => $proposals,
             'tool_results' => $toolResults,
             'model' => $finalModel,
         ];
+    }
+
+    /**
+     * Buang blok tabel markdown dari teks jawaban.
+     *
+     * Alasan: klien merender data tool sebagai tabel visual (AiResultTables);
+     * bila model juga menulis tabel markdown di dalam teks, tabel muncul dua
+     * kali. Menghapusnya di sini bersifat deterministik — tidak bergantung
+     * pada kepatuhan model terhadap aturan prompt.
+     *
+     * Yang dibuang: baris header tabel + separator (|---|---|) + baris data.
+     * Yang dipertahankan: prosa, bullet, numbering, heading, **tebal**.
+     * Baris ber-pipe tunggal (bukan tabel) tetap dipertahankan.
+     */
+    private function stripMarkdownTables(string $text): string
+    {
+        if ($text === '' || ! str_contains($text, '|')) {
+            return $text;
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $text) ?: [];
+        $kept = [];
+        $i = 0;
+        $count = count($lines);
+
+        while ($i < $count) {
+            $line = $lines[$i] ?? '';
+            if (! $this->looksLikeTableRow($line)) {
+                $kept[] = $line;
+                $i++;
+
+                continue;
+            }
+
+            // Baris ber-pipe: hanya dibuang bila diikuti separator tabel
+            // (---|---), supaya teks ber-pipe tunggal tidak ikut terhapus.
+            $next = trim($lines[$i + 1] ?? '');
+            if ($this->isTableSeparator($next)) {
+                $i += 2; // lewati header + separator
+                while ($i < $count && $this->looksLikeTableRow($lines[$i] ?? '')) {
+                    $i++; // lewati baris data
+                }
+
+                continue;
+            }
+
+            $kept[] = $line;
+            $i++;
+        }
+
+        // Rapatkan baris kosong beruntun yang tersisa setelah penghapusan.
+        $out = implode("\n", $kept);
+
+        return trim((string) preg_replace("/\n{3,}/", "\n\n", $out));
+    }
+
+    /** Baris tabel markdown: ada "|" sebagai pemisah sel (bukan pipe tunggal). */
+    private function looksLikeTableRow(string $line): bool
+    {
+        $l = trim($line);
+
+        return str_starts_with($l, '|') && str_contains(rtrim($l, '|'), '|');
+    }
+
+    /** Separator tabel markdown: |---|, |:--:|, dsb. */
+    private function isTableSeparator(string $line): bool
+    {
+        if ($line === '' || ! str_contains($line, '-')) {
+            return false;
+        }
+
+        return (bool) preg_match('/^\|?[\s:|-]+\|?$/', $line);
     }
 
     /**
@@ -332,12 +423,23 @@ final class AiOrchestrator
                 || $allowed === null || in_array($id, $allowed, true);
             $wid = (int) ($payload['warehouse_id'] ?? 0);
             $did = (int) ($payload['destination_warehouse_id'] ?? 0);
+            // Ambil sekali jalan (hindari N+1: 1 query items + 1 query gudang
+            // untuk seluruh baris, bukan find() per baris).
+            $itemIds = array_values(array_unique(array_map(
+                fn (array $l): int => (int) ($l['item_id'] ?? 0),
+                $lines,
+            )));
+            $itemMap = $itemIds === []
+                ? collect()
+                : Item::with('unit:id,name')->whereIn('id', $itemIds)->get()->keyBy('id');
+            $warehouses = Warehouse::whereIn('id', array_values(array_filter([$wid, $did])))
+                ->pluck('name', 'id');
             $payload['_preview'] = [
-                'warehouse_name' => $inScope($wid) ? Warehouse::find($wid)?->name : null,
+                'warehouse_name' => $inScope($wid) ? ($warehouses[$wid] ?? null) : null,
                 'destination_warehouse_name' => $did > 0 && $inScope($did)
-                    ? Warehouse::find($did)?->name
+                    ? ($warehouses[$did] ?? null)
                     : null,
-                'lines' => array_map(fn (array $l) => $this->previewLine($l), $lines),
+                'lines' => array_map(fn (array $l) => $this->previewLine($l, $itemMap), $lines),
             ];
 
             return $payload;
@@ -347,14 +449,19 @@ final class AiOrchestrator
     }
 
     /**
-     * Satu baris preview human-readable (nama/SKU/satuanlookup sekali jalan).
+     * Satu baris preview human-readable (nama/SKU/satuan dari map yang sudah
+     * diambil sekali jalan — bukan query per baris).
      *
      * @param  array<string, mixed>  $line
-     * @return array<string, mixed>
      */
-    private function previewLine(array $line): array
+    private function previewLine(array $line, $itemMap = null): array
     {
-        $item = Item::with('unit:id,name')->find($line['item_id'] ?? 0);
+        $item = null;
+        if ($itemMap !== null && method_exists($itemMap, 'get')) {
+            $item = $itemMap->get((int) ($line['item_id'] ?? 0));
+        } else {
+            $item = Item::with('unit:id,name')->find($line['item_id'] ?? 0);
+        }
 
         return [
             'item_id' => (int) ($line['item_id'] ?? 0),
@@ -405,14 +512,26 @@ final class AiOrchestrator
         Cache::put($key, $used + 1, now()->endOfDay());
     }
 
-    private function screenInput(string $prompt): void
+    private function screenInput(string $prompt, array $history = []): void
     {
         if (mb_strlen($prompt) > 4000) {
             throw new AiProviderException('Prompt terlalu panjang (maks 4000 karakter).');
         }
 
+        // Saring juga riwayat (instruksi jahat bisa diselundupkan lewat turn
+        // lama); digabung dalam satu pemanggilan guard agar hemat kuota.
+        $parts = [$prompt];
+        foreach (array_slice($history, -10) as $turn) {
+            $text = trim((string) ($turn['text'] ?? ''));
+            if ($text !== '') {
+                $parts[] = mb_substr($text, 0, 1000);
+            }
+        }
+
         // Guardrail model (bila tersedia). Skor tinggi → tolak lebih awal.
-        $score = $this->provider->guardScore($prompt);
+        // Guard yang gagal mengembalikan null (lolos + sudah dilog provider)
+        // agar layanan tidak mati saat model guard down.
+        $score = $this->provider->guardScore(mb_substr(implode("\n", $parts), 0, 8000));
         if ($score !== null && $score >= 0.9) {
             Log::warning('AiOrchestrator: prompt ditolak guardrail.', ['score' => $score]);
             throw new AiProviderException('Permintaan terdeteksi sebagai upaya tidak wajar dan ditolak.');
@@ -452,6 +571,17 @@ final class AiOrchestrator
           tampilkan daftarnya (nama + SKU) dan minta pengguna memilih.
           Bila user menjawab klarifikasi, pakai riwayat percakapan untuk melengkapi
           parameter, lalu panggil tool tulis.
+        - FORMAT JAWABAN (wajib — UI hanya mendukung subset ini):
+          • Tulis prosa ringkas. JANGAN memakai heading markdown (#, ##, ###),
+            tabel markdown (| ... |), gambar, atau link.
+          • Boleh: **tebal**, daftar berbutir (- / *), daftar bernomor (1. 2.),
+            dan blok kode ``` bila benar-benar perlu.
+          • Data tabular TIDAK ditulis sebagai tabel di dalam teks. Ambil data lewat
+            tool; sistem akan merendernya menjadi tabel otomatis. Di teks, cukup
+            ringkas temuan (mis. "3 barang di bawah stok minimum") tanpa mengulang
+            seluruh tabel.
+          • Jangan pernah menampilkan ID mentah, JSON, SQL, atau nama kolom database
+            ke pengguna — sebutkan nama barang (dengan SKU), nama gudang, dan nama rekanan.
         - {$warehouseNote}{$schemaBlock}
         PROMPT;
     }
