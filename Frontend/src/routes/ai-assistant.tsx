@@ -1,15 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  MessageSquare,
-  Pencil,
-  Plus,
-  Sparkles,
-  Trash2,
-  Warehouse,
-  ShieldAlert,
-  X,
-} from "lucide-react";
+import { MessageSquare, Pencil, Plus, Bot, Trash2, Warehouse, ShieldAlert, X } from "lucide-react";
 
 import { AiChatView } from "@/components/wms/ai-chat-view";
 import { Button } from "@/components/ui/button";
@@ -76,7 +67,7 @@ function AiAssistantPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-soft text-primary">
-              <Sparkles className="h-4 w-4" />
+              <Bot className="h-4 w-4" />
             </span>
             <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               AI Assistant

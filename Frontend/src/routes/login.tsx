@@ -86,7 +86,7 @@ function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      toast.success("Berhasil masuk. Selamat datang kembali!");
+      toast.success("Berhasil masuk. Selamat datang kembali!", { duration: 5000 });
     } catch (err) {
       if (isApiError(err)) {
         const msg = fieldError(err, "email") ?? err.message;

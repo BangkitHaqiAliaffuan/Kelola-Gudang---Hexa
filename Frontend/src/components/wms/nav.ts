@@ -8,7 +8,7 @@ import {
   FileBarChart,
   ShoppingCart,
   ShieldCheck,
-  Sparkles,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -117,7 +117,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "AI Assistant",
-    icon: Sparkles,
+    icon: Bot,
     to: "/ai-assistant",
   },
   {

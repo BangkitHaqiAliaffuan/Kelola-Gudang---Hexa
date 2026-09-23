@@ -10,7 +10,7 @@ import {
   Plus,
   Send,
   ShieldCheck,
-  Sparkles,
+  Bot,
   TrendingUp,
   TriangleAlert,
   User,
@@ -762,7 +762,7 @@ export function AiChatView({
               <div className="space-y-6 py-4">
                 <div className="text-center">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-xs ring-1 ring-primary/25">
-                    <Sparkles className="h-6 w-6" />
+                    <Bot className="h-6 w-6" />
                   </div>
                   <h3 className="text-base font-semibold text-foreground sm:text-lg">
                     Asisten AI KelolaGudang
@@ -903,7 +903,7 @@ export function AiChatView({
             >
               {!isUser && (
                 <div className="flex h-7 w-7 shrink-0 select-none items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs ring-1 ring-primary/20">
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Bot className="h-3.5 w-3.5" />
                 </div>
               )}
 
@@ -991,7 +991,7 @@ export function AiChatView({
         {busy && (
           <div className="flex items-center gap-2.5 justify-start" aria-label="AI sedang mengetik">
             <div className="flex h-7 w-7 shrink-0 select-none items-center justify-center rounded-xl bg-primary/10 text-primary shadow-2xs ring-1 ring-primary/20">
-              <Sparkles className="h-3.5 w-3.5 animate-spin" />
+              <Bot className="h-3.5 w-3.5 animate-spin" />
             </div>
             <div className="flex items-center gap-1.5 rounded-2xl border border-border/70 bg-card px-3.5 py-2.5 shadow-2xs">
               {[0, 1, 2].map((d) => (

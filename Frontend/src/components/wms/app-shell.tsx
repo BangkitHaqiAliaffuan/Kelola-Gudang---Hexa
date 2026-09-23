@@ -17,7 +17,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   QrCode,
-  Sparkles,
+  Bot,
   Check,
   Loader2,
 } from "lucide-react";
@@ -676,19 +676,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <div className="flex items-center gap-0.5 sm:gap-1">
               <ThemePicker />
+              {hasModule("Persediaan") && <NotificationCenter />}
               {hasModule("AI Assistant") && (
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="icon"
                   className="rounded-xl"
                   onClick={() => setCopilotOpen(true)}
                   aria-label="Buka Asisten AI"
                   title="Asisten AI"
                 >
-                  <Sparkles className="h-[18px] w-[18px]" />
+                  <Bot className="h-[18px] w-[18px]" />
                 </Button>
               )}
-              {hasModule("Persediaan") && <NotificationCenter />}
               <ProfileHelpDialog
                 user={user ?? undefined}
                 access={access}

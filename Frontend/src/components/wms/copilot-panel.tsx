@@ -6,7 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Maximize2, Sparkles, X } from "lucide-react";
+import { Maximize2, Bot, X } from "lucide-react";
 
 import { useCopilot } from "@/hooks/use-copilot";
 import { AiChatView } from "./ai-chat-view";
@@ -193,8 +193,18 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
   };
 
   // Sinkronkan prop open → state hook (hook sumber kebenaran tunggal).
+  // Buka ulang mereset state animasi keluar: tanpa ini `leaving` kekal true
+  // (komponen tetap mounted saat return null) sehingga X/Esc mati total,
+  // dan timer basi bisa menutup panel yang baru dibuka.
   useEffect(() => {
     copilot.setOpen(open);
+    if (open) {
+      if (closeTimerRef.current != null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+      setLeaving(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -249,7 +259,7 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
           title={isDesktop ? "Geser untuk memindah · klik ganda untuk reset" : undefined}
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary-soft text-primary">
-            <Sparkles className="h-4 w-4" />
+            <Bot className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold leading-tight">Asisten AI</p>

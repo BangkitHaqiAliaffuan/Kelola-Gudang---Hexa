@@ -280,4 +280,39 @@ describe("CopilotPanel animasi tutup", () => {
       "slide-out-to-bottom-4",
     );
   });
+
+  it("buka ulang setelah tutup: tombol Tutup tetap berfungsi", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onClose = vi.fn();
+    const { rerender } = render(<CopilotPanel open onClose={onClose} />, { wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Tutup" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+    // Parent menutup lalu membuka ulang (komponen tetap mounted, return null).
+    rerender(<CopilotPanel open={false} onClose={onClose} />);
+    rerender(<CopilotPanel open onClose={onClose} />);
+
+    // State exit tidak boleh menempel di pembukaan baru.
+    expect(screen.getByRole("dialog", { name: "Asisten AI KelolaGudang" }).className).not.toContain(
+      "slide-out-to-bottom-4",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tutup" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2));
+  });
+
+  it("buka ulang sebelum animasi selesai membatalkan onClose tertunda", async () => {
+    const user = userEvent.setup({ delay: null });
+    const onClose = vi.fn();
+    const { rerender } = render(<CopilotPanel open onClose={onClose} />, { wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Tutup" }));
+    // Buka ulang sebelum timer 150ms sempat jalan.
+    rerender(<CopilotPanel open={false} onClose={onClose} />);
+    rerender(<CopilotPanel open onClose={onClose} />);
+
+    await new Promise((r) => setTimeout(r, 250));
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
