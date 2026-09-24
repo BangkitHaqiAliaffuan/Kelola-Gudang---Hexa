@@ -8,6 +8,7 @@ use App\Models\ItemStock;
 use App\Models\StockDocument;
 use App\Models\StockDocumentLine;
 use App\Models\StockMovement;
+use App\Models\User;
 use App\Support\CodeGenerator;
 use App\Support\StockItemLock;
 use App\Support\WarehouseScope;
@@ -293,10 +294,15 @@ class StockDocumentService
      * Gudang tujuan transfer bebas (W8). Tanpa user terautentikasi
      * (console/seeder) → lolos. Controller `post()` memetakan
      * InvalidArgumentException → 422.
+     *
+     * `$user` boleh diberikan eksplisit (mis. `$request->user('sanctum')`) agar
+     * identitas yang dipakai konsisten dengan controller. Bila null, fallback
+     * ke `auth()->user()` — namun ketergantungan implisit itu bisa divergen di
+     * jalur yang mengubah resolver (mis. AiExecutor memanggil route nyata).
      */
-    public function assertWarehouseInScope(StockDocument $document): void
+    public function assertWarehouseInScope(StockDocument $document, ?User $user = null): void
     {
-        $user = auth()->user();
+        $user ??= auth()->user();
 
         if (! $user) {
             return;
@@ -308,7 +314,7 @@ class StockDocumentService
             return;
         }
 
-        if (! in_array((int) $document->warehouse_id, $allowed, true)) {
+        if ($allowed === [] || ! in_array((int) $document->warehouse_id, $allowed, true)) {
             throw new \InvalidArgumentException('Gudang asal dokumen di luar lingkup akses Anda.');
         }
     }

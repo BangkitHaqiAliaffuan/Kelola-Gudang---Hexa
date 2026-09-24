@@ -41,6 +41,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('bulk', fn () => $testBypass ?? Limit::perMinute(10));
         RateLimiter::for('laporan', fn () => $testBypass ?? Limit::perMinute(60));
 
+        // Endpoint BACA berat (stock/stock-card/valuation/stock-documents/summary,
+        // seluruh /master/*) — sebelumnya hanya write yang dibatasi, sehingga satu
+        // user bisa menjalankan puluhan query berat paralel (fold ledger, full-table
+        // search) dan menjenuhkan DB. Dibatas per-user (bukan per-IP) agar adil di
+        // belakang proxy; 240/menit cukup untuk `fetchAll()` ekspor (loop halaman)
+        // namun tetap membendung abuse. Lihat audit 2026-09-24 S-2.
+        RateLimiter::for('read-heavy', fn ($request) => $testBypass ?? Limit::perMinute(240)
+            ->by('read:'.($request->user()?->id ?? $request->ip())));
+
         // AI Assistant (F8): batas laju panggilan AI per user. Kuota HARIAN
         // (config ai.daily_quota) ditegakkan di lapisan atas (orchestrator)
         // agar bisa dihitung lintas-menit; limiter ini meredam burst.

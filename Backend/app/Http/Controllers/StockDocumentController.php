@@ -556,11 +556,11 @@ class StockDocumentController extends Controller
 
                 $attributes = [
                     'line_no' => $index + 1,
-                    // system_qty dipertahankan dari snapshot dokumen asli; hanya
-                    // baris BARU yang di-backfill dari item_stock saat ini.
-                    'system_qty' => array_key_exists('system_qty', $line)
-                        ? $line['system_qty']
-                        : ($current ? $current->system_qty : (int) ($stockRow?->stock ?? 0)),
+                    // system_qty adalah snapshot otoritatif server (dibuat saat dokumen
+                    // dibuat / saat baris baru di-backfill). Nilai kiriman klien
+                    // DIABAIKAN sepenuhnya agar variance tidak bisa dipalsukan via
+                    // edit opname (integritas saldo buku).
+                    'system_qty' => $current ? $current->system_qty : (int) ($stockRow?->stock ?? 0),
                     'actual_qty' => $line['actual_qty'] ?? null,
                     'unit_cost' => (float) ($line['unit_cost'] ?? $stockRow?->unit_cost_avg ?? 0),
                     'note' => array_key_exists('note', $line) ? $line['note'] : ($current?->note ?? null),
@@ -697,6 +697,13 @@ class StockDocumentController extends Controller
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
         }
 
+        // Guard lingkup gudang eksplisit (route group ini tanpa scope.warehouse).
+        // post() → assertWarehouseInScope juga memeriksa; guard eksplisit ini membuat
+        // perilakunya identik dengan reject/force-unlock (defense-in-depth).
+        if ($denied = $this->assertDocumentInScope($request, $stockDocument)) {
+            return $denied;
+        }
+
         $isAuditor = $user && $user->canReview();
         $hasKelola = $user && RolePermission::where('role', $user->role)->where('module', 'Persediaan')->where('level', 'Kelola')->exists();
         if (! ($isAuditor || $hasKelola)) {
@@ -803,6 +810,11 @@ class StockDocumentController extends Controller
         $authId = $user?->id;
         if ($stockDocument->requester_user_id !== null && $stockDocument->requester_user_id === $authId) {
             return response()->json(['message' => 'Pembuat dokumen tidak boleh menyetujui laporannya sendiri.'], 422);
+        }
+
+        // Guard lingkup gudang eksplisit (route group ini tanpa scope.warehouse).
+        if ($denied = $this->assertDocumentInScope($request, $stockDocument)) {
+            return $denied;
         }
 
         $isAuditor = $user && $user->canReview();

@@ -32,7 +32,7 @@ Route::prefix('auth')->group(function () {
     Route::get('me', [AuthController::class, 'me'])->middleware(['auth:sanctum', 'user.active']);
 });
 
-Route::prefix('master')->middleware(['auth:sanctum', 'user.active', 'role.access:Master Data'])->group(function () {
+Route::prefix('master')->middleware(['auth:sanctum', 'user.active', 'role.access:Master Data', 'throttle:read-heavy'])->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('sub-categories', SubCategoryController::class);
     Route::apiResource('merks', MerkController::class);
@@ -72,7 +72,7 @@ Route::prefix('master')->middleware(['auth:sanctum', 'user.active', 'role.access
     });
 });
 
-Route::prefix('persediaan')->middleware(['auth:sanctum', 'user.active', 'role.access:Persediaan', 'scope.warehouse'])->group(function () {
+Route::prefix('persediaan')->middleware(['auth:sanctum', 'user.active', 'role.access:Persediaan', 'scope.warehouse', 'throttle:read-heavy'])->group(function () {
     Route::get('stock', [StockController::class, 'index']);
     Route::get('stock-minimum', [StockController::class, 'stockMinimum']);
     Route::get('stock-card', [StockController::class, 'stockCard']);

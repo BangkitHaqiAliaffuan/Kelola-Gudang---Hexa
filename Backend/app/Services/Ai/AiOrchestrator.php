@@ -507,13 +507,25 @@ final class AiOrchestrator
         }
 
         $key = 'ai:quota:'.$user->id.':'.now()->toDateString();
-        $used = (int) Cache::get($key, 0);
-        if ($used >= $quota) {
-            throw new AiProviderException('Kuota harian AI Anda sudah habis. Coba lagi besok.');
+
+        // Increment ATOMIK (bukan Cache::get lalu Cache::put): read-modify-write
+        // non-atomik membuat N request paralel membaca $used yang sama → semuanya
+        // lolos → kuota harian terlampaui. `increment` dijamin atomik oleh store
+        // (redis/database/array), sehingga hitungan tidak bisa di-race.
+        $used = (int) Cache::increment($key);
+
+        // TTL hanya di-set saat kunci baru dibuat (=1) agar window harian tetap.
+        if ($used === 1) {
+            Cache::put($key, 1, now()->endOfDay());
         }
 
-        // Tambah 1 (dihitung per permintaan; window harian).
-        Cache::put($key, $used + 1, now()->endOfDay());
+        if ($used > $quota) {
+            // Kembalikan hitungan agar percobaan yang ditolak tidak "membakar"
+            // kuota; tetap di atas kuota bila ada burst paralel (ditolak semua).
+            Cache::decrement($key);
+
+            throw new AiProviderException('Kuota harian AI Anda sudah habis. Coba lagi besok.');
+        }
     }
 
     private function screenInput(string $prompt, array $history = []): void

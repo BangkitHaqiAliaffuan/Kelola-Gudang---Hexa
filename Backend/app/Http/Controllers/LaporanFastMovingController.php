@@ -7,6 +7,7 @@ use App\Http\Resources\LaporanFastMovingResource;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMovement;
+use App\Support\WarehouseScope;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Carbon;
 
@@ -32,6 +33,15 @@ class LaporanFastMovingController extends Controller
         $categoryId = $data['category_id'] ?? null;
         $search = $data['search'] ?? null;
 
+        // Lingkup gudang user (null = Semua; [] = nol gudang fail-closed; [..] = terbatas).
+        // WAJIB di-inject manual ke subquery mentah di bawah: query builder
+        // `->from('stock_movements')` TIDAK terkena global scope ScopesToWarehouse,
+        // sehingga tanpa ini pre-filter "item bergerak di periode" bocor lintas
+        // gudang (meta.total salah) — lihat audit 2026-09-24 S-15.
+        $allowed = $request->user()
+            ? WarehouseScope::effectiveIdsFor($request->user())
+            : null;
+
         $periodDays = max(1, (int) $from->diffInDays($to) + 1);
         $prevFrom = $from->copy()->subDays($periodDays)->startOfDay();
         $prevTo = $from->copy()->subDay()->endOfDay();
@@ -49,7 +59,7 @@ class LaporanFastMovingController extends Controller
 
         // Hanya item yang benar-benar keluar di periode ini (pre-filter SQL
         // sebelum paginasi agar meta.total = jumlah item bergerak).
-        $query->whereExists(function ($q) use ($from, $to, $warehouseId) {
+        $query->whereExists(function ($q) use ($from, $to, $warehouseId, $allowed) {
             $q->selectRaw('1')
                 ->from('stock_movements')
                 ->whereColumn('stock_movements.item_id', 'items.id')
@@ -57,6 +67,13 @@ class LaporanFastMovingController extends Controller
                 ->where('stock_movements.movement_type', 'Pengeluaran')
                 ->whereBetween('stock_movements.occurred_at', [$from->toDateTimeString(), $to->toDateTimeString()])
                 ->when($warehouseId !== null, fn ($qq) => $qq->where('stock_movements.warehouse_id', $warehouseId));
+
+            // Scope gudang user: [] (nol) → fail-closed; [..] → batasi; null → semua.
+            if ($allowed === []) {
+                $q->whereRaw('1 = 0');
+            } elseif ($allowed !== null) {
+                $q->whereIn('stock_movements.warehouse_id', $allowed);
+            }
         });
 
         $paginator = $query->orderBy('items.name')->paginate((int) ($data['per_page'] ?? 20));

@@ -331,94 +331,106 @@ class ItemController extends Controller
     {
         $data = $request->validated();
 
-        // Auto-generate SKU kosong (format A SKU-10001-001 series) + block duplikat intra-file
-        DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ['code:items:sku:SKU']);
-        $allSeen = [];
-        foreach (Item::pluck('sku') as $s) {
-            $allSeen[strtoupper(trim($s))] = true;
-        }
-        $firstOcc = [];
-        foreach (array_keys($allSeen) as $k) {
-            $firstOcc[$k] = ['idx' => -1, 'name' => 'database'];
-        }
-        $rowErrors = [];
-        foreach ($data['items'] as $idx => &$row) {
-            $sku = trim($row['sku'] ?? '');
-            $name = trim($row['name'] ?? 'tanpa nama');
-            if ($sku === '') {
-                $sku = $this->nextSkuSeries($allSeen);
-                $row['sku'] = $sku;
-            }
-            $upper = strtoupper($sku);
-            if (isset($allSeen[$upper])) {
-                $first = $firstOcc[$upper];
-                $firstLabel = $first['idx'] >= 0 ? 'baris '.($first['idx'] + 1)." ('{$first['name']}')" : 'database';
-                $rowErrors[$idx] = "SKU '{$sku}' duplikat di file dengan {$firstLabel} — barang '{$name}' baris ".($idx + 1);
-            }
-            if (! isset($firstOcc[$upper])) {
-                $firstOcc[$upper] = ['idx' => $idx, 'name' => $name];
-            }
-            $allSeen[$upper] = true;
-        }
-        unset($row);
-        if (! empty($rowErrors)) {
-            return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
-        }
-        $rowErrors = [];
-        foreach ($data['items'] as $index => $row) {
-            if (empty($row['category_id']) && empty($row['category_name'])) {
-                $rowErrors[$index] = 'Kategori wajib diisi (category_id atau category_name).';
-            }
-        }
-        if (! empty($rowErrors)) {
-            return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
-        }
-
-        // Resolve name→id maps (dedupe + create in one pass per entity type)
-        $catMap = [];
-        $merkMap = [];
-        $unitMap = [];
-        $created = 0;
-        $updated = 0;
-        $errors = [];
-
-        // Peringatan barcode produk ganda (non-blocking): barcode kemasan boleh
-        // sama di banyak barang — laporkan agar operator sadar, jangan gagalkan.
-        $warnings = [];
-        $fileCodes = [];
-        foreach ($data['items'] as $idx => $row) {
-            $code = trim((string) ($row['barcode'] ?? ''));
-            if ($code !== '') {
-                $fileCodes[mb_strtoupper($code)][] = $idx;
-            }
-        }
-        $dbByUpper = collect();
-        if ($fileCodes !== []) {
-            $uppers = array_keys($fileCodes);
-            $placeholders = implode(',', array_fill(0, count($uppers), '?'));
-            $dbByUpper = Item::whereRaw("UPPER(barcode) IN ({$placeholders})", $uppers)
-                ->get(['id', 'name', 'sku', 'barcode'])
-                ->groupBy(fn ($it) => mb_strtoupper((string) $it->barcode));
-        }
-        foreach ($fileCodes as $upper => $idxs) {
-            $notes = [];
-            if (count($idxs) > 1) {
-                $lines = array_map(fn ($i) => 'baris '.($i + 1), $idxs);
-                $notes[] = 'duplikat di file ('.implode(', ', $lines).')';
-            }
-            foreach ($dbByUpper->get($upper, collect()) as $other) {
-                $notes[] = "{$other->name} ({$other->sku})";
-            }
-            if ($notes !== []) {
-                foreach ($idxs as $i) {
-                    $warnings[$i] = 'Barcode dipakai bersama: '.implode('; ', $notes).'.';
-                }
-            }
-        }
-
+        // Auto-generate SKU kosong (format A SKU-10001-001 series) + block duplikat intra-file.
+        //
+        // PENTING: transaksi DIBUKA SEBELUM advisory lock. `pg_advisory_xact_lock`
+        // bersifat transaction-scoped — bila diambil dalam mode autocommit (tanpa
+        // transaksi aktif) lock langsung dilepas pada statement yang sama sehingga
+        // TIDAK menyerialkan read-modify-write SKU antar-import paralel (dulu bug:
+        // dua import bersamaan bisa menghasilkan SKU duplikat). Transaksi mengapit
+        // seluruh blok agar lock benar-benar tertahan sampai commit/rollback.
         DB::beginTransaction();
 
         try {
+            DB::selectOne('SELECT pg_advisory_xact_lock(hashtext(?))', ['code:items:sku:SKU']);
+            $allSeen = [];
+            foreach (Item::pluck('sku') as $s) {
+                $allSeen[strtoupper(trim($s))] = true;
+            }
+            $firstOcc = [];
+            foreach (array_keys($allSeen) as $k) {
+                $firstOcc[$k] = ['idx' => -1, 'name' => 'database'];
+            }
+            $rowErrors = [];
+            foreach ($data['items'] as $idx => &$row) {
+                $sku = trim($row['sku'] ?? '');
+                $name = trim($row['name'] ?? 'tanpa nama');
+                if ($sku === '') {
+                    $sku = $this->nextSkuSeries($allSeen);
+                    $row['sku'] = $sku;
+                }
+                $upper = strtoupper($sku);
+                if (isset($allSeen[$upper])) {
+                    $first = $firstOcc[$upper];
+                    $firstLabel = $first['idx'] >= 0 ? 'baris '.($first['idx'] + 1)." ('{$first['name']}')" : 'database';
+                    $rowErrors[$idx] = "SKU '{$sku}' duplikat di file dengan {$firstLabel} — barang '{$name}' baris ".($idx + 1);
+                }
+                if (! isset($firstOcc[$upper])) {
+                    $firstOcc[$upper] = ['idx' => $idx, 'name' => $name];
+                }
+                $allSeen[$upper] = true;
+            }
+            unset($row);
+
+            if (! empty($rowErrors)) {
+                DB::rollBack();
+
+                return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
+            }
+            $rowErrors = [];
+            foreach ($data['items'] as $index => $row) {
+                if (empty($row['category_id']) && empty($row['category_name'])) {
+                    $rowErrors[$index] = 'Kategori wajib diisi (category_id atau category_name).';
+                }
+            }
+            if (! empty($rowErrors)) {
+                DB::rollBack();
+
+                return response()->json(['message' => 'Validasi gagal.', 'errors' => $rowErrors], 422);
+            }
+
+            // Resolve name→id maps (dedupe + create in one pass per entity type)
+            $catMap = [];
+            $merkMap = [];
+            $unitMap = [];
+            $created = 0;
+            $updated = 0;
+            $errors = [];
+
+            // Peringatan barcode produk ganda (non-blocking): barcode kemasan boleh
+            // sama di banyak barang — laporkan agar operator sadar, jangan gagalkan.
+            $warnings = [];
+            $fileCodes = [];
+            foreach ($data['items'] as $idx => $row) {
+                $code = trim((string) ($row['barcode'] ?? ''));
+                if ($code !== '') {
+                    $fileCodes[mb_strtoupper($code)][] = $idx;
+                }
+            }
+            $dbByUpper = collect();
+            if ($fileCodes !== []) {
+                $uppers = array_keys($fileCodes);
+                $placeholders = implode(',', array_fill(0, count($uppers), '?'));
+                $dbByUpper = Item::whereRaw("UPPER(barcode) IN ({$placeholders})", $uppers)
+                    ->get(['id', 'name', 'sku', 'barcode'])
+                    ->groupBy(fn ($it) => mb_strtoupper((string) $it->barcode));
+            }
+            foreach ($fileCodes as $upper => $idxs) {
+                $notes = [];
+                if (count($idxs) > 1) {
+                    $lines = array_map(fn ($i) => 'baris '.($i + 1), $idxs);
+                    $notes[] = 'duplikat di file ('.implode(', ', $lines).')';
+                }
+                foreach ($dbByUpper->get($upper, collect()) as $other) {
+                    $notes[] = "{$other->name} ({$other->sku})";
+                }
+                if ($notes !== []) {
+                    foreach ($idxs as $i) {
+                        $warnings[$i] = 'Barcode dipakai bersama: '.implode('; ', $notes).'.';
+                    }
+                }
+            }
+
             // Resolve categories
             foreach ($data['items'] as $row) {
                 $id = $row['category_id'] ?? null;
